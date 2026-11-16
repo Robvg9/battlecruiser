@@ -587,4 +587,964 @@ END;
 $function$;
 GRANT EXECUTE ON FUNCTION public.bc7_transferencias_pendientes_vinculo_jornada(uuid) TO authenticated;
 
+
+CREATE OR REPLACE FUNCTION public.bc7_jornada_saldos_operativos(p_turno_sesion_id uuid)
+ RETURNS TABLE(producto_id uuid, inventario_inicial numeric, entradas numeric, salidas numeric, cantidad_actual numeric)
+ LANGUAGE plpgsql
+ STABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_session record;
+  v_initial record;
+  v_start_at timestamptz;
+  v_end_at timestamptz := now();
+BEGIN
+  IF p_turno_sesion_id IS NULL THEN
+    RAISE EXCEPTION 'turno_sesion_id requerido';
+  END IF;
+
+  SELECT
+    s.id,
+    s.estado,
+    s.bloque,
+    s.apertura_retroactiva,
+    s.almacen_id,
+    s.jornada_programacion_id,
+    jp.fecha AS fecha_programada,
+    jp.fecha_fin AS fecha_programada_fin,
+    jp.zona_horaria,
+    t.apertura_real,
+    a.tipo AS almacen_tipo
+  INTO v_session
+  FROM public.turno_sesiones s
+  JOIN public.turnos t ON t.id = s.turno_id
+  JOIN public.turno_jornada_programacion jp ON jp.id = s.jornada_programacion_id
+  JOIN public.almacenes a ON a.id = s.almacen_id
+  WHERE s.id = p_turno_sesion_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No existe la jornada solicitada';
+  END IF;
+
+  IF v_session.estado <> 'EN_CURSO'
+     OR v_session.bloque <> 'JORNADA'
+     OR v_session.jornada_programacion_id IS NULL
+     OR v_session.almacen_tipo <> 'minorista' THEN
+    RAISE EXCEPTION 'El saldo operativo solo aplica a una jornada minorista activa';
+  END IF;
+
+  SELECT c.id, c.confirmado_en, c.creado_en
+  INTO v_initial
+  FROM public.turno_jornada_inventario_cortes c
+  WHERE c.turno_sesion_id = p_turno_sesion_id
+    AND c.tipo = 'INICIAL'
+    AND c.estado = 'CONFIRMADO'
+  ORDER BY c.confirmado_en DESC NULLS LAST, c.creado_en DESC
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La jornada activa no tiene un corte inicial confirmado; se bloquea el saldo global incompleto';
+  END IF;
+
+  v_start_at := COALESCE(v_session.apertura_real, v_initial.confirmado_en, v_initial.creado_en);
+
+  IF v_start_at IS NULL THEN
+    RAISE EXCEPTION 'No se pudo determinar la hora de apertura de la jornada';
+  END IF;
+
+  RETURN QUERY
+  WITH initial_rows AS (
+    SELECT
+      l.producto_id,
+      SUM(l.cantidad_contada)::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+  ),
+  movement_rows AS (
+    -- Transferencias entrantes. En una apertura retroactiva solo se aceptan
+    -- las del día siguiente o las vinculadas expresamente al corte.
+    SELECT tl.producto_id, 'ENTRADA'::text AS tipo, tl.cantidad::numeric AS cantidad
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id = t.id
+    WHERE t.almacen_destino_id = v_session.almacen_id
+      AND LOWER(t.estado) = 'completada'
+      AND t.fecha > v_start_at
+      AND t.fecha <= v_end_at
+      AND (
+        NOT COALESCE(v_session.apertura_retroactiva, false)
+        OR (t.fecha AT TIME ZONE COALESCE(NULLIF(v_session.zona_horaria, ''), 'America/Havana'))::date BETWEEN v_session.fecha_programada AND COALESCE(v_session.fecha_programada_fin,v_session.fecha_programada)
+        OR EXISTS (
+          SELECT 1
+          FROM public.turno_jornada_entradas_vinculadas x
+          WHERE x.turno_sesion_id = p_turno_sesion_id
+            AND x.transferencia_id = t.id
+        )
+      )
+
+    UNION ALL
+
+    -- Transferencias salientes.
+    SELECT tl.producto_id, 'SALIDA'::text, tl.cantidad::numeric
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id = t.id
+    WHERE t.almacen_origen_id = v_session.almacen_id
+      AND LOWER(t.estado) = 'completada'
+      AND t.fecha > v_start_at
+      AND t.fecha <= v_end_at
+
+    UNION ALL
+
+    -- Compras recibidas en el almacén.
+    SELECT lc.producto_id, 'ENTRADA'::text, lc.cantidad_inicial::numeric
+    FROM public.lotes_compra lc
+    WHERE lc.almacen_id = v_session.almacen_id
+      AND LOWER(COALESCE(lc.origen, '')) = 'compra'
+      AND lc.fecha_compra > v_start_at
+      AND lc.fecha_compra <= v_end_at
+
+    UNION ALL
+
+    -- Reinversiones aprobadas durante esta jornada.
+    SELECT rl.producto_id, 'ENTRADA'::text, rl.cantidad_base::numeric
+    FROM public.reinversiones r
+    JOIN public.reinversiones_lineas rl ON rl.reinversion_id = r.id
+    WHERE r.almacen_id = v_session.almacen_id
+      AND r.turno_sesion_id = p_turno_sesion_id
+      AND r.estado = 'APROBADA'
+      AND r.fecha_revision IS NOT NULL
+      AND r.fecha_revision > v_start_at
+      AND r.fecha_revision <= v_end_at
+
+    UNION ALL
+
+    -- Vales de salida confirmados.
+    SELECT vs.producto_id, 'SALIDA'::text, vs.cantidad::numeric
+    FROM public.vales_salida vs
+    WHERE vs.almacen_id = v_session.almacen_id
+      AND vs.fecha > v_start_at
+      AND vs.fecha <= v_end_at
+      AND UPPER(COALESCE(vs.estado, 'REGISTRADO')) NOT IN
+          ('PENDIENTE', 'RECHAZADO', 'CANCELADO', 'ANULADO')
+
+    UNION ALL
+
+    -- Bajas y mermas aprobadas; las solicitudes pendientes no descuentan.
+    SELECT m.producto_id, 'SALIDA'::text, m.cantidad::numeric
+    FROM public.mermas m
+    WHERE m.almacen_id = v_session.almacen_id
+      AND m.estado = 'APROBADA'
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) > v_start_at
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) <= v_end_at
+
+    UNION ALL
+
+    SELECT b.producto_id, 'SALIDA'::text, b.cantidad::numeric
+    FROM public.bajas b
+    WHERE b.almacen_id = v_session.almacen_id
+      AND b.estado = 'APROBADA'
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) > v_start_at
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) <= v_end_at
+
+    UNION ALL
+
+    -- Ventas completadas, si el almacén utiliza POS.
+    SELECT vl.producto_id, 'SALIDA'::text, vl.cantidad::numeric
+    FROM public.ventas v
+    JOIN public.ventas_lineas vl ON vl.venta_id = v.id
+    WHERE v.almacen_id = v_session.almacen_id
+      AND LOWER(COALESCE(v.estado, '')) IN ('completada', 'completado')
+      AND v.fecha > v_start_at
+      AND v.fecha <= v_end_at
+  ),
+  movement_totals AS (
+    SELECT
+      m.producto_id,
+      COALESCE(SUM(m.cantidad) FILTER (WHERE m.tipo = 'ENTRADA'), 0)::numeric AS entradas,
+      COALESCE(SUM(m.cantidad) FILTER (WHERE m.tipo = 'SALIDA'), 0)::numeric AS salidas
+    FROM movement_rows m
+    GROUP BY m.producto_id
+  ),
+  product_ids AS (
+    SELECT i.producto_id FROM initial_rows i
+    UNION
+    SELECT m.producto_id FROM movement_totals m
+  )
+  SELECT
+    ids.producto_id,
+    COALESCE(i.cantidad, 0)::numeric AS inventario_inicial,
+    COALESCE(m.entradas, 0)::numeric AS entradas,
+    COALESCE(m.salidas, 0)::numeric AS salidas,
+    (
+      COALESCE(i.cantidad, 0)
+      + COALESCE(m.entradas, 0)
+      - COALESCE(m.salidas, 0)
+    )::numeric AS cantidad_actual
+  FROM product_ids ids
+  LEFT JOIN initial_rows i ON i.producto_id = ids.producto_id
+  LEFT JOIN movement_totals m ON m.producto_id = ids.producto_id;
+END;
+$function$
+
+
+CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada(p_turno_sesion_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_turno public.turnos;
+  v_initial public.turno_jornada_inventario_cortes;
+  v_final public.turno_jornada_inventario_cortes;
+  v_is_retail boolean:=false;
+  v_retroactive boolean:=false;
+  v_start_at timestamptz;
+  v_end_at timestamptz;
+  v_rate numeric;
+  v_lines jsonb:='[]'::jsonb;
+  v_total_units numeric:=0;
+  v_sales_total numeric;
+  v_priced_lines integer:=0;
+  v_total_lines integer:=0;
+  v_negative_lines integer:=0;
+  v_missing_price_sold integer:=0;
+  v_expenses numeric:=0;
+  v_reinvestments numeric:=0;
+  v_daily_cash numeric:=0;
+  v_daily_pending integer:=0;
+  v_daily_expected integer:=0;
+  v_daily_approved integer:=0;
+  v_daily_missing integer:=0;
+  v_pending_expenses integer:=0;
+  v_pending_reinvestments integer:=0;
+  v_pending_adjustments integer:=0;
+  v_pending_post integer:=0;
+  v_final_declared numeric;
+  v_final_counted numeric;
+  v_final_cash_state text;
+  v_salary numeric;
+  v_expected_cash numeric;
+  v_cash_received numeric;
+  v_difference numeric;
+  v_complete boolean:=false;
+  v_negative_details jsonb:='[]'::jsonb;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La sesión no corresponde a una jornada registrada.' USING ERRCODE='23503';
+  END IF;
+  IF NOT public.bc_actor_is_admin() AND (
+    NOT public.tiene_permiso('turnos','ver')
+    OR NOT EXISTS(SELECT 1 FROM public.turno_asignaciones a
+      WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL)
+  ) THEN RAISE EXCEPTION 'Solo el responsable asignado o ADMIN puede consultar esta liquidación.' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  SELECT * INTO v_turno FROM public.turnos WHERE id=v_s.turno_id;
+  v_retroactive:=coalesce(v_s.apertura_retroactiva,false);
+  SELECT (a.tipo='minorista') INTO v_is_retail FROM public.almacenes a WHERE a.id=v_s.almacen_id;
+  IF NOT v_is_retail THEN
+    RETURN jsonb_build_object('aplica',false,'motivo','La liquidación por diferencia de inventario está habilitada para almacenes minoristas.');
+  END IF;
+  SELECT * INTO v_initial FROM public.turno_jornada_inventario_cortes
+  WHERE turno_sesion_id=v_s.id AND tipo='INICIAL' AND estado='CONFIRMADO';
+  SELECT * INTO v_final FROM public.turno_jornada_inventario_cortes
+  WHERE turno_sesion_id=v_s.id AND tipo='FINAL' AND estado='CONFIRMADO';
+  v_start_at:=coalesce(v_turno.apertura_real,v_initial.confirmado_en,v_initial.creado_en);
+  v_end_at:=coalesce(v_final.confirmado_en,v_final.creado_en,now());
+  v_rate:=v_p.salario_porcentaje;
+
+  -- Approved Bajas/Mermas registered or approved after the immutable final cut
+  -- require an explicit Owner decision before sales/salary can be calculated.
+  SELECT count(*)::integer INTO v_pending_post
+  FROM (
+    SELECT b.id FROM public.bajas b
+    WHERE b.turno_sesion_id=v_s.id AND b.estado='APROBADA'
+      AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_end_at
+      AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+        WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA' AND mr.movimiento_id=b.id)
+    UNION ALL
+    SELECT m.id FROM public.mermas m
+    WHERE m.turno_sesion_id=v_s.id AND m.estado='APROBADA'
+      AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>v_end_at
+      AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+        WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA' AND mr.movimiento_id=m.id)
+  ) unresolved;
+
+  WITH initial_lines AS (
+    SELECT l.producto_id AS product_id,l.cantidad_contada::numeric AS qty
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id=v_initial.id
+  ),
+  final_lines AS (
+    SELECT l.producto_id AS product_id,
+      coalesce(c.cantidad_corregida,l.cantidad_contada)::numeric AS qty,
+      l.cantidad_contada::numeric AS original_qty,
+      c.cantidad_corregida AS corrected_qty
+    FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=v_s.id AND c.tipo='FINAL'
+      AND c.producto_id=l.producto_id AND c.vigente
+    WHERE l.corte_id=v_final.id
+  ),
+  movement_events AS (
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END product_id,
+           'TRANSFERENCIA_ENTRADA'::text kind,tl.cantidad::numeric qty
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+    JOIN public.productos p ON p.id=tl.producto_id
+    WHERE t.almacen_destino_id=v_s.almacen_id AND lower(t.estado)='completada'
+      AND t.fecha>v_start_at AND t.fecha<=v_end_at
+      AND (NOT v_retroactive
+        OR (t.fecha AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'))::date BETWEEN v_p.fecha AND coalesce(v_p.fecha_fin,v_p.fecha)
+        OR EXISTS(SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
+          WHERE linked.turno_sesion_id=v_s.id AND linked.transferencia_id=t.id))
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'TRANSFERENCIA_SALIDA',tl.cantidad::numeric
+    FROM public.transferencias t
+    JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+    JOIN public.productos p ON p.id=tl.producto_id
+    WHERE t.almacen_origen_id=v_s.almacen_id AND lower(t.estado)='completada'
+      AND t.fecha>v_start_at AND t.fecha<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'COMPRA',lc.cantidad_inicial::numeric
+    FROM public.lotes_compra lc
+    JOIN public.productos p ON p.id=lc.producto_id
+    WHERE lc.almacen_id=v_s.almacen_id AND lower(lc.origen)='compra'
+      AND lc.fecha_compra>v_start_at AND lc.fecha_compra<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'REINVERSION',rl.cantidad_base::numeric
+    FROM public.reinversiones r
+    JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
+    JOIN public.productos p ON p.id=rl.producto_id
+    WHERE r.almacen_id=v_s.almacen_id AND r.turno_sesion_id=v_s.id
+      AND r.estado='APROBADA' AND r.fecha_revision IS NOT NULL
+      AND r.creado_en>v_start_at AND r.creado_en<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'VALE',vs.cantidad::numeric
+    FROM public.vales_salida vs
+    JOIN public.productos p ON p.id=vs.producto_id
+    WHERE vs.almacen_id=v_s.almacen_id
+      AND upper(coalesce(vs.estado,'REGISTRADO')) NOT IN ('PENDIENTE','RECHAZADO','CANCELADO','ANULADO')
+      AND vs.fecha>v_start_at AND vs.fecha<=v_end_at
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'MERMA',m.cantidad::numeric
+    FROM public.mermas m
+    JOIN public.productos p ON p.id=m.producto_id
+    WHERE m.almacen_id=v_s.almacen_id AND m.estado='APROBADA'
+      AND (
+        (coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>v_start_at
+          AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)<=v_end_at
+          AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+            WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA'
+              AND mr.movimiento_id=m.id AND mr.clasificacion='DESPUES_CORTE'))
+        OR EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+          WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='MERMA'
+            AND mr.movimiento_id=m.id AND mr.clasificacion='ANTES_CORTE')
+      )
+    UNION ALL
+    SELECT CASE WHEN v_is_retail THEN coalesce(p.producto_padre_id,p.id) ELSE p.id END,
+           'BAJA',b.cantidad::numeric
+    FROM public.bajas b
+    JOIN public.productos p ON p.id=b.producto_id
+    WHERE b.almacen_id=v_s.almacen_id AND b.estado='APROBADA'
+      AND (
+        (coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_start_at
+          AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)<=v_end_at
+          AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+            WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA'
+              AND mr.movimiento_id=b.id AND mr.clasificacion='DESPUES_CORTE'))
+        OR EXISTS(SELECT 1 FROM public.turno_jornada_movimiento_revision mr
+          WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA'
+            AND mr.movimiento_id=b.id AND mr.clasificacion='ANTES_CORTE')
+      )
+  ),
+  movement_totals AS (
+    SELECT product_id,
+      coalesce(sum(qty) FILTER(WHERE kind='TRANSFERENCIA_ENTRADA'),0) transfer_in,
+      coalesce(sum(qty) FILTER(WHERE kind='COMPRA'),0) purchases_in,
+      coalesce(sum(qty) FILTER(WHERE kind='REINVERSION'),0) reinvestment_in,
+      coalesce(sum(qty) FILTER(WHERE kind='TRANSFERENCIA_SALIDA'),0) transfer_out,
+      coalesce(sum(qty) FILTER(WHERE kind='VALE'),0) vales_out,
+      coalesce(sum(qty) FILTER(WHERE kind='MERMA'),0) merma_out,
+      coalesce(sum(qty) FILTER(WHERE kind='BAJA'),0) bajas_out
+    FROM movement_events GROUP BY product_id
+  ),
+  price_info AS (
+    SELECT p.id product_id,p.nombre,p.unidad,
+      CASE
+        WHEN coalesce(p.precio_normal,0)>0 THEN p.precio_normal
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN min(ch.precio_normal)
+        ELSE NULL
+      END precio_unitario,
+      CASE
+        WHEN coalesce(p.precio_normal,0)>0 THEN 'PRECIO_FAMILIA'
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN 'PRECIO_VARIANTES_UNIFORME'
+        WHEN count(ch.id)>0 THEN 'PRECIO_VARIANTES_DIFERENTE_O_INCOMPLETO'
+        ELSE 'SIN_PRECIO'
+      END estado_precio
+    FROM public.productos p
+    LEFT JOIN public.productos ch ON ch.producto_padre_id=p.id AND ch.activo=true
+    WHERE p.activo=true AND p.producto_padre_id IS NULL
+    GROUP BY p.id,p.nombre,p.unidad,p.precio_normal
+  ),
+  all_product_ids AS (
+    SELECT product_id FROM initial_lines
+    UNION SELECT product_id FROM final_lines
+    UNION SELECT product_id FROM movement_totals
+  ),
+  calculated AS (
+    SELECT ids.product_id,coalesce(pi.nombre,p.nombre) nombre,coalesce(pi.unidad,p.unidad) unidad,
+      coalesce(i.qty,0) initial_qty,coalesce(f.qty,0) final_qty,
+      f.original_qty final_qty_original,f.corrected_qty final_qty_corrected,
+      coalesce(mt.transfer_in,0) transfer_in,coalesce(mt.purchases_in,0) purchases_in,
+      coalesce(mt.reinvestment_in,0) reinvestment_in,coalesce(mt.transfer_out,0) transfer_out,
+      coalesce(mt.vales_out,0) vales_out,coalesce(mt.merma_out,0) merma_out,coalesce(mt.bajas_out,0) bajas_out,
+      (coalesce(i.qty,0)+coalesce(mt.transfer_in,0)+coalesce(mt.purchases_in,0)+coalesce(mt.reinvestment_in,0)
+        -coalesce(mt.transfer_out,0)-coalesce(mt.vales_out,0)-coalesce(mt.merma_out,0)-coalesce(mt.bajas_out,0)-coalesce(f.qty,0)) sold_qty,
+      pi.precio_unitario,pi.estado_precio
+    FROM all_product_ids ids
+    JOIN public.productos p ON p.id=ids.product_id
+    LEFT JOIN price_info pi ON pi.product_id=ids.product_id
+    LEFT JOIN initial_lines i ON i.product_id=ids.product_id
+    LEFT JOIN final_lines f ON f.product_id=ids.product_id
+    LEFT JOIN movement_totals mt ON mt.product_id=ids.product_id
+  )
+  SELECT count(*),
+         count(*) FILTER(WHERE (precio_unitario IS NOT NULL AND sold_qty>=0) OR sold_qty=0),
+         count(*) FILTER(WHERE sold_qty<0),
+         count(*) FILTER(WHERE precio_unitario IS NULL AND sold_qty>0),
+         coalesce(sum(sold_qty),0),
+         CASE WHEN count(*) FILTER(WHERE (precio_unitario IS NULL AND sold_qty>0) OR sold_qty<0)>0 THEN NULL
+              ELSE round(coalesce(sum(sold_qty*precio_unitario),0),2) END,
+         coalesce(jsonb_agg(jsonb_build_object(
+           'producto_id',product_id,'nombre',nombre,'unidad',unidad,
+           'inventario_inicial',initial_qty,'transferencias_entrada',transfer_in,
+           'compras',purchases_in,'reinversiones_entrada',reinvestment_in,
+           'transferencias_salida',transfer_out,'vales_salida',vales_out,
+           'mermas_aprobadas',merma_out,'bajas_aprobadas',bajas_out,
+           'inventario_final',final_qty,'inventario_final_original',final_qty_original,
+           'inventario_final_corregido',final_qty_corrected,'unidades_vendidas',sold_qty,
+           'precio_unitario',precio_unitario,'estado_precio',estado_precio,
+           'importe_estimado',CASE WHEN precio_unitario IS NOT NULL AND sold_qty>=0 THEN round(sold_qty*precio_unitario,2) ELSE NULL END
+         ) ORDER BY nombre,product_id),'[]'::jsonb)
+    INTO v_total_lines,v_priced_lines,v_negative_lines,v_missing_price_sold,v_total_units,v_sales_total,v_lines
+  FROM calculated;
+
+  -- Do not present provisional sales or salary as if the missing final stock were zero.
+  IF v_initial.id IS NULL OR v_final.id IS NULL THEN
+    v_total_lines:=0;
+    v_priced_lines:=0;
+    v_negative_lines:=0;
+    v_missing_price_sold:=0;
+    v_total_units:=NULL;
+    v_sales_total:=NULL;
+    v_lines:='[]'::jsonb;
+  END IF;
+
+  SELECT coalesce(sum(g.monto) FILTER(WHERE g.estado='APROBADO'),0),
+         count(*) FILTER(WHERE g.estado='PENDIENTE')
+    INTO v_expenses,v_pending_expenses
+  FROM public.gastos g WHERE g.turno_sesion_id=v_s.id AND g.estado IN ('APROBADO','PENDIENTE');
+  SELECT coalesce(sum(r.total) FILTER(WHERE r.estado='APROBADA'),0),
+         count(*) FILTER(WHERE r.estado='PENDIENTE')
+    INTO v_reinvestments,v_pending_reinvestments
+  FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado IN ('APROBADA','PENDIENTE');
+  SELECT count(*) INTO v_pending_adjustments
+  FROM (
+    SELECT 1 FROM public.mermas m WHERE m.turno_sesion_id=v_s.id AND m.estado='PENDIENTE'
+    UNION ALL
+    SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado='PENDIENTE'
+  ) pending;
+  v_daily_expected:=greatest(0,(coalesce(v_p.fecha_fin,v_p.fecha)-v_p.fecha)::integer);
+  SELECT coalesce(sum(e.monto_aprobado) FILTER(WHERE e.estado='APROBADA'),0),
+         count(*) FILTER(WHERE e.estado='PENDIENTE'),
+         count(*) FILTER(WHERE e.estado='APROBADA')
+    INTO v_daily_cash,v_daily_pending,v_daily_approved
+  FROM public.turno_jornada_entregas_diarias e WHERE e.turno_sesion_id=v_s.id;
+  v_daily_missing:=greatest(0,v_daily_expected-v_daily_approved);
+  SELECT d.monto,d.monto_contado,d.estado_aprobacion
+    INTO v_final_declared,v_final_counted,v_final_cash_state
+  FROM public.turno_declaraciones d
+  WHERE d.turno_sesion_id=v_s.id
+  ORDER BY d.declarado_at DESC NULLS LAST,d.created_at DESC NULLS LAST LIMIT 1;
+
+  v_salary:=CASE WHEN v_rate IS NOT NULL AND v_sales_total IS NOT NULL
+    THEN round(v_sales_total*v_rate/100,2) ELSE NULL END;
+  v_cash_received:=CASE WHEN v_final_counted IS NOT NULL AND v_final_cash_state='APROBADA'
+    THEN v_daily_cash+v_final_counted ELSE NULL END;
+  v_expected_cash:=CASE WHEN v_sales_total IS NOT NULL
+    THEN round(v_sales_total-v_expenses-v_reinvestments,2) ELSE NULL END;
+  v_difference:=CASE WHEN v_cash_received IS NOT NULL AND v_expected_cash IS NOT NULL
+    THEN round(v_cash_received-v_expected_cash,2) ELSE NULL END;
+  -- Keep the physical inventory rows visible even while post-cutoff
+  -- movements await Owner classification. Preserve a separate diagnostic
+  -- for negative calculated sales, but never expose provisional sales/cash.
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'producto_id',x.value->'producto_id',
+    'nombre',x.value->'nombre',
+    'unidades_vendidas',x.value->'unidades_vendidas',
+    'inventario_inicial',x.value->'inventario_inicial',
+    'transferencias_entrada',x.value->'transferencias_entrada',
+    'compras',x.value->'compras',
+    'reinversiones_entrada',x.value->'reinversiones_entrada',
+    'transferencias_salida',x.value->'transferencias_salida',
+    'vales_salida',x.value->'vales_salida',
+    'mermas_aprobadas',x.value->'mermas_aprobadas',
+    'bajas_aprobadas',x.value->'bajas_aprobadas',
+    'inventario_final',x.value->'inventario_final',
+    'inventario_final_original',x.value->'inventario_final_original',
+    'inventario_final_corregido',x.value->'inventario_final_corregido'
+  ) ORDER BY x.value->>'nombre'),'[]'::jsonb)
+  INTO v_negative_details
+  FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value)
+  WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)<0;
+
+  IF v_pending_post>0 THEN
+    v_total_units:=NULL;
+    v_sales_total:=NULL;
+    v_salary:=NULL;
+    v_expected_cash:=NULL;
+    v_difference:=NULL;
+    SELECT coalesce(jsonb_agg(
+      x.value - ARRAY['unidades_vendidas','importe_estimado']
+      ORDER BY x.value->>'nombre'
+    ),'[]'::jsonb)
+    INTO v_lines
+    FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
+  END IF;
+  v_complete:=v_initial.id IS NOT NULL AND v_final.id IS NOT NULL
+    AND v_total_lines>0 AND v_priced_lines=v_total_lines AND v_missing_price_sold=0 AND v_negative_lines=0
+    AND v_rate IS NOT NULL AND v_daily_pending=0 AND v_daily_missing=0
+    AND v_pending_expenses=0 AND v_pending_reinvestments=0 AND v_pending_adjustments=0
+    AND v_pending_post=0
+    AND v_cash_received IS NOT NULL;
+
+  RETURN jsonb_build_object(
+    'aplica',true,'calculable',v_complete,
+    'formula','Inicial + entradas (transferencias/compras/reinversiones) - salidas aprobadas (transferencias/vales/mermas/bajas) - final = unidades vendidas; valoradas al precio normal.',
+    'lineas',v_lines,'unidades_vendidas',v_total_units,
+    'ventas_estimadas',v_sales_total,'salario_porcentaje',v_rate,'salario_calculado',v_salary,
+    'gastos_aprobados',v_expenses,'reinversiones_aprobadas',v_reinvestments,
+    'entregas_diarias_aprobadas',v_daily_cash,'entregas_diarias_pendientes',v_daily_pending,'entregas_diarias_faltantes',v_daily_missing,
+    'dinero_final_declarado',v_final_declared,'dinero_final_contado',v_final_counted,
+    'estado_dinero_final',v_final_cash_state,'dinero_recogido_total',v_cash_received,
+    'efectivo_esperado_despues_de_gastos_reinversiones',v_expected_cash,
+    'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_expected_cash,
+    'formula_efectivo','Ventas - gastos aprobados - reinversiones aprobadas. El salario se acumula y paga por separado; no se descuenta de esta caja.',
+    'diferencia',v_difference,
+    'faltan_cortes',NOT(v_initial.id IS NOT NULL AND v_final.id IS NOT NULL),
+    'familias_sin_precio',v_missing_price_sold,
+    'familias_con_vendidas_negativas',v_negative_lines,
+    'familias_vendidas_negativas_detalle',v_negative_details,
+    'movimientos_posteriores_pendientes',v_pending_post,
+    'pendientes',jsonb_build_object(
+      'gastos',v_pending_expenses,'reinversiones',v_pending_reinvestments,
+      'ajustes',v_pending_adjustments,'movimientos_posteriores_corte',v_pending_post,
+      'entregas_diarias',v_daily_pending,'entregas_diarias_faltantes',v_daily_missing
+    )
+  );
+END;
+$function$
+
+
+CREATE OR REPLACE FUNCTION public.bc7_movimientos_sesion(p_turno_sesion_id uuid)
+ RETURNS TABLE(fecha timestamp with time zone, tipo text, producto text, almacen text, cantidad numeric, costo_unitario numeric, usuario text, operacion_id uuid)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT public.tiene_permiso('reportes', 'ver')
+     AND NOT public.tiene_permiso('turnos', 'ver') THEN
+    RAISE EXCEPTION 'No tienes permiso para consultar movimientos ni turnos.' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_s
+  FROM public.turno_sesiones
+  WHERE id = p_turno_sesion_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La sesión del turno no existe.' USING ERRCODE = '23503';
+  END IF;
+  IF v_s.jornada_programacion_id IS NOT NULL THEN
+    SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  END IF;
+
+  IF NOT public.bc_actor_is_admin()
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turnos t
+       WHERE t.id = v_s.turno_id
+         AND t.usuario_id = v_uid
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turno_asignaciones a
+       WHERE a.turno_sesion_id = v_s.id
+         AND a.usuario_id = v_uid
+         AND a.retirado_at IS NULL
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turno_jornada_programacion p
+       WHERE p.id = v_s.jornada_programacion_id
+         AND p.responsable_id = v_uid
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.turno_tramos tr
+       WHERE tr.turno_sesion_id = v_s.id
+         AND tr.usuario_id = v_uid
+     ) THEN
+    RAISE EXCEPTION 'Solo el responsable, participante asignado o administrador puede consultar este archivo.' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    lc.fecha_compra,
+    'compra'::text,
+    p.nombre::text,
+    a.nombre::text,
+    lc.cantidad_inicial,
+    lc.costo_unitario,
+    COALESCE(u.nombre, '')::text,
+    lc.id
+  FROM public.lotes_compra lc
+  JOIN public.productos p ON p.id = lc.producto_id
+  JOIN public.almacenes a ON a.id = lc.almacen_id
+  LEFT JOIN public.usuarios u ON u.id = lc.usuario_id
+  WHERE lc.origen = 'compra'
+    AND lc.almacen_id = v_s.almacen_id
+    AND (lc.fecha_compra AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+    AND EXISTS (
+      SELECT 1
+      FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = lc.usuario_id
+        AND lc.fecha_compra >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR lc.fecha_compra < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    v.fecha,
+    'venta'::text,
+    p.nombre::text,
+    a.nombre::text,
+    -vl.cantidad,
+    vl.costo_unitario_fifo,
+    COALESCE(u.nombre, '')::text,
+    v.id
+  FROM public.ventas_lineas vl
+  JOIN public.ventas v ON v.id = vl.venta_id
+  JOIN public.productos p ON p.id = vl.producto_id
+  JOIN public.almacenes a ON a.id = v.almacen_id
+  LEFT JOIN public.usuarios u ON u.id = v.creado_por
+  WHERE v.almacen_id = v_s.almacen_id
+    AND (v.fecha AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = v.creado_por
+        AND v.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR v.fecha < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    t.fecha,
+    'transferencia_salida'::text,
+    p.nombre::text,
+    origen.nombre::text,
+    -tl.cantidad,
+    NULL::numeric,
+    COALESCE(u.nombre, '')::text,
+    t.id
+  FROM public.transferencias_lineas tl
+  JOIN public.transferencias t ON t.id = tl.transferencia_id
+  JOIN public.productos p ON p.id = tl.producto_id
+  JOIN public.almacenes origen ON origen.id = t.almacen_origen_id
+  LEFT JOIN public.usuarios u ON u.id = t.creado_por
+  WHERE t.almacen_origen_id = v_s.almacen_id
+    AND (t.fecha AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = t.creado_por
+        AND t.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    t.fecha,
+    'transferencia_entrada'::text,
+    p.nombre::text,
+    destino.nombre::text,
+    tl.cantidad,
+    NULL::numeric,
+    COALESCE(u.nombre, '')::text,
+    t.id
+  FROM public.transferencias_lineas tl
+  JOIN public.transferencias t ON t.id = tl.transferencia_id
+  JOIN public.productos p ON p.id = tl.producto_id
+  JOIN public.almacenes destino ON destino.id = t.almacen_destino_id
+  LEFT JOIN public.usuarios u ON u.id = t.creado_por
+  WHERE t.almacen_destino_id = v_s.almacen_id
+    AND (
+      -- A single explicit link can attribute a later-registered transfer to this
+      -- multi-day Jornada. Otherwise the transfer must be inside the scheduled
+      -- period and belong to a responsible worker's active tranche.
+      EXISTS (
+        SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
+        WHERE linked.turno_sesion_id = v_s.id AND linked.transferencia_id = t.id
+      )
+      OR (
+        (t.fecha AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+        AND EXISTS (
+          SELECT 1 FROM public.turno_tramos tr
+          WHERE tr.turno_sesion_id = v_s.id
+            AND tr.usuario_id = t.creado_por
+            AND t.fecha >= tr.inicio_at
+            AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
+        )
+      )
+    )
+
+  UNION ALL
+
+  SELECT
+    vs.fecha,
+    'vale'::text,
+    p.nombre::text,
+    a.nombre::text,
+    -vs.cantidad,
+    NULL::numeric,
+    COALESCE(u.nombre, '')::text,
+    vs.id
+  FROM public.vales_salida vs
+  JOIN public.productos p ON p.id = vs.producto_id
+  JOIN public.almacenes a ON a.id = vs.almacen_id
+  LEFT JOIN public.usuarios u ON u.id = vs.creado_por
+  WHERE vs.almacen_id = v_s.almacen_id
+    AND (vs.fecha AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.turno_sesion_id = v_s.id
+        AND tr.usuario_id = vs.creado_por
+        AND vs.fecha >= tr.inicio_at
+        AND (tr.fin_at IS NULL OR vs.fecha < tr.fin_at)
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en),
+    CASE m.estado WHEN 'APROBADA' THEN 'merma'
+      WHEN 'PENDIENTE' THEN 'merma_pendiente' ELSE 'merma_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    CASE WHEN m.estado='APROBADA' THEN -m.cantidad ELSE m.cantidad END,
+    NULL::numeric,
+    COALESCE(m.revisado_nombre, m.creado_nombre, '')::text,
+    m.id
+  FROM public.mermas m
+  JOIN public.productos p ON p.id = m.producto_id
+  JOIN public.almacenes a ON a.id = m.almacen_id
+  WHERE m.estado IN ('PENDIENTE','APROBADA','RECHAZADA')
+    AND m.almacen_id = v_s.almacen_id
+    AND (
+      -- Explicit source-session + tranche links are authoritative for pending,
+      -- approved and rejected requests. Unlinked legacy records are only inferred
+      -- when ADMIN approval falls inside an exact worker tranche.
+      (m.turno_sesion_id = v_s.id AND EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.id=m.turno_tramo_id
+          AND tr.turno_sesion_id=v_s.id
+          AND tr.usuario_id=m.creado_por
+      ))
+      OR (
+        m.estado='APROBADA'
+        AND (COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+        AND EXISTS (
+          SELECT 1 FROM public.turno_tramos tr
+          WHERE tr.turno_sesion_id = v_s.id
+            AND tr.usuario_id = COALESCE(m.revisado_por, m.creado_por)
+            AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) >= tr.inicio_at
+            AND (tr.fin_at IS NULL OR COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) < tr.fin_at)
+        )
+      )
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en),
+    CASE b.estado WHEN 'APROBADA' THEN 'baja'
+      WHEN 'PENDIENTE' THEN 'baja_pendiente' ELSE 'baja_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    CASE WHEN b.estado='APROBADA' THEN -b.cantidad ELSE b.cantidad END,
+    NULL::numeric,
+    COALESCE(b.revisado_nombre, b.creado_nombre, '')::text,
+    b.id
+  FROM public.bajas b
+  JOIN public.productos p ON p.id = b.producto_id
+  JOIN public.almacenes a ON a.id = b.almacen_id
+  WHERE b.estado IN ('PENDIENTE','APROBADA','RECHAZADA')
+    AND b.almacen_id = v_s.almacen_id
+    AND (
+      (b.turno_sesion_id = v_s.id AND EXISTS (
+        SELECT 1 FROM public.turno_tramos tr
+        WHERE tr.id=b.turno_tramo_id
+          AND tr.turno_sesion_id=v_s.id
+          AND tr.usuario_id=b.creado_por
+      ))
+      OR (
+        b.estado='APROBADA'
+        AND (COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
+        AND EXISTS (
+          SELECT 1 FROM public.turno_tramos tr
+          WHERE tr.turno_sesion_id = v_s.id
+            AND tr.usuario_id = COALESCE(b.revisado_por, b.creado_por)
+            AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) >= tr.inicio_at
+            AND (tr.fin_at IS NULL OR COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) < tr.fin_at)
+        )
+      )
+    )
+
+  UNION ALL
+
+  -- Finance events are part of the exact Jornada ledger, not only the global date history.
+  SELECT
+    COALESCE(g.fecha_revision,g.creado_en),
+    CASE g.estado WHEN 'APROBADO' THEN 'gasto'
+      WHEN 'PENDIENTE' THEN 'gasto_pendiente' ELSE 'gasto_rechazado' END::text,
+    g.concepto::text,
+    a.nombre::text,
+    NULL::numeric,
+    g.monto,
+    COALESCE(g.revisado_nombre,g.creado_nombre,'')::text,
+    g.id
+  FROM public.gastos g
+  JOIN public.almacenes a ON a.id=g.almacen_id
+  WHERE g.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=g.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=g.creado_por
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(r.fecha_revision,r.fecha),
+    CASE r.estado WHEN 'APROBADA' THEN 'reinversion'
+      WHEN 'PENDIENTE' THEN 'reinversion_pendiente' ELSE 'reinversion_rechazada' END::text,
+    p.nombre::text,
+    a.nombre::text,
+    rl.cantidad_base,
+    rl.costo_total,
+    COALESCE(r.revisado_nombre,r.usuario_nombre,'')::text,
+    r.id
+  FROM public.reinversiones r
+  JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
+  JOIN public.productos p ON p.id=rl.producto_id
+  JOIN public.almacenes a ON a.id=r.almacen_id
+  WHERE r.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=r.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=r.usuario_id
+    )
+
+  UNION ALL
+
+  SELECT
+    COALESCE(e.fecha_revision,e.creado_en),
+    CASE e.estado WHEN 'APROBADA' THEN 'entrega_diaria'
+      WHEN 'PENDIENTE' THEN 'entrega_diaria_pendiente' ELSE 'entrega_diaria_rechazada' END::text,
+    ('Efectivo recogido · '||e.fecha::text)::text,
+    a.nombre::text,
+    NULL::numeric,
+    COALESCE(e.monto_aprobado,e.monto_declarado),
+    COALESCE(e.revisado_nombre,e.creado_nombre,'')::text,
+    e.id
+  FROM public.turno_jornada_entregas_diarias e
+  JOIN public.almacenes a ON a.id=e.almacen_id
+  WHERE e.turno_sesion_id=v_s.id
+    AND EXISTS (
+      SELECT 1 FROM public.turno_tramos tr
+      WHERE tr.id=e.turno_tramo_id
+        AND tr.turno_sesion_id=v_s.id
+        AND tr.usuario_id=e.creado_por
+    )
+
+  UNION ALL
+
+  SELECT
+    d.declarado_at,
+    'dinero_declarado_final'::text,
+    'Declaración final de efectivo'::text,
+    a.nombre::text,
+    NULL::numeric,
+    d.monto,
+    COALESCE(u.nombre,'')::text,
+    d.id
+  FROM public.turno_declaraciones d
+  JOIN public.almacenes a ON a.id=v_s.almacen_id
+  LEFT JOIN public.usuarios u ON u.id=d.usuario_id
+  WHERE d.turno_sesion_id=v_s.id
+
+  UNION ALL
+
+  SELECT
+    d.contado_at,
+    'dinero_contado_final'::text,
+    'Conteo físico del Dueño'::text,
+    a.nombre::text,
+    NULL::numeric,
+    d.monto_contado,
+    COALESCE(contador.nombre,'ADMIN')::text,
+    d.id
+  FROM public.turno_declaraciones d
+  JOIN public.almacenes a ON a.id=v_s.almacen_id
+  LEFT JOIN public.usuarios contador ON contador.id=d.contado_por
+  WHERE d.turno_sesion_id=v_s.id
+    AND d.monto_contado IS NOT NULL
+
+  ORDER BY 1 DESC;
+END;
+$function$
+
+
 COMMIT;
