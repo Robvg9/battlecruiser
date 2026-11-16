@@ -1,7 +1,7 @@
 {
   "name": "BattleCruiser",
   "short_name": "BattleCruiser",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0c1c18",
   "theme_color": "#0c1c18",

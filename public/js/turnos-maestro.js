@@ -309,8 +309,10 @@ function money(v) {
             actions += '<button type="button" class="cc-accion" data-tm-asignar="' + esc(s.id) + '">Cambiar</button>';
           }
           const me = currentUserId();
+          // A full-day JORNADA is a real assigned session too. Excluding it
+          // leaves the assigned worker unable to open the old scheduled period.
           const puedoIniciar = (se === 'PENDIENTE' || se === 'PROGRAMADA') &&
-            bloque !== 'JORNADA' && assigned && me && String(assigned) === String(me);
+            assigned && me && String(assigned) === String(me);
           if (puedoIniciar) {
             actions += '<button type="button" class="cc-accion" data-tm-iniciar="' + esc(s.id) + '">Iniciar jornada</button>';
           }

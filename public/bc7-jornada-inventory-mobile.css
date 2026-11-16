@@ -557,3 +557,23 @@
   #tab-jornada .bc7-receive-correction-row{grid-template-columns:minmax(0,1fr) minmax(105px,125px);gap:8px;padding:9px}
   #tab-jornada .bc7-receive-mode-tabs .bc7-btn{flex-basis:130px}
 }
+
+/* 2026-11-16 — Receipt quantity fields must remain visible on narrow Android viewports. */
+@media (max-width: 560px), (hover: none) and (pointer: coarse) {
+  #tab-jornada .bc7-receive-correction-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch;
+    gap: 7px;
+  }
+  #tab-jornada .bc7-receive-correction-row .bc7-field,
+  #tab-jornada .bc7-receive-correction-row .bc7-field input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  #tab-jornada .bc7-receive-correction-row .bc7-field input {
+    min-height: 46px;
+    font-size: 16px;
+  }
+}
