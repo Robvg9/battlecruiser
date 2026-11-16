@@ -13,6 +13,7 @@
   const dateHavana=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Havana',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   function addDays(s,n){const d=new Date(String(s||dateHavana())+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+Number(n||0));return d.toISOString().slice(0,10);}
   function fmtDate(v){const s=String(v||'').slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:s||'—';}
+  function fmtDateTimeHavana(v){if(!v)return '—';const d=new Date(v);if(!Number.isFinite(d.getTime()))return String(v);return new Intl.DateTimeFormat('es-CU',{timeZone:'America/Havana',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);}
   function fmtDateHuman(v){const p=String(v||'').slice(0,10).split('-').map(Number);if(p.length!==3||!p[0]||!p[1]||!p[2])return fmtDate(v);return new Intl.DateTimeFormat('es-ES',{timeZone:'UTC',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(Date.UTC(p[0],p[1]-1,p[2],12)));}
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
   function money(v){return typeof window.money==='function'?window.money(Number(v||0)):Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -1552,7 +1553,7 @@
         x.inventario_final==null?'—':qty(x.inventario_final),x.unidades_vendidas==null?'—':qty(x.unidades_vendidas),x.precio_unitario==null?'Sin precio':money(x.precio_unitario),x.importe_estimado==null?'Pendiente':money(x.importe_estimado)+' CUP'
       ]);
       const movementRows=arr(movements).map(x=>[
-        String(x.fecha||'').replace('T',' ').slice(0,16),x.tipo,x.producto,qty(x.cantidad),x.almacen,x.usuario,String(x.operacion_id||'')
+        fmtDateTimeHavana(x.fecha),x.tipo,x.producto,qty(x.cantidad),x.almacen,x.usuario,String(x.operacion_id||'')
       ]);
       const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
       const reinvestmentRows=arr(finance?.reinversiones).map(x=>[x.producto_nombre||x.producto,x.total||x.monto,x.estado,x.proveedor||'']);
@@ -1569,7 +1570,7 @@
       const periodLabel=fmtDate(detail.sesion.fecha)+' – '+fmtDate(detail.sesion.fecha_fin||detail.sesion.fecha);
       const pendingTransferHtml=pendingTransferGroups.length?pendingTransferGroups.map(group=>
         '<article class="bc7-card"><h4>Transferencia pendiente de atribución · '+group.lines.length+' líneas</h4>'+
-        '<p><b>Operación:</b> '+esc(group.id)+'<br><b>Fecha real de registro:</b> '+esc(String(group.fecha||'').replace('T',' ').slice(0,16))+
+        '<p><b>Operación:</b> '+esc(group.id)+'<br><b>Fecha real de registro:</b> '+esc(fmtDateTimeHavana(group.fecha))+
         '<br><b>Origen → destino:</b> '+esc(group.origen)+' → '+esc(group.destino)+
         '<br><b>Período operativo propuesto:</b> '+esc(periodLabel)+'</p>'+
         previewTable(['Producto','Cantidad'],group.lines)+
