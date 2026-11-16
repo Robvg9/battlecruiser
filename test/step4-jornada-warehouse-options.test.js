@@ -59,7 +59,7 @@ function createContext(t, { failCatalog = false } = {}) {
     }
   };
 
-  window.eval("const _cache = { almacenes: [], usuarios: [] }; const client = window.client;\n" + SOURCE);
+  window.eval("let _usuarioActual = window._usuarioActual; let _bcSesionActivaId = window._usuarioActual.id; let _permisosCargaExitosa = true; const _cache = { almacenes: [], usuarios: [] }; const client = window.client;\n" + SOURCE);
   t.after(() => window.close());
   return { window, calls };
 }

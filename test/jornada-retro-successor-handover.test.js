@@ -50,10 +50,10 @@ test("incoming count is blank by default",()=>{
   assert.ok(jornada.includes('placeholder="Contar físicamente"'));
 });
 test("PWA release and service worker cache keys are aligned",()=>{
-  assert.ok(app.includes('const VERSION="9.5.115"'));
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.32"]'));
-  assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.115"]'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.115"'));
-  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.32'));
-  assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.115'));
+  assert.ok(app.includes('const VERSION="9.5.117"'));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.33"]'));
+  assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.117"]'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.117"'));
+  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.33'));
+  assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.117'));
 });

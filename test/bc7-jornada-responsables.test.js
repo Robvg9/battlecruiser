@@ -60,7 +60,7 @@ function setup(t, rpcHandler) {
     }
   };
 
-  window.eval(SOURCE);
+  window.eval("let _usuarioActual = window._usuarioActual; let _bcSesionActivaId = window._usuarioActual.id; let _permisosCargaExitosa = true; const client = window.client;\n" + SOURCE);
   t.after(() => window.close());
   return { window, calls };
 }

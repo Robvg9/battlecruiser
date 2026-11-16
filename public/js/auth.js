@@ -1034,8 +1034,12 @@ safeInit("cambiar-contraseña", () => {
 });
 
 if ("serviceWorker" in navigator && (location.protocol === "http:" || location.protocol === "https:")) {
-  window.addEventListener("load", function() {
-    navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" }).then(function(registration) {
+  // Start registration as soon as Auth is parsed. Waiting for window.load lets optional
+  // dynamic modules delay installation and leaves first-time PWA visits uncontrolled.
+  var bcServiceWorkerRegistrationPromise = null;
+  function bcRegisterServiceWorker() {
+    if (bcServiceWorkerRegistrationPromise) return bcServiceWorkerRegistrationPromise;
+    bcServiceWorkerRegistrationPromise = navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" }).then(function(registration) {
       function announceWaiting() {
         if (!registration.waiting || !navigator.serviceWorker.controller) return;
         window.dispatchEvent(new CustomEvent("bc:pwa-update-ready", {
@@ -1052,10 +1056,15 @@ if ("serviceWorker" in navigator && (location.protocol === "http:" || location.p
       announceWaiting();
       // A lightweight, non-blocking check prevents an HTTP-cached SW script hiding a release.
       registration.update().then(announceWaiting).catch(function() {});
+      return registration;
     }).catch(function(error) {
-      console.warn("[BattleCruiser] No se pudo comprobar la actualización PWA:", error);
+      bcServiceWorkerRegistrationPromise = null;
+      console.warn("[Battlecruiser] No se pudo comprobar la actualización PWA:", error);
+      return null;
     });
-  });
+    return bcServiceWorkerRegistrationPromise;
+  }
+  bcRegisterServiceWorker();
 }
 
 safeInit("escape-cierra-paneles", () => {

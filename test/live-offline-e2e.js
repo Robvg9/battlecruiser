@@ -1083,6 +1083,7 @@ async function main() {
   await cdpCommand("Emulation.clearDeviceMetricsOverride");
   report.evidence.phase = "online_initial";
 
+  report.evidence.serviceWorkerRegistrationBeforeWait = await evaluate("(async()=>({supported:'serviceWorker' in navigator,readyState:document.readyState,protocol:location.protocol,controller:navigator.serviceWorker&&navigator.serviceWorker.controller?{scriptURL:navigator.serviceWorker.controller.scriptURL}:null,registrations:navigator.serviceWorker?await navigator.serviceWorker.getRegistrations().then(rs=>rs.map(r=>({scope:r.scope,active:r.active?{scriptURL:r.active.scriptURL,state:r.active.state}:null,installing:r.installing?{scriptURL:r.installing.scriptURL,state:r.installing.state}:null,waiting:r.waiting?{scriptURL:r.waiting.scriptURL,state:r.waiting.state}:null}))):[]}))()");
   let registration = await waitUntil(
     "activación del Service Worker",
     "(()=>{const r=navigator.serviceWorker&&navigator.serviceWorker.controller;return r?{controlled:true,scriptURL:r.scriptURL}:null})()",
