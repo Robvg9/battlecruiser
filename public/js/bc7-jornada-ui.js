@@ -1305,7 +1305,7 @@
       :mode==='diff'?total+' productos en la entrega · '+selectedCount+' diferencias seleccionadas'
       :'Conteo completo pendiente de confirmación · '+total+' productos';
     return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Confirma si todo coincide o registra únicamente las diferencias. No necesitas volver a introducir las cantidades que vienen iguales del turno anterior.</p>'+recount+'</div>'+
-      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'" data-bc7-receive-delivery="'+esc(delivery.id)+'" data-bc7-receive-lines=\\''+esc(JSON.stringify(lines.map(l=>({producto_id:String(l.producto_id),cantidad_declarada:Number(l.cantidad_declarada),nombre:l.nombre||''}))))+'\\'>'+
+      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'" data-bc7-receive-delivery="'+esc(delivery.id)+'" data-bc7-receive-lines="'+esc(JSON.stringify(lines.map(l=>({producto_id:String(l.producto_id),cantidad_declarada:Number(l.cantidad_declarada),nombre:l.nombre||''}))))+'">'+
       modeTabs+fastPane+diffPane+
       '<div class="bc7-note bc7-receive-summary" data-bc7-receive-summary role="status" aria-live="polite">'+startSummary+'</div>'+
       '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" value="'+esc(attempt.note||'')+'" placeholder="Incidencias o diferencias observadas"></label>'+
