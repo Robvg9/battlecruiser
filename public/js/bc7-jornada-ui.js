@@ -1513,7 +1513,30 @@
     (document.getElementById('tab-jornada')||document.body).appendChild(root);
     const close=()=>root.remove();
     root.querySelectorAll('[data-bc7-preview-close]').forEach(b=>b.addEventListener('click',close));
-    root.addEventListener('click',e=>{if(e.target===root)close();});
+    root.addEventListener('click',async e=>{
+      if(e.target===root){close();return;}
+      const linkButton=e.target&&e.target.closest?e.target.closest('[data-bc7-link-transfer]'):null;
+      if(!linkButton)return;
+      e.preventDefault();
+      const transferId=linkButton.dataset.bc7LinkTransfer;
+      const period=String(detail.sesion.fecha||'')+' a '+String(detail.sesion.fecha_fin||detail.sesion.fecha||'');
+      const reason=window.prompt('Motivo obligatorio de atribución histórica. Período operativo '+period+'. La fecha real de registro se conservará.', 'Una sola transferencia agrupada para el período '+period+', según confirmación del Dueño.');
+      if(!reason||reason.trim().length<10)return;
+      if(!confirm('Se vinculará la transferencia '+transferId+' UNA SOLA VEZ a esta jornada ('+period+'). Se conservará su fecha real de registro. No se dividirá entre días ni se aplicará a Adriana. ¿Confirmas?'))return;
+      linkButton.disabled=true;
+      try{
+        await rpc('bc7_vincular_transferencia_jornada',{
+          p_turno_sesion_id:detail.sesion.id,p_transferencia_id:transferId,p_motivo:reason.trim()
+        });
+        close();
+        await openWorkspace(detail.sesion.id);
+        setStatus('Transferencia atribuida una sola vez a esta jornada. Revisa de nuevo la previsualización y el inventario.','ok');
+        await openJornadaPreview(null);
+      }catch(error){
+        linkButton.disabled=false;
+        alert(friendlyError(error,'calendar')+' No se modificó la transferencia.');
+      }
+    });
     try{
       const [settlement,movements,finance,cash,unlinkedTransfers]=await Promise.all([
         detail.liquidacion?Promise.resolve(detail.liquidacion):rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:detail.sesion.id}),
@@ -1534,10 +1557,26 @@
       const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
       const reinvestmentRows=arr(finance?.reinversiones).map(x=>[x.producto_nombre||x.producto,x.total||x.monto,x.estado,x.proveedor||'']);
       const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP']);
-      const pendingTransferRows=arr(unlinkedTransfers).map(x=>[
-        x.transferencia_id,String(x.fecha_registro||'').replace('T',' ').slice(0,16),
-        x.almacen_origen,x.almacen_destino,x.producto,qty(x.cantidad),x.lineas_total
-      ]);
+      const pendingTransferGroups=[];
+      for(const item of arr(unlinkedTransfers)){
+        let group=pendingTransferGroups.find(x=>String(x.id)===String(item.transferencia_id));
+        if(!group){
+          group={id:item.transferencia_id,fecha:item.fecha_registro,origen:item.almacen_origen,destino:item.almacen_destino,total:item.lineas_total,lines:[]};
+          pendingTransferGroups.push(group);
+        }
+        group.lines.push([item.producto,qty(item.cantidad)]);
+      }
+      const periodLabel=fmtDate(sessionDate(detail.sesion.fecha))+' – '+fmtDate(sessionDate(detail.sesion.fecha_fin||detail.sesion.fecha));
+      const pendingTransferHtml=pendingTransferGroups.length?pendingTransferGroups.map(group=>
+        '<article class="bc7-card"><h4>Transferencia pendiente de atribución · '+group.lines.length+' líneas</h4>'+
+        '<p><b>Operación:</b> '+esc(group.id)+'<br><b>Fecha real de registro:</b> '+esc(String(group.fecha||'').replace('T',' ').slice(0,16))+
+        '<br><b>Origen → destino:</b> '+esc(group.origen)+' → '+esc(group.destino)+
+        '<br><b>Período operativo propuesto:</b> '+esc(periodLabel)+'</p>'+
+        previewTable(['Producto','Cantidad'],group.lines)+
+        '<p class="bc7-note">No está incluida en el saldo ni en la liquidación. Si la atribuyes, se registrará como una sola operación para todo el período, sin dividirla por día.</p>'+
+        (detail.is_admin?'<button type="button" class="bc7-btn primary" data-bc7-link-transfer="'+esc(group.id)+'">Atribuir una sola vez a esta jornada</button>':'<span class="bc7-muted">Solo ADMIN puede atribuir esta transferencia.</span>')+
+        '</article>'
+      ).join(''):'<div class="bc7-empty">No hay transferencias completadas fuera del período pendientes de atribución.</div>';
       const declaration=detail.declaracion_dinero;
       const session=detail.sesion;
       const complete=String(session.estado||'').toUpperCase()==='COMPLETADA';
@@ -1563,7 +1602,7 @@
         (missing.length?'<section class="bc7-card"><h4>Pendientes de verificación</h4><ul>'+missing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>':'')+
         '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Inicial','Entradas','Salidas','Bajas','Mermas','Final','Vendidas','Precio','Importe'],lines)+'</section>'+
         '<section class="bc7-card"><h4>Movimientos del período · transferencias y bajas incluidas</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario','Operación'],movementRows)+'</section>'+
-        '<section class="bc7-card"><h4>Transferencias completadas fuera del período · pendientes de atribución</h4><p class="bc7-muted">Estas entradas no están incluidas en el inventario calculado hasta que el Dueño las vincule expresamente a esta jornada. Se muestran por fecha de registro y en una sola operación, sin repartirlas entre días.</p>'+previewTable(['ID de operación','Fecha registrada','Almacén origen','Almacén destino','Producto','Cantidad','Líneas en la transferencia'],pendingTransferRows)+'</section>'+
+        '<section class="bc7-card"><h4>Transferencias completadas fuera del período · pendientes de atribución</h4><p class="bc7-muted">Estas entradas no están incluidas en el inventario calculado hasta que el Dueño las vincule expresamente a esta jornada.</p>'+pendingTransferHtml+'</section>'+
         '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows)+'</section>'+
         '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows)+'</section>'+
         '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado'],cashRows)+'</section>'+
