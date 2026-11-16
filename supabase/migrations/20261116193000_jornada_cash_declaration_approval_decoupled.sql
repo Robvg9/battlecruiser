@@ -1326,16 +1326,7 @@ BEGIN
         SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
         WHERE linked.turno_sesion_id = v_s.id AND linked.transferencia_id = t.id
       )
-      OR (
-        (t.fecha AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
-        AND EXISTS (
-          SELECT 1 FROM public.turno_tramos tr
-          WHERE tr.turno_sesion_id = v_s.id
-            AND tr.usuario_id = t.creado_por
-            AND t.fecha >= tr.inicio_at
-            AND (tr.fin_at IS NULL OR t.fecha < tr.fin_at)
-        )
-      )
+      OR (t.fecha AT TIME ZONE 'America/Havana')::date BETWEEN coalesce(v_p.fecha,v_s.fecha) AND coalesce(v_p.fecha_fin,v_p.fecha,v_s.fecha)
     )
 
   UNION ALL
