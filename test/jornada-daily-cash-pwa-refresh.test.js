@@ -32,8 +32,11 @@ test("PWA update banner waits for the user-approved worker activation before rel
   assert.match(APP, /var button = document\.createElement\("button"\)/);
   assert.match(APP, /button\.textContent = "Actualizar ahora"/);
   assert.match(APP, /button\.addEventListener\("click"/);
-  assert.match(APP, /notice\.appendChild\(button\)/);
-  assert.doesNotMatch(APP, /notice\.querySelector\("button"\)\.addEventListener/);
+  assert.match(APP, /aviso\.appendChild\(button\)/);
+  assert.match(APP, /waiting\.postMessage\(\{ type: "SKIP_WAITING" \}\)/);
+  assert.match(APP, /waiting\.state === "activated"/);
+  assert.match(APP, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(APP, /controllerchange[\s\S]*?window\.location\.reload/);
 });
 
 test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
