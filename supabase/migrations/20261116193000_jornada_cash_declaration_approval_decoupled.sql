@@ -531,4 +531,60 @@ end;
 $function$
 
 
+
+CREATE OR REPLACE FUNCTION public.bc7_transferencias_pendientes_vinculo_jornada(p_turno_sesion_id uuid)
+RETURNS TABLE(
+  transferencia_id uuid,
+  fecha_registro timestamptz,
+  almacen_origen text,
+  almacen_destino text,
+  producto text,
+  cantidad numeric,
+  lineas_total integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_period_end timestamptz;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
+  END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La sesión no corresponde a una Jornada.' USING ERRCODE='23503';
+  END IF;
+  IF NOT public.bc_actor_is_admin() AND (
+    NOT public.tiene_permiso('turnos','ver')
+    OR NOT EXISTS(SELECT 1 FROM public.turno_asignaciones a
+      WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL)
+  ) THEN
+    RAISE EXCEPTION 'Solo la responsable asignada o ADMIN puede consultar transferencias pendientes de atribución.' USING ERRCODE='42501';
+  END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  v_period_end:=((coalesce(v_p.fecha_fin,v_p.fecha)+1)::timestamp
+    AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'));
+  RETURN QUERY
+  SELECT t.id,t.fecha,ao.nombre::text,ad.nombre::text,p.nombre::text,tl.cantidad,
+    count(*) OVER(PARTITION BY t.id)::integer
+  FROM public.transferencias t
+  JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+  JOIN public.productos p ON p.id=tl.producto_id
+  JOIN public.almacenes ao ON ao.id=t.almacen_origen_id
+  JOIN public.almacenes ad ON ad.id=t.almacen_destino_id
+  WHERE t.almacen_destino_id=v_s.almacen_id
+    AND lower(t.estado)='completada'
+    AND t.fecha>v_period_end
+    AND t.fecha<=now()
+    AND NOT EXISTS(SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
+      WHERE linked.transferencia_id=t.id)
+  ORDER BY t.fecha,t.id,p.nombre;
+END;
+$function$;
+GRANT EXECUTE ON FUNCTION public.bc7_transferencias_pendientes_vinculo_jornada(uuid) TO authenticated;
+
 COMMIT;
