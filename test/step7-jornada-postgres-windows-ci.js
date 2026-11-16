@@ -352,6 +352,8 @@ function applySql(file) {
     log("Apply PR #341 shared inventory handover truth migration and verify late-correction guard.");
     applySql("supabase/migrations/20261116180000_jornada_inventory_handover_truth.sql");
     applySql("test/jornada-inventory-handover-truth-contract.sql");
+    applySql("supabase/migrations/20261116193000_jornada_post_close_sales_rectification.sql");
+    applySql("test/jornada-post-close-sales-rectification-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
