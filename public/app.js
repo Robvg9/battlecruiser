@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.120 — Recepción física de inventario compartido en dos pasos; rectificación histórica auditada de jornadas cerradas
+// v9.5.121 — Recepción física de inventario compartido en dos pasos; rectificación histórica auditada de jornadas cerradas
 (function hotfixV9475(){
   const VERSION="9.5.121";
   window.__BC_VERSION__=VERSION;
