@@ -361,7 +361,7 @@ BEGIN
     );
   END IF;
 
-  IF coalesce(v_d.estado_aprobacion,'') NOT IN ('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA') THEN
+  IF coalesce(v_d.estado_aprobacion,'')<>'DECLARACION_APROBADA' THEN
     RAISE EXCEPTION 'La declaración no está pendiente de conteo.' USING ERRCODE='23514';
   END IF;
 
@@ -452,7 +452,7 @@ BEGIN
       OR public.tiene_permiso('auditoria','editar_any')) THEN
     RAISE EXCEPTION 'No tienes permiso para aprobar declaraciones finales de efectivo.' USING ERRCODE='42501';
   END IF;
-  IF p_decision NOT IN ('APROBAR','RECHAZAR') THEN
+  IF p_decision IS NULL OR p_decision NOT IN ('APROBAR','RECHAZAR') THEN
     RAISE EXCEPTION 'Decisión inválida.' USING ERRCODE='23514';
   END IF;
   IF p_decision='RECHAZAR' AND v_comment IS NULL THEN
@@ -509,7 +509,7 @@ begin
   if p_monto is null or p_monto<0 then raise exception 'Monto inválido'; end if;
   SELECT * INTO r FROM public.turno_declaraciones WHERE turno_tramo_id=t.id FOR UPDATE;
   IF FOUND THEN
-    IF r.estado_aprobacion<>'RECHAZADA' OR r.monto_contado IS NOT NULL THEN
+    IF r.estado_aprobacion IS DISTINCT FROM 'RECHAZADA' OR r.monto_contado IS NOT NULL THEN
       RAISE EXCEPTION 'Este tramo ya tiene una declaración de dinero que no puede sobrescribirse.';
     END IF;
     v_old_amount:=r.monto;
