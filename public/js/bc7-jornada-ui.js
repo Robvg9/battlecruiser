@@ -1581,7 +1581,7 @@
         '<br><b>Período operativo propuesto:</b> '+esc(periodLabel)+'</p>'+
         previewTable(['Producto','Cantidad'],group.lines)+
         '<p class="bc7-note">No está incluida en el saldo ni en la liquidación. Si la atribuyes, se registrará como una sola operación para todo el período, sin dividirla por día.</p>'+
-        (detail.is_admin?'<button type="button" class="bc7-btn primary" data-bc7-link-transfer="'+esc(group.id)+'">Atribuir una sola vez a esta jornada</button>':'<span class="bc7-muted">Solo ADMIN puede atribuir esta transferencia.</span>')+
+        (state.admin?'<button type="button" class="bc7-btn primary" data-bc7-link-transfer="'+esc(group.id)+'">Atribuir una sola vez a esta jornada</button>':'<span class="bc7-muted">Solo ADMIN puede atribuir esta transferencia.</span>')+
         '</article>'
       ).join(''):'<div class="bc7-empty">No hay transferencias completadas fuera del período pendientes de atribución.</div>';
       const declaration=detail.declaracion_dinero;
@@ -1641,7 +1641,7 @@
     }else if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial){
       actionArea='<div class="bc7-note"><b>Lista para comenzar.</b> El servidor valida fecha, responsable y secuencia.<form><label class="bc7-field">Motivo de excepción<input id="bc7-start-reason" maxlength="1000" placeholder="Solo si abres fuera del horario"></label><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-start="'+esc(s.id)+'" '+(!isAssigned?'disabled':'')+'>Comenzar jornada</button></div><p class="bc7-msg" id="bc7-start-msg"></p></form></div>';
     }else if(status==='EN_CURSO'&&s.es_minorista===true){
-      actionArea='<div class="bc7-note"><b>Completar jornada y enviarla a Administración.</b><p>Registra los importes diarios y completa los cuatro checks. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
+      actionArea='<div class="bc7-note"><b>Completar jornada y enviarla a Administración.</b><p>Registra los importes diarios y completa los cinco pasos. Después entrega la jornada: el Dueño podrá contar el efectivo y resolver las pendientes; el Turno maestro seguirá abierto para la revisión y aprobación final.</p><form data-bc7-close-form="'+esc(s.id)+'" data-bc7-cash-mode="daily">'+
         '<details class="bc7-cash-declarations-fold"><summary>Declaraciones de efectivo por día</summary>'+cashDaysManagerShellHtml(detail,isAssigned,status)+'</details>'+
         '<label class="bc7-field">Motivo de cierre anticipado o tiempo extra (opcional)<input id="bc7-close-reason" maxlength="1000" placeholder="Solo si cerraste antes o trabajaste tiempo extra"><small class="bc7-muted">Entregar los datos después de las 23:00 no requiere motivo: la jornada termina a la hora programada y el registro queda fechado por separado.</small></label>'+
         '<div class="bc7-actions"><button type="button" class="bc7-btn" data-bc7-save-cash-days '+(!isAssigned||!tramo?'disabled':'')+'>Guardar importes</button><button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned||detail.checklist?.lista_para_conteo!==true?'disabled':'')+'>Cerrar jornada y enviar a Administración</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">Para finalizar, primero confirma el inventario final.</p>')+'</form></div>';
