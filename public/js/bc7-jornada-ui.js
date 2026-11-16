@@ -1086,15 +1086,15 @@
     const sharedLines=new Map(arr(delivery&&delivery.lineas).map(x=>[String(x.producto_id),x]));
     const accepted=!!delivery&&delivery.estado==='ACEPTADA';
     const sharedNote=delivery
-      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">El expediente conserva el conteo declarado originalmente. La cantidad efectiva aprobada ya aparece en la tabla de este inventario inicial; el detalle declarado/recibido se muestra junto a cada producto. No se repite una segunda tabla.</p>'+
-        (accepted?'<p class="bc7-note">Cantidad vigente compartida confirmada entre el FINAL de origen y el INITIAL de destino.</p>':
+      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">El valor declarado y la cantidad recibida se conservan en este expediente. La cantidad física aceptada alimenta el inventario inicial del destino; el FINAL del origen se mantiene independiente. No se repite una segunda tabla.</p>'+
+        (accepted?'<p class="bc7-note">La cantidad física aceptada quedó confirmada como inventario inicial del destino; el FINAL del origen no se modifica por esta recepción.</p>':
           '<p class="bc7-note">La cantidad efectiva todavía no está aceptada. No se puede operar en la jornada de destino.</p>')+
         '</div>'
       :'';
     return '<p class="bc7-muted">Confirmado '+esc(fmtDateHuman(cut.confirmado_en||cut.creado_en))+' · responsable '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
       (cut.origen_corte_id?'<p class="bc7-muted">Este inventario inicial pertenece a la entrega compartida del corte final anterior.</p>':'')+
       (cut.observacion?'<p class="bc7-muted">Nota: '+esc(cut.observacion)+'</p>':'')+
-      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>'+(accepted?'Cantidad efectiva compartida':'Conteo registrado')+'</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
+      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>'+(accepted?'Cantidad efectiva compartida':'Conteo registrado')+'</th><th>Saldo del sistema guardado (referencia)</th><th>Diferencia</th></tr></thead><tbody>'+
       lines.map(l=>{
         const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};
         const shared=sharedLines.get(String(l.producto_id));
@@ -1104,7 +1104,7 @@
         const audit=hasEffective?'<small>Declarado originalmente: '+esc(qty(shared.cantidad_declarada))+' · recibido físicamente: '+esc(qty(shared.cantidad_recibida))+'</small>':'';
         return '<tr><td>'+esc(p.nombre||'Producto no identificado')+'</td><td><b>'+esc(qty(effective))+'</b>'+audit+'</td><td>'+esc(qty(l.stock_sistema))+'</td><td class="bc7-diff '+(d===0?'good':'bad')+'">'+(d>0?'+':'')+esc(qty(d))+'</td></tr>';
       }).join('')+
-      '</tbody></table></div>'+sharedNote;
+      '</tbody></table></div><p class="bc7-muted">Diferencia inicial = cantidad efectiva compartida menos saldo del sistema guardado al crear este corte. No compara la declaración con la recepción ni demuestra por sí sola una pérdida.</p>'+sharedNote;
   }
 
   function receiveAttemptKey(deliveryId){
@@ -1331,7 +1331,7 @@
     const delivery=[shared.entrada,shared.salida].find(x=>x&&x.estado==='PENDIENTE_REVISION');
     if(!detail.is_admin||!delivery)return '';
     const lines=arr(delivery.lineas);
-    return '<div class="bc7-note"><b>Revisión del dueño · diferencia de recepción</b><p class="bc7-muted">No se ha creado el inventario inicial de destino. Al aprobar, las diferencias se guardarán como correcciones auditadas del inventario final anterior y la cantidad física recibida se convertirá en el inventario inicial de esta jornada. El corte original se conserva. Rechazar exige un nuevo conteo.</p>'+
+    return '<div class="bc7-note"><b>Revisión del dueño · diferencia de recepción</b><p class="bc7-muted">No se ha creado el inventario inicial de destino. Al aprobar, las diferencias quedarán registradas en este expediente de recepción y la cantidad física aceptada se convertirá en el inventario inicial de destino. El inventario final cerrado del origen permanece intacto; cualquier corrección histórica del origen requiere una decisión separada del Dueño. Rechazar exige un nuevo conteo.</p>'+
       '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Declarado</th><th>Recibido</th><th>Diferencia</th></tr></thead><tbody>'+
       lines.map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td>'+esc(l.cantidad_recibida==null?'—':qty(l.cantidad_recibida))+'</td><td class="bc7-diff '+(Number(l.diferencia)===0?'good':'bad')+'">'+(Number(l.diferencia)>0?'+':'')+esc(qty(l.diferencia||0))+'</td></tr>').join('')+
       '</tbody></table></div><label class="bc7-field">Motivo obligatorio de la decisión<input data-bc7-delivery-decision-note maxlength="1000" placeholder="Motivo de aprobación o rechazo"></label>'+
@@ -1738,7 +1738,7 @@
     const message=document.querySelector('[data-bc7-delivery-decision-msg]');
     if(!note){msg(message,'Registra el motivo de la decisión.','error');return;}
     if(!confirm(decision==='APROBAR'
-      ?'Vas a aprobar la recepción. Las diferencias corregirán el inventario final anterior mediante auditoría y crearán el inventario inicial con la cantidad física recibida. El conteo original se conserva. ¿Confirmas?'
+      ?'Vas a aprobar la recepción. Las diferencias quedarán registradas en el expediente y se creará el inventario inicial con la cantidad física recibida. El inventario final del origen no se modificará. ¿Confirmas?'
       :'Vas a rechazar esta recepción. La jornada seguirá bloqueada y la dependienta tendrá que realizar otro conteo físico. ¿Confirmas?'))return;
     if(!busy(btn,true))return;
     try{
@@ -1747,7 +1747,7 @@
       });
       if(state.selected)await openWorkspace(state.selected);
       setStatus(decision==='APROBAR'
-        ?'Diferencia aprobada. La existencia efectiva quedó compartida en el FINAL y el INITIAL.'
+        ?'Recepción aprobada. La diferencia quedó en el expediente y la cantidad física recibida pasó al inventario inicial; el FINAL del origen no se modificó.'
         :'Diferencia rechazada. Se exige un nuevo conteo y la jornada sigue bloqueada.','ok');
     }catch(e){msg(message,'No se pudo resolver la entrega. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
