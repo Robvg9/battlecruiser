@@ -1433,10 +1433,17 @@
       '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button>'+
       '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
     '</div>';
+    const cashDeclared=checks.declaracion_dinero?.completado===true;
+    const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
+      '<span class="bc7-checklist-mark">'+(cashDeclared?'✓':'5')+'</span>'+
+      '<div class="bc7-checklist-copy"><b>Declaración de dinero</b><small>'+(cashDeclared?'Importe final guardado · pendiente de conteo físico independiente':'Falta guardar la declaración final de efectivo')+'</small></div>'+
+      '<button type="button" class="bc7-btn" data-bc7-checklist-cash>Ir a declaraciones</button>'+
+      '<span class="bc7-checklist-state">'+(cashDeclared?'✓ Registrada':'Pendiente')+'</span>'+
+    '</div>';
     return '<section class="bc7-checklist" aria-label="Checklist de cierre de la dependienta">'+
-      '<div class="bc7-checklist-head"><div><h4>Checklist de Sheila</h4><p>Completa estos cuatro pasos. Las entradas/transferencias las registra el Dueño; no aparecen aquí.</p></div>'+
-      '<span class="bc7-checklist-count">'+(manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0))+'/4</span></div>'+
-      rows+finalRow+
+      '<div class="bc7-checklist-head"><div><h4>Checklist de la jornada</h4><p>Completa los cinco pasos. Las entradas/transferencias las registra el Dueño y se muestran en la vista previa del cuadro.</p></div>'+
+      '<span class="bc7-checklist-count">'+(manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0)+(cashDeclared?1:0))+'/5</span></div>'+
+      rows+finalRow+cashRow+
       '<p class="bc7-muted">Si registras un nuevo gasto, reinversión o baja después de confirmar, el sistema reabre automáticamente ese check.</p>'+
     '</section>';
   }
@@ -2438,6 +2445,14 @@
     if(checklistToggle){e.preventDefault();toggleChecklistBlock(checklistToggle);return;}
     const checklistInventory=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-inventory]'):null;
     if(checklistInventory){e.preventDefault();activateWorkspaceTab('inventario');return;}
+    const checklistCash=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-cash]'):null;
+    if(checklistCash){
+      e.preventDefault();activateWorkspaceTab('operacion');
+      const fold=document.querySelector('#bc7-workspace-body .bc7-cash-declarations-fold');
+      if(fold){fold.open=true;fold.scrollIntoView({behavior:'smooth',block:'center'});}
+      else setStatus('Las declaraciones de efectivo no están disponibles en el estado actual.','error');
+      return;
+    }
     const tab=e.target&&e.target.closest?e.target.closest('[data-bc7-workspace-tab]'):null;
     if(tab){e.preventDefault();activateWorkspaceTab(tab.getAttribute('data-bc7-workspace-tab'));return;}
     const back=e.target&&e.target.closest?e.target.closest('[data-bc7-back-calendar]'):null;
