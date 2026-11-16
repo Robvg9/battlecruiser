@@ -32,6 +32,12 @@ test("Final declaration approval is independent and available before session com
   assert.match(MIGRATION,/DECLARACION_APROBADA/,"approved declaration remains eligible for later physical count");
 });
 
+test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
+  assert.match(MIGRATION,/fecha_programada_fin/);
+  assert.match(MIGRATION,/BETWEEN v_session\.fecha_programada AND COALESCE\(v_session\.fecha_programada_fin,v_session\.fecha_programada\)/);
+  assert.match(MIGRATION,/BETWEEN v_p\.fecha AND coalesce\(v_p\.fecha_fin,v_p\.fecha\)/);
+  assert.match(MIGRATION,/linked\.transferencia_id = t\.id/);
+});
 test("A rejected declaration can be corrected without erasing the prior value from audit history",()=>{
   assert.match(MIGRATION,/DINERO_REDECLARADO/);
   assert.match(MIGRATION,/monto_anterior',v_old_amount/);
