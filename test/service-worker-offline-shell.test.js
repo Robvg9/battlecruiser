@@ -16,16 +16,13 @@ function createWorker(options = {}) {
   const entries = new Map();
   const precacheRequests = [];
   const cache = {
-    addAll: async function(urls) {
-      if (options.precacheError) throw new Error('simulated precache failure');
-      for (const item of urls) {
-        const url = new URL(item, ORIGIN).href;
-        precacheRequests.push(new URL(url).pathname);
-        entries.set(url, new Response('cached:' + new URL(url).pathname, { status: 200 }));
-      }
+    addAll: async function() {
+      throw new Error('cache.addAll must not be used by release install');
     },
     put: async function(request, response) {
-      entries.set(requestUrl(request), response.clone());
+      const url = new URL(requestUrl(request));
+      if (url.origin === ORIGIN) precacheRequests.push(url.pathname);
+      entries.set(url.href, response.clone());
     },
     match: async function(request, matchOptions = {}) {
       const url = new URL(requestUrl(request));
@@ -50,12 +47,15 @@ function createWorker(options = {}) {
     delete: async function() { return true; }
   };
   const self = {
-    location: { origin: ORIGIN, pathname: '/service-worker.js' },
+    location: { origin: ORIGIN, pathname: '/service-worker.js', href: ORIGIN + '/service-worker.js' },
     clients: { claim: async function() {} },
     skipWaiting: function() {},
     addEventListener: function(name, handler) { listeners.set(name, handler); }
   };
   const networkFetch = options.fetch || (async function(request) {
+    if (options.precacheError && new URL(request.url).origin === ORIGIN) {
+      throw new Error('simulated precache failure');
+    }
     return new Response('network:' + new URL(request.url).pathname, { status: 200 });
   });
   vm.runInNewContext(source, {
