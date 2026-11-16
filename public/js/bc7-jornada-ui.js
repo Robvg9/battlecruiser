@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.36 — recepción física de diferencias en dos pasos; calendario histórico de solo lectura.
+// v7.37 — vista previa de cuadro, checklist 5/5 y efectivo desacoplado del conteo físico.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
