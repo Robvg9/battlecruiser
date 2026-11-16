@@ -15,17 +15,15 @@ function createWorker(options = {}) {
   const listeners = new Map();
   const entries = new Map();
   const precacheRequests = [];
+  const cacheNames = Array.isArray(options.existingCacheNames) ? options.existingCacheNames.slice() : [];
   const cache = {
-    addAll: async function(urls) {
-      if (options.precacheError) throw new Error('simulated precache failure');
-      for (const item of urls) {
-        const url = new URL(item, ORIGIN).href;
-        precacheRequests.push(new URL(url).pathname);
-        entries.set(url, new Response('cached:' + new URL(url).pathname, { status: 200 }));
-      }
+    addAll: async function() {
+      throw new Error('cache.addAll must not be used by release install');
     },
     put: async function(request, response) {
-      entries.set(requestUrl(request), response.clone());
+      const url = new URL(requestUrl(request));
+      if (url.origin === ORIGIN) precacheRequests.push(url.pathname);
+      entries.set(url.href, response.clone());
     },
     match: async function(request, matchOptions = {}) {
       const url = new URL(requestUrl(request));
@@ -44,37 +42,73 @@ function createWorker(options = {}) {
     }
   };
   const caches = {
-    open: async function() { return cache; },
+    open: async function(name) { if (name && !cacheNames.includes(name)) cacheNames.push(name); return cache; },
     match: function(request, matchOptions) { return cache.match(request, matchOptions); },
-    keys: async function() { return ['battlecruiser-static-9.4.77']; },
+    keys: async function() { return cacheNames.slice(); },
     delete: async function() { return true; }
   };
+  let claimCount = 0;
   const self = {
-    location: { origin: ORIGIN, pathname: '/service-worker.js' },
-    clients: { claim: async function() {} },
+    location: { origin: ORIGIN, pathname: '/service-worker.js', href: ORIGIN + '/service-worker.js' },
+    clients: { claim: async function() { claimCount++; } },
     skipWaiting: function() {},
     addEventListener: function(name, handler) { listeners.set(name, handler); }
   };
-  const networkFetch = options.fetch || (async function(request) {
+  let networkFetch = options.fetch || (async function(request) {
+    if (options.precacheError && new URL(request.url).origin === ORIGIN) {
+      throw new Error('simulated precache failure');
+    }
     return new Response('network:' + new URL(request.url).pathname, { status: 200 });
   });
+  // Keep a stable VM fetch function whose closure observes later online/offline changes.
+  const fetchAdapter = function(request) { return networkFetch(request); };
   vm.runInNewContext(source, {
     self: self,
     caches: caches,
-    fetch: networkFetch,
+    fetch: fetchAdapter,
     Request: Request,
     Response: Response,
     URL: URL,
     Promise: Promise,
     console: console
   }, { filename: 'service-worker.js' });
-  return { listeners, entries, precacheRequests, cache, networkFetch };
+  return { listeners, entries, precacheRequests, cache, cacheNames, get claimCount() { return claimCount; }, networkFetch, setNetworkFetch: function(nextFetch) { networkFetch = nextFetch; } };
 }
 
 async function dispatchInstall(worker) {
   const waits = [];
   worker.listeners.get('install')({ waitUntil: function(promise) { waits.push(promise); } });
   await Promise.all(waits);
+}
+
+async function dispatchActivate(worker) {
+  const waits = [];
+  worker.listeners.get('activate')({ waitUntil: function(promise) { waits.push(promise); } });
+  await Promise.all(waits);
+}
+
+test('first installation claims its initial document when no prior release cache exists', async () => {
+  const worker = createWorker();
+  await dispatchInstall(worker);
+  await dispatchActivate(worker);
+  assert.equal(worker.claimCount, 1);
+});
+
+test('an update does not claim existing documents while an older release cache exists', async () => {
+  const worker = createWorker({ existingCacheNames: ['battlecruiser-static-9.5.114'] });
+  await dispatchInstall(worker);
+  await dispatchActivate(worker);
+  assert.equal(worker.claimCount, 0);
+  assert.ok(worker.cacheNames.includes('battlecruiser-static-9.5.114'));
+});
+
+
+function simulateOffline(worker) {
+  worker.setNetworkFetch(async function(request) {
+    const url = new URL(request.url);
+    if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
+    throw new TypeError('offline');
+  });
 }
 
 async function dispatchFetch(worker, request) {
@@ -131,56 +165,36 @@ test('successful same-origin shell requests are cached for subsequent offline us
 });
 
 test('offline fallback serves the exact cached app.js release URL', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const appVersion = source.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)[1];
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=' + appVersion));
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), 'cached:/app.js');
+  assert.equal(await response.text(), 'network:/app.js');
 });
 
 test('offline fallback fails closed when an explicit app.js release version is not cached', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=9.4.77'));
   assert.equal(response.status, 0);
 });
 
 test('offline fallback serves the exact app root from the precache', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/'));
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), 'cached:/');
+  assert.equal(await response.text(), 'network:/');
 });
 
 test('offline fallback rejects a cache-busting query on an unversioned navigation URL', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/?offline_check=1'));
   assert.equal(response.status, 0);
 });

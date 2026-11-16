@@ -8,6 +8,9 @@ const path = require("node:path");
 const ROOT = path.join(__dirname, "..");
 const read = (relativePath) => fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 const core = read("public/js/core.js");
+const auth = read("public/js/auth.js");
+const theme = read("public/js/m27-5-theme-dark-reset.js");
+const style = read("public/style.css");
 const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
 const indexHtml = read("public/index.html");
@@ -66,7 +69,7 @@ test("PWA shell, app loader and Service Worker use one cache-isolated release ve
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/)?.[1];
   const swVersion = serviceWorker.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
   const htmlAppVersion = indexHtml.match(/app\.js\?v=([^"']+)/)?.[1];
-  assert.equal(appVersion, "9.5.114");
+  assert.equal(appVersion, "9.5.115");
   assert.equal(swVersion, appVersion);
   assert.equal(htmlAppVersion, appVersion);
   assert.match(indexHtml, new RegExp("v" + appVersion));
@@ -136,4 +139,85 @@ test("Service Worker: offline fallback never ignores an explicit asset version",
     "an explicitly versioned request must fail closed when that exact version is absent");
   assert.match(fallback, /candidates\.length !== 1/,
     "unversioned fallback must reject ambiguous cached pathname variants");
+});
+
+
+test("Service Worker installs each shell asset from a fresh network response", () => {
+  assert.match(serviceWorker, /function precacheLocalAssets\(cache, assetUrls\)/);
+  assert.match(serviceWorker, /new Request\(absoluteUrl,\s*\{[\s\S]*?cache: "no-store"/);
+  assert.match(serviceWorker, /return cache\.put\(request, response\.clone\(\)\)/);
+  assert.match(serviceWorker, /precacheLocalAssets\(cache, PRECACHE_SHELL\.concat\(PRECACHE_STATIC\)\)/);
+  assert.doesNotMatch(serviceWorker, /(?:^|\n)\s*cache\.addAll\(/,
+    "install must not seed this release cache from stale browser HTTP-cache bytes");
+});
+
+test("Service Worker bypasses browser HTTP cache for shell navigation HTML", () => {
+  const start = serviceWorker.indexOf("if (isAppShellRequest(url))");
+  const end = serviceWorker.indexOf("event.respondWith(caches.match(request)", start);
+  assert.ok(start >= 0 && end > start, "shell navigation fetch handler must be present");
+  const shellFetch = serviceWorker.slice(start, end);
+  assert.match(shellFetch, /request.mode === "navigate"/);
+  assert.match(shellFetch, /new Request\(request.url/);
+  assert.match(shellFetch, /mode: "same-origin"/);
+  assert.match(shellFetch, /credentials: "same-origin"/);
+  assert.match(shellFetch, /cache: "no-store"/,
+    "app-shell HTML must not come from the browser HTTP cache");
+  assert.match(shellFetch, /cache-control/);
+  assert.match(shellFetch, /return cacheSuccessfulResponse\(request, response\)/,
+    "the fresh response is cached only in this release's versioned SW cache");
+});
+
+test("Service Worker updates wait for an explicit, stable handoff", () => {
+  const installStart = serviceWorker.indexOf('self.addEventListener("install"');
+  const messageStart = serviceWorker.indexOf('self.addEventListener("message"');
+  assert.ok(installStart >= 0 && messageStart > installStart, "install and message handlers must exist");
+  const installBlock = serviceWorker.slice(installStart, messageStart);
+  assert.doesNotMatch(installBlock, /skipWaiting\s*\(/,
+    "install must not activate an update while an existing document is booting");
+  const activateStart = serviceWorker.indexOf('self.addEventListener("activate"');
+  const fetchStart = serviceWorker.indexOf('self.addEventListener("fetch"');
+  assert.ok(activateStart >= 0 && fetchStart > activateStart, "activate handler must be present");
+  const activateBlock = serviceWorker.slice(activateStart, fetchStart);
+  assert.match(activateBlock, /previousReleaseCacheExists/);
+  assert.match(activateBlock, /if \(!previousReleaseCacheExists\) return self\.clients\.claim\(\)/,
+    "only a first installation with no older release cache may claim the initial document");
+  assert.doesNotMatch(activateBlock, /caches\.delete\(/,
+    "activation must preserve previous release caches used by open tabs");
+  assert.match(serviceWorker, /event\.data\.type === "SKIP_WAITING"/,
+    "only an explicit update action may activate the waiting worker");
+  assert.match(auth, /updateViaCache:\s*"none"/,
+    "browser HTTP cache must not hide a changed Service Worker script");
+  assert.match(auth, /bc:pwa-update-ready/,
+    "the registration must announce a waiting worker to the UI");
+  assert.match(app, /waiting\.postMessage\(\{ type: "SKIP_WAITING" \}\)/,
+    "the user-facing update button must trigger worker activation");
+  assert.doesNotMatch(core, /CLAIM_CLIENT|recuperarControlServiceWorker/,
+    "core.js must not auto-claim a controller mid-boot");
+  assert.match(app, /PRUNE_OLD_RELEASES/,
+    "old release caches are pruned only after the UI is ready");
+  assert.match(serviceWorker, /if \(clients\.length > 1\) return/,
+    "older caches must remain while another tab may still use them");
+});
+
+test("Saved light/dark preference is applied before first paint", () => {
+  const bootstrapAt = indexHtml.indexOf('id="bc-theme-first-paint"');
+  const stylesheetAt = indexHtml.indexOf('href="style.css?v=9.5.115"');
+  const themeScriptAt = indexHtml.indexOf('js/m27-5-theme-dark-reset.js?v=27.5a3');
+  const appScriptAt = indexHtml.indexOf('app.js?v=9.5.115');
+  assert.ok(bootstrapAt >= 0 && bootstrapAt < stylesheetAt,
+    "the saved preference bootstrap must execute before the main stylesheet");
+  assert.ok(themeScriptAt >= 0 && themeScriptAt < appScriptAt,
+    "the full theme module must load before the dynamic module registry");
+  assert.match(indexHtml, /localStorage\.getItem\("bc-ui-preferences-v2"\)/);
+  assert.match(indexHtml, /data-bc-theme/);
+  assert.match(style, /html\[data-bc-theme="light"\]/,
+    "critical CSS must render the persisted light theme without waiting for body classes");
+  assert.match(theme, /setAttribute\('data-bc-theme', appearance\)/,
+    "runtime theme changes must keep the first-paint state synchronized");
+  assert.ok(indexHtml.includes('js/core.js?v=9.5.115'));
+  assert.ok(indexHtml.includes('js/auth.js?v=9.5.115'));
+  assert.ok(indexHtml.includes('js/m27-5-theme-dark-reset.js?v=27.5a3'));
+  assert.ok(serviceWorker.includes('./js/core.js?v=9.5.115'));
+  assert.ok(serviceWorker.includes('./js/auth.js?v=9.5.115'));
+  assert.ok(serviceWorker.includes('./js/m27-5-theme-dark-reset.js?v=27.5a3'));
 });

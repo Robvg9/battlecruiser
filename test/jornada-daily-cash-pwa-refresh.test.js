@@ -12,15 +12,15 @@ const SW = read("public/service-worker.js");
 const UI = read("public/js/bc7-jornada-ui.js");
 const CSS = read("public/style.css");
 
-test("PWA shell pins one fresh 9.5.114 release and Jornada UI 7.32", () => {
-  assert.ok(APP.includes('const VERSION="9.5.114";'));
-  assert.ok(INDEX.includes('style.css?v=9.5.100'));
-  assert.ok(INDEX.includes('app.js?v=9.5.114'));
+test("PWA shell pins one fresh 9.5.115 release and Jornada UI 7.32", () => {
+  assert.ok(APP.includes('const VERSION="9.5.115";'));
+  assert.ok(INDEX.includes('style.css?v=9.5.115'));
+  assert.ok(INDEX.includes('app.js?v=9.5.115'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(INDEX.includes('app-footer-version">v9.5.114 — BattleCruiser'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.114"'));
-  assert.ok(SW.includes('./app.js?v=9.5.114'));
-  assert.ok(SW.includes('./style.css?v=9.5.100'));
+  assert.ok(INDEX.includes('app-footer-version">v9.5.115 — BattleCruiser'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.115"'));
+  assert.ok(SW.includes('./app.js?v=9.5.115'));
+  assert.ok(SW.includes('./style.css?v=9.5.115'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.32"]'));
   assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.32'));
@@ -28,12 +28,15 @@ test("PWA shell pins one fresh 9.5.114 release and Jornada UI 7.32", () => {
   assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261113.4'));
 });
 
-test("PWA update notice creates its action button before binding the click", () => {
+test("PWA update banner waits for the user-approved worker activation before reloading", () => {
   assert.match(APP, /var button = document\.createElement\("button"\)/);
   assert.match(APP, /button\.textContent = "Actualizar ahora"/);
   assert.match(APP, /button\.addEventListener\("click"/);
-  assert.match(APP, /notice\.appendChild\(button\)/);
-  assert.doesNotMatch(APP, /notice\.querySelector\("button"\)\.addEventListener/);
+  assert.match(APP, /aviso\.appendChild\(button\)/);
+  assert.match(APP, /waiting\.postMessage\(\{ type: "SKIP_WAITING" \}\)/);
+  assert.match(APP, /waiting\.state === "activated"/);
+  assert.match(APP, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(APP, /controllerchange[\s\S]*?window\.location\.reload/);
 });
 
 test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
