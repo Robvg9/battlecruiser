@@ -704,7 +704,12 @@ async function main() {
   report.evidence.phase = "online_warm";
   const warmResponseStart = responses.length;
   await reloadAndWait(false);
-  const warm = await waitUntil("shell warm con versión esperada", shellSnapshotPredicate(), 10000);
+  const warmPredicate = "(()=>{const s=" + pageSnapshotExpression() +
+    ";return s.readyState!=='loading'&&s.loginForm&&s.usernameField&&s.passwordField&&" +
+    "window.__BC_UI_READY_RESOLVED__===true&&s.version===" + JSON.stringify(expectedVersion) +
+    "?s:null})()";
+  const warm = await waitUntil("shell warm con versión esperada", warmPredicate, 10000);
+  report.evidence.onlineWarm = warm;
   assert(warm.readyState !== "loading" && warm.version === expectedVersion,
     "La segunda navegación cálida no terminó con la versión esperada.");
   await evaluate("document.readyState === 'complete' ? true : new Promise(resolve => window.addEventListener('load',()=>resolve(true),{once:true}))");
