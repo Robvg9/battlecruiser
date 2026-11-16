@@ -11,12 +11,32 @@ var PRECACHE_STATIC = ["./manifest.json", "./favicon.png", "./icons/icon-192x192
 // The UMD Supabase client is a required runtime dependency, so cache this pinned public CDN asset for offline boot.
 var BC_OFFLINE_EXTERNAL = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"];
 
+function precacheLocalAssets(cache, assetUrls) {
+  return Promise.all(assetUrls.map(function(assetUrl) {
+    var absoluteUrl = new URL(assetUrl, self.location.href).toString();
+    // cache.addAll() may reuse a stale browser HTTP-cache response for index.html.
+    // Fetch each exact release asset with no-store, then write those bytes to this
+    // release's named Cache Storage bucket.
+    var request = new Request(absoluteUrl, {
+      mode: "same-origin",
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    return fetch(request).then(function(response) {
+      if (!response || !response.ok) {
+        throw new Error("Failed to precache required app asset: " + assetUrl);
+      }
+      return cache.put(request, response.clone());
+    });
+  }));
+}
+
 self.addEventListener("install", function(event) {
   // Keep a new release waiting until the user explicitly finishes the current page.
   event.waitUntil(caches.open(BC_STATIC).then(function(cache) {
     // Do not silently swallow a failed shell precache: an incomplete install
     // must not replace a working Service Worker with an offline-broken one.
-    return cache.addAll(PRECACHE_SHELL.concat(PRECACHE_STATIC)).then(function() {
+    return precacheLocalAssets(cache, PRECACHE_SHELL.concat(PRECACHE_STATIC)).then(function() {
       return Promise.all(BC_OFFLINE_EXTERNAL.map(function(assetUrl) {
         var request = new Request(assetUrl, { mode: "cors", cache: "no-store" });
         return fetch(request).then(function(response) {
