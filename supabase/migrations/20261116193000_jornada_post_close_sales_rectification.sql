@@ -29,6 +29,13 @@ CREATE INDEX IF NOT EXISTS turno_jornada_rect_post_cierre_latest_idx
   ON public.turno_jornada_rectificaciones_post_cierre
   (turno_sesion_id, producto_id, version DESC);
 
+CREATE INDEX IF NOT EXISTS turno_jornada_rect_post_cierre_turno_idx
+  ON public.turno_jornada_rectificaciones_post_cierre (turno_id);
+CREATE INDEX IF NOT EXISTS turno_jornada_rect_post_cierre_producto_idx
+  ON public.turno_jornada_rectificaciones_post_cierre (producto_id);
+CREATE INDEX IF NOT EXISTS turno_jornada_rect_post_cierre_actor_idx
+  ON public.turno_jornada_rectificaciones_post_cierre (creado_por);
+
 ALTER TABLE public.turno_jornada_rectificaciones_post_cierre ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.turno_jornada_rectificaciones_post_cierre FROM PUBLIC, anon, authenticated;
 
