@@ -41,19 +41,21 @@ test("owner-approved physical differences produce an audited correction of previ
   assert.ok(migration.includes("El Turno está cerrado. Solo se permite corregir"));
   assert.ok(migration.includes("_bc7_crear_inicial_desde_entrega"));
 });
-test("completed sessions expose no operational management or rescheduling",()=>{
+test("completed sessions expose read-only viewing but no operational management or rescheduling",()=>{
   assert.ok(jornada.includes("const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status)"));
-  assert.ok(jornada.includes("!rest&&!isTerminal&&r.sesion_id"));
+  assert.ok(jornada.includes("const viewable=status==='COMPLETADA'"));
+  assert.ok(jornada.includes("viewable?'Ver jornada':'Gestionar jornada'"));
+  assert.ok(jornada.includes("data-bc7-open="));
   assert.ok(jornada.includes("state.admin&&!isTerminal"));
 });
 test("incoming count is blank by default",()=>{
   assert.ok(jornada.includes('placeholder="Contar físicamente"'));
 });
 test("PWA release and service worker cache keys are aligned",()=>{
-  assert.ok(app.includes('const VERSION="9.5.118"'));
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.34"]'));
-  assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.118"]'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.118"'));
-  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.34'));
-  assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.118'));
+  assert.ok(app.includes('const VERSION="9.5.119"'));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.35"]'));
+  assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.119"]'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.119"'));
+  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.35'));
+  assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.119'));
 });
