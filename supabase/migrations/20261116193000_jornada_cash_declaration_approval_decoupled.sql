@@ -493,4 +493,41 @@ END;
 $function$;
 GRANT EXECUTE ON FUNCTION public.bc7_resolver_declaracion_jornada(uuid,text,text) TO authenticated;
 
+
+CREATE OR REPLACE FUNCTION public.bc_declarar_dinero(p_turno_tramo_id uuid, p_monto numeric)
+ RETURNS turno_declaraciones
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare t public.turno_tramos; r public.turno_declaraciones;
+begin
+  if auth.uid() is null then raise exception 'Usuario no autenticado.' using errcode='42501'; end if;
+  select * into t from public.turno_tramos where id=p_turno_tramo_id for update;
+  if t.id is null or t.estado not in ('ACTIVO','INTERRUMPIDO','COMPLETADO') then raise exception 'Tramo inválido'; end if;
+  if t.usuario_id<>auth.uid() then raise exception 'Solo el operador del tramo puede declarar'; end if;
+  if p_monto is null or p_monto<0 then raise exception 'Monto inválido'; end if;
+  SELECT * INTO r FROM public.turno_declaraciones WHERE turno_tramo_id=t.id FOR UPDATE;
+  IF FOUND THEN
+    IF r.estado_aprobacion<>'RECHAZADA' OR r.monto_contado IS NOT NULL THEN
+      RAISE EXCEPTION 'Este tramo ya tiene una declaración de dinero que no puede sobrescribirse.';
+    END IF;
+    UPDATE public.turno_declaraciones
+    SET monto=p_monto,estado_aprobacion='PENDIENTE',aprobado_por=NULL,aprobado_at=NULL,
+        monto_contado=NULL,contado_por=NULL,contado_at=NULL,diferencia=NULL,observacion_conteo=NULL
+    WHERE id=r.id RETURNING * INTO r;
+    INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo,payload)
+    VALUES(t.turno_id,t.turno_sesion_id,t.id,auth.uid(),'DINERO_REDECLARADO',
+      jsonb_build_object('declaracion_id',r.id,'monto_anterior',r.monto,'monto_nuevo',p_monto,'estado_anterior','RECHAZADA'));
+  ELSE
+    INSERT INTO public.turno_declaraciones(turno_id,turno_sesion_id,turno_tramo_id,usuario_id,monto)
+    VALUES(t.turno_id,t.turno_sesion_id,t.id,t.usuario_id,p_monto) RETURNING * INTO r;
+    INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo,payload)
+    VALUES(t.turno_id,t.turno_sesion_id,t.id,auth.uid(),'DINERO_DECLARADO',jsonb_build_object('monto',p_monto));
+  END IF;
+  return r;
+end;
+$function$
+
+
 COMMIT;
