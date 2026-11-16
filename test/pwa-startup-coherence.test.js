@@ -147,23 +147,23 @@ test("Service Worker updates wait for an explicit, stable handoff", () => {
   const messageStart = serviceWorker.indexOf('self.addEventListener("message"');
   assert.ok(installStart >= 0 && messageStart > installStart, "install and message handlers must exist");
   const installBlock = serviceWorker.slice(installStart, messageStart);
-  assert.doesNotMatch(installBlock, /skipWaiting\\s*\\(/,
+  assert.doesNotMatch(installBlock, /skipWaiting\s*\(/,
     "install must not activate an update while an existing document is booting");
-  assert.doesNotMatch(serviceWorker, /clients\\.claim\\s*\\(/,
+  assert.doesNotMatch(serviceWorker, /clients\.claim\s*\(/,
     "a new worker must not take over existing tabs without a reload");
-  assert.match(serviceWorker, /event\\.data\\.type === "SKIP_WAITING"/,
+  assert.match(serviceWorker, /event\.data\.type === "SKIP_WAITING"/,
     "only an explicit update action may activate the waiting worker");
-  assert.match(auth, /updateViaCache:\\s*"none"/,
+  assert.match(auth, /updateViaCache:\s*"none"/,
     "browser HTTP cache must not hide a changed Service Worker script");
   assert.match(auth, /bc:pwa-update-ready/,
     "the registration must announce a waiting worker to the UI");
-  assert.match(app, /waiting\\.postMessage\\(\\{ type: "SKIP_WAITING" \\}\\)/,
+  assert.match(app, /waiting\.postMessage\(\{ type: "SKIP_WAITING" \}\)/,
     "the user-facing update button must trigger worker activation");
   assert.doesNotMatch(core, /CLAIM_CLIENT|recuperarControlServiceWorker/,
     "core.js must not auto-claim a controller mid-boot");
   assert.match(app, /PRUNE_OLD_RELEASES/,
     "old release caches are pruned only after the UI is ready");
-  assert.match(serviceWorker, /if \\(clients\\.length > 1\\) return/,
+  assert.match(serviceWorker, /if \(clients\.length > 1\) return/,
     "older caches must remain while another tab may still use them");
 });
 
@@ -176,10 +176,10 @@ test("Saved light/dark preference is applied before first paint", () => {
     "the saved preference bootstrap must execute before the main stylesheet");
   assert.ok(themeScriptAt >= 0 && themeScriptAt < appScriptAt,
     "the full theme module must load before the dynamic module registry");
-  assert.match(indexHtml, /localStorage\\.getItem\\("bc-ui-preferences-v2"\\)/);
+  assert.match(indexHtml, /localStorage\.getItem\("bc-ui-preferences-v2"\)/);
   assert.match(indexHtml, /data-bc-theme/);
-  assert.match(style, /html\\[data-bc-theme="light"\\]/,
+  assert.match(style, /html\[data-bc-theme="light"\]/,
     "critical CSS must render the persisted light theme without waiting for body classes");
-  assert.match(theme, /setAttribute\\('data-bc-theme', appearance\\)/,
+  assert.match(theme, /setAttribute\('data-bc-theme', appearance\)/,
     "runtime theme changes must keep the first-paint state synchronized");
 });
