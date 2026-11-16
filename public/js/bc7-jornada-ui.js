@@ -1085,12 +1085,10 @@
     const sharedLines=new Map(arr(delivery&&delivery.lineas).map(x=>[String(x.producto_id),x]));
     const accepted=!!delivery&&delivery.estado==='ACEPTADA';
     const sharedNote=delivery
-      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">El expediente conserva el conteo declarado originalmente. La cantidad efectiva aprobada es el único saldo vigente y se muestra igual en el FINAL de origen y en el INITIAL de destino.</p>'+
-        (accepted?'<p class="bc7-note">Cantidad vigente compartida confirmada. Ambos expedientes muestran la misma existencia efectiva.</p>':
+      ?'<div class="bc7-note"><b>Entrega compartida · '+esc(delivery.estado)+'</b><p class="bc7-muted">El expediente conserva el conteo declarado originalmente. La cantidad efectiva aprobada ya aparece en la tabla de este inventario inicial; el detalle declarado/recibido se muestra junto a cada producto. No se repite una segunda tabla.</p>'+
+        (accepted?'<p class="bc7-note">Cantidad vigente compartida confirmada entre el FINAL de origen y el INITIAL de destino.</p>':
           '<p class="bc7-note">La cantidad efectiva todavía no está aceptada. No se puede operar en la jornada de destino.</p>')+
-        '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Declarado</th><th>Recibido</th><th>Existencia efectiva</th></tr></thead><tbody>'+
-        arr(delivery.lineas).map(l=>'<tr><td>'+esc(l.nombre||'Producto')+'</td><td>'+esc(qty(l.cantidad_declarada))+'</td><td>'+esc(l.cantidad_recibida==null?'—':qty(l.cantidad_recibida))+'</td><td><b>'+esc(l.cantidad_efectiva==null?'Pendiente':qty(l.cantidad_efectiva))+'</b></td></tr>').join('')+
-        '</tbody></table></div></div>'
+        '</div>'
       :'';
     return '<p class="bc7-muted">Confirmado '+esc(fmtDateHuman(cut.confirmado_en||cut.creado_en))+' · responsable '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
       (cut.origen_corte_id?'<p class="bc7-muted">Este inventario inicial pertenece a la entrega compartida del corte final anterior.</p>':'')+
