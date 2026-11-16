@@ -623,7 +623,7 @@
     for(let index=0;index<totalDays;index++){
       const date=addDays(firstDate,index),isFinal=date===lastDate;
       const row=rows.find(item=>String(item.fecha||'').slice(0,10)===date);
-      const rejected=!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
+      const rejected=isFinal?String(declaration?.estado_aprobacion||'').toUpperCase()==='RECHAZADA':!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
       html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><div><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong></div>';
       if(isFinal&&finalSaved){
         const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
@@ -682,7 +682,7 @@
     const entries=arr(state.dailyCashData?.entregas);
     const declaration=detail.declaracion_dinero||null;
     const trancheId=detail.tramo_activo?.id;
-    const finalSaved=!!declaration&&(!trancheId||String(declaration.turno_tramo_id)===String(trancheId));
+    const finalSaved=!!declaration&&(!trancheId||String(declaration.turno_tramo_id)===String(trancheId))&&String(declaration.estado_aprobacion||'').toUpperCase()!=='RECHAZADA';
     const days=Array.from(form.querySelectorAll('[data-bc7-cash-day-row]'));
     const operations=[],missing=[];
     for(const day of days){
@@ -1922,7 +1922,7 @@
     const input=$('bc7-cash');
     const raw=input?input.value.trim():'';
     const amount=Number(raw);
-    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&String(state.detail.declaracion_dinero.estado_aprobacion||'').toUpperCase()!=='RECHAZADA';
     const message=form.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg');
     if(saved){msg(message,'El dinero del último día ya está guardado.','ok');return true;}
     if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return false;}
