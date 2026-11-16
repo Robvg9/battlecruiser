@@ -21,6 +21,15 @@ test("deferred handover retries never rewrite a delivery after a physical receip
   assert.ok(migration.includes("cantidad_efectiva=NULL"));
 });
 
+test("a correction made after handover preparation refreshes only an unreceived delivery",()=>{
+  assert.ok(migration.includes("INVENTARIO_ENTREGA_SINCRONIZADA_CORRECCION_FINAL"));
+  assert.ok(migration.includes("e.estado IN ('PENDIENTE_PROGRAMACION','PENDIENTE_RECEPCION','REQUIERE_RECUENTO')"));
+  assert.ok(migration.includes("r.estado IN ('PENDIENTE_REVISION','ACEPTADA')"));
+  assert.ok(migration.includes("SET cantidad_declarada=v_new_qty,cantidad_efectiva=NULL"));
+  assert.ok(migration.includes("cantidad_declarada_anterior"));
+  assert.ok(migration.includes("cantidad_declarada_actualizada"));
+});
+
 test("owner approval preserves source FINAL and creates destination INITIAL from accepted receipt",()=>{
   const start=migration.indexOf("CREATE OR REPLACE FUNCTION public.bc7_resolver_entrega_jornada(");
   assert.ok(start>=0);
