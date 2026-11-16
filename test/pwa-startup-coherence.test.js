@@ -66,10 +66,10 @@ test("PWA loader: app.js has one authoritative version per module", () => {
 });
 
 test("Service Worker registration starts during Auth boot without waiting for window.load",()=>{
-  assert.match(auth,/function bcRegisterServiceWorker\\(\\)/);
-  assert.match(auth,/navigator\\.serviceWorker\\.register\\("\.\\/service-worker\\.js"/);
-  assert.match(auth,/bcRegisterServiceWorker\\(\\);/);
-  assert.doesNotMatch(auth,/window\\.addEventListener\\("load",\\s*function\\(\\)\\s*\\{\\s*navigator\\.serviceWorker\\.register/,
+  assert.ok(auth.includes("function bcRegisterServiceWorker()"));
+  assert.ok(auth.includes('navigator.serviceWorker.register("./service-worker.js"'));
+  assert.ok(auth.includes("bcRegisterServiceWorker();"));
+  assert.ok(!auth.includes('window.addEventListener("load", function() {\n    navigator.serviceWorker.register'),
     "Service Worker registration must not wait for window.load or optional dynamic modules");
 });
 
