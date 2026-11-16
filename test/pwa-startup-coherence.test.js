@@ -142,6 +142,15 @@ test("Service Worker: offline fallback never ignores an explicit asset version",
 });
 
 
+test("Service Worker installs each shell asset from a fresh network response", () => {
+  assert.match(serviceWorker, /function precacheLocalAssets\(cache, assetUrls\)/);
+  assert.match(serviceWorker, /new Request\(absoluteUrl,\s*\{[\s\S]*?cache: "no-store"/);
+  assert.match(serviceWorker, /return cache\.put\(request, response\.clone\(\)\)/);
+  assert.match(serviceWorker, /precacheLocalAssets\(cache, PRECACHE_SHELL\.concat\(PRECACHE_STATIC\)\)/);
+  assert.doesNotMatch(serviceWorker, /cache\.addAll\(/,
+    "install must not seed this release cache from stale browser HTTP-cache bytes");
+});
+
 test("Service Worker bypasses browser HTTP cache for shell navigation HTML", () => {
   const start = serviceWorker.indexOf("if (isAppShellRequest(url))");
   const end = serviceWorker.indexOf("event.respondWith(caches.match(request)", start);
