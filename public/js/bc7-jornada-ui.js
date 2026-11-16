@@ -1510,7 +1510,7 @@
     const root=document.createElement('div');
     root.className='bc7-checklist-modal';
     root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');
-    root.innerHTML='<div class="bc7-checklist-modal-panel" style="max-width:1100px"><header class="bc7-checklist-modal-head"><div><p>JORNADA · VISTA DE SOLO LECTURA</p><h3>Previsualización del cuadro</h3><small>Esta vista no cierra la jornada ni modifica registros.</small></div><button type="button" class="bc7-btn" data-bc7-preview-close>Cerrar ✕</button></header><div class="bc7-checklist-modal-body"><div class="bc7-empty">Reuniendo inventario, movimientos, bajas, finanzas y efectivo…</div></div></div>';
+    root.innerHTML='<div class="bc7-checklist-modal-panel" style="max-width:1100px"><header class="bc7-checklist-modal-head"><div><p>JORNADA · PREVISUALIZACIÓN SIN CAMBIOS AUTOMÁTICOS</p><h3>Previsualización del cuadro</h3><small>La consulta no modifica registros. Solo la atribución histórica requiere una acción ADMIN explícita y confirmada.</small></div><button type="button" class="bc7-btn" data-bc7-preview-close>Cerrar ✕</button></header><div class="bc7-checklist-modal-body"><div class="bc7-empty">Reuniendo inventario, movimientos, bajas, finanzas y efectivo…</div></div></div>';
     (document.getElementById('tab-jornada')||document.body).appendChild(root);
     const close=()=>root.remove();
     root.querySelectorAll('[data-bc7-preview-close]').forEach(b=>b.addEventListener('click',close));
