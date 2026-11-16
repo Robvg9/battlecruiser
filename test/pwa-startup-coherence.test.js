@@ -142,6 +142,22 @@ test("Service Worker: offline fallback never ignores an explicit asset version",
 });
 
 
+test("Service Worker bypasses browser HTTP cache for shell navigation HTML", () => {
+  const start = serviceWorker.indexOf("if (isAppShellRequest(url))");
+  const end = serviceWorker.indexOf("event.respondWith(caches.match(request)", start);
+  assert.ok(start >= 0 && end > start, "shell navigation fetch handler must be present");
+  const shellFetch = serviceWorker.slice(start, end);
+  assert.match(shellFetch, /request.mode === "navigate"/);
+  assert.match(shellFetch, /new Request\(request.url/);
+  assert.match(shellFetch, /mode: "same-origin"/);
+  assert.match(shellFetch, /credentials: "same-origin"/);
+  assert.match(shellFetch, /cache: "no-store"/,
+    "app-shell HTML must not come from the browser HTTP cache");
+  assert.match(shellFetch, /cache-control/);
+  assert.match(shellFetch, /return cacheSuccessfulResponse\(request, response\)/,
+    "the fresh response is cached only in this release's versioned SW cache");
+});
+
 test("Service Worker updates wait for an explicit, stable handoff", () => {
   const installStart = serviceWorker.indexOf('self.addEventListener("install"');
   const messageStart = serviceWorker.indexOf('self.addEventListener("message"');
