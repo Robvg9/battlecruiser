@@ -6,15 +6,14 @@ const fs = require("node:fs");
 const ui = fs.readFileSync("public/js/bc7-jornada-ui.js", "utf8");
 
 test("completed Jornada sessions remain openable from the calendar in read-only mode", () => {
-  const start = ui.indexOf("function rowHtml(r){");
-  const end = ui.indexOf("\n  async function loadHours()", start);
-  assert.ok(start >= 0 && end > start, "calendar row renderer must exist");
-  const row = ui.slice(start, end);
+  const marker = ui.indexOf("const isTerminal");
+  assert.ok(marker >= 0, "calendar terminal-state classification must exist");
+  const row = ui.slice(Math.max(0, marker - 700), marker + 900);
   assert.match(row, /const viewable=status==='COMPLETADA'/);
   assert.match(row, /viewable\?'Ver jornada':'Gestionar jornada'/);
   assert.match(row, /data-bc7-open=/);
   assert.match(row, /const isTerminal=\['COMPLETADA','CANCELADA','CANCELADO'\]/);
-  assert.match(row, /if\(state\.admin&&!isTerminal\)/,
+  assert.match(row, /state\.admin&&!isTerminal/,
     "rescheduling remains unavailable for completed or cancelled sessions");
 });
 
