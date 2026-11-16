@@ -3,6 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const migration=fs.readFileSync("supabase/migrations/20261115132235_jornada_retro_successor_handover.sql","utf8");
+const inventoryTruth=fs.readFileSync("supabase/migrations/20261116180000_jornada_inventory_handover_truth.sql","utf8");
 const jornada=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
@@ -36,10 +37,14 @@ test("closed master turns freeze late movement classification",()=>{
   assert.ok(migration.includes("El Turno está cerrado. Las bajas/mermas quedaron congeladas"));
   assert.ok(migration.includes("bc7_clasificar_movimientos_fuera_corte"));
 });
-test("owner-approved physical differences produce an audited correction of previous final",()=>{
-  assert.ok(migration.includes("bc7_corregir_inventario_final_jornada(v_e.origen_sesion_id,v_correcciones"));
-  assert.ok(migration.includes("El Turno está cerrado. Solo se permite corregir"));
-  assert.ok(migration.includes("_bc7_crear_inicial_desde_entrega"));
+test("owner-approved physical differences stay on the receipt and do not mutate the previous FINAL",()=>{
+  const resolverStart=inventoryTruth.indexOf("CREATE OR REPLACE FUNCTION public.bc7_resolver_entrega_jornada(");
+  assert.ok(resolverStart>=0,"the truth migration must replace the resolver");
+  const resolver=inventoryTruth.slice(resolverStart);
+  assert.ok(resolver.includes("diferencias_registradas_en_recepcion"));
+  assert.ok(resolver.includes("corte_final_origen_modificado',false"));
+  assert.ok(resolver.includes("_bc7_crear_inicial_desde_entrega"));
+  assert.equal(resolver.includes("PERFORM public.bc7_corregir_inventario_final_jornada"),false);
 });
 test("completed sessions expose read-only viewing but no operational management or rescheduling",()=>{
   assert.ok(jornada.includes("const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status)"));
@@ -53,9 +58,9 @@ test("incoming count is blank by default",()=>{
 });
 test("PWA release and service worker cache keys are aligned",()=>{
   assert.ok(app.includes('const VERSION="9.5.119"'));
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.35"]'));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.36"]'));
   assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.119"]'));
   assert.ok(sw.includes('BC_SW_VERSION = "9.5.119"'));
-  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.35'));
+  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.36'));
   assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.119'));
 });

@@ -349,6 +349,9 @@ function applySql(file) {
     log("\\r\\n=== Apply Issue #333 reception admin queue/detail and verify contract ===");
     applySql("supabase/migrations/20261116090000_jornada_recepcion_admin_queue_issue_333.sql");
     applySql("test/jornada-recepcion-issue333-contract.sql");
+    log("Apply PR #341 shared inventory handover truth migration and verify late-correction guard.");
+    applySql("supabase/migrations/20261116180000_jornada_inventory_handover_truth.sql");
+    applySql("test/jornada-inventory-handover-truth-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
