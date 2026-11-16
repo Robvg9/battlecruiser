@@ -56,6 +56,6 @@ test("PWA release and service worker cache keys are aligned",()=>{
   assert.ok(app.includes('["bc7-jornada-ui.js","7.36"]'));
   assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.119"]'));
   assert.ok(sw.includes('BC_SW_VERSION = "9.5.119"'));
-  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.35'));
+  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.36'));
   assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.119'));
 });
