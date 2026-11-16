@@ -1456,17 +1456,17 @@
     const cashDone=String(checks.estado_efectivo_final||'').toUpperCase()==='APROBADA';
     const cashState=String(checks.estado_efectivo_final||'').toUpperCase();
     const fifthCheck='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
-      '<span class="bc7-checklist-mark">'+(cashDone?'✓':'5')+'</span>'+
+      '<span class="bc7-checklist-mark">'+(cashDone?'✓':'↻')+'</span>'+
       '<div class="bc7-checklist-copy"><b>Conteo físico independiente</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo del efectivo declarado por el Dueño')+'</small></div>'+
       '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
     '</div>';
     if(!checks.lista_para_calcular){
       if(phase==='LISTA_PARA_ENTREGA'){
-        return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cuatro checks de Sheila están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
+        return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cinco pasos de la jornada están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
       }
       if(phase==='PENDIENTE_CONTEO_DUENO'){
         return '<section class="bc7-calculation-phase is-waiting"><h4>Conteo físico · paso posterior</h4>'+
-          fifthCheck+'<p>Los cuatro checks de Sheila están completos. El Dueño debe contar y aprobar el efectivo declarado antes de iniciar los cálculos.</p></section>';
+          fifthCheck+'<p>Los cinco pasos de la jornada están completos. El Dueño debe contar y aprobar el efectivo declarado antes de iniciar los cálculos.</p></section>';
       }
       const pending=settlement.pendientes||{};
       const reasons=[];
