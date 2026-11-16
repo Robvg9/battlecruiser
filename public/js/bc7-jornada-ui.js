@@ -1515,24 +1515,29 @@
     root.querySelectorAll('[data-bc7-preview-close]').forEach(b=>b.addEventListener('click',close));
     root.addEventListener('click',e=>{if(e.target===root)close();});
     try{
-      const [settlement,movements,finance,cash]=await Promise.all([
+      const [settlement,movements,finance,cash,unlinkedTransfers]=await Promise.all([
         detail.liquidacion?Promise.resolve(detail.liquidacion):rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_finanzas_jornada',{p_turno_sesion_id:detail.sesion.id}),
-        rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:detail.sesion.id})
+        rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:detail.sesion.id}),
+        rpc('bc7_transferencias_pendientes_vinculo_jornada',{p_turno_sesion_id:detail.sesion.id})
       ]);
       detail.liquidacion=settlement||detail.liquidacion;
       const lines=arr(settlement?.lineas).map(x=>[
-        x.nombre,qty(x.inventario_inicial),qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0)),
+        x.nombre,x.inventario_inicial==null?'—':qty(x.inventario_inicial),qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0)),
         qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)),qty(x.bajas_aprobadas),qty(x.mermas_aprobadas),
-        qty(x.inventario_final),qty(x.unidades_vendidas),x.precio_unitario==null?'Sin precio':money(x.precio_unitario),x.importe_estimado==null?'Pendiente':money(x.importe_estimado)+' CUP'
+        x.inventario_final==null?'—':qty(x.inventario_final),x.unidades_vendidas==null?'—':qty(x.unidades_vendidas),x.precio_unitario==null?'Sin precio':money(x.precio_unitario),x.importe_estimado==null?'Pendiente':money(x.importe_estimado)+' CUP'
       ]);
       const movementRows=arr(movements).map(x=>[
         String(x.fecha||'').replace('T',' ').slice(0,16),x.tipo,x.producto,qty(x.cantidad),x.almacen,x.usuario,String(x.operacion_id||'')
       ]);
       const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
       const reinvestmentRows=arr(finance?.reinversiones).map(x=>[x.producto_nombre||x.producto,x.total||x.monto,x.estado,x.proveedor||'']);
-      const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,money(x.monto_aprobado??0)+' CUP']);
+      const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP']);
+      const pendingTransferRows=arr(unlinkedTransfers).map(x=>[
+        x.transferencia_id,String(x.fecha_registro||'').replace('T',' ').slice(0,16),
+        x.almacen_origen,x.almacen_destino,x.producto,qty(x.cantidad),x.lineas_total
+      ]);
       const declaration=detail.declaracion_dinero;
       const session=detail.sesion;
       const complete=String(session.estado||'').toUpperCase()==='COMPLETADA';
@@ -1558,6 +1563,7 @@
         (missing.length?'<section class="bc7-card"><h4>Pendientes de verificación</h4><ul>'+missing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>':'')+
         '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Inicial','Entradas','Salidas','Bajas','Mermas','Final','Vendidas','Precio','Importe'],lines)+'</section>'+
         '<section class="bc7-card"><h4>Movimientos del período · transferencias y bajas incluidas</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario','Operación'],movementRows)+'</section>'+
+        '<section class="bc7-card"><h4>Transferencias completadas fuera del período · pendientes de atribución</h4><p class="bc7-muted">Estas entradas no están incluidas en el inventario calculado hasta que el Dueño las vincule expresamente a esta jornada. Se muestran por fecha de registro y en una sola operación, sin repartirlas entre días.</p>'+previewTable(['ID de operación','Fecha registrada','Almacén origen','Almacén destino','Producto','Cantidad','Líneas en la transferencia'],pendingTransferRows)+'</section>'+
         '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows)+'</section>'+
         '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows)+'</section>'+
         '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado'],cashRows)+'</section>'+
