@@ -1496,6 +1496,76 @@
       metrics.map(([label,value])=>'<div><small>'+esc(label)+'</small><b>'+(value==null?'—':money(value)+' CUP')+'</b></div>').join('')+
       '</div><p>La jornada queda lista para la revisión final. El Turno todavía no está cerrado: el Dueño debe revisar el expediente, dejar su observación y pulsar «Aprobar turno» en Turnos.</p></section>';
   }
+  function previewValue(value){return value==null?'—':esc(String(value));}
+  function previewTable(headers,rows){
+    if(!rows.length)return '<div class="bc7-empty">Todavía no hay registros para mostrar.</div>';
+    return '<div class="bc7-table-wrap"><table class="bc7-table bc7-table-wide"><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
+      rows.map(row=>'<tr>'+row.map(v=>'<td>'+previewValue(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+  }
+  async function openJornadaPreview(button){
+    const detail=state.detail;
+    if(!detail?.sesion?.id)return;
+    if(button)button.disabled=true;
+    const root=document.createElement('div');
+    root.className='bc7-checklist-modal';
+    root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');
+    root.innerHTML='<div class="bc7-checklist-modal-panel" style="max-width:1100px"><header class="bc7-checklist-modal-head"><div><p>JORNADA · VISTA DE SOLO LECTURA</p><h3>Previsualización del cuadro</h3><small>Esta vista no cierra la jornada ni modifica registros.</small></div><button type="button" class="bc7-btn" data-bc7-preview-close>Cerrar ✕</button></header><div class="bc7-checklist-modal-body"><div class="bc7-empty">Reuniendo inventario, movimientos, bajas, finanzas y efectivo…</div></div></div>';
+    (document.getElementById('tab-jornada')||document.body).appendChild(root);
+    const close=()=>root.remove();
+    root.querySelectorAll('[data-bc7-preview-close]').forEach(b=>b.addEventListener('click',close));
+    root.addEventListener('click',e=>{if(e.target===root)close();});
+    try{
+      const [settlement,movements,finance,cash]=await Promise.all([
+        detail.liquidacion?Promise.resolve(detail.liquidacion):rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:detail.sesion.id}),
+        rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id}),
+        rpc('bc7_finanzas_jornada',{p_turno_sesion_id:detail.sesion.id}),
+        rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:detail.sesion.id})
+      ]);
+      detail.liquidacion=settlement||detail.liquidacion;
+      const lines=arr(settlement?.lineas).map(x=>[
+        x.nombre,qty(x.inventario_inicial),qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0)),
+        qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)),qty(x.bajas_aprobadas),qty(x.mermas_aprobadas),
+        qty(x.inventario_final),qty(x.unidades_vendidas),x.precio_unitario==null?'Sin precio':money(x.precio_unitario),x.importe_estimado==null?'Pendiente':money(x.importe_estimado)+' CUP'
+      ]);
+      const movementRows=arr(movements).map(x=>[
+        String(x.fecha||'').replace('T',' ').slice(0,16),x.tipo,x.producto,qty(x.cantidad),x.almacen,x.usuario,String(x.operacion_id||'')
+      ]);
+      const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
+      const reinvestmentRows=arr(finance?.reinversiones).map(x=>[x.producto_nombre||x.producto,x.total||x.monto,x.estado,x.proveedor||'']);
+      const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,money(x.monto_aprobado??0)+' CUP']);
+      const declaration=detail.declaracion_dinero;
+      const session=detail.sesion;
+      const complete=String(session.estado||'').toUpperCase()==='COMPLETADA';
+      const status=complete?'Jornada entregada':'Vista provisional · jornada en curso';
+      const summary=[
+        ['Estado',humanStatus(session.estado)],
+        ['Responsable',userName(session.responsable_id)],
+        ['Período',fmtDateHuman(session.fecha)+(session.fecha_fin&&session.fecha_fin!==session.fecha?' – '+fmtDateHuman(session.fecha_fin):'')],
+        ['Ventas estimadas',settlement?.ventas_estimadas==null?'Pendiente':money(settlement.ventas_estimadas)+' CUP'],
+        ['Salario calculado',settlement?.salario_calculado==null?'Pendiente':money(settlement.salario_calculado)+' CUP'],
+        ['Efectivo declarado',declaration?.monto==null?'Pendiente':money(declaration.monto)+' CUP'],
+        ['Conteo físico',declaration?.monto_contado==null?'Pendiente':money(declaration.monto_contado)+' CUP']
+      ];
+      const summaryHtml='<div class="bc7-workspace-overview">'+summary.map(([k,v])=>'<div class="bc7-overview-item"><small>'+esc(k)+'</small><b>'+esc(v)+'</b></div>').join('')+'</div>';
+      const missing=[];
+      if(!detail.cortes?.INICIAL)missing.push('Inventario inicial sin confirmar');
+      if(!detail.cortes?.FINAL)missing.push('Inventario final sin confirmar');
+      if(!declaration)missing.push('Declaración final de efectivo pendiente');
+      if(settlement?.calculable!==true)missing.push('Liquidación todavía no calculable o con datos pendientes');
+      const body=root.querySelector('.bc7-checklist-modal-body');
+      body.innerHTML='<div class="bc7-note"><b>'+esc(status)+'</b><p>Los datos pendientes se muestran como pendientes; no se sustituyen por cero ni se consideran aprobados.</p></div>'+
+        summaryHtml+
+        (missing.length?'<section class="bc7-card"><h4>Pendientes de verificación</h4><ul>'+missing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>':'')+
+        '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Inicial','Entradas','Salidas','Bajas','Mermas','Final','Vendidas','Precio','Importe'],lines)+'</section>'+
+        '<section class="bc7-card"><h4>Movimientos del período · transferencias y bajas incluidas</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario','Operación'],movementRows)+'</section>'+
+        '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows)+'</section>'+
+        '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows)+'</section>'+
+        '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado'],cashRows)+'</section>'+
+        '<p class="bc7-muted">Vista de solo lectura. La fecha de registro de cada movimiento se conserva; una transferencia retroactiva solo se atribuirá al período cuando exista un vínculo explícito con esta jornada.</p>';
+    }catch(error){
+      root.querySelector('.bc7-checklist-modal-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificó ningún dato.</div>';
+    }finally{if(button)button.disabled=false;}
+  }
   function renderWorkspace(detail){
     state.detail=detail;
     const s=detail.sesion,cuts=detail.cortes||{},initial=!!cuts.INICIAL,final=!!cuts.FINAL;
@@ -1565,7 +1635,7 @@
     const op='<div class="bc7-panel-stack">'+checks+actionArea+'<div class="bc7-checklist-section-source" hidden>'+fin+adjustment+'</div>'+calculation+'</div>';
     const mov='<div class="bc7-panel-stack"><div class="bc7-muted">Solo movimientos vinculados a esta sesión. El resto sigue en Movimientos → Historial.</div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-mov-refresh>Actualizar</button><button class="bc7-btn" type="button" data-bc7-open-movements>Abrir historial general</button></div><div id="bc7-movements"><div class="bc7-empty">Abre esta pestaña para consultar los movimientos.</div></div></div>';
     $('bc7-workspace-title').textContent=fmtDateHuman(s.fecha)+(s.fecha_fin&&s.fecha_fin!==s.fecha?' – '+fmtDateHuman(s.fecha_fin):'')+' · '+warehouseName(s.almacen_id);
-    $('bc7-workspace-body').innerHTML='<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
+    $('bc7-workspace-body').innerHTML='<div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-preview-jornada>Previsualizar cuadro completo</button></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Estado</small><b>'+esc(humanStatus(status))+'</b></div><div class="bc7-overview-item"><small>Responsable</small><b>'+esc(userName(s.responsable_id))+'</b></div><div class="bc7-overview-item"><small>Horario</small><b>'+esc(String(s.hora_inicio_prevista||'').slice(0,5))+'–'+esc(String(s.hora_fin_prevista||'').slice(0,5))+'</b></div></div><div class="bc7-workspace-tabs" role="tablist" aria-label="Secciones de la jornada"><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="inventario" aria-selected="true">Inventario</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="operacion" aria-selected="false">Operación y liquidación</button><button type="button" class="bc7-workspace-tab" role="tab" data-bc7-workspace-tab="movimientos" aria-selected="false">Movimientos</button></div><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="inventario">'+inv+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="operacion" hidden>'+op+'</section><section class="bc7-workspace-panel" role="tabpanel" data-bc7-workspace-panel="movimientos" hidden>'+mov+'</section>';
     $('bc7-workspace').hidden=false;setPageMode(true);$('bc7-workspace').scrollIntoView({behavior:'smooth',block:'start'});
     activateWorkspaceTab(state.workspaceTab);
   }
@@ -2453,6 +2523,8 @@
       else setStatus('Las declaraciones de efectivo no están disponibles en el estado actual.','error');
       return;
     }
+    const preview=e.target&&e.target.closest?e.target.closest('[data-bc7-preview-jornada]'):null;
+    if(preview){e.preventDefault();openJornadaPreview(preview);return;}
     const tab=e.target&&e.target.closest?e.target.closest('[data-bc7-workspace-tab]'):null;
     if(tab){e.preventDefault();activateWorkspaceTab(tab.getAttribute('data-bc7-workspace-tab'));return;}
     const back=e.target&&e.target.closest?e.target.closest('[data-bc7-back-calendar]'):null;
