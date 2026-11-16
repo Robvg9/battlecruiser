@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.116 — Jornada waits for authenticated profile and permissions before RPCs
+// v9.5.116 — Espera de autenticación antes de consultar Jornada e inventario
 (function hotfixV9475(){
   const VERSION="9.5.116";
   window.__BC_VERSION__=VERSION;
