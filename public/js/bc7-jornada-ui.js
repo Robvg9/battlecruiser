@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.33 — arranque autenticado y seguro de Jornada e inventario.
+// v7.34 — recepción física de diferencias en dos pasos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1113,11 +1113,16 @@
   }
   function getReceiveAttempt(delivery){
     const key=receiveAttemptKey(delivery&&delivery.id);
-    if(!key)return {key:'',mode:'fast',marked:{},values:{},note:'',attestFast:false,attestDiff:false,inline:null,sending:false,idempotencyKey:'',lastSignature:''};
+    if(!key)return {key:'',mode:'fast',step:'select',search:'',marked:{},values:{},note:'',attestFast:false,attestDiff:false,inline:null,sending:false,idempotencyKey:'',lastSignature:''};
     if(!state.receiveAttempts[key]){
-      state.receiveAttempts[key]={key,mode:'fast',marked:{},values:{},note:'',attestFast:false,attestDiff:false,inline:null,sending:false,idempotencyKey:'',lastSignature:''};
+      state.receiveAttempts[key]={key,mode:'fast',step:'select',search:'',marked:{},values:{},note:'',attestFast:false,attestDiff:false,inline:null,sending:false,idempotencyKey:'',lastSignature:''};
     }
-    return state.receiveAttempts[key];
+    const attempt=state.receiveAttempts[key];
+    if(!attempt.marked||typeof attempt.marked!=='object')attempt.marked={};
+    if(!attempt.values||typeof attempt.values!=='object')attempt.values={};
+    if(!['select','values'].includes(attempt.step))attempt.step='select';
+    if(typeof attempt.search!=='string')attempt.search='';
+    return attempt;
   }
   function receiveSignature(payload){try{return JSON.stringify(payload);}catch(_){return String(Date.now());}}
   function isUncertainReceiveError(error){
@@ -1136,43 +1141,119 @@
   }
   function receiveSummaryFromForm(form){
     const lines=arr(JSON.parse(form.dataset.bc7ReceiveLines||'[]'));
-    const mode=form.querySelector('[data-bc7-receive-mode][aria-pressed="true"]')?.dataset.bc7ReceiveMode||'fast';
+    const deliveryId=form.dataset.bc7ReceiveDelivery||'';
+    const attempt=getReceiveAttempt({id:deliveryId});
+    const mode=form.querySelector('[data-bc7-receive-mode][aria-pressed="true"]')?.dataset.bc7ReceiveMode||attempt.mode||'fast';
     let counted=0,matches=0,differences=0,invalid=0,pending=0;
     if(mode==='fast'){
       const attested=!!form.querySelector('[data-bc7-receive-attest-fast]')?.checked;
       if(attested){counted=lines.length;matches=lines.length;}
       else{pending=lines.length;}
-      return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested};
+      return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested,selectedCount:0,step:'fast'};
+    }
+    const selected=lines.filter(l=>!!attempt.marked[String(l.producto_id)]);
+    const selectedCount=selected.length;
+    const step=attempt.step==='values'?'values':'select';
+    if(step!=='values'){
+      return {total:lines.length,counted:0,matches:lines.length-selectedCount,differences:0,pending:selectedCount,invalid:0,mode,attested:false,selectedCount,step};
     }
     const attested=!!form.querySelector('[data-bc7-receive-attest-diff]')?.checked;
-    lines.forEach(l=>{
+    selected.forEach(l=>{
       const id=String(l.producto_id);
-      const marked=!!form.querySelector('[data-bc7-receive-mark="'+CSS.escape(id)+'"]')?.checked;
-      if(!marked){
-        if(attested){counted++;matches++;} else {pending++;}
-        return;
-      }
       const input=form.querySelector('[data-bc7-receive-count="'+CSS.escape(id)+'"]');
-      const raw=String(input?input.value:'').trim();
+      const raw=String(input?input.value:(attempt.values[id]??'')).trim();
       if(raw===''){pending++;return;}
       if(!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){invalid++;return;}
       counted++;
       const diff=Math.round((Number(raw)-Number(l.cantidad_declarada))*1000)/1000;
       if(Math.abs(diff)<0.0005)matches++; else differences++;
     });
-    return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested};
+    if(!attested)pending+=selectedCount;
+    return {total:lines.length,counted,matches,differences,pending,invalid,mode,attested,selectedCount,step};
   }
   function renderReceiveSummary(form){
     const s=receiveSummaryFromForm(form);
     const el=form.querySelector('[data-bc7-receive-summary]');
     if(el){
-      el.textContent='Total '+s.total+' — Contados '+s.counted+' — Coincidencias '+s.matches+' — Diferencias '+s.differences+' — Pendientes '+s.pending+(s.invalid?' — Inválidos '+s.invalid:'');
+      if(s.mode==='fast'){
+        el.textContent=s.attested
+          ?'✓ Coincidencia total confirmada · '+s.total+' productos · Sin diferencias'
+          :'Conteo completo pendiente de confirmación · '+s.total+' productos';
+        el.classList.toggle('is-confirmed',!!s.attested);
+      }else if(s.step==='select'){
+        el.textContent=s.total+' productos en la entrega · '+s.selectedCount+' diferencias seleccionadas';
+        el.classList.remove('is-confirmed');
+      }else{
+        el.textContent=s.selectedCount+' productos con diferencia · '+s.counted+' cantidades válidas · '+s.differences+' cantidades distintas del saldo anterior · '+s.pending+' pendientes'+(s.invalid?' · '+s.invalid+' inválidas':'');
+        el.classList.remove('is-confirmed');
+      }
     }
-    const submit=form.querySelector('button[type="submit"]');
+    const submit=form.querySelector('[data-bc7-receive-submit]');
     if(submit){
-      const canSend=!form.dataset.bc7Sending && !!s.attested && s.invalid===0 && s.pending===0;
+      const canSend=!form.dataset.bc7Sending && s.mode==='fast'
+        ? !!s.attested && s.pending===0 && s.invalid===0
+        : !form.dataset.bc7Sending && s.mode==='diff' && s.step==='values' && s.selectedCount>0 && !!s.attested && s.invalid===0 && s.pending===0;
       submit.disabled=!canSend;
+      submit.hidden=s.mode==='diff'&&s.step!=='values';
     }
+    const next=form.querySelector('[data-bc7-receive-continue]');
+    if(next)next.disabled=s.selectedCount===0;
+    const fastState=form.querySelector('[data-bc7-receive-fast-state]');
+    if(fastState)fastState.classList.toggle('is-confirmed',s.mode==='fast'&&!!s.attested);
+  }
+  function receiveDiffPaneHtml(lines,attempt){
+    const selected=lines.filter(l=>!!attempt.marked[String(l.producto_id)]);
+    const total=lines.length;
+    if(attempt.step!=='values'){
+      const candidates=lines.filter(l=>!attempt.marked[String(l.producto_id)]);
+      const picker=candidates.map(l=>{
+        const id=String(l.producto_id);
+        return '<article class="bc7-receive-pick-row" data-bc7-receive-picker-row data-bc7-receive-name="'+esc(l.nombre||'Producto')+'">'+
+          '<div class="bc7-receive-pick-copy"><strong>'+esc(l.nombre||'Producto')+'</strong><span>Saldo del turno anterior: '+esc(qty(l.cantidad_declarada))+'</span></div>'+
+          '<button type="button" class="bc7-btn bc7-receive-compact-btn" data-bc7-receive-add="'+esc(id)+'">Agregar</button>'+
+        '</article>';
+      }).join('');
+      const chosen=selected.map(l=>{
+        const id=String(l.producto_id);
+        return '<article class="bc7-receive-selected-row">'+
+          '<div class="bc7-receive-pick-copy"><strong>'+esc(l.nombre||'Producto')+'</strong><span>Saldo anterior: '+esc(qty(l.cantidad_declarada))+'</span></div>'+
+          '<button type="button" class="bc7-btn bc7-receive-compact-btn" data-bc7-receive-remove="'+esc(id)+'" aria-label="Quitar '+esc(l.nombre||'producto')+'">Quitar</button>'+
+        '</article>';
+      }).join('');
+      return '<div class="bc7-receive-stage">'+
+        '<div class="bc7-receive-step-heading"><span class="bc7-receive-step-number">1</span><div><b>Seleccionar productos con diferencias</b><small>Busca cada producto y agrégalo a la lista. Todavía no introduzcas cantidades.</small></div></div>'+
+        '<label class="bc7-field"><span>Buscar producto</span><input type="search" data-bc7-receive-search value="'+esc(attempt.search||'')+'" placeholder="Escribe el nombre del producto"></label>'+
+        '<div class="bc7-receive-picker-list" aria-label="Productos disponibles para seleccionar">'+
+          (picker||'<div class="bc7-empty bc7-receive-picker-empty">No hay más productos por agregar. Revisa la selección.</div>')+
+        '</div>'+
+        '<div class="bc7-receive-selected-block"><div class="bc7-receive-list-heading"><b>Productos seleccionados</b><span>'+selected.length+'</span></div>'+
+          '<div class="bc7-receive-selected-list">'+(chosen||'<div class="bc7-empty">Todavía no has seleccionado productos.</div>')+'</div></div>'+
+        '<div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-receive-continue '+(selected.length?'':'disabled')+'>Continuar con '+selected.length+' productos</button></div>'+
+        '<p class="bc7-muted bc7-receive-footnote">Los productos que no agregues conservan exactamente la cantidad declarada del turno anterior.</p>'+
+      '</div>';
+    }
+    const correctionRows=selected.map(l=>{
+      const id=String(l.producto_id);
+      const value=attempt.values[id]!=null?String(attempt.values[id]):'';
+      return '<article class="bc7-receive-correction-row">'+
+        '<div class="bc7-receive-correction-copy"><strong>'+esc(l.nombre||'Producto')+'</strong><span>Saldo anterior: '+esc(qty(l.cantidad_declarada))+'</span><small data-bc7-receive-diff="'+esc(id)+'"></small></div>'+
+        '<label class="bc7-field"><span>Cantidad real</span><input type="number" min="0" step="0.001" inputmode="decimal" data-bc7-receive-count="'+esc(id)+'" data-bc7-receive-declared="'+esc(l.cantidad_declarada)+'" aria-label="Cantidad física de '+esc(l.nombre||'Producto')+'" value="'+esc(value)+'" placeholder="0"></label>'+
+      '</article>';
+    }).join('');
+    return '<div class="bc7-receive-stage">'+
+      '<div class="bc7-receive-step-heading"><span class="bc7-receive-step-number">2</span><div><b>Corregir las cantidades encontradas</b><small>Solo aparecen los '+selected.length+' productos que seleccionaste.</small></div></div>'+
+      '<div class="bc7-receive-correction-list">'+correctionRows+'</div>'+
+      '<button type="button" class="bc7-btn bc7-receive-back-btn" data-bc7-receive-back>← Volver a seleccionar productos</button>'+
+      '<label class="bc7-check"><input type="checkbox" data-bc7-receive-attest-diff '+(attempt.attestDiff?'checked':'')+'> <span>Confirmo que conté físicamente los '+selected.length+' productos seleccionados. Los demás conservan el saldo del turno anterior.</span></label>'+
+      '<p class="bc7-muted bc7-receive-footnote">Al guardar, el sistema incluirá internamente todos los productos. Los no seleccionados conservarán su cantidad anterior sin que tengas que volver a escribirla.</p>'+
+    '</div>';
+  }
+  function renderReceiveDiffPane(form){
+    const pane=form.querySelector('[data-bc7-receive-pane="diff"]');
+    if(!pane)return;
+    const attempt=getReceiveAttempt({id:form.dataset.bc7ReceiveDelivery||''});
+    const lines=arr(JSON.parse(form.dataset.bc7ReceiveLines||'[]'));
+    pane.innerHTML=receiveDiffPaneHtml(lines,attempt);
   }
   function syncReceiveFormState(form){
     if(!form)return;
@@ -1183,20 +1264,13 @@
     if(note)attempt.note=note.value||'';
     const af=form.querySelector('[data-bc7-receive-attest-fast]'); if(af)attempt.attestFast=af.checked;
     const ad=form.querySelector('[data-bc7-receive-attest-diff]'); if(ad)attempt.attestDiff=ad.checked;
-    form.querySelectorAll('[data-bc7-receive-mark]').forEach(ch=>{
-      const id=ch.dataset.bc7ReceiveMark; attempt.marked[id]=ch.checked;
-      const row=form.querySelector('[data-bc7-receive-row="'+CSS.escape(id)+'"]');
-      const input=form.querySelector('[data-bc7-receive-count="'+CSS.escape(id)+'"]');
-      if(row)row.classList.toggle('is-marked',ch.checked);
-      if(input){input.disabled=!ch.checked; if(!ch.checked)input.value='';}
-      const diffBox=form.querySelector('[data-bc7-receive-diff="'+CSS.escape(id)+'"]');
-      if(diffBox)diffBox.textContent=ch.checked&&input&&input.value!==''?('Diferencia: '+((Number(input.value)-Number(input.dataset.bc7ReceiveDeclared))>0?'+':'')+qty(Number(input.value)-Number(input.dataset.bc7ReceiveDeclared))):'';
-    });
+    const search=form.querySelector('[data-bc7-receive-search]');
+    if(search)attempt.search=search.value||'';
     form.querySelectorAll('[data-bc7-receive-count]').forEach(input=>{
-      attempt.values[input.dataset.bc7ReceiveCount]=input.value;
       const id=input.dataset.bc7ReceiveCount;
+      attempt.values[id]=input.value;
       const diffBox=form.querySelector('[data-bc7-receive-diff="'+CSS.escape(id)+'"]');
-      if(diffBox && attempt.marked[id]){
+      if(diffBox){
         const raw=String(input.value||'').trim();
         if(raw!=='' && /^\d+(?:\.\d{1,3})?$/.test(raw)){
           const d=Math.round((Number(raw)-Number(input.dataset.bc7ReceiveDeclared))*1000)/1000;
@@ -1204,11 +1278,10 @@
         }else diffBox.textContent='';
       }
     });
-    const search=form.querySelector('[data-bc7-receive-search]');
-    const q=(search?search.value:'').toLowerCase().trim();
-    form.querySelectorAll('[data-bc7-receive-row]').forEach(row=>{
+    const q=String(attempt.search||'').toLowerCase().trim();
+    form.querySelectorAll('[data-bc7-receive-picker-row]').forEach(row=>{
       const name=(row.getAttribute('data-bc7-receive-name')||'').toLowerCase();
-      row.hidden=!!q && !name.includes(q);
+      row.hidden=!!q&&!name.includes(q);
     });
     renderReceiveSummary(form);
   }
@@ -1218,45 +1291,28 @@
     const total=lines.length;
     const mode=attempt.mode||'fast';
     const recount=delivery.estado==='REQUIERE_RECUENTO'?'<p class="bc7-note">El dueño rechazó el intento anterior. Realiza otro conteo físico completo. El intento rechazado y su motivo permanecen en el historial.</p>':'';
-    const modeTabs='<div class="bc7-actions" role="tablist" aria-label="Modo de recepción">'+
-      '<button type="button" class="bc7-btn '+(mode==='fast'?'primary':'')+'" data-bc7-receive-mode="fast" aria-pressed="'+(mode==='fast')+'">A. Todo coincide</button>'+
-      '<button type="button" class="bc7-btn '+(mode==='diff'?'primary':'')+'" data-bc7-receive-mode="diff" aria-pressed="'+(mode==='diff')+'">B. Registrar diferencias</button></div>';
-    const fastPane='<section data-bc7-receive-pane="fast" '+(mode!=='fast'?'hidden':'')+'>'+
-      '<p class="bc7-muted"><b>El camino verde significa exclusivamente conteo físico completo y coincidencia total.</b></p>'+
+    const modeTabs='<div class="bc7-actions bc7-receive-mode-tabs" role="tablist" aria-label="Modo de recepción">'+
+      '<button type="button" class="bc7-btn '+(mode==='fast'?'primary':'')+'" data-bc7-receive-mode="fast" aria-pressed="'+(mode==='fast')+'">✓ Todo coincide</button>'+
+      '<button type="button" class="bc7-btn '+(mode==='diff'?'primary':'')+'" data-bc7-receive-mode="diff" aria-pressed="'+(mode==='diff')+'">Registrar diferencias</button></div>';
+    const fastPane='<section class="bc7-receive-fast-pane" data-bc7-receive-pane="fast" '+(mode!=='fast'?'hidden':'')+'>'+
+      '<div class="bc7-receive-fast-state" data-bc7-receive-fast-state><span class="bc7-receive-fast-symbol">✓</span><div><b>Todo coincide</b><small>Cuenta todos los productos. Si no hay diferencias, confirma aquí y termina.</small></div></div>'+
       '<label class="bc7-check"><input type="checkbox" data-bc7-receive-attest-fast '+(attempt.attestFast?'checked':'')+'> <span>Confirmo que conté físicamente los '+total+' productos y que todos coinciden con lo declarado.</span></label>'+
       '</section>';
-    const rows=lines.map(l=>{
-      const id=String(l.producto_id);
-      const name=l.nombre||'Producto';
-      const marked=!!attempt.marked[id];
-      const val=attempt.values[id]!=null?String(attempt.values[id]):'';
-      return '<article class="bc7-receive-item '+(marked?'is-marked':'')+'" data-bc7-receive-row="'+esc(id)+'" data-bc7-receive-name="'+esc(name)+'">'+
-        '<label class="bc7-check"><input type="checkbox" data-bc7-receive-mark="'+esc(id)+'" '+(marked?'checked':'')+'> <span>Marcar diferencia</span></label>'+
-        '<div class="bc7-receive-product"><strong>'+esc(name)+'</strong><span class="bc7-muted">Declarado: '+esc(qty(l.cantidad_declarada))+'</span></div>'+
-        '<div class="bc7-receive-count-wrap" data-bc7-receive-input-wrap>'+ 
-          '<label class="bc7-field"><span>Conteo físico (solo si difiere)</span><input type="number" min="0" step="0.001" inputmode="decimal" data-bc7-receive-count="'+esc(id)+'" data-bc7-receive-declared="'+esc(l.cantidad_declarada)+'" aria-label="Conteo físico de '+esc(name)+'" value="'+esc(val)+'" '+(marked?'':'disabled')+' placeholder="Cantidad física"></label>'+
-          '<small class="bc7-muted" data-bc7-receive-diff="'+esc(id)+'"></small>'+
-        '</div>'+
-      '</article>';
-    }).join('');
-    const diffPane='<section data-bc7-receive-pane="diff" '+(mode!=='diff'?'hidden':'')+'>'+
-      '<label class="bc7-field"><span>Buscar producto</span><input type="search" data-bc7-receive-search placeholder="Filtra por nombre"></label>'+
-      '<div class="bc7-receive-list" aria-label="Lista de productos para recepción">'+rows+'</div>'+
-      '<label class="bc7-check"><input type="checkbox" data-bc7-receive-attest-diff '+(attempt.attestDiff?'checked':'')+'> <span>Conté físicamente los '+total+' productos; los productos que no marqué coinciden.</span></label>'+
-      '</section>';
-    const initialPending=(mode==='fast'&&!attempt.attestFast)||(mode==='diff'&&!attempt.attestDiff)?total:(mode==='diff'?Object.keys(attempt.marked||{}).filter(k=>attempt.marked[k]&&!String(attempt.values[k]??'').trim()).length:0);
-    const initialCounted=(mode==='fast'&&attempt.attestFast)?total:(mode==='diff'&&attempt.attestDiff?lines.filter(l=>!attempt.marked[String(l.producto_id)]).length:0);
-    const initialMatches=initialCounted;
-    const summary='<div class="bc7-note" data-bc7-receive-summary role="status" aria-live="polite">Total '+total+' — Contados '+initialCounted+' — Coincidencias '+initialMatches+' — Diferencias 0 — Pendientes '+initialPending+'</div>';
-    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Elige un camino. En diferencias, solo capturas cantidades de productos marcados; los no marcados se envían con la cantidad declarada tras tu atestación.</p>'+recount+'</div>'+
-      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'" data-bc7-receive-delivery="'+esc(delivery.id)+'" data-bc7-receive-lines=\''+esc(JSON.stringify(lines.map(l=>({producto_id:String(l.producto_id),cantidad_declarada:Number(l.cantidad_declarada),nombre:l.nombre||''}))))+'\'>'+
-      modeTabs+fastPane+diffPane+summary+
-      '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" value="'+esc(attempt.note||'')+'" placeholder="Incidencias, embalaje o diferencias observadas"></label>'+
-      '<div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar recepción física</button></div>'+
+    const diffPane='<section class="bc7-receive-diff-pane" data-bc7-receive-pane="diff" '+(mode!=='diff'?'hidden':'')+'>'+receiveDiffPaneHtml(lines,attempt)+'</section>';
+    const selectedCount=lines.filter(l=>!!attempt.marked[String(l.producto_id)]).length;
+    const startSummary=mode==='fast'&&attempt.attestFast
+      ?'✓ Coincidencia total confirmada · '+total+' productos · Sin diferencias'
+      :mode==='diff'?total+' productos en la entrega · '+selectedCount+' diferencias seleccionadas'
+      :'Conteo completo pendiente de confirmación · '+total+' productos';
+    return '<div class="bc7-note"><b>Recepción física de inventario compartido</b><p class="bc7-muted">Confirma si todo coincide o registra únicamente las diferencias. No necesitas volver a introducir las cantidades que vienen iguales del turno anterior.</p>'+recount+'</div>'+
+      '<form data-bc7-receive-form="'+esc(detail.sesion.id)+'" data-bc7-receive-delivery="'+esc(delivery.id)+'" data-bc7-receive-lines="'+esc(JSON.stringify(lines.map(l=>({producto_id:String(l.producto_id),cantidad_declarada:Number(l.cantidad_declarada),nombre:l.nombre||''}))))+'">'+
+      modeTabs+fastPane+diffPane+
+      '<div class="bc7-note bc7-receive-summary" data-bc7-receive-summary role="status" aria-live="polite">'+startSummary+'</div>'+
+      '<label class="bc7-field">Observación de recepción (opcional)<input data-bc7-receive-note maxlength="1000" value="'+esc(attempt.note||'')+'" placeholder="Incidencias o diferencias observadas"></label>'+
+      '<div class="bc7-actions"><button class="bc7-btn primary" type="submit" data-bc7-receive-submit '+(mode==='diff'&&attempt.step!=='values'?'hidden':'disabled')+'>Guardar recepción física</button></div>'+
       receiveInlineStatusHtml(attempt,delivery)+
       '</form>';
   }
-
   function updateReceivePreview(form){
     // Compatibility for existing input listener: sync and render summary.
     syncReceiveFormState(form);
@@ -1563,21 +1619,28 @@
       }
       payloadLines=lineDefs.map(l=>({producto_id:l.producto_id,cantidad:Number(l.cantidad_declarada)}));
     }else{
-      if(!form.querySelector('[data-bc7-receive-attest-diff]')?.checked){
-        msg(msgEl,'Debes confirmar que contaste físicamente todos los productos y que los no marcados coinciden.','error');return;
+      if(attempt.step!=='values'){
+        msg(msgEl,'Primero selecciona los productos con diferencias y continúa al paso de corrección.','error');return;
       }
-      let bad=false, markedCount=0;
+      const markedCount=lineDefs.filter(l=>!!attempt.marked[String(l.producto_id)]).length;
+      if(markedCount===0){
+        msg(msgEl,'Selecciona al menos un producto con diferencia o utiliza la opción Todo coincide.','error');return;
+      }
+      if(!form.querySelector('[data-bc7-receive-attest-diff]')?.checked){
+        msg(msgEl,'Debes confirmar el conteo físico de los productos seleccionados.','error');return;
+      }
+      let bad=false;
       payloadLines=lineDefs.map(l=>{
         const id=String(l.producto_id);
         const marked=!!attempt.marked[id];
-        if(!marked) return {producto_id:l.producto_id,cantidad:Number(l.cantidad_declarada)};
-        markedCount++;
+        if(!marked)return {producto_id:l.producto_id,cantidad:Number(l.cantidad_declarada)};
         const raw=String(attempt.values[id]??'').trim();
-        if(raw===''||!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){bad=true; return {producto_id:l.producto_id,cantidad:NaN};}
+        if(raw===''||! /^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0){
+          bad=true;return {producto_id:l.producto_id,cantidad:NaN};
+        }
         return {producto_id:l.producto_id,cantidad:Number(raw)};
       });
-      if(bad){msg(msgEl,'Los productos marcados requieren una cantidad física válida (0 o hasta 3 decimales).','error');return;}
-      // markedCount can be 0? user could use diff mode with no marks but attestation means all match - treat as all match payload.
+      if(bad){msg(msgEl,'Cada producto seleccionado requiere una cantidad física válida (0 o hasta 3 decimales).','error');return;}
     }
 
     const payload={p_destino_sesion_id:sessionId,p_lineas:payloadLines,p_observacion:note};
@@ -2393,8 +2456,63 @@
     if(modeBtn){
       const form=modeBtn.closest('form[data-bc7-receive-form]');
       if(form){
+        const attempt=getReceiveAttempt({id:form.dataset.bc7ReceiveDelivery||''});
         form.querySelectorAll('[data-bc7-receive-mode]').forEach(b=>{const on=b===modeBtn;b.setAttribute('aria-pressed',on?'true':'false');b.classList.toggle('primary',on);});
-        form.querySelectorAll('[data-bc7-receive-pane]').forEach(p=>{p.hidden=p.getAttribute('data-bc7-receive-pane')!==modeBtn.dataset.bc7ReceiveMode;});
+        attempt.mode=modeBtn.dataset.bc7ReceiveMode||'fast';
+        form.querySelectorAll('[data-bc7-receive-pane]').forEach(p=>{p.hidden=p.getAttribute('data-bc7-receive-pane')!==attempt.mode;});
+        if(attempt.mode==='diff')renderReceiveDiffPane(form);
+        syncReceiveFormState(form);
+      }
+      return;
+    }
+    const addDiff=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-add]'):null;
+    if(addDiff){
+      const form=addDiff.closest('form[data-bc7-receive-form]');
+      if(form){
+        const attempt=getReceiveAttempt({id:form.dataset.bc7ReceiveDelivery||''});
+        attempt.marked[addDiff.dataset.bc7ReceiveAdd]=true;
+        attempt.step='select';
+        attempt.attestDiff=false;
+        renderReceiveDiffPane(form);
+        syncReceiveFormState(form);
+      }
+      return;
+    }
+    const removeDiff=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-remove]'):null;
+    if(removeDiff){
+      const form=removeDiff.closest('form[data-bc7-receive-form]');
+      if(form){
+        const attempt=getReceiveAttempt({id:form.dataset.bc7ReceiveDelivery||''});
+        delete attempt.marked[removeDiff.dataset.bc7ReceiveRemove];
+        attempt.step='select';
+        attempt.attestDiff=false;
+        renderReceiveDiffPane(form);
+        syncReceiveFormState(form);
+      }
+      return;
+    }
+    const continueDiff=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-continue]'):null;
+    if(continueDiff){
+      const form=continueDiff.closest('form[data-bc7-receive-form]');
+      if(form){
+        const attempt=getReceiveAttempt({id:form.dataset.bc7ReceiveDelivery||''});
+        const selected=Object.keys(attempt.marked).filter(id=>attempt.marked[id]);
+        if(!selected.length)return;
+        attempt.step='values';
+        attempt.attestDiff=false;
+        renderReceiveDiffPane(form);
+        syncReceiveFormState(form);
+      }
+      return;
+    }
+    const backDiff=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-back]'):null;
+    if(backDiff){
+      const form=backDiff.closest('form[data-bc7-receive-form]');
+      if(form){
+        const attempt=getReceiveAttempt({id:form.dataset.bc7ReceiveDelivery||''});
+        attempt.step='select';
+        attempt.attestDiff=false;
+        renderReceiveDiffPane(form);
         syncReceiveFormState(form);
       }
       return;
@@ -2437,7 +2555,7 @@
   });
   document.addEventListener('change',function(e){
     const t=e.target;
-    if(t&&(t.matches('[data-bc7-receive-mark]')||t.matches('[data-bc7-receive-attest-fast]')||t.matches('[data-bc7-receive-attest-diff]'))){
+    if(t&&(t.matches('[data-bc7-receive-attest-fast]')||t.matches('[data-bc7-receive-attest-diff]'))){
       const f=t.closest('form[data-bc7-receive-form]'); if(f)syncReceiveFormState(f);
     }
     if(t&&t.matches('[data-bc7-rework]')){const s=t.closest('form')?.querySelector('[data-bc7-reperson]');if(s){s.disabled=!t.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!t.checked)s.value='';}}
