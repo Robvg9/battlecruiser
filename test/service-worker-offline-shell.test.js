@@ -15,6 +15,7 @@ function createWorker(options = {}) {
   const listeners = new Map();
   const entries = new Map();
   const precacheRequests = [];
+  const cacheNames = Array.isArray(options.existingCacheNames) ? options.existingCacheNames.slice() : [];
   const cache = {
     addAll: async function() {
       throw new Error('cache.addAll must not be used by release install');
@@ -41,14 +42,15 @@ function createWorker(options = {}) {
     }
   };
   const caches = {
-    open: async function() { return cache; },
+    open: async function(name) { if (name && !cacheNames.includes(name)) cacheNames.push(name); return cache; },
     match: function(request, matchOptions) { return cache.match(request, matchOptions); },
-    keys: async function() { return ['battlecruiser-static-9.4.77']; },
+    keys: async function() { return cacheNames.slice(); },
     delete: async function() { return true; }
   };
+  let claimCount = 0;
   const self = {
     location: { origin: ORIGIN, pathname: '/service-worker.js', href: ORIGIN + '/service-worker.js' },
-    clients: { claim: async function() {} },
+    clients: { claim: async function() { claimCount++; } },
     skipWaiting: function() {},
     addEventListener: function(name, handler) { listeners.set(name, handler); }
   };
@@ -70,7 +72,7 @@ function createWorker(options = {}) {
     Promise: Promise,
     console: console
   }, { filename: 'service-worker.js' });
-  return { listeners, entries, precacheRequests, cache, networkFetch, setNetworkFetch: function(nextFetch) { networkFetch = nextFetch; } };
+  return { listeners, entries, precacheRequests, cache, cacheNames, get claimCount() { return claimCount; }, networkFetch, setNetworkFetch: function(nextFetch) { networkFetch = nextFetch; } };
 }
 
 async function dispatchInstall(worker) {
@@ -78,6 +80,28 @@ async function dispatchInstall(worker) {
   worker.listeners.get('install')({ waitUntil: function(promise) { waits.push(promise); } });
   await Promise.all(waits);
 }
+
+async function dispatchActivate(worker) {
+  const waits = [];
+  worker.listeners.get('activate')({ waitUntil: function(promise) { waits.push(promise); } });
+  await Promise.all(waits);
+}
+
+test('first installation claims its initial document when no prior release cache exists', async () => {
+  const worker = createWorker();
+  await dispatchInstall(worker);
+  await dispatchActivate(worker);
+  assert.equal(worker.claimCount, 1);
+});
+
+test('an update does not claim existing documents while an older release cache exists', async () => {
+  const worker = createWorker({ existingCacheNames: ['battlecruiser-static-9.5.114'] });
+  await dispatchInstall(worker);
+  await dispatchActivate(worker);
+  assert.equal(worker.claimCount, 0);
+  assert.ok(worker.cacheNames.includes('battlecruiser-static-9.5.114'));
+});
+
 
 function simulateOffline(worker) {
   worker.setNetworkFetch(async function(request) {
