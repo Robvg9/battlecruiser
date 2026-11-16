@@ -173,7 +173,7 @@ test("Jornada handover precedes Owner cash count and automatic calculation",()=>
   for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc5_contar_dinero_entregado"]) {
     assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
   }
-  assert.match(ui,/Checklist de Sheila/);
+  assert.match(ui,/Checklist de la jornada/);
   assert.match(ui,/¿Ya pusiste todos los gastos\?/);
   assert.match(ui,/¿Ya pusiste todas las reinversiones\?/);
   assert.match(ui,/¿Ya pusiste todas las bajas\?/);
