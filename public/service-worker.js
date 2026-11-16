@@ -50,7 +50,19 @@ self.addEventListener("install", function(event) {
   }));
 });
 
-// Existing tabs keep their current controller and release cache until they reload.
+// A first installation has no previous application release to protect. Claiming
+// that initial document is safe and required for offline navigation. During an
+// update, an older release cache exists, so the new worker must NOT take over
+// already-open documents; they stay on their current controller until reload.
+self.addEventListener("activate", function(event) {
+  event.waitUntil(caches.keys().then(function(keys) {
+    var previousReleaseCacheExists = keys.some(function(key) {
+      return key.indexOf("battlecruiser") === 0 && key !== BC_SHELL && key !== BC_STATIC;
+    });
+    if (!previousReleaseCacheExists) return self.clients.claim();
+  }));
+});
+
 
 function isAppShellRequest(url) {
   var path = url.pathname || "";
