@@ -28,6 +28,9 @@ test("a correction made after handover preparation refreshes only an unreceived 
   assert.ok(migration.includes("SET cantidad_declarada=v_new_qty,cantidad_efectiva=NULL"));
   assert.ok(migration.includes("cantidad_declarada_anterior"));
   assert.ok(migration.includes("cantidad_declarada_actualizada"));
+  assert.ok(migration.includes("e.origen_sesion_id=v_s.id"));
+  assert.ok(migration.includes("dl.producto_id=v_product_id"));
+  assert.ok(migration.includes("FOR UPDATE OF e,dl"));
 });
 
 test("owner approval preserves source FINAL and creates destination INITIAL from accepted receipt",()=>{
