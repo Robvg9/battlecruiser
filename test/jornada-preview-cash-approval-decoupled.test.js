@@ -22,6 +22,7 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
 test("Final declaration approval is independent and available before session completion",()=>{
   assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_resolver_declaracion_jornada/);
   assert.match(MIGRATION,/DECLARACION_APROBADA/);
+  assert.match(MIGRATION,/turno_declaraciones_estado_aprobacion_check/);
   assert.match(MIGRATION,/GRANT EXECUTE ON FUNCTION public\.bc7_resolver_declaracion_jornada/);
   assert.match(MIGRATION,/d\.estado_aprobacion,/);
   assert.doesNotMatch(MIGRATION,/CASE WHEN s\.estado='COMPLETADA' THEN d\.estado_aprobacion ELSE 'ESPERANDO_ENTREGA'/);
