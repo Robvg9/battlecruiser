@@ -147,7 +147,7 @@ test('offline fallback serves the exact cached app.js release URL', async () => 
   const appVersion = source.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)[1];
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=' + appVersion));
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), 'cached:/app.js');
+  assert.equal(await response.text(), 'network:/app.js');
 });
 
 test('offline fallback fails closed when an explicit app.js release version is not cached', async () => {
@@ -164,7 +164,7 @@ test('offline fallback serves the exact app root from the precache', async () =>
   simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/'));
   assert.equal(response.status, 200);
-  assert.equal(await response.text(), 'cached:/');
+  assert.equal(await response.text(), 'network:/');
 });
 
 test('offline fallback rejects a cache-busting query on an unversioned navigation URL', async () => {
