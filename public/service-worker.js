@@ -120,9 +120,25 @@ self.addEventListener("fetch", function(event) {
   }
 
   if (isAppShellRequest(url)) {
-    // Navigation requests use mode "navigate"; reconstructing them with a different cache mode can throw before respondWith is registered.
-    // Preserve the original navigation request and bypass HTTP cache only for ordinary shell asset requests.
-    var freshRequest = request.mode === "navigate" ? request : new Request(request, { cache: "no-store" });
+    var freshRequest;
+    if (request.mode === "navigate") {
+      // A navigation Request has mode "navigate" and cannot be cloned with a new
+      // cache mode. Rebuild it as same-origin GET while preserving its Accept
+      // headers/cookies, so an older browser HTTP-cached index.html cannot win.
+      var navigationHeaders = new Headers(request.headers);
+      navigationHeaders.set("cache-control", "no-cache, no-store, max-age=0");
+      navigationHeaders.set("pragma", "no-cache");
+      freshRequest = new Request(request.url, {
+        method: "GET",
+        headers: navigationHeaders,
+        mode: "same-origin",
+        credentials: "same-origin",
+        cache: "no-store",
+        redirect: "follow"
+      });
+    } else {
+      freshRequest = new Request(request, { cache: "no-store" });
+    }
     event.respondWith(fetch(freshRequest).then(function(response) {
       return cacheSuccessfulResponse(request, response);
     }).catch(function() {
