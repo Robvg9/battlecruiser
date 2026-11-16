@@ -186,7 +186,7 @@ test("Service Worker updates wait for an explicit, stable handoff", () => {
 test("Saved light/dark preference is applied before first paint", () => {
   const bootstrapAt = indexHtml.indexOf('id="bc-theme-first-paint"');
   const stylesheetAt = indexHtml.indexOf('href="style.css?v=9.5.115"');
-  const themeScriptAt = indexHtml.indexOf('js/m27-5-theme-dark-reset.js?v=27.5a2');
+  const themeScriptAt = indexHtml.indexOf('js/m27-5-theme-dark-reset.js?v=27.5a3');
   const appScriptAt = indexHtml.indexOf('app.js?v=9.5.115');
   assert.ok(bootstrapAt >= 0 && bootstrapAt < stylesheetAt,
     "the saved preference bootstrap must execute before the main stylesheet");
@@ -198,4 +198,10 @@ test("Saved light/dark preference is applied before first paint", () => {
     "critical CSS must render the persisted light theme without waiting for body classes");
   assert.match(theme, /setAttribute\('data-bc-theme', appearance\)/,
     "runtime theme changes must keep the first-paint state synchronized");
+  assert.ok(indexHtml.includes('js/core.js?v=9.5.115'));
+  assert.ok(indexHtml.includes('js/auth.js?v=9.5.115'));
+  assert.ok(indexHtml.includes('js/m27-5-theme-dark-reset.js?v=27.5a3'));
+  assert.ok(serviceWorker.includes('./js/core.js?v=9.5.115'));
+  assert.ok(serviceWorker.includes('./js/auth.js?v=9.5.115'));
+  assert.ok(serviceWorker.includes('./js/m27-5-theme-dark-reset.js?v=27.5a3'));
 });
