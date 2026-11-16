@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.35 — recepción física de diferencias en dos pasos; calendario histórico de solo lectura.
+// v7.36 — recepción física de diferencias en dos pasos; calendario histórico de solo lectura.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1094,7 +1094,8 @@
     return '<p class="bc7-muted">Confirmado '+esc(fmtDateHuman(cut.confirmado_en||cut.creado_en))+' · responsable '+esc(userName(cut.confirmado_por||cut.creado_por))+' · '+lines.length+' productos.</p>'+
       (cut.origen_corte_id?'<p class="bc7-muted">Este inventario inicial pertenece a la entrega compartida del corte final anterior.</p>':'')+
       (cut.observacion?'<p class="bc7-muted">Nota: '+esc(cut.observacion)+'</p>':'')+
-      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>'+(accepted?'Cantidad efectiva compartida':'Conteo registrado')+'</th><th>Existencias según la aplicación</th><th>Diferencia</th></tr></thead><tbody>'+
+      '<p class="bc7-muted">La diferencia compara la cantidad efectiva con el stock de referencia capturado al confirmar el corte. No es la diferencia entre lo declarado y lo recibido; esa comparación aparece en el detalle de recepción.</p>'+
+      '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>'+(accepted?'Cantidad efectiva compartida':'Conteo registrado')+'</th><th>Stock de referencia capturado al confirmar el corte</th><th>Diferencia vs. referencia</th></tr></thead><tbody>'+
       lines.map(l=>{
         const p=products.find(x=>String(x.producto_id)===String(l.producto_id))||{};
         const shared=sharedLines.get(String(l.producto_id));
