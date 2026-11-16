@@ -52,7 +52,7 @@ function createWorker(options = {}) {
     skipWaiting: function() {},
     addEventListener: function(name, handler) { listeners.set(name, handler); }
   };
-  const networkFetch = options.fetch || (async function(request) {
+  let networkFetch = options.fetch || (async function(request) {
     if (options.precacheError && new URL(request.url).origin === ORIGIN) {
       throw new Error('simulated precache failure');
     }
@@ -68,13 +68,21 @@ function createWorker(options = {}) {
     Promise: Promise,
     console: console
   }, { filename: 'service-worker.js' });
-  return { listeners, entries, precacheRequests, cache, networkFetch };
+  return { listeners, entries, precacheRequests, cache, networkFetch, setNetworkFetch: function(nextFetch) { networkFetch = nextFetch; } };
 }
 
 async function dispatchInstall(worker) {
   const waits = [];
   worker.listeners.get('install')({ waitUntil: function(promise) { waits.push(promise); } });
   await Promise.all(waits);
+}
+
+function simulateOffline(worker) {
+  worker.setNetworkFetch(async function(request) {
+    const url = new URL(request.url);
+    if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
+    throw new TypeError('offline');
+  });
 }
 
 async function dispatchFetch(worker, request) {
@@ -131,14 +139,9 @@ test('successful same-origin shell requests are cached for subsequent offline us
 });
 
 test('offline fallback serves the exact cached app.js release URL', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const appVersion = source.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)[1];
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=' + appVersion));
   assert.equal(response.status, 200);
@@ -146,41 +149,26 @@ test('offline fallback serves the exact cached app.js release URL', async () => 
 });
 
 test('offline fallback fails closed when an explicit app.js release version is not cached', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/app.js?v=9.4.77'));
   assert.equal(response.status, 0);
 });
 
 test('offline fallback serves the exact app root from the precache', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/'));
   assert.equal(response.status, 200);
   assert.equal(await response.text(), 'cached:/');
 });
 
 test('offline fallback rejects a cache-busting query on an unversioned navigation URL', async () => {
-  const worker = createWorker({
-    fetch: async function(request) {
-      const url = new URL(request.url);
-      if (url.origin !== ORIGIN) return new Response('cached external dependency', { status: 200 });
-      throw new TypeError('offline');
-    }
-  });
+  const worker = createWorker();
   await dispatchInstall(worker);
+  simulateOffline(worker);
   const response = await dispatchFetch(worker, new Request(ORIGIN + '/?offline_check=1'));
   assert.equal(response.status, 0);
 });
