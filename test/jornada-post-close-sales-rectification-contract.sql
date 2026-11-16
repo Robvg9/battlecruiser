@@ -38,7 +38,6 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Append-only mutation blocker trigger is missing.';
   END IF;
-END;
 
   IF (
     SELECT count(*) FROM pg_indexes
@@ -51,4 +50,5 @@ END;
   ) <> 3 THEN
     RAISE EXCEPTION 'Post-close rectification foreign-key indexes are missing.';
   END IF;
+END;
 $contract$;
