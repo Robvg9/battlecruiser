@@ -1555,6 +1555,12 @@
       const movementRows=arr(movements).map(x=>[
         fmtDateTimeHavana(x.fecha),x.tipo,x.producto,qty(x.cantidad),x.almacen,x.usuario,String(x.operacion_id||'')
       ]);
+      const bajaRows=arr(finance?.bajas).map(x=>[
+        x.producto,qty(x.cantidad),x.estado,x.motivo,x.creado_nombre,x.revisado_nombre,fmtDateTimeHavana(x.creado_en)
+      ]);
+      const mermaRows=arr(finance?.mermas).map(x=>[
+        x.producto,qty(x.cantidad),x.estado,x.motivo,x.creado_nombre,x.revisado_nombre,fmtDateTimeHavana(x.creado_en)
+      ]);
       const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
       const reinvestmentRows=arr(finance?.reinversiones).map(x=>[x.producto_nombre||x.producto,x.total||x.monto,x.estado,x.proveedor||'']);
       const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP']);
@@ -1609,6 +1615,8 @@
         '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Inicial','Entradas','Salidas','Bajas','Mermas','Final','Vendidas','Precio','Importe'],lines)+'</section>'+
         '<section class="bc7-card"><h4>Movimientos del período · transferencias y bajas incluidas</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario','Operación'],movementRows)+'</section>'+
         '<section class="bc7-card"><h4>Transferencias completadas fuera del período · pendientes de atribución</h4><p class="bc7-muted">Estas entradas no están incluidas en el inventario calculado hasta que el Dueño las vincule expresamente a esta jornada.</p>'+pendingTransferHtml+'</section>'+
+        '<section class="bc7-card"><h4>Bajas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],bajaRows)+'</section>'+
+        '<section class="bc7-card"><h4>Mermas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],mermaRows)+'</section>'+
         '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows)+'</section>'+
         '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows)+'</section>'+
         '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado'],cashRows)+'</section>'+
