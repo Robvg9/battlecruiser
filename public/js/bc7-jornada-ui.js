@@ -629,7 +629,7 @@
         const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
         html+='<span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(finalCashState))+'. El importe declarado no sustituye el conteo físico.</p>';
         if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='COMPLETADA'&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
-          html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico del Dueño</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
+          html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
         }else if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()!=='COMPLETADA'&&declaration.monto_contado==null){
           html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
         }else if(declaration.monto_contado!=null){
@@ -1457,7 +1457,7 @@
     const cashState=String(checks.estado_efectivo_final||'').toUpperCase();
     const fifthCheck='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(cashDone?'✓':'5')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Conteo físico del Dueño</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo del efectivo declarado por el Dueño')+'</small></div>'+
+      '<div class="bc7-checklist-copy"><b>Conteo físico independiente</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo del efectivo declarado por el Dueño')+'</small></div>'+
       '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
     '</div>';
     if(!checks.lista_para_calcular){
@@ -1465,7 +1465,7 @@
         return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cuatro checks de Sheila están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
       }
       if(phase==='PENDIENTE_CONTEO_DUENO'){
-        return '<section class="bc7-calculation-phase is-waiting"><h4>Paso 5 · Efectivo final</h4>'+
+        return '<section class="bc7-calculation-phase is-waiting"><h4>Conteo físico · paso posterior</h4>'+
           fifthCheck+'<p>Los cuatro checks de Sheila están completos. El Dueño debe contar y aprobar el efectivo declarado antes de iniciar los cálculos.</p></section>';
       }
       const pending=settlement.pendientes||{};
@@ -1479,7 +1479,7 @@
       if(Number(settlement.familias_sin_precio||0)>0)reasons.push('hay productos sin precio');
       if(Number(settlement.familias_con_vendidas_negativas||0)>0)reasons.push('hay diferencias negativas de inventario');
       return '<section class="bc7-calculation-phase is-waiting"><h4>Fase 2 · Preparando cálculos</h4>'+
-        fifthCheck+'<p>El efectivo está aprobado cuando el check 5 aparece verde. BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
+        fifthCheck+'<p>La declaración de efectivo ya quedó registrada en el check 5. El conteo físico se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
         (reasons.length?'<small>'+esc(reasons.join(' · '))+'</small>':'')+'</section>';
     }
     if(settlement.calculable!==true)return '';
