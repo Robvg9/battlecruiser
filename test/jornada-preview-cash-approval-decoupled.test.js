@@ -62,7 +62,7 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   const end=UI.indexOf("function renderWorkspace(detail)",start);
   assert.ok(start>=0&&end>start);
   const block=UI.slice(start,end);
-  for(const token of ["bc7_liquidacion_inventario_jornada","bc7_movimientos_sesion","bc7_finanzas_jornada","bc7_entregas_diarias_jornada","bc7_transferencias_pendientes_vinculo_jornada","Vista de solo lectura","Bajas","Transferencias","data-bc7-preview-jornada"]) {
+  for(const token of ["bc7_liquidacion_inventario_jornada","bc7_movimientos_sesion","bc7_finanzas_jornada","bc7_entregas_diarias_jornada","bc7_transferencias_pendientes_vinculo_jornada","PREVISUALIZACIÓN SIN CAMBIOS AUTOMÁTICOS","Bajas","Transferencias","data-bc7-preview-jornada"]) {
     assert.ok(UI.includes(token), "missing preview token: "+token);
   }
   assert.doesNotMatch(block,/rpc\('(bc7_guardar|bc7_registrar|bc5_cerrar|bc_declarar)/,
