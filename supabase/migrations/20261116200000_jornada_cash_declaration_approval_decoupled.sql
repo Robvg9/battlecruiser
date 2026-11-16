@@ -1576,6 +1576,9 @@ BEGIN
   IF v_s.estado NOT IN ('PROGRAMADA','EN_CURSO','COMPLETADA') THEN
     RAISE EXCEPTION 'La sesión no admite atribuciones históricas en su estado actual.' USING ERRCODE='23514';
   END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.turnos t WHERE t.id=v_s.turno_id AND t.estado='ABIERTO') THEN
+    RAISE EXCEPTION 'El Turno maestro debe seguir ABIERTO; no se altera un cierre ya aprobado.' USING ERRCODE='23514';
+  END IF;
   SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
   v_period_end:=((coalesce(v_p.fecha_fin,v_p.fecha)+1)::timestamp
     AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'));
