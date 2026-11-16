@@ -1566,7 +1566,7 @@
         }
         group.lines.push([item.producto,qty(item.cantidad)]);
       }
-      const periodLabel=fmtDate(sessionDate(detail.sesion.fecha))+' – '+fmtDate(sessionDate(detail.sesion.fecha_fin||detail.sesion.fecha));
+      const periodLabel=fmtDate(detail.sesion.fecha)+' – '+fmtDate(detail.sesion.fecha_fin||detail.sesion.fecha);
       const pendingTransferHtml=pendingTransferGroups.length?pendingTransferGroups.map(group=>
         '<article class="bc7-card"><h4>Transferencia pendiente de atribución · '+group.lines.length+' líneas</h4>'+
         '<p><b>Operación:</b> '+esc(group.id)+'<br><b>Fecha real de registro:</b> '+esc(String(group.fecha||'').replace('T',' ').slice(0,16))+
