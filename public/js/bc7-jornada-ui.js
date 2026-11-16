@@ -124,7 +124,9 @@
     else if(/responsable.*(no esta activo|no elegible|rol elegible)|no esta activo o no tiene rol/.test(value)) message='Uno de los responsables ya no está disponible para trabajar. Actualiza la lista y vuelve a seleccionarlo.';
     else if(/configuracion de jornada no encontrada|falta.*horario/.test(value)) message='Todavía no está configurado el horario de este almacén. Guarda primero la hora de apertura y de cierre.';
     else if(/almacen inexistente|almacen.*inactivo|warehouse.*not found/.test(value)) message='El almacén seleccionado ya no está disponible. Actualiza la lista de almacenes y vuelve a intentarlo.';
-    else if(code==='42501'||/solo admin|permiso|not authorized|permission denied|no autorizado/.test(value)) message='Tu cuenta no tiene permiso para hacer este cambio. Pide al administrador que revise tu acceso.';
+    else if(code==='BC_AUTH_CONTEXT_NOT_READY') message='La sesión todavía se está validando. Espera a que termine la verificación de tu cuenta y vuelve a actualizar el calendario.';
+    else if(code==='42501'&&/permission denied for function/.test(value)) message='El servidor rechazó la llamada de jornada antes de consultar los datos. Vuelve a validar la sesión; no concedas permisos administrativos para resolverlo.';
+    else if(code==='42501'||/solo admin|sin permiso|not authorized|no autorizado/.test(value)) message='Tu cuenta no tiene permiso para hacer este cambio. Pide al administrador que revise tu acceso.';
     else if(code==='23505') message='Hay una jornada o asignación que se repite. Revisa las fechas y los responsables antes de volver a intentarlo.';
     else if(code==='22023'||/rango.*invalido|patron incompleto|entrada invalida|debe tener una entrada/.test(value)) message='Hay algún dato de la programación que debemos corregir. Revisa las fechas, la duración y que cada día de trabajo tenga una persona asignada.';
     else if(code==='23514'||/no puede|no se puede|conflicto/.test(value)) message='La programación no cumple una regla de trabajo. Revisa los días de descanso, los responsables y las fechas repetidas.';
@@ -156,9 +158,22 @@
   function setStatus(msg,kind){const el=$('bc7-status');if(!el)return;el.textContent=msg||'';el.className='bc7-status '+(kind||'');}
   function msg(el,text,kind){if(!el)return;el.textContent=text||'';el.className='bc7-msg '+(kind||'');}
   function can(section,action){try{return typeof tienePermiso==='function'&&tienePermiso(section,action)}catch(e){return false}}
+  function authenticatedContextReady(){
+    try{
+      if(typeof _bcSesionActivaId==='undefined'||!_bcSesionActivaId)return false;
+      if(typeof _usuarioActual==='undefined'||!_usuarioActual||!_usuarioActual.id)return false;
+      if(String(_usuarioActual.id)!==String(_bcSesionActivaId))return false;
+      if(typeof _permisosCargaExitosa==='undefined'||_permisosCargaExitosa!==true)return false;
+      return true;
+    }catch(_){return false;}
+  }
   async function rpc(name,params){
     if(!navigator.onLine)throw new Error('Estás sin conexión. Reconecta para consultar o guardar datos; nada se ha enviado.');
     if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
+    if(!authenticatedContextReady()){
+      const error=new Error('La sesión todavía está validando el usuario y sus permisos. No se consultaron ni modificaron datos.');
+      error.code='BC_AUTH_CONTEXT_NOT_READY';error.rpc=name;throw error;
+    }
     const r=await client.rpc(name,params||{});
     if(r&&r.error){const e=new Error(r.error.message||r.error.details||'La operación fue rechazada.');e.code=r.error.code;e.rpc=name;throw e;}
     return r?r.data:null;
@@ -2307,6 +2322,10 @@
   }
   async function boot(){
     ensureStyles();ensureDayRowsStyles();if(!ensureShell())return;
+    if(!authenticatedContextReady()){
+      setStatus('Esperando la validación segura de tu sesión antes de consultar las jornadas…','');
+      return;
+    }
     const today=dateHavana();
     if($('bc7-anchor'))$('bc7-anchor').value=today;
     if($('bc7-start-date'))$('bc7-start-date').value=today;
@@ -2435,5 +2454,51 @@
     if(reinvestment&&t.matches('[data-bc7-reinvestment-quantity],[data-bc7-reinvestment-unit-cost]'))updateReinvestmentEstimate(reinvestment);
     if(t&&t.matches('[data-bc7-ajust-qty]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));
   });
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>boot());else boot();
+  let bootStarted=false;
+  let authWaitTimer=null;
+  function scheduleAuthenticatedBoot(){
+    if(bootStarted||authWaitTimer!==null)return;
+    ensureStyles();ensureDayRowsStyles();
+    if(!ensureShell())return;
+    setStatus('Validando la sesión y los permisos de tu cuenta…','');
+    const deadline=Date.now()+30000;
+    function check(){
+      authWaitTimer=null;
+      if(bootStarted)return;
+      if(authenticatedContextReady()){
+        bootStarted=true;
+        Promise.resolve().then(boot).catch(function(error){
+          setStatus('No se pudo iniciar Jornada e inventario. Actualiza la sección y vuelve a intentarlo.','error');
+          console.warn('[BC7] No se pudo iniciar tras validar la sesión:',error);
+        });
+        return;
+      }
+      if(Date.now()>=deadline){
+        setStatus('La sesión todavía no se ha validado. Vuelve a entrar en BattleCruiser y pulsa Actualizar calendario.','error');
+        return;
+      }
+      authWaitTimer=window.setTimeout(check,150);
+    }
+    check();
+  }
+  try{
+    if(typeof client!=='undefined'&&client&&client.auth&&typeof client.auth.onAuthStateChange==='function'){
+      client.auth.onAuthStateChange(function(event,session){
+        if(event==='SIGNED_OUT'){
+          if(authWaitTimer!==null)window.clearTimeout(authWaitTimer);
+          authWaitTimer=null;bootStarted=false;
+          return;
+        }
+        if(session)window.setTimeout(scheduleAuthenticatedBoot,0);
+      });
+    }
+  }catch(error){console.warn('[BC7] No se pudo enlazar el estado Auth:',error);}
+  document.addEventListener('click',function(e){
+    const refresh=e.target&&e.target.closest?e.target.closest('[data-bc7-refresh]'):null;
+    if(refresh&&!bootStarted){
+      e.preventDefault();e.stopImmediatePropagation();scheduleAuthenticatedBoot();
+    }
+  },true);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scheduleAuthenticatedBoot,{once:true});
+  else scheduleAuthenticatedBoot();
 })();
