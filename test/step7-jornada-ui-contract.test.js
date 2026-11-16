@@ -27,6 +27,18 @@ test("Step 7 has session-scoped, immutable inventory snapshots and gates start/c
   assert.doesNotMatch(migration,/\bDROP\s+TABLE\b|\bTRUNCATE\s/i);
 });
 
+test("Jornada waits for the authenticated profile and permissions before calling protected RPCs",()=>{
+  assert.match(ui,/function authenticatedContextReady\(\)/);
+  assert.match(ui,/String\(_usuarioActual\.id\)!==String\(_bcSesionActivaId\)/);
+  assert.match(ui,/_permisosCargaExitosa!==true/);
+  assert.match(ui,/if\(!authenticatedContextReady\(\)\)/);
+  assert.match(ui,/error\.code='BC_AUTH_CONTEXT_NOT_READY'/);
+  assert.match(ui,/client\.auth\.onAuthStateChange/);
+  assert.match(ui,/scheduleAuthenticatedBoot/);
+  assert.doesNotMatch(ui,/code==='42501'\|\|\/solo admin\|permiso\|not authorized\|permission denied\|no autorizado\//,
+    "a missing Auth session must not be described as a missing role permission");
+});
+
 test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write confirmations",()=>{
   for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_bajas_multiple_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
     assert.ok(ui.includes(rpc),`UI no wired to ${rpc}`);
@@ -139,7 +151,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.32");
+  assert.equal(moduleVersion,"7.33");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assert.ok(app.includes('["aprobaciones-admin.js","20261113.4"]'));
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.4"));
