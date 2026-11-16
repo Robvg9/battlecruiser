@@ -174,8 +174,15 @@ test("Service Worker updates wait for an explicit, stable handoff", () => {
   const installBlock = serviceWorker.slice(installStart, messageStart);
   assert.doesNotMatch(installBlock, /skipWaiting\s*\(/,
     "install must not activate an update while an existing document is booting");
-  assert.doesNotMatch(serviceWorker, /clients\.claim\s*\(/,
-    "a new worker must not take over existing tabs without a reload");
+  const activateStart = serviceWorker.indexOf('self.addEventListener("activate"');
+  const fetchStart = serviceWorker.indexOf('self.addEventListener("fetch"');
+  assert.ok(activateStart >= 0 && fetchStart > activateStart, "activate handler must be present");
+  const activateBlock = serviceWorker.slice(activateStart, fetchStart);
+  assert.match(activateBlock, /previousReleaseCacheExists/);
+  assert.match(activateBlock, /if \(!previousReleaseCacheExists\) return self\.clients\.claim\(\)/,
+    "only a first installation with no older release cache may claim the initial document");
+  assert.doesNotMatch(activateBlock, /caches\.delete\(/,
+    "activation must preserve previous release caches used by open tabs");
   assert.match(serviceWorker, /event\.data\.type === "SKIP_WAITING"/,
     "only an explicit update action may activate the waiting worker");
   assert.match(auth, /updateViaCache:\s*"none"/,
