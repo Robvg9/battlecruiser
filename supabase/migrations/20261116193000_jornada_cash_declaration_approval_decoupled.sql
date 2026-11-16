@@ -57,12 +57,7 @@ BEGIN
   WHERE d.turno_sesion_id=p_turno_sesion_id
   ORDER BY d.declarado_at DESC NULLS LAST,d.created_at DESC NULLS LAST
   LIMIT 1;
-  SELECT EXISTS(
-    SELECT 1 FROM public.turno_declaraciones d
-    WHERE d.turno_sesion_id=p_turno_sesion_id
-      AND d.monto IS NOT NULL
-      AND coalesce(d.estado_aprobacion,'')<>'RECHAZADA'
-  ) INTO v_cash_declared;
+  v_cash_declared:=v_cash_state IS NOT NULL AND v_cash_state<>'RECHAZADA';
   v_lista_conteo:=v_gastos AND v_reinversiones AND v_bajas AND v_final AND v_cash_declared;
   v_liquidacion:=public.bc7_liquidacion_inventario_jornada(p_turno_sesion_id);
   v_lista_calculo:=v_lista_conteo
