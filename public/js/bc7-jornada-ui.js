@@ -1585,8 +1585,13 @@
         ['Estado',humanStatus(session.estado)],
         ['Responsable',userName(session.responsable_id)],
         ['Período',fmtDateHuman(session.fecha)+(session.fecha_fin&&session.fecha_fin!==session.fecha?' – '+fmtDateHuman(session.fecha_fin):'')],
-        ['Ventas estimadas',settlement?.ventas_estimadas==null?'Pendiente':money(settlement.ventas_estimadas)+' CUP'],
+        ['Ventas comprobadas',settlement?.ventas_estimadas==null?'Pendiente':money(settlement.ventas_estimadas)+' CUP'],
         ['Salario calculado',settlement?.salario_calculado==null?'Pendiente':money(settlement.salario_calculado)+' CUP'],
+        ['Gastos aprobados',settlement?.gastos_aprobados==null?'Pendiente':money(settlement.gastos_aprobados)+' CUP'],
+        ['Reinversiones aprobadas',settlement?.reinversiones_aprobadas==null?'Pendiente':money(settlement.reinversiones_aprobadas)+' CUP'],
+        ['Dinero recogido',settlement?.dinero_recogido_total==null?'Pendiente':money(settlement.dinero_recogido_total)+' CUP'],
+        ['Efectivo esperado',settlement?.efectivo_esperado_despues_de_gastos_reinversiones==null?'Pendiente':money(settlement.efectivo_esperado_despues_de_gastos_reinversiones)+' CUP'],
+        ['Diferencia de caja',settlement?.diferencia==null?'Pendiente':money(settlement.diferencia)+' CUP'],
         ['Efectivo declarado',declaration?.monto==null?'Pendiente':money(declaration.monto)+' CUP'],
         ['Conteo físico',declaration?.monto_contado==null?'Pendiente':money(declaration.monto_contado)+' CUP']
       ];
