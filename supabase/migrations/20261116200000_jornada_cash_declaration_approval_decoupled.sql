@@ -83,9 +83,7 @@ BEGIN
     'fase',v_phase
   );
 END;
-$function$
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.listar_aprobaciones_admin()
  RETURNS TABLE(tipo text, id uuid, fecha timestamp with time zone, usuario_nombre text, almacen_nombre text, producto_nombre text, resumen text, monto numeric, cantidad numeric, estado text, motivo text)
  LANGUAGE plpgsql
@@ -288,9 +286,7 @@ BEGIN
 
     ORDER BY 3 DESC;
 END;
-$function$
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.bc5_contar_dinero_entregado(p_declaracion_id uuid, p_monto_contado numeric, p_observacion text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -425,9 +421,7 @@ BEGIN
     'idempotente',false
   );
 END;
-$function$
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.bc7_resolver_declaracion_jornada(
   p_declaracion_id uuid,
   p_decision text,
@@ -529,10 +523,7 @@ begin
   END IF;
   return r;
 end;
-$function$
-
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.bc7_transferencias_pendientes_vinculo_jornada(p_turno_sesion_id uuid)
 RETURNS TABLE(
   transferencia_id uuid,
@@ -787,9 +778,7 @@ BEGIN
   LEFT JOIN initial_rows i ON i.producto_id = ids.producto_id
   LEFT JOIN movement_totals m ON m.producto_id = ids.producto_id;
 END;
-$function$
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.bc7_liquidacion_inventario_jornada(p_turno_sesion_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1162,9 +1151,7 @@ BEGIN
     )
   );
 END;
-$function$
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.bc7_movimientos_sesion(p_turno_sesion_id uuid)
  RETURNS TABLE(fecha timestamp with time zone, tipo text, producto text, almacen text, cantidad numeric, costo_unitario numeric, usuario text, operacion_id uuid)
  LANGUAGE plpgsql
@@ -1537,10 +1524,7 @@ BEGIN
 
   ORDER BY 1 DESC;
 END;
-$function$
-
-
-
+$function$;
 CREATE OR REPLACE FUNCTION public.bc7_vincular_transferencia_jornada(
   p_turno_sesion_id uuid,
   p_transferencia_id uuid,
