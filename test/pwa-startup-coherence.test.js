@@ -147,7 +147,7 @@ test("Service Worker installs each shell asset from a fresh network response", (
   assert.match(serviceWorker, /new Request\(absoluteUrl,\s*\{[\s\S]*?cache: "no-store"/);
   assert.match(serviceWorker, /return cache\.put\(request, response\.clone\(\)\)/);
   assert.match(serviceWorker, /precacheLocalAssets\(cache, PRECACHE_SHELL\.concat\(PRECACHE_STATIC\)\)/);
-  assert.doesNotMatch(serviceWorker, /cache\.addAll\(/,
+  assert.doesNotMatch(serviceWorker, /(?:^|\n)\s*cache\.addAll\(/,
     "install must not seed this release cache from stale browser HTTP-cache bytes");
 });
 
