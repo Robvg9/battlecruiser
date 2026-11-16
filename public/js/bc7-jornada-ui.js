@@ -1562,7 +1562,7 @@
         x.producto,qty(x.cantidad),x.estado,x.motivo,x.creado_nombre,x.revisado_nombre,fmtDateTimeHavana(x.creado_en)
       ]);
       const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
-      const reinvestmentRows=arr(finance?.reinversiones).map(x=>[x.producto_nombre||x.producto,x.total||x.monto,x.estado,x.proveedor||'']);
+      const reinvestmentRows=arr(finance?.reinversiones).map(x=>[arr(x.lineas).map(line=>line.producto+' × '+qty(line.cantidad_base)).join(', ')||'Sin detalle',x.total??x.monto,x.estado,x.proveedor||'']);
       const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP']);
       const pendingTransferGroups=[];
       for(const item of arr(unlinkedTransfers)){
