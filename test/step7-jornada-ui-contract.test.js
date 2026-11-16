@@ -215,30 +215,51 @@ test("Daily cash approvals display the feminine state labels returned by the ser
 
 
 
-test("shared inventory receipt uses A/B attestation flow and preserves live counting state",()=>{
-  const start=ui.indexOf("function receiveFormHtml(delivery,detail){");
-  const end=ui.indexOf("function updateReceivePreview(form){",start);
-  assert.ok(start>=0&&end>start,"shared receipt form and preview helper must be present");
-  const receive=ui.slice(start,end);
+test("shared inventory receipt uses a compact two-step discrepancy flow and preserves the full payload",()=>{
+  const formStart=ui.indexOf("function receiveFormHtml(delivery,detail){");
+  const formEnd=ui.indexOf("function updateReceivePreview(form){",formStart);
+  assert.ok(formStart>=0&&formEnd>formStart,"shared receipt form and preview helper must be present");
+  const form=ui.slice(formStart,formEnd);
   for(const token of [
-    "data-bc7-receive-mode=\"fast\"",
-    "data-bc7-receive-mode=\"diff\"",
+    'data-bc7-receive-mode="fast"',
+    'data-bc7-receive-mode="diff"',
     "data-bc7-receive-attest-fast",
-    "data-bc7-receive-attest-diff",
     "data-bc7-receive-summary",
-    "bc7-receive-list",
-    "bc7-receive-item",
-    "Declarado:",
-    "data-bc7-receive-declared",
-    "data-bc7-receive-mark",
-    "data-bc7-receive-count"
-  ]) {
-    assert.ok(receive.includes(token),"receipt form must include "+token);
-  }
-  assert.match(ui,/function receiveSummaryFromForm\(form\)\{[\s\S]*attested[\s\S]*pending/,"summary reflects attestation/pending state");
-  assert.match(ui,/No se pudo actualizar la vista automáticamente\. La recepción ya fue registrada en el servidor/,"post-save refresh failure must not be presented as reception failure");
-  assert.match(ui,/bc7_recibir_entrega_jornada/,"the existing server receipt RPC remains authoritative");
-  assert.ok(jornadaCss.includes(".bc7-receive-item"));
-  assert.ok(jornadaCss.includes(".bc7-receive-count input"));
-  assert.ok(jornadaCss.includes("@media (max-width: 650px)"));
+    "Todo coincide"
+  ]) assert.ok(form.includes(token),"receipt form must include "+token);
+
+  const paneStart=ui.indexOf("function receiveDiffPaneHtml(lines,attempt){");
+  const paneEnd=ui.indexOf("function renderReceiveDiffPane(form){",paneStart);
+  assert.ok(paneStart>=0&&paneEnd>paneStart,"two-step discrepancy pane builder must exist");
+  const pane=ui.slice(paneStart,paneEnd);
+  for(const token of [
+    "data-bc7-receive-search","data-bc7-receive-add","data-bc7-receive-remove",
+    "data-bc7-receive-continue","data-bc7-receive-count","data-bc7-receive-back",
+    "data-bc7-receive-attest-diff","selected.map"
+  ]) assert.ok(pane.includes(token),"discrepancy pane must include "+token);
+  const pickerStart=pane.indexOf("if(attempt.step!=='values'){");
+  const correctionStart=pane.indexOf("const correctionRows=selected.map",pickerStart);
+  assert.ok(pickerStart>=0&&correctionStart>pickerStart,"picker and quantity stages must be separate");
+  assert.doesNotMatch(pane.slice(pickerStart,correctionStart),/data-bc7-receive-count=/,
+    "step 1 must select products without asking for quantities");
+  const correctionPane=pane.slice(correctionStart);
+  assert.match(correctionPane,/data-bc7-receive-count=/);
+  assert.match(correctionPane,/data-bc7-receive-attest-diff/);
+  assert.doesNotMatch(correctionPane,/lines\.map/,"step 2 renders only selected products");
+
+  const saveStart=ui.indexOf("async function saveReceipt(form)");
+  const payloadStart=ui.indexOf("let payloadLines=[];",saveStart);
+  const payloadEnd=ui.indexOf("const payload={p_destino_sesion_id",payloadStart);
+  const savePayload=ui.slice(payloadStart,payloadEnd);
+  assert.match(savePayload,/markedCount===0/,"empty discrepancy selection cannot be submitted");
+  assert.match(savePayload,/if\(!marked\)return \{producto_id:l\.producto_id,cantidad:Number\(l\.cantidad_declarada\)\}/,
+    "unselected products preserve the quantity declared by the previous jornada");
+  assert.match(ui,/bc7_recibir_entrega_jornada/,"the existing server RPC remains authoritative");
+  assert.match(ui,/No se pudo actualizar la vista automáticamente\. La recepción ya fue registrada en el servidor/,
+    "a failed view refresh must not be presented as a failed physical receipt");
+  assert.match(jornadaCss,/input\[type="checkbox"\][\s\S]*?width:18px!important/);
+  assert.match(jornadaCss,/bc7-receive-pick-row/);
+  assert.match(jornadaCss,/bc7-receive-correction-row/);
+  assert.match(jornadaCss,/overflow-x:hidden/);
+  assert.match(jornadaCss,/@media\(max-width:560px\)/);
 });

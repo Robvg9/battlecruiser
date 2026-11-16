@@ -442,10 +442,24 @@ BEGIN
 
   -- The final handover is scheduled for the day after the recorded operational close.
   -- This may differ from the programmed period end when closure used an exception.
-  SELECT id INTO v_handover_id
-  FROM public.turno_jornada_inventario_entregas
-  WHERE origen_sesion_id=v_session AND destino_sesion_id IS NULL
-    AND fecha_destino=((v_end AT TIME ZONE 'America/Havana')::date+1) AND estado='PENDIENTE_PROGRAMACION';
+  SELECT e.id INTO v_handover_id
+  FROM public.turno_jornada_inventario_entregas e
+  JOIN LATERAL (
+    SELECT je.tipo,je.estado_despues
+    FROM public.turno_jornada_eventos je
+    WHERE je.programacion_id=v_program
+      AND je.tipo IN ('JORNADA_CERRADA','JORNADA_CERRADA_CON_EXCEPCION','JORNADA_ENTREGADA_TARDE')
+    ORDER BY je.creado_en DESC
+    LIMIT 1
+  ) cierre ON true
+  WHERE e.origen_sesion_id=v_session AND e.destino_sesion_id IS NULL
+    AND e.estado='PENDIENTE_PROGRAMACION'
+    AND e.fecha_destino=(
+      CASE WHEN cierre.tipo='JORNADA_ENTREGADA_TARDE'
+        THEN coalesce(nullif(cierre.estado_despues->>'fecha_fin_programada','')::date,v_today)+1
+        ELSE coalesce(nullif(cierre.estado_despues->>'fecha_real','')::date,v_today)+1
+      END
+    );
   IF v_handover_id IS NULL THEN
     RAISE EXCEPTION 'FAIL: final Jornada did not leave its actual-close-date handover schedulable';
   END IF;
