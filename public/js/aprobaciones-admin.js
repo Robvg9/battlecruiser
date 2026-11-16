@@ -292,7 +292,7 @@ async function resolverDesdeModal(decision){
         throw new Error((isDailyCash||isFinalCash)?'El conteo físico no puede ser negativo.':'El valor real debe ser mayor que cero.');
       }
       if(isFinalCash){
-        if(!confirm('Vas a aprobar la declaración de '+money(Number(modal.dataset.declaredAmount))+' CUP. Esto no registra el conteo físico, que seguirá pendiente hasta que la jornada sea entregada. ¿Confirmas?')){accept.disabled=false;reject.disabled=false;return;}
+        if(!confirm((decision==='APROBAR'?'Vas a aprobar':'Vas a rechazar')+' la declaración de '+money(Number(modal.dataset.declaredAmount))+' CUP. '+(decision==='APROBAR'?'Esto no registra el conteo físico, que seguirá pendiente hasta que la jornada sea entregada.':'El rechazo requiere que la responsable corrija y vuelva a presentar el importe.')+' ¿Confirmas?')){accept.disabled=false;reject.disabled=false;return;}
         await rpc('bc7_resolver_declaracion_jornada',{
           p_declaracion_id:id,p_decision:decision,p_comentario:comment||null
         });
