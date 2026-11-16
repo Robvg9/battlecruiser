@@ -1590,7 +1590,7 @@
         ['Gastos aprobados',settlement?.gastos_aprobados==null?'Pendiente':money(settlement.gastos_aprobados)+' CUP'],
         ['Reinversiones aprobadas',settlement?.reinversiones_aprobadas==null?'Pendiente':money(settlement.reinversiones_aprobadas)+' CUP'],
         ['Dinero recogido',settlement?.dinero_recogido_total==null?'Pendiente':money(settlement.dinero_recogido_total)+' CUP'],
-        ['Efectivo esperado',settlement?.efectivo_esperado_despues_de_gastos_reinversiones==null?'Pendiente':money(settlement.efectivo_esperado_despues_de_gastos_reinversiones)+' CUP'],
+        ['Efectivo esperado',(settlement?.efectivo_esperado_despues_de_gastos_reinversiones??settlement?.efectivo_esperado_despues_de_gastos_reinversiones_salario)==null?'Pendiente':money(settlement.efectivo_esperado_despues_de_gastos_reinversiones??settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP'],
         ['Diferencia de caja',settlement?.diferencia==null?'Pendiente':money(settlement.diferencia)+' CUP'],
         ['Efectivo declarado',declaration?.monto==null?'Pendiente':money(declaration.monto)+' CUP'],
         ['Conteo físico',declaration?.monto_contado==null?'Pendiente':money(declaration.monto_contado)+' CUP']
