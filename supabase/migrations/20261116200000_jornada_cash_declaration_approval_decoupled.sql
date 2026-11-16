@@ -2,6 +2,20 @@
 -- Generated against the production function signatures; no existing jornada records are rewritten.
 BEGIN;
 
+-- Preserve a distinct state for approval of the declared amount, before physical cash count.
+ALTER TABLE public.turno_declaraciones
+  DROP CONSTRAINT IF EXISTS turno_declaraciones_estado_aprobacion_check;
+ALTER TABLE public.turno_declaraciones
+  ADD CONSTRAINT turno_declaraciones_estado_aprobacion_check
+  CHECK (estado_aprobacion = ANY (ARRAY[
+    'PENDIENTE'::text,
+    'ESPERANDO_APROBACION'::text,
+    'DECLARACION_APROBADA'::text,
+    'APROBADA'::text,
+    'RECHAZADA'::text,
+    'CON_DIFERENCIA'::text
+  ]));
+
 CREATE OR REPLACE FUNCTION public.bc7_estado_confirmaciones_jornada(p_turno_sesion_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
