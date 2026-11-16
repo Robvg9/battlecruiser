@@ -1538,4 +1538,85 @@ END;
 $function$
 
 
+
+CREATE OR REPLACE FUNCTION public.bc7_vincular_transferencia_jornada(
+  p_turno_sesion_id uuid,
+  p_transferencia_id uuid,
+  p_motivo text
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_t public.transferencias;
+  v_existing public.turno_jornada_entradas_vinculadas;
+  v_link_id uuid;
+  v_period_end timestamptz;
+  v_line_count integer;
+  v_reason text:=nullif(left(btrim(coalesce(p_motivo,'')),1000),'');
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
+  END IF;
+  IF NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN puede atribuir una transferencia histórica a una Jornada.' USING ERRCODE='42501';
+  END IF;
+  IF v_reason IS NULL OR length(v_reason)<10 THEN
+    RAISE EXCEPTION 'Escribe un motivo de atribución de al menos 10 caracteres.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL THEN
+    RAISE EXCEPTION 'La sesión destino no corresponde a una Jornada.' USING ERRCODE='23503';
+  END IF;
+  IF v_s.estado NOT IN ('PROGRAMADA','EN_CURSO','COMPLETADA') THEN
+    RAISE EXCEPTION 'La sesión no admite atribuciones históricas en su estado actual.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
+  v_period_end:=((coalesce(v_p.fecha_fin,v_p.fecha)+1)::timestamp
+    AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'));
+  IF coalesce(v_p.fecha_fin,v_p.fecha)>=(now() AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana'))::date THEN
+    RAISE EXCEPTION 'La atribución retroactiva solo aplica a períodos ya finalizados.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_t FROM public.transferencias WHERE id=p_transferencia_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'No existe la transferencia indicada.' USING ERRCODE='23503'; END IF;
+  IF lower(v_t.estado)<>'completada' OR v_t.almacen_destino_id<>v_s.almacen_id THEN
+    RAISE EXCEPTION 'La transferencia debe estar completada y su destino debe ser el almacén de esta Jornada.' USING ERRCODE='23514';
+  END IF;
+  IF v_t.fecha<=v_period_end THEN
+    RAISE EXCEPTION 'La transferencia está fechada dentro del período; no necesita atribución retroactiva.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_existing FROM public.turno_jornada_entradas_vinculadas
+  WHERE transferencia_id=v_t.id;
+  IF FOUND THEN
+    IF v_existing.turno_sesion_id=v_s.id THEN
+      RETURN jsonb_build_object('ok',true,'idempotente',true,'vinculo_id',v_existing.id,
+        'turno_sesion_id',v_s.id,'transferencia_id',v_t.id);
+    END IF;
+    RAISE EXCEPTION 'Esta transferencia ya está vinculada a otra Jornada; no se puede duplicar.' USING ERRCODE='23505';
+  END IF;
+  SELECT count(*)::integer INTO v_line_count FROM public.transferencias_lineas WHERE transferencia_id=v_t.id;
+  IF v_line_count=0 THEN RAISE EXCEPTION 'La transferencia no contiene líneas de producto.' USING ERRCODE='23514'; END IF;
+  INSERT INTO public.turno_jornada_entradas_vinculadas(turno_sesion_id,transferencia_id,vinculado_por)
+  VALUES(v_s.id,v_t.id,auth.uid()) RETURNING id INTO v_link_id;
+  INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo,payload)
+  VALUES(v_s.turno_id,v_s.id,NULL,auth.uid(),'TRANSFERENCIA_RETROACTIVA_VINCULADA',
+    jsonb_build_object(
+      'vinculo_id',v_link_id,'transferencia_id',v_t.id,
+      'fecha_registro_real',v_t.fecha,'periodo_operativo_inicio',v_p.fecha,
+      'periodo_operativo_fin',coalesce(v_p.fecha_fin,v_p.fecha),
+      'lineas',v_line_count,'almacen_origen_id',v_t.almacen_origen_id,
+      'almacen_destino_id',v_t.almacen_destino_id,'motivo',v_reason,
+      'aplicacion_unica',true
+    ));
+  RETURN jsonb_build_object('ok',true,'idempotente',false,'vinculo_id',v_link_id,
+    'turno_sesion_id',v_s.id,'transferencia_id',v_t.id,
+    'fecha_registro_real',v_t.fecha,'periodo_operativo_inicio',v_p.fecha,
+    'periodo_operativo_fin',coalesce(v_p.fecha_fin,v_p.fecha),'lineas',v_line_count);
+END;
+$function$;
+GRANT EXECUTE ON FUNCTION public.bc7_vincular_transferencia_jornada(uuid,uuid,text) TO authenticated;
+
 COMMIT;
