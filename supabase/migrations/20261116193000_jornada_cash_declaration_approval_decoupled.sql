@@ -335,7 +335,7 @@ BEGIN
     RAISE EXCEPTION 'Sheila debe entregar la jornada antes de que el Dueño pueda contar el efectivo.' USING ERRCODE='23514';
   END IF;
   IF coalesce((public.bc7_estado_confirmaciones_jornada(v_s.id)->>'lista_para_conteo')::boolean,false) IS NOT TRUE THEN
-    RAISE EXCEPTION 'El conteo físico requiere que Sheila haya completado los cuatro checks antes de entregar la jornada.' USING ERRCODE='23514';
+    RAISE EXCEPTION 'El conteo físico requiere que la responsable haya completado los cinco pasos antes de entregar la jornada.' USING ERRCODE='23514';
   END IF;
 
   -- A retry with the exact same physical count is safe. A different amount cannot overwrite evidence.
