@@ -1442,7 +1442,7 @@
       '<span class="bc7-checklist-state">'+(cashDeclared?'✓ Registrada':'Pendiente')+'</span>'+
     '</div>';
     return '<section class="bc7-checklist" aria-label="Checklist de cierre de la dependienta">'+
-      '<div class="bc7-checklist-head"><div><h4>Checklist de Sheila · jornada</h4><p>Completa los cinco pasos. Las entradas/transferencias las registra el Dueño y se muestran en la vista previa del cuadro.</p></div>'+
+      '<div class="bc7-checklist-head"><div><h4>Checklist de la jornada</h4><p>Completa los cinco pasos. Las entradas/transferencias las registra el Dueño y se muestran en la vista previa del cuadro.</p></div>'+
       '<span class="bc7-checklist-count">'+(manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0)+(cashDeclared?1:0))+'/5</span></div>'+
       rows+finalRow+cashRow+
       '<p class="bc7-muted">Si registras un nuevo gasto, reinversión o baja después de confirmar, el sistema reabre automáticamente ese check.</p>'+
