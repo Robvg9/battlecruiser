@@ -46,7 +46,7 @@ test("release manifest records exact source SHA, numeric run ID and aligned app/
 test("release asset inventory is stable, complete, and excludes the generated manifest", () => {
   const entries = buildAssetInventory([
     { path: "z/icon.svg", content: "<svg/>" },
-    { path: "release-" + "a".repeat(40) + ".json", content: "self-reference" },
+    { path: "build-provenance.json", content: "self-reference" },
     { path: "app.js", content: "hello" },
   ]);
   assert.deepEqual(Object.keys(entries), ["app.js", "z/icon.svg"]);
@@ -65,13 +65,14 @@ test("asset collection reads the full public tree and omits prior release manife
     assert.ok(inventory[required], "missing public release asset " + required);
     assert.match(inventory[required].sha256, /^[0-9a-f]{64}$/);
   }
-  assert.ok(!Object.keys(inventory).some(name => /^release-[0-9a-f]{40}\.json$/i.test(name)),
+  assert.ok(!Object.keys(inventory).some(name => /^release-[0-9a-f]{40}\.json$/i.test(name) || name === "build-provenance.json"),
     "a generated manifest must not hash itself or prior manifests");
 });
 
-test("content-addressed manifest URL is unique to a full commit SHA", () => {
+test("build provenance uses a stable LIVE asset path while the document remains bound to the full commit SHA", () => {
   const sha = "fedcba9876543210fedcba9876543210fedcba98";
-  assert.equal(releaseManifestFilename(sha), "release-" + sha + ".json");
+  assert.equal(releaseManifestFilename(sha), "build-provenance.json");
+  assert.equal(releaseManifestFilename("abcdef0123456789abcdef0123456789abcdef01"), "build-provenance.json");
   assert.throws(() => releaseManifestFilename("short"), /40-character git SHA/);
   assert.throws(() => releaseManifestFilename("../" + "a".repeat(40)), /40-character git SHA/);
 });
@@ -94,12 +95,12 @@ test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run 
 test("production deploy uses standard hosted Windows and persists the exact LIVE release manifest", () => {
   assert.match(deploy, /^    runs-on: windows-latest$/m);
   assert.ok(deploy.includes("run: node test/deploy-production-pwa.js"));
-  assert.ok(deploy.includes("test-results/release/release-*.json"));
+  assert.ok(deploy.includes("test-results/release/build-provenance.json"));
   assert.ok(deploy.includes("name: battlecruiser-release-provenance-${{ github.run_id }}"));
   assert.ok(deploy.includes("test-results/deploy-pwa-log.txt"));
   assert.ok(deploy.includes("if-no-files-found: warn"));
   assert.ok(deployScript.includes("writeReleaseManifest()"));
-  assert.ok(deployScript.includes('const filename = "release-" + expected.source_sha + ".json";'));
+  assert.ok(deployScript.includes("releaseManifestFilename(expected.source_sha)"));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
   assert.ok(deployScript.includes("workflow_run_id"));
   assert.ok(deployScript.includes("asset_inventory"));

@@ -66,6 +66,6 @@ jobs:
           name: battlecruiser-release-provenance-${{ github.run_id }}
           path: |
             test-results/deploy-pwa-log.txt
-            test-results/release/release-*.json
+            test-results/release/build-provenance.json
           if-no-files-found: warn
           retention-days: 90
