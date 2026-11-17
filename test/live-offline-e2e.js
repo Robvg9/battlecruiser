@@ -5,6 +5,11 @@ const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawn, execFileSync } = require("node:child_process");
+const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const expectedDeployRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
+const LIVE_VERSION_AFFINITY_KEY = /^\d+$/.test(expectedDeployRunId)
+  ? "battlecruiser-release-" + expectedDeployRunId
+  : null;
 
 const BASE_URL = (process.env.BC_LIVE_BASE_URL || "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");
 const PREVIEW_BASE_URL = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
@@ -66,7 +71,13 @@ async function fetchText(url, timeoutMs = 20000) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
-      headers: { "cache-control": "no-cache", pragma: "no-cache" },
+      headers: {
+        "cache-control": "no-cache",
+        pragma: "no-cache",
+        ...(LIVE_VERSION_AFFINITY_KEY
+          ? { "Cloudflare-Workers-Version-Key": LIVE_VERSION_AFFINITY_KEY }
+          : {}),
+      },
       signal: controller.signal,
       redirect: "follow",
     });
@@ -389,6 +400,8 @@ async function main() {
   const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
   if (isProductionBase) {
     assert(/^[0-9a-f]{40}$/.test(expectedReleaseSha), "BC_EXPECTED_RELEASE_SHA no es un SHA Git completo para LIVE.");
+    assert(/^\d+$/.test(expectedDeployRunId), "BC_EXPECTED_DEPLOY_RUN_ID debe ser el ID numérico del deploy LIVE.");
+    assert(LIVE_VERSION_AFFINITY_KEY, "No se pudo formar la clave de afinidad del release LIVE.");
   }
 
   for (const assetPath of assetPaths) {
@@ -433,9 +446,8 @@ async function main() {
   }
 
   if (isProductionBase) {
-    const releaseFilename = "release-" + expectedReleaseSha + ".json";
-    const expectedRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
-    assert(/^\d+$/.test(expectedRunId), "BC_EXPECTED_DEPLOY_RUN_ID debe ser el ID numérico del deploy LIVE.");
+    const releaseFilename = releaseManifestFilename(expectedReleaseSha);
+    const expectedRunId = expectedDeployRunId;
     const releasePath = path.join(OUTPUT_DIR, "release", releaseFilename);
     assert(fs.existsSync(releasePath), "No se descargó el artefacto validado por Deploy: " + releasePath);
     let release;
@@ -654,6 +666,11 @@ async function main() {
   };
 
   await cdpCommand("Network.enable");
+  if (isProductionBase) {
+    await cdpCommand("Network.setExtraHTTPHeaders", {
+      headers: { "Cloudflare-Workers-Version-Key": LIVE_VERSION_AFFINITY_KEY },
+    });
+  }
   await cdpCommand("Log.enable");
   await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
   await cdpCommand("Network.setBypassServiceWorker", { bypass: false });
