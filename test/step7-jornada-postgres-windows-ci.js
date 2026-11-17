@@ -357,7 +357,7 @@ function applySql(file) {
     log("Apply PR #345 Jornada preview, five-step cash gate, separate declaration approval and retroactive transfer attribution.");
     applySql("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
     log("Apply the historical final inventory product-set correction and verify late reinvestment/transfer evidence.");
-    applySql("supabase/migrations/20261117030000_jornada_final_inventory_period_products.sql");
+    applySql("supabase/migrations/20261117040544_jornada_final_inventory_period_products.sql");
     applySql("test/jornada-final-inventory-period-products-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
