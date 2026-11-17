@@ -10,6 +10,7 @@ DECLARE
   v_owner uuid:='20000000-0000-0000-0000-000000000001';
   v_worker uuid:='20000000-0000-0000-0000-000000000002';
   v_warehouse uuid:=gen_random_uuid();
+  v_source_warehouse uuid:=gen_random_uuid();
   v_turn uuid:=gen_random_uuid();
   v_program uuid:=gen_random_uuid();
   v_program_day2 uuid:=gen_random_uuid();
@@ -37,7 +38,9 @@ BEGIN
   v_cutoff:=((v_end+1)::timestamp AT TIME ZONE 'America/Havana');
 
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
-  VALUES(v_warehouse,'Jornada final inventory period products fixture','minorista',true);
+  VALUES
+    (v_warehouse,'Jornada final inventory period products fixture','minorista',true),
+    (v_source_warehouse,'Jornada transfer source fixture','mayorista',true);
 
   -- Two opening families existed before the period. Four other catalogue rows
   -- are deliberately created after it; three are supported by this Jornada
@@ -120,8 +123,8 @@ BEGIN
   INSERT INTO public.transferencias(
     id,almacen_origen_id,almacen_destino_id,estado,creado_por,fecha
   ) VALUES
-    (v_transfer,gen_random_uuid(),v_warehouse,'completada',v_owner,now()),
-    (v_foreign_transfer,gen_random_uuid(),v_warehouse,'completada',v_owner,now());
+    (v_transfer,v_source_warehouse,v_warehouse,'completada',v_owner,now()),
+    (v_foreign_transfer,v_source_warehouse,v_warehouse,'completada',v_owner,now());
 
   INSERT INTO public.transferencias_lineas(id,transferencia_id,producto_id,cantidad)
   VALUES
