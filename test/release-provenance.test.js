@@ -76,7 +76,7 @@ test("build provenance is embedded in the existing LIVE PWA manifest and remains
   assert.throws(() => releaseManifestFilename("short"), /40-character git SHA/);
   assert.throws(() => releaseManifestFilename("../" + "a".repeat(40)), /40-character git SHA/);
   const original = { name: "BattleCruiser", start_url: "./", icons: [{ src: "icons/icon.svg" }] };
-  const provenance = { source_sha: sha, app_version: "9.5.123", workflow_run_id: "44000000000" };
+  const provenance = { source_sha: sha, app_version: "9.5.124", workflow_run_id: "44000000000" };
   const combined = embedReleaseProvenance(original, provenance);
   assert.equal(combined.name, "BattleCruiser");
   assert.equal(combined.start_url, "./");

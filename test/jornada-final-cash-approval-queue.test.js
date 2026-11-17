@@ -77,3 +77,28 @@ test("final cash label follows the actual handover phase, not a generic pending 
   assert.match(block,/\?'Esperando aprobación'/);
   assert.match(block,/sessionState==='EN_CURSO'\?'Esperando entrega'/);
 });
+
+test("Approved final cash declarations become countable by the Owner only after handover",()=>{
+  const CASH_QUEUE=read("supabase/migrations/20261117220000_jornada_cash_owner_pending_count.sql");
+  const CASH_UI=read("public/js/turno-cash-handover-ui.js");
+  assert.ok(CASH_QUEUE.includes("'DECLARACION_APROBADA'"));
+  assert.ok(CASH_QUEUE.includes("s.estado='COMPLETADA'"));
+  assert.ok(CASH_UI.includes("status === 'DECLARACION_APROBADA' && row.monto_contado == null"));
+  assert.ok(CASH_UI.includes("if (approvedForCount && completed)"));
+  assert.ok(CASH_UI.includes("rpc('bc5_contar_dinero_entregado'"));
+});
+
+test("Owner review shows declared final cash separately from physical cash counted",()=>{
+  const OWNER_REVIEW=read("public/js/jornada-owner-review.js");
+  assert.ok(OWNER_REVIEW.includes("s.efectivo?.declarado"));
+  assert.ok(OWNER_REVIEW.includes("Declaración final"));
+  assert.ok(OWNER_REVIEW.includes("No se suma al efectivo total recogido"));
+  assert.ok(OWNER_REVIEW.includes("Conteo final de caja"));
+});
+
+test("cash count module cache key is refreshed with the new UI contract",()=>{
+  const APP=read("public/app.js");
+  const SW=read("public/service-worker.js");
+  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.1"'));
+  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.1"));
+});
