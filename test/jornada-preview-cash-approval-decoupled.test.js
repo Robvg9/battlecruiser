@@ -70,6 +70,7 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   assert.match(block,/const bajaRows=\[\.\.\.arr\(finance\?\.bajas\),\.\.\.arr\(finance\?\.mermas\)\]/,"both backend adjustment categories appear under Bajas");
   assert.doesNotMatch(block,/Mermas registradas/,"there is no separate Mermas section");
   assert.match(block,/x\.revisado_nombre\?'ADMIN':'Pendiente'/,"reviewer label is shortened to ADMIN");
+  assert.match(block,/previewTable\(\['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario'\],movementRows,6\)/,"all useful movement fields stay visible without an operation ID");
   assert.doesNotMatch(block,/String\(x\.operacion_id/,"movement operation IDs are not rendered");
   assert.doesNotMatch(block,/<b>Operación:<\/b>/,"transfer operation IDs are not shown to the user");
   assert.match(block,/const finalDeclaration=detail\.declaracion_dinero/,"the final cash declaration is included separately from daily entries");
