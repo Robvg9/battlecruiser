@@ -20,6 +20,7 @@ const expectedSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toL
 if (!/^[0-9a-f]{40}$/.test(expectedSha)) throw new Error("BC_EXPECTED_RELEASE_SHA must be a full 40-character git SHA.");
 const expectedRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
 if (!/^\d+$/.test(expectedRunId)) throw new Error("BC_EXPECTED_DEPLOY_RUN_ID must be the numeric ID of the deploy workflow run.");
+const versionAffinityKey = "battlecruiser-release-" + expectedRunId;
 
 const releaseFilename = releaseManifestFilename(expectedSha);
 const releasePath = path.join(process.cwd(), "test-results", "release", releaseFilename);
@@ -37,7 +38,12 @@ function describeError(error) {
 }
 function requestWithHttps(url) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { "Cache-Control": "no-store, no-cache, max-age=0", Pragma: "no-cache", Expires: "0" } }, (res) => {
+    const req = https.get(url, { headers: {
+      "Cache-Control": "no-store, no-cache, max-age=0",
+      Pragma: "no-cache",
+      Expires: "0",
+      "Cloudflare-Workers-Version-Key": versionAffinityKey,
+    } }, (res) => {
       let body = "";
       res.setEncoding("utf8");
       res.on("data", chunk => { body += chunk; });
@@ -54,7 +60,17 @@ async function requestWithFetch(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch(url, { cache: "no-store", redirect: "follow", headers: { "Cache-Control": "no-store, no-cache, max-age=0", Pragma: "no-cache", Expires: "0" }, signal: controller.signal });
+    const response = await fetch(url, {
+      cache: "no-store",
+      redirect: "follow",
+      headers: {
+        "Cache-Control": "no-store, no-cache, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+        "Cloudflare-Workers-Version-Key": versionAffinityKey,
+      },
+      signal: controller.signal,
+    });
     if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
     return await response.text();
   } finally { clearTimeout(timer); }
@@ -104,6 +120,15 @@ async function verifyOnce(attempt) {
   const liveSwMatch = liveSw.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);
   if (!liveAppMatch) throw new Error("LIVE app.js has no readable VERSION.");
   if (!liveSwMatch) throw new Error("LIVE Service Worker has no readable version.");
+  const indexAppMatch = liveIndex.match(/<script\\s+src=["']app\\.js\\?v=([^"']+)["']/i);
+  const indexFooterMatch = liveIndex.match(/v(\\d+\\.\\d+\\.\\d+) — BattleCruiser/);
+  if (!indexAppMatch || !indexFooterMatch) {
+    throw new Error("LIVE index.html is missing its versioned app entry or release footer.");
+  }
+  if (indexAppMatch[1] !== expectedAppVersion || indexFooterMatch[1] !== expectedAppVersion) {
+    throw new Error("LIVE index.html release mismatch: expected " + expectedAppVersion +
+      ", app entry=" + indexAppMatch[1] + ", footer=" + indexFooterMatch[1]);
+  }
   if (liveAppMatch[1] !== expectedAppVersion) {
     throw new Error("LIVE app.js version mismatch: expected " + expectedAppVersion + ", got " + liveAppMatch[1]);
   }
