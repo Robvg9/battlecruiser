@@ -49,7 +49,7 @@ test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable fr
   assert.match(MIGRATION,/Esta transferencia ya está vinculada a otra Jornada/);
   assert.match(UI,/data-bc7-link-transfer/);
   assert.match(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
-  assert.match(UI,/No se dividirá entre días ni se aplicará a Adriana/);
+  assert.match(UI,/No se dividirá entre días ni se aplicará a otra jornada/);
 });
 test("A rejected declaration can be corrected without erasing the prior value from audit history",()=>{
   assert.match(MIGRATION,/DINERO_REDECLARADO/);
@@ -63,18 +63,27 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   const end=UI.indexOf("function renderWorkspace(detail)",start);
   assert.ok(start>=0&&end>start);
   const block=UI.slice(start,end);
-  for(const token of ["bc7_liquidacion_inventario_jornada","bc7_movimientos_sesion","bc7_finanzas_jornada","bc7_entregas_diarias_jornada","bc7_transferencias_pendientes_vinculo_jornada","PREVISUALIZACIÓN SIN CAMBIOS AUTOMÁTICOS","finance?.bajas","finance?.mermas","Bajas registradas","Mermas registradas","Transferencias","data-bc7-preview-jornada"]) {
+  for(const token of ["bc7_liquidacion_inventario_jornada","bc7_movimientos_sesion","bc7_finanzas_jornada","bc7_entregas_diarias_jornada","bc7_transferencias_pendientes_vinculo_jornada","PREVISUALIZACIÓN SIN CAMBIOS AUTOMÁTICOS","finance?.bajas","finance?.mermas","Bajas registradas","Transferencias","data-bc7-preview-jornada"]) {
     assert.ok(UI.includes(token), "missing preview token: "+token);
   }
+  assert.match(UI,/<summary>Ver más<\/summary>/,"secondary fields stay behind an inline disclosure");
+  assert.match(block,/const bajaRows=\[\.\.\.arr\(finance\?\.bajas\),\.\.\.arr\(finance\?\.mermas\)\]/,"both backend adjustment categories appear under Bajas");
+  assert.doesNotMatch(block,/Mermas registradas/,"there is no separate Mermas section");
+  assert.match(block,/x\.revisado_nombre\?'ADMIN':'Pendiente'/,"reviewer label is shortened to ADMIN");
+  assert.doesNotMatch(block,/String\(x\.operacion_id/,"movement operation IDs are not rendered");
+  assert.doesNotMatch(block,/<b>Operación:<\/b>/,"transfer operation IDs are not shown to the user");
+  assert.match(block,/const finalDeclaration=detail\.declaracion_dinero/,"the final cash declaration is included separately from daily entries");
+  assert.match(block,/finalState==='DECLARACION_APROBADA'\?money\(finalDeclaration\.monto\)/,"approved final declared amount is shown without inventing a daily cash row");
+  assert.doesNotMatch(block,/previewTable\(\['Producto','Inicial','Entradas','Salidas','Bajas','Mermas'/,"inventory presents one combined Bajas column");
   assert.doesNotMatch(block,/rpc\('(bc7_guardar|bc7_registrar|bc5_cerrar|bc_declarar)/,
     "preview must not write or close the Jornada");
 });
 
 test("PWA caches the new Jornada and admin approval modules",()=>{
-  assert.match(APP,/const VERSION="9\.5\.121"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.121"/);
-  assert.match(APP,/\["bc7-jornada-ui\.js","7\.37"\]/);
-  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.37/);
+  assert.match(APP,/const VERSION="9\.5\.122"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.122"/);
+  assert.match(APP,/\["bc7-jornada-ui\.js","7\.38"\]/);
+  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.38/);
   assert.match(APP,/\["aprobaciones-admin\.js","20261116\.1"\]/);
   assert.match(SW,/aprobaciones-admin\.js\?v=20261116\.1/);
 });
