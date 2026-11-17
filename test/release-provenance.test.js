@@ -110,6 +110,8 @@ test("production deploy uses standard hosted Windows and persists the exact LIVE
   assert.ok(deployScript.includes("writeReleaseManifest()"));
   assert.ok(deployScript.includes("releaseManifestFilename(expected.source_sha)"));
   assert.ok(deployScript.includes("pwaManifest.build_provenance"));
+  assert.ok(deployScript.includes("Cloudflare-Workers-Version-Key"));
+  assert.ok(deployScript.includes("battlecruiser-release-"));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
   assert.ok(deployScript.includes("workflow_run_id"));
   assert.ok(deployScript.includes("asset_inventory"));
@@ -135,11 +137,22 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
   assert.match(verifier, /test-results", "release", releaseFilename/);
   assert.match(verifier, /source_sha: expectedSha/);
   assert.match(verifier, /workflow_run_id: expectedRunId/);
+  assert.ok(verifier.includes("Cloudflare-Workers-Version-Key"));
+  assert.ok(verifier.includes("battlecruiser-release-"));
+  assert.match(verifier, /indexFooterMatch/);
   assert.match(verifier, /EXACT_SHA=PASS/);
   assert.ok(verifier.includes("release.asset_inventory"));
   assert.ok(verifier.includes("critical asset SHA-256=PASS"));
   assert.ok(verifier.includes('"style.css": liveStyle'));
   assert.doesNotMatch(verifier, /request\(baseUrl \+ "\/" \+ releaseFilename/);
+});
+
+
+test("deploy smoke and post-deploy LIVE verifier pin related requests to the same Cloudflare Worker version", () => {
+  assert.ok(deployScript.includes('"Cloudflare-Workers-Version-Key": versionKey'));
+  assert.ok(verifier.includes('"Cloudflare-Workers-Version-Key": versionAffinityKey'));
+  assert.ok(deployScript.includes('"battlecruiser-release-" + String(process.env.GITHUB_RUN_ID || "")'));
+  assert.ok(verifier.includes('"battlecruiser-release-" + expectedRunId'));
 });
 
 test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact core asset checks", () => {
