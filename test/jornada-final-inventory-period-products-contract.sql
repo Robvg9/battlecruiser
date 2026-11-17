@@ -80,14 +80,14 @@ BEGIN
   ) VALUES
     (v_program,v_turn,v_warehouse,1,v_start,v_end,true,v_worker,
       '07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner),
-    (v_program_day2,v_turn,v_warehouse,2,v_start+1,v_end,true,v_worker,
+    (v_program_day2,v_turn,v_warehouse,2,v_end+1,v_end+1,true,v_worker,
       '07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner);
 
   INSERT INTO public.turno_sesiones(
     id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id,apertura_retroactiva
   ) VALUES
     (v_session,v_turn,v_warehouse,1,'JORNADA',v_start,'PROGRAMADA',v_program,true),
-    (v_session_day2,v_turn,v_warehouse,2,'JORNADA',v_start+1,'PROGRAMADA',v_program_day2,true);
+    (v_session_day2,v_turn,v_warehouse,2,'JORNADA',v_end+1,'PROGRAMADA',v_program_day2,true);
 
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
   VALUES(v_session,v_turn,v_worker,v_owner);
