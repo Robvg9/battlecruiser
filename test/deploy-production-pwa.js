@@ -49,10 +49,18 @@ function findWranglerEntry() {
 }
 
 async function fetchText(url) {
+  // Keep the deploy smoke and post-deploy verifier on one Worker version.
+  // Cloudflare can otherwise route related HTML/assets requests to different
+  // versions during rollouts. Both workflows derive this key from the deploy run.
+  const versionKey = "battlecruiser-release-" + String(process.env.GITHUB_RUN_ID || "");
   const response = await fetch(url, {
     cache: "no-store",
     redirect: "follow",
-    headers: { "cache-control": "no-cache", pragma: "no-cache" },
+    headers: {
+      "cache-control": "no-cache",
+      pragma: "no-cache",
+      "Cloudflare-Workers-Version-Key": versionKey,
+    },
     signal: AbortSignal.timeout(20000),
   });
   const body = await response.text();
