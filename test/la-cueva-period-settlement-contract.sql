@@ -478,7 +478,7 @@ BEGIN
 
   -- Create the next Turn only after the previous one is approved and closed.
   v_program_result:=public.bc5_crear_jornada_unica(
-    v_warehouse,((v_end AT TIME ZONE 'America/Havana')::date+1),2,
+    v_warehouse,((now() AT TIME ZONE 'America/Havana')::date+1),2,
     jsonb_build_array(
       jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_worker),
       jsonb_build_object('numero_dia',2,'trabaja',false,'responsable_id',NULL)
