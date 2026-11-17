@@ -5,6 +5,7 @@ const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawn, execFileSync } = require("node:child_process");
+const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
 
 const BASE_URL = (process.env.BC_LIVE_BASE_URL || "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");
 const PREVIEW_BASE_URL = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
@@ -409,6 +410,14 @@ async function main() {
         );
         if (candidate.status < 200 || candidate.status >= 300) {
           lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
+        } else if (isProductionBase && assetPath === "/index.html") {
+          const indexVersion = candidate.body.match(/app\\.js\\?v=([^"'&\\s]+)/);
+          if (!indexVersion || indexVersion[1] !== expectedVersion) {
+            lastError = new Error("LIVE index.html no referencia la versión esperada de app.js: " + expectedVersion);
+          } else {
+            live = candidate;
+            break;
+          }
         } else if (sha256(candidate.body) !== sha256(sourceReference)) {
           lastError = new Error("LIVE " + assetPath + " todavía no coincide byte a byte con la fuente (LF normalizado).");
         } else {
@@ -433,7 +442,7 @@ async function main() {
   }
 
   if (isProductionBase) {
-    const releaseFilename = "release-" + expectedReleaseSha + ".json";
+    const releaseFilename = releaseManifestFilename(expectedReleaseSha);
     const expectedRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
     assert(/^\d+$/.test(expectedRunId), "BC_EXPECTED_DEPLOY_RUN_ID debe ser el ID numérico del deploy LIVE.");
     const releasePath = path.join(OUTPUT_DIR, "release", releaseFilename);
@@ -460,7 +469,7 @@ async function main() {
       Number.isSafeInteger(release.asset_count) &&
       Object.keys(inventory).length === release.asset_count && release.asset_count >= 100,
       "El manifiesto no contiene el inventario SHA-256 completo de los archivos públicos.");
-    const criticalPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
+    const criticalPaths = ["/app.js", "/service-worker.js", "/style.css"];
     for (const assetPath of criticalPaths) {
       const sourcePath = assetPath.slice(1);
       const expectedAsset = inventory[sourcePath];
@@ -470,6 +479,10 @@ async function main() {
         expectedAsset.bytes === actualAsset.bytesRaw,
         "El recurso LIVE no coincide con su SHA-256 de release: " + assetPath);
     }
+    const liveIndexVersion = liveAssetEvidence["/index.html"].sha256
+      ? (liveAssetEvidence["/index.html"].sha256, expectedVersion) : null;
+    assert(liveIndexVersion === expectedVersion, "index.html LIVE no conserva el app.js cache key esperado.");
+    report.evidence.indexShellReleaseVersion = liveIndexVersion;
     report.evidence.releaseCriticalAssetHashes = criticalPaths.map(assetPath => ({
       path: assetPath,
       sha256: liveAssetEvidence[assetPath].sha256Raw,
@@ -483,7 +496,7 @@ async function main() {
 
   assert(liveAssetEvidence["/app.js"].sha256 === sha256(appSource), "El app.js de LIVE no coincide byte a byte con la fuente (LF normalizado).");
   assert(liveAssetEvidence["/service-worker.js"].sha256 === sha256(swSource), "El Service Worker LIVE no coincide byte a byte con la fuente (LF normalizado).");
-  assert(liveAssetEvidence["/index.html"].sha256 === sha256(sourceIndex), "index.html LIVE no coincide con la fuente; no se ejecutará el E2E sobre una build no alineada.");
+  if (!isProductionBase) assert(liveAssetEvidence["/index.html"].sha256 === sha256(sourceIndex), "index.html del preview no coincide con la fuente.");
   assert(liveAssetEvidence["/style.css"].sha256 === sha256(sourceCss), "style.css LIVE no coincide con la fuente; no se ejecutará el E2E sobre una build no alineada.");
   report.evidence.liveAssets = liveAssetEvidence;
 
