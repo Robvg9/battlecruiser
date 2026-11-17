@@ -162,6 +162,10 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.ok(liveOfflineE2e.includes("releaseManifestFilename(expectedReleaseSha)"));
   assert.ok(liveOfflineE2e.includes("Cloudflare-Workers-Version-Key"));
   assert.ok(liveOfflineE2e.includes("battlecruiser-release-"));
+  assert.ok(liveOfflineE2e.includes('Fetch.enable", {'));
+  assert.ok(liveOfflineE2e.includes('Fetch.continueRequest'));
+  assert.doesNotMatch(liveOfflineE2e, /Network\.setExtraHTTPHeaders/,
+    "LIVE version affinity must not leak to Supabase/CDN cross-origin requests");
   assert.match(liveOfflineE2e, /startupPerformanceCold/);
   assert.match(liveOfflineE2e, /startupPerformanceWarm/);
   assert.match(liveOfflineE2e, /startupPerformanceColdWarmComparison/);
