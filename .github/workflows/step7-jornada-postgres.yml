@@ -25,6 +25,7 @@ on:
       - 'supabase/migrations/20261116090000_jornada_recepcion_admin_queue_issue_333.sql'
       - 'test/jornada-recepcion-issue333-contract.sql'
       - 'supabase/migrations/20261116193000_jornada_post_close_sales_rectification.sql'
+      - 'supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql'
       - 'test/jornada-post-close-sales-rectification-contract.sql'
       - 'test/jornada-post-close-sales-rectification.test.js'
       - 'public/js/jornada-owner-review.js'
