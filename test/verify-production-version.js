@@ -116,7 +116,7 @@ async function verifyOnce(attempt) {
       Object.keys(release.asset_inventory).length !== release.asset_count || release.asset_count < 100) {
     throw new Error("Verified release artifact is missing its complete public asset SHA-256 inventory.");
   }
-  const indexAppVersion = liveIndex.match(/app\\.js\\?v=([^"'&\\s]+)/);
+  const indexAppVersion = liveIndex.match(/app\.js\?v=([^"'&\s]+)/);
   if (!indexAppVersion || indexAppVersion[1] !== expectedAppVersion) {
     throw new Error("LIVE index.html cache key mismatch: expected app.js?v=" + expectedAppVersion
       + ", got " + (indexAppVersion ? indexAppVersion[1] : "missing"));
