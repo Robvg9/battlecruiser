@@ -182,7 +182,7 @@ async function verifyLiveRelease(expected) {
     log("Expected PWA version: " + appMatch[1]);
     log("Runner storage for Wrangler cache: " + WRANGLER_ROOT);
 
-    // Create an immutable content-addressed release manifest for this exact commit/run.
+    // Embed immutable release provenance in the already-served PWA manifest for this exact commit/run.
     const localManifest = writeReleaseManifest();
     if (localManifest.source_sha !== sha || localManifest.workflow_run_id !== runId) {
       throw new Error("The local release manifest does not match this deploy workflow SHA/run.");
