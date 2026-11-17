@@ -148,6 +148,12 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(liveOfflineE2e, /sha256Raw/);
   assert.match(liveOfflineE2e, /fetch\(\x27\/index\.html\x27,\{cache:\x27no-store\x27\}\)/);
   assert.match(liveOfflineE2e, /sha256\(candidate\.body\) !== sha256\(sourceReference\)/);
+  assert.match(liveOfflineE2e, /releaseManifestFilename\(expectedReleaseSha\)/);
+  assert.match(liveOfflineE2e, /liveIndexReleaseVersion === expectedVersion/);
+  assert.match(liveOfflineE2e, /const criticalPaths = \["\\/app\.js", "\\/service-worker\.js", "\\/style\.css"\]/);
+  assert.match(verifier, /const indexAppVersion = liveIndex\.match/);
+  assert.doesNotMatch(verifier, /"index\.html": liveIndex/);
+  assert.doesNotMatch(liveOfflineE2e, /const criticalPaths = \["\\/index\.html"/);
   assert.doesNotMatch(liveOfflineE2e, /fetchText\(BASE_URL \+ "\/" \+ releaseFilename/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_DEPLOY_RUN_ID/);
