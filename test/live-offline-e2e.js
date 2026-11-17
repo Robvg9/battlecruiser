@@ -386,6 +386,7 @@ async function main() {
   const sourceCss = fs.readFileSync(path.join(PUBLIC_DIR, "style.css"), "utf8");
   const assetPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
   const liveAssetEvidence = {};
+  let liveIndexReleaseVersion = null;
   const isProductionBase = BASE_URL === "https://battlecruiser.robvg9.workers.dev";
   const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
   if (isProductionBase) {
@@ -415,6 +416,7 @@ async function main() {
           if (!indexVersion || indexVersion[1] !== expectedVersion) {
             lastError = new Error("LIVE index.html no referencia la versión esperada de app.js: " + expectedVersion);
           } else {
+            liveIndexReleaseVersion = indexVersion[1];
             live = candidate;
             break;
           }
@@ -479,10 +481,8 @@ async function main() {
         expectedAsset.bytes === actualAsset.bytesRaw,
         "El recurso LIVE no coincide con su SHA-256 de release: " + assetPath);
     }
-    const liveIndexVersion = liveAssetEvidence["/index.html"].sha256
-      ? (liveAssetEvidence["/index.html"].sha256, expectedVersion) : null;
-    assert(liveIndexVersion === expectedVersion, "index.html LIVE no conserva el app.js cache key esperado.");
-    report.evidence.indexShellReleaseVersion = liveIndexVersion;
+    assert(liveIndexReleaseVersion === expectedVersion, "index.html LIVE no conserva el app.js cache key esperado.");
+    report.evidence.indexShellReleaseVersion = liveIndexReleaseVersion;
     report.evidence.releaseCriticalAssetHashes = criticalPaths.map(assetPath => ({
       path: assetPath,
       sha256: liveAssetEvidence[assetPath].sha256Raw,
