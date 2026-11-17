@@ -15,7 +15,7 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
   assert.match(MIGRATION,/v_lista_conteo:=v_gastos AND v_reinversiones AND v_bajas AND v_final AND v_cash_declared/);
   assert.match(MIGRATION,/'declaracion_dinero',jsonb_build_object\('completado',v_cash_declared/);
   assert.match(UI,/data-bc7-checklist-cash/);
-  assert.ok(UI.includes("+(cashDeclared?1:0))+'/5</span></div>'), "the five-step progress counter includes the cash declaration");
+  assert.ok(UI.includes("+(cashDeclared?1:0))+'/5</span></div>'"), "the five-step progress counter includes the cash declaration");
   assert.match(UI,/Declaración de dinero/);
 });
 
