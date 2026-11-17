@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.37 — vista previa de cuadro, checklist 5/5 y efectivo desacoplado del conteo físico.
+// v7.38 — previsualización compacta, Bajas unificadas y declaración final de efectivo visible.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
