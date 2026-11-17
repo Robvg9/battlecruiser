@@ -77,6 +77,9 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/bajaState==='APROBADA'/,"the UI distinguishes server-side auto-approval from a pending approval list");
   assert.match(ui,/p_motivo_general:reason/,"the list shares one administrative reason");
   assert.match(ui,/friendlyError\(e,'adjustment'\)/,"stock errors are reported as inventory errors, not schedule-creation errors");
+  assert.match(ui,/friendlyError\(e,'inventory'\)/,"final inventory errors are not translated into scheduling errors");
+  assert.match(ui,/context==='inventory'&&code==='22023'/,"final inventory validation errors have a dedicated user message");
+  assert.match(ui,/conteo llegó incompleto/,"the UI reports expected and received product counts when the backend rejects an incomplete snapshot");
   assert.match(ui,/data-stock=/,"each candidate product carries its current available stock into validation");
   assert.match(ui,/detail\.productos_ajuste/,"the adjustment picker loads every active catalog product for the current warehouse");
   assert.match(ui,/AGOTADO · stock 0/,"out-of-stock products remain visible and searchable in the picker");
