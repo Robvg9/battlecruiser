@@ -87,6 +87,7 @@ BEGIN
             JOIN public.productos tp ON tp.id=tl.producto_id
             WHERE t.almacen_destino_id=v_s.almacen_id
               AND lower(t.estado)='completada'
+              AND t.fecha<=now()
               AND t.fecha >= (
                 (coalesce(v_p.fecha_fin,v_p.fecha) + 1)::timestamp
                 AT TIME ZONE coalesce(nullif(v_p.zona_horaria,''),'America/Havana')
@@ -271,6 +272,7 @@ BEGIN
         JOIN public.productos tp ON tp.id=tl.producto_id
         WHERE t.almacen_destino_id=v_s.almacen_id
           AND lower(t.estado)='completada'
+              AND t.fecha<=now()
           AND t.fecha >= ((v_period_end + 1)::timestamp AT TIME ZONE v_timezone)
           AND NOT EXISTS (
             SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
@@ -320,6 +322,7 @@ BEGIN
       JOIN public.productos tp ON tp.id=tl.producto_id
       WHERE t.almacen_destino_id=v_s.almacen_id
         AND lower(t.estado)='completada'
+              AND t.fecha<=now()
         AND t.fecha >= ((v_period_end + 1)::timestamp AT TIME ZONE v_timezone)
         AND NOT EXISTS (
           SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
