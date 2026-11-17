@@ -92,9 +92,14 @@ async function verifyLiveRelease(expected) {
           expected.service_worker_version + " actual=" + (swMatch && swMatch[1]));
       } else {
         let liveManifest;
-        try { liveManifest = JSON.parse(manifest.body); }
-        catch (error) {
-          log("[deploy smoke] attempt " + attempt + "/30: LIVE manifest JSON invalid: " + error.message);
+        try {
+          const pwaManifest = JSON.parse(manifest.body);
+          if (!pwaManifest || pwaManifest.name !== "BattleCruiser" || !pwaManifest.build_provenance) {
+            throw new Error("Existing PWA manifest is missing its exact build_provenance object.");
+          }
+          liveManifest = pwaManifest.build_provenance;
+        } catch (error) {
+          log("[deploy smoke] attempt " + attempt + "/30: LIVE PWA manifest/provenance invalid: " + error.message);
           await delay(2000);
           continue;
         }
@@ -143,7 +148,7 @@ async function verifyLiveRelease(expected) {
     }
     if (attempt < 30) await delay(2000);
   }
-  throw new Error("Production did not serve the exact content-addressed release manifest and aligned PWA assets within 60 seconds.");
+  throw new Error("Production did not serve the exact build provenance inside the existing PWA manifest and aligned assets within 60 seconds.");
 }
 
 (async () => {
