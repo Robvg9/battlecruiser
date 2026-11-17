@@ -24,7 +24,7 @@ function buildAssetInventory(assetFiles) {
 
   for (const asset of entries) {
     const assetPath = normalizeAssetPath(asset && asset.path);
-    if (/^release-[0-9a-f]{40}\.json$/i.test(path.posix.basename(assetPath))) continue;
+    if (/^release-[0-9a-f]{40}\.json$/i.test(path.posix.basename(assetPath)) || /^build-provenance\.json$/i.test(path.posix.basename(assetPath))) continue;
     if (Object.prototype.hasOwnProperty.call(inventory, assetPath)) {
       throw new Error("Duplicate public asset path: " + assetPath);
     }
@@ -54,7 +54,7 @@ function collectPublicAssets(publicDir) {
       }
       if (entry.isDirectory()) {
         walk(absolute, relative);
-      } else if (entry.isFile() && !/^release-[0-9a-f]{40}\.json$/i.test(entry.name)) {
+      } else if (entry.isFile() && !/^release-[0-9a-f]{40}\.json$/i.test(entry.name) && !/^build-provenance\.json$/i.test(entry.name)) {
         files.push({ path: relative, content: fs.readFileSync(absolute) });
       }
     }
@@ -98,7 +98,7 @@ function buildReleaseManifest({ appSource, swSource, sourceSha, workflowRunId, a
 function releaseManifestFilename(sourceSha) {
   const sha = String(sourceSha || "").trim().toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error("sourceSha must be a full 40-character git SHA.");
-  return "release-" + sha + ".json";
+  return "build-provenance.json";
 }
 
 function writeReleaseManifest() {
