@@ -909,7 +909,7 @@
     if(Number(pending.entregas_diarias_faltantes||result.entregas_diarias_faltantes||0)>0)blockers.push(Number(pending.entregas_diarias_faltantes||result.entregas_diarias_faltantes)+' días sin entrega diaria aprobada.');
     if(Number(pending.gastos||0)>0)blockers.push(Number(pending.gastos)+' gastos pendientes de aprobación.');
     if(Number(pending.reinversiones||0)>0)blockers.push(Number(pending.reinversiones)+' reinversiones pendientes de aprobación.');
-    if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas/mermas pendientes de aprobación.');
+    if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas pendientes de aprobación.');
     const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
     host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
       '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
@@ -1476,7 +1476,7 @@
       const reasons=[];
       if(Number(pending.gastos||0)>0)reasons.push(Number(pending.gastos)+' gasto(s) pendientes');
       if(Number(pending.reinversiones||0)>0)reasons.push(Number(pending.reinversiones)+' reinversión(es) pendientes');
-      if(Number(pending.ajustes||0)>0)reasons.push(Number(pending.ajustes)+' baja(s)/merma(s) pendientes');
+      if(Number(pending.ajustes||0)>0)reasons.push(Number(pending.ajustes)+' bajas pendientes');
       if(Number(pending.entregas_diarias||0)>0||Number(pending.entregas_diarias_faltantes||0)>0)reasons.push('entregas diarias de efectivo pendientes');
       if(cashState==='CON_DIFERENCIA')reasons.push('el conteo de efectivo tiene una diferencia pendiente de revisión');
       if(settlement.salario_porcentaje==null)reasons.push('falta configurar el porcentaje salarial');
@@ -1516,7 +1516,7 @@
     return labels[key]||value||'—';
   }
   async function openJornadaPreview(button){
-    const detail=state.detail;
+    let detail=state.detail;
     if(!detail?.sesion?.id)return;
     if(button)button.disabled=true;
     const root=document.createElement('div');
@@ -1551,8 +1551,18 @@
       }
     });
     try{
+      // Re-read the session before building the preview. The owner may have
+      // approved the final day's cash declaration after this workspace loaded.
+      const refreshedDetail=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:detail.sesion.id});
+      if(!refreshedDetail?.sesion?.id||String(refreshedDetail.sesion.id)!==String(detail.sesion.id)){
+        throw new Error('No se pudo actualizar la información de la jornada antes de previsualizar.');
+      }
+      Object.assign(detail,refreshedDetail);
+      detail.is_admin=!!state.admin;
+      detail.liquidacion=null;
+      state.detail=detail;
       const [settlement,movements,finance,cash,unlinkedTransfers]=await Promise.all([
-        detail.liquidacion?Promise.resolve(detail.liquidacion):rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:detail.sesion.id}),
+        rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_finanzas_jornada',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:detail.sesion.id}),
@@ -1666,7 +1676,7 @@
         '<section class="bc7-card"><h4>Bajas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],bajaRows,3)+'</section>'+
         '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows,3)+'</section>'+
         '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows,3)+'</section>'+
-        '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado','Tipo','Detalle'],cashRows,4)+'</section>'+
+        '<section class="bc7-card"><h4>Dinero recogido por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado','Tipo','Detalle'],cashRows,4)+'</section>'+
         '<p class="bc7-muted">La declaración final aparece separada de las entregas diarias: su aprobación no sustituye el conteo físico independiente. Esta vista es de solo lectura; las transferencias históricas requieren un vínculo explícito con la jornada.</p>';
     }catch(error){
       root.querySelector('.bc7-checklist-modal-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificó ningún dato.</div>';
