@@ -73,6 +73,11 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   assert.match(block,/previewTable\(\['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario'\],movementRows,6\)/,"all useful movement fields stay visible without an operation ID");
   assert.doesNotMatch(block,/String\(x\.operacion_id/,"movement operation IDs are not rendered");
   assert.doesNotMatch(block,/<b>Operación:<\/b>/,"transfer operation IDs are not shown to the user");
+  assert.match(block,/const refreshedDetail=await rpc\('bc7_obtener_inventario_jornada'/,"preview re-reads the latest session state so an approved final-day declaration cannot be hidden by stale workspace data");
+  assert.match(block,/Object\.assign\(detail,refreshedDetail\)/,"fresh server detail replaces stale preview state");
+  assert.match(block,/detail\.liquidacion=null/,"the preview recalculates settlement from the refreshed state");
+  assert.match(block,/Dinero recogido por día/,"the cash table is labelled by the daily amounts, not only the delivery mechanism");
+  assert.doesNotMatch(block,/bajas\/mermas|baja\(s\)\/merma\(s\)/,"the preview uses only the Bajas terminology");
   assert.match(block,/const finalDeclaration=detail\.declaracion_dinero/,"the final cash declaration is included separately from daily entries");
   assert.match(block,/finalState==='DECLARACION_APROBADA'\?money\(finalDeclaration\.monto\)/,"approved final declared amount is shown without inventing a daily cash row");
   assert.doesNotMatch(block,/previewTable\(\['Producto','Inicial','Entradas','Salidas','Bajas','Mermas'/,"inventory presents one combined Bajas column");
