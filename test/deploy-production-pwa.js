@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const crypto = require("node:crypto");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { writeReleaseManifest } = require("../scripts/write-release-manifest.js");
+const { writeReleaseManifest, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const RESULT_DIR = path.join(ROOT, "test-results");
@@ -64,7 +64,7 @@ async function delay(ms) {
 }
 
 async function verifyLiveRelease(expected) {
-  const filename = "release-" + expected.source_sha + ".json";
+  const filename = releaseManifestFilename(expected.source_sha);
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
       const stamp = encodeURIComponent(String(process.env.GITHUB_RUN_ID) + "-" + attempt);
