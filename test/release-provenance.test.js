@@ -65,7 +65,7 @@ test("asset collection reads the full public tree and omits prior release manife
     assert.ok(inventory[required], "missing public release asset " + required);
     assert.match(inventory[required].sha256, /^[0-9a-f]{64}$/);
   }
-  assert.ok(!Object.keys(inventory).some(name => /^release-[0-9a-f]{40}\.json$/i.test(name)),
+  assert.ok(!Object.keys(inventory).some(name => /^release-[0-9a-f]{40}\.json$/i.test(name) || name === "build-provenance.json"),
     "a generated manifest must not hash itself or prior manifests");
 });
 
