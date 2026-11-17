@@ -282,10 +282,16 @@ BEGIN
     RAISE EXCEPTION 'FAIL: handover must complete only the employee session, preserve the open master Turn and leave Owner approvals pending';
   END IF;
 
-  -- The Owner can count only after handover; the session remains completed.
+  -- The Owner approves the declared amount independently after handover.
+  -- Approval records no physical count; the count remains a separate later action.
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
-  v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico posterior al traspaso');
+  v_result:=public.bc7_resolver_declaracion_jornada(v_declaracion,'APROBAR',NULL);
+  IF v_result->>'estado'<>'DECLARACION_APROBADA'
+     OR (SELECT monto_contado FROM public.turno_declaraciones WHERE id=v_declaracion) IS NOT NULL THEN
+    RAISE EXCEPTION 'FAIL: declaration approval must not masquerade as a physical count: %',v_result;
+  END IF;
+  v_result:=public.bc5_contar_dinero_entregado(v_declaracion,2800,'Conteo físico posterior a aprobación y traspaso');
   IF v_result->>'estado'<>'APROBADA'
      OR (v_result->>'monto_contado')::numeric<>2800
      OR (SELECT estado FROM public.turno_sesiones WHERE id=v_sesion)<>'COMPLETADA' THEN

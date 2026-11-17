@@ -151,10 +151,10 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.36");
+  assert.equal(moduleVersion,"7.37");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
-  assert.ok(app.includes('["aprobaciones-admin.js","20261113.4"]'));
-  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261113.4"));
+  assert.ok(app.includes('["aprobaciones-admin.js","20261116.1"]'));
+  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261116.1"));
   assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261116.2"));
 });
 
@@ -173,7 +173,7 @@ test("Jornada handover precedes Owner cash count and automatic calculation",()=>
   for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc5_contar_dinero_entregado"]) {
     assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
   }
-  assert.match(ui,/Checklist de Sheila/);
+  assert.match(ui,/Checklist de la jornada/);
   assert.match(ui,/¿Ya pusiste todos los gastos\?/);
   assert.match(ui,/¿Ya pusiste todas las reinversiones\?/);
   assert.match(ui,/¿Ya pusiste todas las bajas\?/);

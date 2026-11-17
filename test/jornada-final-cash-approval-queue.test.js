@@ -22,18 +22,18 @@ test("Centro de Control includes pending final-cash declarations for JORNADA ses
   assert.ok(QUEUE.includes("s.estado::text"));
 });
 
-test("Final cash count is enabled only after Sheila hands over the Jornada",()=>{
+test("Final cash declaration approval is independent from the later physical count",()=>{
   assert.ok(ADMIN.includes("x.tipo==='declaracion_jornada'"));
-  assert.ok(ADMIN.includes("const finalCashReady=String(x.motivo||'').toUpperCase()==='COMPLETADA'"));
-  assert.ok(ADMIN.includes("acceptButton.disabled=isFinalCash&&!finalCashReady"));
-  assert.ok(ADMIN.includes("rejectButton.hidden=isFinalCash"));
-  assert.ok(ADMIN.includes("La sesión debe estar completada"));
-  assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
-  assert.ok(ADMIN.includes("p_declaracion_id:id,p_monto_contado:real"));
-  assert.ok(PHASE.includes("IF v_s.estado<>'COMPLETADA' THEN"),"the server rejects cash count before session handover");
-  assert.ok(PHASE.includes("lista_para_conteo"),"the server still requires all four employee checks");
-  assert.ok(PHASE.includes("AND s.estado='COMPLETADA'"),"the Owner inbox exposes final cash only after handover");
-  assert.ok(!PHASE.includes("'LISTA_PARA_CONTEO'"),"an active session cannot advertise cash as ready to count");
+  assert.ok(ADMIN.includes("Aprobar declaración"));
+  assert.ok(ADMIN.includes("rpc('bc7_resolver_declaracion_jornada'"));
+  assert.ok(ADMIN.includes("Esta decisión aprueba la declaración del importe, no certifica un conteo físico"));
+  assert.ok(!ADMIN.includes("acceptButton.disabled=isFinalCash&&!finalCashReady"));
+  assert.ok(!ADMIN.includes("rejectButton.hidden=isFinalCash"));
+  assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'")===false,
+    "the admin declaration modal must not perform the physical count");
+  assert.ok(PHASE.includes("IF v_s.estado<>'COMPLETADA' THEN"),"the server still blocks physical count until handover");
+  assert.ok(PHASE.includes("lista_para_conteo"),"physical count still requires the employee checklist");
+  assert.ok(QUEUE.includes("s.estado::text"),"the queue retains the real session state while exposing pending declarations");
 });
 
 test("Journey movement archive includes exact-session finance and cash records",()=>{

@@ -42,15 +42,34 @@ test("each attendant checklist item opens its own operational section", () => {
   assert.match(ui, /Cerrar jornada y enviar a Administración/);
 });
 
-test("cash declaration is visible before handover but cannot be approved or counted early", () => {
+test("final cash declaration can be approved while the Jornada is open; physical count stays post-handover", () => {
   const admin = read("public/js/aprobaciones-admin.js");
-  const migration = read("supabase/migrations/20261113180000_admin_show_pending_jornada_cash_declarations.sql");
-  assert.match(admin, /ESPERANDO_ENTREGA/);
-  assert.match(admin, /disabled=!!b\.disabled/);
-  assert.match(migration, /ESPERANDO_ENTREGA/);
-  assert.match(migration, /monto_contado IS NULL/);
-  assert.doesNotMatch(migration, /AND s\.estado='COMPLETADA'/);
-  assert.match(migration, /tiene_permiso/);
+  const migration = read("supabase/migrations/20261116200000_jornada_cash_declaration_approval_decoupled.sql");
+  assert.match(admin, /Aprobar declaración/);
+  assert.match(admin, /rpc\('bc7_resolver_declaracion_jornada'/);
+  assert.ok(admin.includes("acceptButton.disabled=false;"));
+  assert.doesNotMatch(admin, /rpc\('bc5_contar_dinero_entregado'/,
+    "approval UI must not perform the later physical cash count");
+
+  const queueStart = migration.indexOf("'declaracion_jornada'::text");
+  const queueEnd = migration.indexOf("'recepcion_inventario_jornada'::text", queueStart);
+  assert.ok(queueStart >= 0 && queueEnd > queueStart, "pending declaration queue must be defined");
+  const queue = migration.slice(queueStart, queueEnd);
+  assert.match(queue, /d\.estado_aprobacion IN \('PENDIENTE','ESPERANDO_APROBACION'\)/);
+  assert.match(queue, /d\.monto_contado IS NULL/);
+  assert.doesNotMatch(queue, /AND s\.estado='COMPLETADA'/,
+    "declaration review must remain visible before handover");
+
+  const countStart = migration.indexOf("CREATE OR REPLACE FUNCTION public.bc5_contar_dinero_entregado");
+  const approvalStart = migration.indexOf("CREATE OR REPLACE FUNCTION public.bc7_resolver_declaracion_jornada");
+  assert.ok(countStart >= 0 && approvalStart > countStart);
+  const countGate = migration.slice(countStart, approvalStart);
+  assert.match(countGate, /IF v_s\.estado<>'COMPLETADA' THEN/);
+  assert.match(countGate, /lista_para_conteo/);
+  assert.match(countGate, /IF coalesce\(v_d\.estado_aprobacion,''\)<>'DECLARACION_APROBADA' THEN/);
+  const approval = migration.slice(approvalStart);
+  assert.match(approval, /DECLARACION_APROBADA/);
+  assert.match(approval, /public\.tiene_permiso/);
 });
 
 test("PWA release versions stay aligned after the jornada UX update", () => {
@@ -58,8 +77,8 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
-  assert.match(app, /bc7-jornada-ui\.js","7\.36"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.36/);
-  assert.match(app, /aprobaciones-admin\.js","20261113\.4"/);
-  assert.match(sw, /aprobaciones-admin\.js\?v=20261113\.4/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.37"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.37/);
+  assert.match(app, /aprobaciones-admin\.js","20261116\.1"/);
+  assert.match(sw, /aprobaciones-admin\.js\?v=20261116\.1/);
 });
