@@ -83,14 +83,11 @@ BEGIN
   INSERT INTO public.turno_sesiones(
     id,turno_id,almacen_id,numero_dia,bloque,fecha,estado,jornada_programacion_id,apertura_retroactiva
   ) VALUES
-    (v_session,v_turn,v_warehouse,1,'JORNADA',v_start,'EN_CURSO',v_program,true),
+    (v_session,v_turn,v_warehouse,1,'JORNADA',v_start,'PROGRAMADA',v_program,true),
     (v_session_day2,v_turn,v_warehouse,2,'JORNADA',v_start+1,'PROGRAMADA',v_program_day2,true);
 
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
   VALUES(v_session,v_turn,v_worker,v_owner);
-
-  INSERT INTO public.turno_tramos(id,turno_id,turno_sesion_id,usuario_id,tipo,estado,inicio_at)
-  VALUES(v_tranche,v_turn,v_session,v_worker,'NORMAL','ACTIVO',now()-interval '1 hour');
 
   INSERT INTO public.turno_jornada_inventario_cortes(
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,observacion
@@ -98,6 +95,10 @@ BEGIN
 
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
   VALUES(v_initial_cut,v_pan,10,10),(v_initial_cut,v_juice,5,5);
+
+  INSERT INTO public.turno_tramos(id,turno_id,turno_sesion_id,usuario_id,tipo,estado,inicio_at)
+  VALUES(v_tranche,v_turn,v_session,v_worker,'NORMAL','ACTIVO',now()-interval '1 hour');
+  UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_session;
 
   -- An approved reinvestment is directly linked to this Jornada and contributes
   -- a late-created product even though the catalogue cutoff has passed.
