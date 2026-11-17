@@ -24,7 +24,7 @@ function buildAssetInventory(assetFiles) {
 
   for (const asset of entries) {
     const assetPath = normalizeAssetPath(asset && asset.path);
-    if (/^release-[0-9a-f]{40}\.json$/i.test(path.posix.basename(assetPath)) || /^build-provenance\.json$/i.test(path.posix.basename(assetPath))) continue;
+    if (/^release-[0-9a-f]{40}\.json$/i.test(path.posix.basename(assetPath)) || path.posix.basename(assetPath) === "manifest.json") continue;
     if (Object.prototype.hasOwnProperty.call(inventory, assetPath)) {
       throw new Error("Duplicate public asset path: " + assetPath);
     }
@@ -54,7 +54,7 @@ function collectPublicAssets(publicDir) {
       }
       if (entry.isDirectory()) {
         walk(absolute, relative);
-      } else if (entry.isFile() && !/^release-[0-9a-f]{40}\.json$/i.test(entry.name) && !/^build-provenance\.json$/i.test(entry.name)) {
+      } else if (entry.isFile() && !/^release-[0-9a-f]{40}\.json$/i.test(entry.name) && entry.name !== "manifest.json") {
         files.push({ path: relative, content: fs.readFileSync(absolute) });
       }
     }
@@ -98,7 +98,17 @@ function buildReleaseManifest({ appSource, swSource, sourceSha, workflowRunId, a
 function releaseManifestFilename(sourceSha) {
   const sha = String(sourceSha || "").trim().toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error("sourceSha must be a full 40-character git SHA.");
-  return "build-provenance.json";
+  return "manifest.json";
+}
+
+function embedReleaseProvenance(pwaManifest, releaseManifest) {
+  if (!pwaManifest || typeof pwaManifest !== "object" || Array.isArray(pwaManifest)) {
+    throw new Error("The existing PWA manifest must be a JSON object.");
+  }
+  if (!releaseManifest || !/^[0-9a-f]{40}$/.test(String(releaseManifest.source_sha || ""))) {
+    throw new Error("Release provenance must contain a full source SHA.");
+  }
+  return { ...pwaManifest, build_provenance: releaseManifest };
 }
 
 function writeReleaseManifest() {
@@ -112,9 +122,12 @@ function writeReleaseManifest() {
     assetInventory: collectPublicAssets(publicDir),
   });
   const filename = releaseManifestFilename(manifest.source_sha);
-  fs.writeFileSync(path.join(publicDir, filename), JSON.stringify(manifest, null, 2) + "\n", "utf8");
-  console.log("[release] immutable content-addressed manifest: public/" + filename +
-    " (" + manifest.asset_count + " assets with SHA-256)");
+  const pwaManifestPath = path.join(publicDir, filename);
+  const pwaManifest = JSON.parse(fs.readFileSync(pwaManifestPath, "utf8"));
+  const combinedManifest = embedReleaseProvenance(pwaManifest, manifest);
+  fs.writeFileSync(pwaManifestPath, JSON.stringify(combinedManifest, null, 2) + "\n", "utf8");
+  console.log("[release] exact build provenance embedded in existing PWA manifest: public/" + filename +
+    " (" + manifest.asset_count + " assets with SHA-256; manifest.json excluded to avoid self-reference)");
   return { ...manifest, filename, path: "public/" + filename };
 }
 
@@ -129,6 +142,7 @@ module.exports = {
   buildAssetInventory,
   buildReleaseManifest,
   collectPublicAssets,
+  embedReleaseProvenance,
   releaseManifestFilename,
   writeReleaseManifest,
 };

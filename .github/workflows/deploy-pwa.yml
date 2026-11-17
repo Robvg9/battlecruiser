@@ -8,7 +8,7 @@ on:
       - 'wrangler.toml'
       - '.github/workflows/deploy-pwa.yml'
       # Release provenance and the gates that prove the deployed SHA must redeploy
-      # so the LIVE content-addressed manifest identifies the exact current main commit.
+      # so the LIVE PWA manifest embeds provenance for the exact current main commit.
       - '.github/workflows/quality.yml'
       - '.github/workflows/selfhosted-windows-test.yml'
       - 'scripts/write-release-manifest.js'
@@ -66,6 +66,6 @@ jobs:
           name: battlecruiser-release-provenance-${{ github.run_id }}
           path: |
             test-results/deploy-pwa-log.txt
-            test-results/release/build-provenance.json
+            test-results/release/manifest.json
           if-no-files-found: warn
           retention-days: 90
