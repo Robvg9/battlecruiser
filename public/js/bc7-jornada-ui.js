@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.37 — vista previa de cuadro, checklist 5/5 y efectivo desacoplado del conteo físico.
+// v7.38 — previsualización compacta, Bajas unificadas y declaración final de efectivo visible.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1498,10 +1498,19 @@
       '</div><p>La jornada queda lista para la revisión final. El Turno todavía no está cerrado: el Dueño debe revisar el expediente, dejar su observación y pulsar «Aprobar turno» en Turnos.</p></section>';
   }
   function previewValue(value){return value==null?'—':esc(String(value));}
-  function previewTable(headers,rows){
+  function previewTable(headers,rows,primaryCount=3){
     if(!rows.length)return '<div class="bc7-empty">Todavía no hay registros para mostrar.</div>';
-    return '<div class="bc7-table-wrap"><table class="bc7-table bc7-table-wide"><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
-      rows.map(row=>'<tr>'+row.map(v=>'<td>'+previewValue(v)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+    return '<div class="bc7-preview-list">'+rows.map(row=>{
+      const primary=row.slice(0,primaryCount),extra=row.slice(primaryCount);
+      const primaryHtml=primary.map((value,index)=>'<div class="bc7-preview-field"><small>'+esc(headers[index])+'</small><b>'+previewValue(value)+'</b></div>').join('');
+      const extraHtml=extra.length?'<details class="bc7-preview-more"><summary>Ver más</summary><dl>'+extra.map((value,index)=>'<div><dt>'+esc(headers[primaryCount+index])+'</dt><dd>'+previewValue(value)+'</dd></div>').join('')+'</dl></details>':'';
+      return '<article class="bc7-preview-record"><div class="bc7-preview-primary">'+primaryHtml+'</div>'+extraHtml+'</article>';
+    }).join('')+'</div>';
+  }
+  function previewMovementType(value){
+    const labels={compra:'Compra',venta:'Venta',transferencia_salida:'Transferencia de salida',transferencia_entrada:'Transferencia de entrada',vale:'Vale de salida',baja:'Baja aprobada',baja_pendiente:'Baja pendiente',baja_rechazada:'Baja rechazada',merma:'Baja aprobada',merma_pendiente:'Baja pendiente',merma_rechazada:'Baja rechazada',gasto:'Gasto aprobado',gasto_pendiente:'Gasto pendiente',gasto_rechazado:'Gasto rechazado',reinversion:'Reinversión aprobada',reinversion_pendiente:'Reinversión pendiente',reinversion_rechazada:'Reinversión rechazada',entrega_diaria:'Efectivo diario aprobado',entrega_diaria_pendiente:'Efectivo diario pendiente',entrega_diaria_rechazada:'Efectivo diario rechazado',dinero_declarado_final:'Declaración final de efectivo',dinero_contado_final:'Conteo final de efectivo'};
+    const key=String(value||'').toLowerCase();
+    return labels[key]||value||'—';
   }
   async function openJornadaPreview(button){
     const detail=state.detail;
@@ -1523,7 +1532,7 @@
       const period=String(detail.sesion.fecha||'')+' a '+String(detail.sesion.fecha_fin||detail.sesion.fecha||'');
       const reason=window.prompt('Motivo obligatorio de atribución histórica. Período operativo '+period+'. La fecha real de registro se conservará.', 'Una sola transferencia agrupada para el período '+period+', según confirmación del Dueño.');
       if(!reason||reason.trim().length<10)return;
-      if(!confirm('Se vinculará la transferencia '+transferId+' UNA SOLA VEZ a esta jornada ('+period+'). Se conservará su fecha real de registro. No se dividirá entre días ni se aplicará a Adriana. ¿Confirmas?'))return;
+      if(!confirm('Se vinculará la transferencia  UNA SOLA VEZ a esta jornada ('+period+'). Se conservará su fecha real de registro. No se dividirá entre días ni se aplicará a otra jornada. ¿Confirmas?'))return;
       linkButton.disabled=true;
       try{
         await rpc('bc7_vincular_transferencia_jornada',{
@@ -1548,22 +1557,41 @@
       ]);
       detail.liquidacion=settlement||detail.liquidacion;
       const lines=arr(settlement?.lineas).map(x=>[
-        x.nombre,x.inventario_inicial==null?'—':qty(x.inventario_inicial),qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0)),
-        qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)),qty(x.bajas_aprobadas),qty(x.mermas_aprobadas),
-        x.inventario_final==null?'—':qty(x.inventario_final),x.unidades_vendidas==null?'—':qty(x.unidades_vendidas),x.precio_unitario==null?'Sin precio':money(x.precio_unitario),x.importe_estimado==null?'Pendiente':money(x.importe_estimado)+' CUP'
+        x.nombre,
+        x.inventario_final==null?'—':qty(x.inventario_final),
+        qty(Number(x.bajas_aprobadas||0)+Number(x.mermas_aprobadas||0)),
+        x.unidades_vendidas==null?'—':qty(x.unidades_vendidas),
+        x.inventario_inicial==null?'—':qty(x.inventario_inicial),
+        qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0)),
+        qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)),
+        x.precio_unitario==null?'Sin precio':money(x.precio_unitario),
+        x.importe_estimado==null?'Pendiente':money(x.importe_estimado)+' CUP'
       ]);
       const movementRows=arr(movements).map(x=>[
-        fmtDateTimeHavana(x.fecha),x.tipo,x.producto,qty(x.cantidad),x.almacen,x.usuario,String(x.operacion_id||'')
+        fmtDateTimeHavana(x.fecha),previewMovementType(x.tipo),x.producto,qty(x.cantidad),x.almacen,x.usuario
       ]);
-      const bajaRows=arr(finance?.bajas).map(x=>[
-        x.producto,qty(x.cantidad),x.estado,x.motivo,x.creado_nombre,x.revisado_nombre,fmtDateTimeHavana(x.creado_en)
+      const bajaRows=[...arr(finance?.bajas),...arr(finance?.mermas)].map(x=>[
+        x.producto,qty(x.cantidad),humanStatus(x.estado),x.motivo,x.creado_nombre,x.revisado_nombre?'ADMIN':'Pendiente',fmtDateTimeHavana(x.creado_en)
       ]);
-      const mermaRows=arr(finance?.mermas).map(x=>[
-        x.producto,qty(x.cantidad),x.estado,x.motivo,x.creado_nombre,x.revisado_nombre,fmtDateTimeHavana(x.creado_en)
+      const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto==null?'—':money(x.monto)+' CUP',humanStatus(x.estado),x.creado_nombre||x.usuario_nombre]);
+      const reinvestmentRows=arr(finance?.reinversiones).map(x=>[arr(x.lineas).map(line=>line.producto+' × '+qty(line.cantidad_base)).join(', ')||'Sin detalle',money(x.total??x.monto)+' CUP',humanStatus(x.estado),x.proveedor||'']);
+      const cashRows=arr(cash?.entregas).map(x=>[
+        fmtDateHuman(x.fecha),money(x.monto_declarado)+' CUP',humanStatus(x.estado),
+        x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP',
+        'Entrega diaria',x.observacion||'—'
       ]);
-      const expenseRows=arr(finance?.gastos).map(x=>[x.concepto||x.descripcion,x.monto,x.estado,x.creado_nombre||x.usuario_nombre]);
-      const reinvestmentRows=arr(finance?.reinversiones).map(x=>[arr(x.lineas).map(line=>line.producto+' × '+qty(line.cantidad_base)).join(', ')||'Sin detalle',x.total??x.monto,x.estado,x.proveedor||'']);
-      const cashRows=arr(cash?.entregas).map(x=>[x.fecha,money(x.monto_declarado)+' CUP',x.estado,x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP']);
+      const finalDeclaration=detail.declaracion_dinero;
+      if(finalDeclaration){
+        const finalState=String(finalDeclaration.estado_aprobacion||'').toUpperCase();
+        cashRows.push([
+          fmtDateHuman(detail.sesion.fecha_fin||detail.sesion.fecha),
+          money(finalDeclaration.monto)+' CUP',
+          humanStatus(finalState),
+          finalState==='DECLARACION_APROBADA'?money(finalDeclaration.monto)+' CUP':'Pendiente',
+          'Declaración final',
+          finalDeclaration.monto_contado==null?'Conteo físico pendiente':'Conteo físico: '+money(finalDeclaration.monto_contado)+' CUP'
+        ]);
+      }
       const pendingTransferGroups=[];
       for(const item of arr(unlinkedTransfers)){
         let group=pendingTransferGroups.find(x=>String(x.id)===String(item.transferencia_id));
@@ -1576,10 +1604,10 @@
       const periodLabel=fmtDate(detail.sesion.fecha)+' – '+fmtDate(detail.sesion.fecha_fin||detail.sesion.fecha);
       const pendingTransferHtml=pendingTransferGroups.length?pendingTransferGroups.map(group=>
         '<article class="bc7-card"><h4>Transferencia pendiente de atribución · '+group.lines.length+' líneas</h4>'+
-        '<p><b>Operación:</b> '+esc(group.id)+'<br><b>Fecha real de registro:</b> '+esc(fmtDateTimeHavana(group.fecha))+
+        '<p><b>Fecha real de registro:</b> '+esc(fmtDateTimeHavana(group.fecha))+
         '<br><b>Origen → destino:</b> '+esc(group.origen)+' → '+esc(group.destino)+
         '<br><b>Período operativo propuesto:</b> '+esc(periodLabel)+'</p>'+
-        previewTable(['Producto','Cantidad'],group.lines)+
+        previewTable(['Producto','Cantidad'],group.lines,2)+
         '<p class="bc7-note">No está incluida en el saldo ni en la liquidación. Si la atribuyes, se registrará como una sola operación para todo el período, sin dividirla por día.</p>'+
         (state.admin?'<button type="button" class="bc7-btn primary" data-bc7-link-transfer="'+esc(group.id)+'">Atribuir una sola vez a esta jornada</button>':'<span class="bc7-muted">Solo ADMIN puede atribuir esta transferencia.</span>')+
         '</article>'
@@ -1609,18 +1637,34 @@
       if(!declaration)missing.push('Declaración final de efectivo pendiente');
       if(settlement?.calculable!==true)missing.push('Liquidación todavía no calculable o con datos pendientes');
       const body=root.querySelector('.bc7-checklist-modal-body');
-      body.innerHTML='<div class="bc7-note"><b>'+esc(status)+'</b><p>Los datos pendientes se muestran como pendientes; no se sustituyen por cero ni se consideran aprobados.</p></div>'+
+      body.innerHTML='<style>'+
+        '.bc7-preview-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:8px}'+
+        '.bc7-preview-record{min-width:0;padding:10px;border:1px solid var(--gold-dim);border-radius:9px;background:var(--stone-2,var(--stone))}'+
+        '.bc7-preview-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}'+
+        '.bc7-preview-field{min-width:0;overflow-wrap:anywhere}'+
+        '.bc7-preview-field:first-child{grid-column:1/-1}'+
+        '.bc7-preview-field small{display:block;color:var(--mist);font-size:10px;line-height:1.2}'+
+        '.bc7-preview-field b{display:block;margin-top:3px;color:var(--text);font-size:12px;font-weight:650;overflow-wrap:anywhere;white-space:normal}'+
+        '.bc7-preview-more{margin-top:8px;border-top:1px solid var(--gold-dim);padding-top:6px}'+
+        '.bc7-preview-more summary{cursor:pointer;color:var(--gold);font-size:11px;font-weight:650;list-style:none}'+
+        '.bc7-preview-more summary::-webkit-details-marker{display:none}'+
+        '.bc7-preview-more dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0 0}'+
+        '.bc7-preview-more dl>div{min-width:0;overflow-wrap:anywhere}'+
+        '.bc7-preview-more dt{color:var(--mist);font-size:10px}'+
+        '.bc7-preview-more dd{margin:2px 0 0;color:var(--text);font-size:11px;overflow-wrap:anywhere;white-space:normal}'+
+        '@media(max-width:380px){.bc7-preview-more dl{grid-template-columns:1fr}}'+
+        '</style>'+
+        '<div class="bc7-note"><b>'+esc(status)+'</b><p>Los datos pendientes se muestran como pendientes; no se sustituyen por cero ni se consideran aprobados.</p></div>'+
         summaryHtml+
         (missing.length?'<section class="bc7-card"><h4>Pendientes de verificación</h4><ul>'+missing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>':'')+
-        '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Inicial','Entradas','Salidas','Bajas','Mermas','Final','Vendidas','Precio','Importe'],lines)+'</section>'+
-        '<section class="bc7-card"><h4>Movimientos del período · transferencias y bajas incluidas</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario','Operación'],movementRows)+'</section>'+
+        '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Final','Bajas','Vendidas','Inicial','Entradas','Salidas','Precio','Importe'],lines,4)+'</section>'+
+        '<section class="bc7-card"><h4>Movimientos del período</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario'],movementRows,6)+'</section>'+
         '<section class="bc7-card"><h4>Transferencias completadas fuera del período · pendientes de atribución</h4><p class="bc7-muted">Estas entradas no están incluidas en el inventario calculado hasta que el Dueño las vincule expresamente a esta jornada.</p>'+pendingTransferHtml+'</section>'+
-        '<section class="bc7-card"><h4>Bajas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],bajaRows)+'</section>'+
-        '<section class="bc7-card"><h4>Mermas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],mermaRows)+'</section>'+
-        '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows)+'</section>'+
-        '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows)+'</section>'+
-        '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado'],cashRows)+'</section>'+
-        '<p class="bc7-muted">Vista de solo lectura. La fecha de registro de cada movimiento se conserva; una transferencia retroactiva solo se atribuirá al período cuando exista un vínculo explícito con esta jornada.</p>';
+        '<section class="bc7-card"><h4>Bajas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],bajaRows,3)+'</section>'+
+        '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows,3)+'</section>'+
+        '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows,3)+'</section>'+
+        '<section class="bc7-card"><h4>Entregas de efectivo por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado','Tipo','Detalle'],cashRows,4)+'</section>'+
+        '<p class="bc7-muted">La declaración final aparece separada de las entregas diarias: su aprobación no sustituye el conteo físico independiente. Esta vista es de solo lectura; las transferencias históricas requieren un vínculo explícito con la jornada.</p>';
     }catch(error){
       root.querySelector('.bc7-checklist-modal-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificó ningún dato.</div>';
     }finally{if(button)button.disabled=false;}
