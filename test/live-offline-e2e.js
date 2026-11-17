@@ -412,7 +412,7 @@ async function main() {
         if (candidate.status < 200 || candidate.status >= 300) {
           lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
         } else if (isProductionBase && assetPath === "/index.html") {
-          const indexVersion = candidate.body.match(/app\\.js\\?v=([^"'&\\s]+)/);
+          const indexVersion = candidate.body.match(/app\.js\?v=([^"'&\s]+)/);
           if (!indexVersion || indexVersion[1] !== expectedVersion) {
             lastError = new Error("LIVE index.html no referencia la versión esperada de app.js: " + expectedVersion);
           } else {
