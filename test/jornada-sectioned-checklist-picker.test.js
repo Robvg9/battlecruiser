@@ -44,7 +44,7 @@ test("each attendant checklist item opens its own operational section", () => {
 
 test("final cash declaration can be approved while the Jornada is open; physical count stays post-handover", () => {
   const admin = read("public/js/aprobaciones-admin.js");
-  const migration = read("supabase/migrations/20261116200000_jornada_cash_declaration_approval_decoupled.sql");
+  const migration = read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
   assert.match(admin, /Aprobar declaración/);
   assert.match(admin, /rpc\('bc7_resolver_declaracion_jornada'/);
   assert.ok(admin.includes("acceptButton.disabled=false;"));
