@@ -1658,7 +1658,7 @@
         summaryHtml+
         (missing.length?'<section class="bc7-card"><h4>Pendientes de verificación</h4><ul>'+missing.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></section>':'')+
         '<section class="bc7-card"><h4>Inventario y ventas por diferencia</h4>'+previewTable(['Producto','Final','Bajas','Vendidas','Inicial','Entradas','Salidas','Precio','Importe'],lines,4)+'</section>'+
-        '<section class="bc7-card"><h4>Movimientos del período</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario'],movementRows,4)+'</section>'+
+        '<section class="bc7-card"><h4>Movimientos del período</h4>'+previewTable(['Fecha de registro','Tipo','Producto','Cantidad','Almacén','Usuario'],movementRows,6)+'</section>'+
         '<section class="bc7-card"><h4>Transferencias completadas fuera del período · pendientes de atribución</h4><p class="bc7-muted">Estas entradas no están incluidas en el inventario calculado hasta que el Dueño las vincule expresamente a esta jornada.</p>'+pendingTransferHtml+'</section>'+
         '<section class="bc7-card"><h4>Bajas registradas</h4>'+previewTable(['Producto','Cantidad','Estado','Motivo','Registrada por','Revisada por','Fecha de registro'],bajaRows,3)+'</section>'+
         '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows,3)+'</section>'+
