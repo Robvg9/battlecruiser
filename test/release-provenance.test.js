@@ -159,6 +159,9 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(quality, /name: battlecruiser-release-provenance-\$\{\{ github\.event\.workflow_run\.id \}\}/);
   assert.match(liveOfflineE2e, /path\.join\(OUTPUT_DIR, "release", releaseFilename\)/);
   assert.match(liveOfflineE2e, /workflow_run_id: expectedRunId/);
+  assert.ok(liveOfflineE2e.includes("releaseManifestFilename(expectedReleaseSha)"));
+  assert.ok(liveOfflineE2e.includes("Cloudflare-Workers-Version-Key"));
+  assert.ok(liveOfflineE2e.includes("battlecruiser-release-"));
   assert.match(liveOfflineE2e, /startupPerformanceCold/);
   assert.match(liveOfflineE2e, /startupPerformanceWarm/);
   assert.match(liveOfflineE2e, /startupPerformanceColdWarmComparison/);
