@@ -98,7 +98,8 @@
   }
   function rowHtml(row) {
     const status = String(row.estado_aprobacion || '').toUpperCase();
-    const pending = status === 'ESPERANDO_APROBACION' || status === 'PENDIENTE';
+    const pendingApproval = status === 'ESPERANDO_APROBACION' || status === 'PENDIENTE';
+    const approvedForCount = status === 'DECLARACION_APROBADA' && row.monto_contado == null;
     const discrepancy = status === 'CON_DIFERENCIA';
     const completed = String(row.estado_sesion || '').toUpperCase() === 'COMPLETADA';
     const id = esc(row.declaracion_id);
@@ -106,13 +107,17 @@
       ' · ' + esc(row.bloque === 'JORNADA' ? 'Jornada completa' : row.bloque || 'Sesión') +
       ' · ' + esc(date(row.fecha));
     let actions = '';
-    if (pending && completed) {
+    if (approvedForCount && completed) {
       actions = '<form class="bc5-cash-form" data-bc5-cash-form="' + id + '">' +
-        '<label>Dinero contado por el dueño (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" required data-bc5-cash-amount placeholder="0.00"><input type="text" maxlength="1000" data-bc5-cash-observation placeholder="Observación del conteo (opcional)"></label>' +
-        '<button type="submit">Registrar conteo</button></form>' +
+        '<label>Dinero contado físicamente por el Dueño (CUP)<input type="number" min="0" step="0.01" inputmode="decimal" required data-bc5-cash-amount placeholder="0.00"><input type="text" maxlength="1000" data-bc5-cash-observation placeholder="Observación del conteo (opcional)"></label>' +
+        '<button type="submit">Registrar conteo físico</button></form>' +
         '<div class="bc5-cash-status" data-bc5-cash-msg></div>';
-    } else if (pending) {
-      actions = '<div class="bc5-cash-status warn">La responsable todavía no ha completado la sesión. El conteo se habilitará después del cierre confirmado.</div>';
+    } else if (approvedForCount) {
+      actions = '<div class="bc5-cash-status warn">Declaración aprobada. El conteo físico se habilitará después de completar la jornada.</div>';
+    } else if (pendingApproval && completed) {
+      actions = '<div class="bc5-cash-status warn">La jornada está completada, pero la declaración todavía necesita aprobación. No se puede contar antes de aprobarla.</div>';
+    } else if (pendingApproval) {
+      actions = '<div class="bc5-cash-status warn">La responsable todavía no ha completado la sesión. El conteo se habilitará después del cierre confirmado y de aprobar la declaración.</div>';
     } else if (discrepancy) {
       actions = '<div class="bc5-cash-status warn">Diferencia pendiente de revisión. No se ha descontado ni ajustado dinero automáticamente.</div>' +
         (row.diferencia_id ? '<button type="button" data-bc5-cash-resolve="' + esc(row.diferencia_id) + '">Revisar y resolver diferencia</button>' : '');
@@ -123,7 +128,7 @@
       '<div><div class="bc5-cash-values"><div class="bc5-cash-value"><small>Declarado</small><b>' + amount(row.monto_declarado) + '</b></div>' +
       '<div class="bc5-cash-value"><small>Contado por dueño</small><b>' + amount(row.monto_contado) + '</b></div>' +
       '<div class="bc5-cash-value"><small>Diferencia</small><b>' + amount(row.diferencia) + '</b></div></div>' +
-      '<div class="bc5-cash-meta">Estado de entrega: ' + esc(status === 'ESPERANDO_APROBACION' ? 'Pendiente de contar' : discrepancy ? 'Diferencia pendiente' : status) + '</div>' +
+      '<div class="bc5-cash-meta">Estado de entrega: ' + esc(approvedForCount ? 'Declaración aprobada · conteo físico pendiente' : pendingApproval ? 'Pendiente de aprobación' : discrepancy ? 'Diferencia pendiente' : status) + '</div>' +
       actions + '</div></article>';
   }
   function render(rows) {
