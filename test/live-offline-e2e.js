@@ -70,14 +70,12 @@ async function fetchText(url, timeoutMs = 20000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const headers = { "cache-control": "no-cache", pragma: "no-cache" };
+    if (LIVE_VERSION_AFFINITY_KEY && new URL(url).origin === new URL(BASE_URL).origin) {
+      headers["Cloudflare-Workers-Version-Key"] = LIVE_VERSION_AFFINITY_KEY;
+    }
     const response = await fetch(url, {
-      headers: {
-        "cache-control": "no-cache",
-        pragma: "no-cache",
-        ...(LIVE_VERSION_AFFINITY_KEY
-          ? { "Cloudflare-Workers-Version-Key": LIVE_VERSION_AFFINITY_KEY }
-          : {}),
-      },
+      headers,
       signal: controller.signal,
       redirect: "follow",
     });
@@ -558,7 +556,19 @@ async function main() {
         else pending.resolve(message.result || {});
         return;
       }
-      if (message.method === "Network.requestWillBeSent") {
+      if (message.method === "Fetch.requestPaused") {
+        const headers = Object.entries(message.params.request.headers || {})
+          .filter(([name]) => name.toLowerCase() !== "cloudflare-workers-version-key")
+          .map(([name, value]) => ({ name, value: String(value) }));
+        headers.push({
+          name: "Cloudflare-Workers-Version-Key",
+          value: LIVE_VERSION_AFFINITY_KEY,
+        });
+        cdpCommand("Fetch.continueRequest", {
+          requestId: message.params.requestId,
+          headers,
+        }).catch(error => report.errors.push("No se pudo continuar la solicitud LIVE con afinidad: " + error.message));
+      } else if (message.method === "Network.requestWillBeSent") {
         requestsById.set(message.params.requestId, {
           url: message.params.request.url,
           type: message.params.type || null,
@@ -667,8 +677,8 @@ async function main() {
 
   await cdpCommand("Network.enable");
   if (isProductionBase) {
-    await cdpCommand("Network.setExtraHTTPHeaders", {
-      headers: { "Cloudflare-Workers-Version-Key": LIVE_VERSION_AFFINITY_KEY },
+    await cdpCommand("Fetch.enable", {
+      patterns: [{ urlPattern: BASE_URL + "/*", requestStage: "Request" }],
     });
   }
   await cdpCommand("Log.enable");
