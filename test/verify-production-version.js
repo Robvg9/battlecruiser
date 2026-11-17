@@ -120,8 +120,8 @@ async function verifyOnce(attempt) {
   const liveSwMatch = liveSw.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);
   if (!liveAppMatch) throw new Error("LIVE app.js has no readable VERSION.");
   if (!liveSwMatch) throw new Error("LIVE Service Worker has no readable version.");
-  const indexAppMatch = liveIndex.match(/<script\\s+src=["']app\\.js\\?v=([^"']+)["']/i);
-  const indexFooterMatch = liveIndex.match(/v(\\d+\\.\\d+\\.\\d+) — BattleCruiser/);
+  const indexAppMatch = liveIndex.match(/<script\s+src=["']app\.js\?v=([^"']+)["']/i);
+  const indexFooterMatch = liveIndex.match(/v(\d+\.\d+\.\d+) — BattleCruiser/);
   if (!indexAppMatch || !indexFooterMatch) {
     throw new Error("LIVE index.html is missing its versioned app entry or release footer.");
   }
