@@ -31,7 +31,8 @@ CREATE TABLE public.turno_revisiones (
 
 CREATE TABLE public.productos(
   id uuid PRIMARY KEY,nombre text NOT NULL,unidad text NOT NULL DEFAULT 'ud',
-  activo boolean NOT NULL DEFAULT true,producto_padre_id uuid,precio_normal numeric(14,2)
+  activo boolean NOT NULL DEFAULT true,producto_padre_id uuid,precio_normal numeric(14,2),
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.stock(
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),producto_id uuid NOT NULL REFERENCES public.productos(id),
