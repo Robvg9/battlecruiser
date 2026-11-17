@@ -40,7 +40,7 @@ test("Retroactive multi-day balances exclude transfers outside the scheduled per
   assert.match(MIGRATION,/linked\.transferencia_id = t\.id/);
 });
 test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable from the preview",()=>{
-  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\\.bc7_vincular_transferencia_jornada/);
+  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_vincular_transferencia_jornada/);
   assert.match(MIGRATION,/Solo ADMIN puede atribuir una transferencia histórica/);
   assert.match(MIGRATION,/El Turno maestro debe seguir ABIERTO/);
   assert.match(MIGRATION,/turno_jornada_entradas_vinculadas/);
@@ -48,7 +48,7 @@ test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable fr
   assert.match(MIGRATION,/aplicacion_unica',true/);
   assert.match(MIGRATION,/Esta transferencia ya está vinculada a otra Jornada/);
   assert.match(UI,/data-bc7-link-transfer/);
-  assert.match(UI,/rpc\\('bc7_vincular_transferencia_jornada'/);
+  assert.match(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
   assert.match(UI,/No se dividirá entre días ni se aplicará a Adriana/);
 });
 test("A rejected declaration can be corrected without erasing the prior value from audit history",()=>{
