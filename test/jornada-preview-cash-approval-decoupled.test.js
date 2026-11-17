@@ -15,7 +15,7 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
   assert.match(MIGRATION,/v_lista_conteo:=v_gastos AND v_reinversiones AND v_bajas AND v_final AND v_cash_declared/);
   assert.match(MIGRATION,/'declaracion_dinero',jsonb_build_object\('completado',v_cash_declared/);
   assert.match(UI,/data-bc7-checklist-cash/);
-  assert.match(UI,/\)\/5<\/span>/);
+  assert.ok(UI.includes("+(cashDeclared?1:0))+'/5</span></div>'), "the five-step progress counter includes the cash declaration");
   assert.match(UI,/Declaración de dinero/);
 });
 
@@ -55,7 +55,7 @@ test("A rejected declaration can be corrected without erasing the prior value fr
   assert.match(MIGRATION,/DINERO_REDECLARADO/);
   assert.match(MIGRATION,/monto_anterior',v_old_amount/);
   assert.match(MIGRATION,/monto_nuevo',p_monto/);
-  assert.match(UI,/estado_aprobacion\|\|'\)\.toUpperCase\(\)!=='RECHAZADA'/);
+  assert.match(UI,/String\(declaration\.estado_aprobacion\|\|''\)\.toUpperCase\(\)!=='RECHAZADA'/);
 });
 
 test("Workbook preview is read-only and includes movements, adjustments, finance and cash",()=>{
