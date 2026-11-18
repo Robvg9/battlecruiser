@@ -23,6 +23,9 @@ DECLARE
   v_paniqueque uuid:=gen_random_uuid();
   v_pastel uuid:=gen_random_uuid();
   v_foreign_product uuid:=gen_random_uuid();
+  v_period_cream uuid:=gen_random_uuid();
+  v_period_malta uuid:=gen_random_uuid();
+  v_period_parranda uuid:=gen_random_uuid();
   v_transfer uuid:=gen_random_uuid();
   v_foreign_transfer uuid:=gen_random_uuid();
   v_reinvestment uuid:=gen_random_uuid();
@@ -42,9 +45,10 @@ BEGIN
     (v_warehouse,'Jornada final inventory period products fixture','minorista',true),
     (v_source_warehouse,'Jornada transfer source fixture','mayorista',true);
 
-  -- Two opening families existed before the period. Four other catalogue rows
-  -- are deliberately created after it; three are supported by this Jornada
-  -- and one belongs to a transfer already attributed to another session.
+  -- Two opening families existed before the period. Three products are
+  -- created inside the period after the inherited opening handover. Four
+  -- other catalogue rows are created after the period; three are supported
+  -- by this Jornada and one belongs to another session.
   UPDATE public.productos
   SET created_at=v_cutoff-interval '2 days'
   WHERE id IN (v_pan,v_juice);
@@ -54,7 +58,10 @@ BEGIN
     (v_mani,'Mani en Grano','ud',true,280,v_cutoff+interval '1 day'),
     (v_paniqueque,'Paniqueque Redondo','ud',true,70,v_cutoff+interval '1 day'),
     (v_pastel,'Pastel de $180','ud',true,180,v_cutoff+interval '1 day'),
-    (v_foreign_product,'Producto de otra Jornada','ud',true,90,v_cutoff+interval '1 day');
+    (v_foreign_product,'Producto de otra Jornada','ud',true,90,v_cutoff+interval '1 day'),
+    (v_period_cream,'Crema de leche','ud',true,220,v_cutoff-interval '12 hours'),
+    (v_period_malta,'Malta Guajira','ud',true,1000,v_cutoff-interval '12 hours'),
+    (v_period_parranda,'Cerveza Parranda 330ml','ud',true,800,v_cutoff-interval '12 hours');
 
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
   VALUES
@@ -146,13 +153,13 @@ BEGIN
   SELECT count(*) INTO v_line_count
   FROM jsonb_array_elements(v_detail->'productos') p;
 
-  IF v_line_count<>5 THEN
-    RAISE EXCEPTION 'FAIL: inventory UI must show exactly five families (2 opening + 3 supported late products); got % products: %',
+  IF v_line_count<>8 THEN
+    RAISE EXCEPTION 'FAIL: inventory UI must show exactly eight families (2 opening + 3 in-period catalogue + 3 supported late products); got % products: %',
       v_line_count,v_detail->'productos';
   END IF;
   IF EXISTS (
     SELECT 1
-    FROM unnest(ARRAY[v_pan,v_juice,v_mani,v_paniqueque,v_pastel]) expected(id)
+    FROM unnest(ARRAY[v_pan,v_juice,v_mani,v_paniqueque,v_pastel,v_period_cream,v_period_malta,v_period_parranda]) expected(id)
     WHERE NOT EXISTS(
       SELECT 1 FROM jsonb_array_elements(v_detail->'productos') p
       WHERE (p->>'producto_id')::uuid=expected.id
@@ -165,6 +172,12 @@ BEGIN
     WHERE (p->>'producto_id')::uuid=v_foreign_product
   ) THEN
     RAISE EXCEPTION 'FAIL: UI leaked a transfer already attributed to another Jornada';
+  END IF;
+
+  SELECT count(*) INTO v_line_count
+  FROM public.bc7_jornada_productos_corte(v_session,'FINAL');
+  IF v_line_count<>8 THEN
+    RAISE EXCEPTION 'FAIL: canonical final product helper should return eight period/opening/evidence-backed products; got %',v_line_count;
   END IF;
 
   -- A stale/partial client list must be rejected by a clear count error, not
@@ -194,20 +207,23 @@ BEGIN
       jsonb_build_object('producto_id',v_juice,'cantidad',4),
       jsonb_build_object('producto_id',v_mani,'cantidad',18),
       jsonb_build_object('producto_id',v_paniqueque,'cantidad',9),
-      jsonb_build_object('producto_id',v_pastel,'cantidad',23)
+      jsonb_build_object('producto_id',v_pastel,'cantidad',23),
+      jsonb_build_object('producto_id',v_period_cream,'cantidad',8),
+      jsonb_build_object('producto_id',v_period_malta,'cantidad',20),
+      jsonb_build_object('producto_id',v_period_parranda,'cantidad',22)
     ),
-    'Final physical inventory fixture with late period evidence'
+    'Final physical inventory fixture with in-period catalogue products'
   );
   IF v_result->>'estado'<>'CONFIRMADO'
-     OR (v_result->>'cantidad_lineas')::integer<>5 THEN
-    RAISE EXCEPTION 'FAIL: server did not confirm the exact five-line physical inventory snapshot: %',v_result;
+     OR (v_result->>'cantidad_lineas')::integer<>8 THEN
+    RAISE EXCEPTION 'FAIL: server did not confirm the exact eight-line physical inventory snapshot: %',v_result;
   END IF;
 
   SELECT count(*) INTO v_line_count
   FROM public.turno_jornada_inventario_lineas l
   JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
   WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL';
-  IF v_line_count<>5 THEN
+  IF v_line_count<>8 THEN
     RAISE EXCEPTION 'FAIL: persisted final snapshot line count differs from the submitted physical count';
   END IF;
 
@@ -219,11 +235,20 @@ BEGIN
       WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL' AND l.producto_id=v_paniqueque)<>9
      OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas l
       JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
-      WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL' AND l.producto_id=v_pastel)<>23 THEN
-    RAISE EXCEPTION 'FAIL: saved physical quantities were not preserved for the three late products';
+      WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL' AND l.producto_id=v_pastel)<>23
+     OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas l
+      JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
+      WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL' AND l.producto_id=v_period_cream)<>8
+     OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas l
+      JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
+      WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL' AND l.producto_id=v_period_malta)<>20
+     OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas l
+      JOIN public.turno_jornada_inventario_cortes c ON c.id=l.corte_id
+      WHERE c.turno_sesion_id=v_session AND c.tipo='FINAL' AND l.producto_id=v_period_parranda)<>22 THEN
+    RAISE EXCEPTION 'FAIL: saved physical quantities were not preserved for period and late evidence products';
   END IF;
 
-  RAISE NOTICE 'PASS Jornada final inventory: exact shared product projection, 3 late evidence-backed products, cross-session transfer isolation, incomplete count rejection and persisted physical quantities';
+  RAISE NOTICE 'PASS Jornada final inventory: period catalogue products, 3 late evidence-backed products, cross-session transfer isolation, incomplete count rejection and persisted physical quantities';
 END
 $test$;
 

@@ -6,6 +6,7 @@ const path=require("node:path");
 const read=p=>fs.readFileSync(path.join(__dirname,"..",p),"utf8");
 const MIGRATION=read("supabase/migrations/20261118090000_jornada_inventory_product_set_archive_late_transfers.sql");
 const CASH_SIGN_MIGRATION=read("supabase/migrations/20261118100000_jornada_cash_difference_excel_sign_convention.sql");
+const PERIOD_PRODUCTS_MIGRATION=read("supabase/migrations/20261118190000_jornada_final_inventory_includes_period_products.sql");
 const PRODUCTS=read("public/js/productos.js");
 const JORNADA=read("public/js/bc7-jornada-ui.js");
 const IMPORTER=read("public/js/bc7-periodo-apertura-ui.js");
@@ -21,6 +22,22 @@ test("Jornada inventory read and write share one exact product/family universe",
  assert.ok(writeFn.includes("expected.producto_id=p.id"));assert.ok(writeFn.includes("exactamente los productos/familias válidos"));
  assert.equal(readFn.includes("p.created_at < ("),false);
 });
+test("final inventory includes products created during the scheduled period even when the inherited opening cut has no line",()=>{
+ const helper=PERIOD_PRODUCTS_MIGRATION.slice(
+  PERIOD_PRODUCTS_MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_jornada_productos_corte"),
+  PERIOD_PRODUCTS_MIGRATION.indexOf("REVOKE ALL ON FUNCTION public.bc7_jornada_productos_corte")
+ );
+ assert.ok(helper.includes("bc7_jornada_productos_corte(v_s.id,'INICIAL')"));
+ assert.ok(helper.includes("period_products.producto_id"));
+ assert.ok(helper.includes("c.tipo='INICIAL'"));
+ assert.ok(helper.includes("root.archivado_at IS NULL"));
+ const writer=PERIOD_PRODUCTS_MIGRATION.slice(
+  PERIOD_PRODUCTS_MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_guardar_inventario_jornada")
+ );
+ assert.ok(writer.includes("FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo))"));
+ assert.ok(writer.includes("exactamente los productos/familias válidos para este corte"));
+});
+
 test("archiving a product does not erase it from a completed Jornada's historical final inventory",()=>{
   const helper=MIGRATION.slice(MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_jornada_productos_corte"),MIGRATION.indexOf("ALTER TABLE public.productos"));
   const openingEvidence=helper.slice(helper.indexOf("SELECT DISTINCT l.producto_id"),helper.indexOf("UNION"));
