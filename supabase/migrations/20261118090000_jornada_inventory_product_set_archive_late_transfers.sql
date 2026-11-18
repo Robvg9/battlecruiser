@@ -21,18 +21,18 @@ BEGIN
     SELECT DISTINCT l.producto_id FROM public.turno_jornada_inventario_cortes c
     JOIN public.turno_jornada_inventario_lineas l ON l.corte_id=c.id
     JOIN public.productos root ON root.id=l.producto_id
-    WHERE c.turno_sesion_id=v_s.id AND c.tipo='INICIAL' AND root.producto_padre_id IS NULL AND root.activo=true AND root.archivado_at IS NULL
+    WHERE c.turno_sesion_id=v_s.id AND c.tipo='INICIAL' AND root.producto_padre_id IS NULL
     UNION
     SELECT DISTINCT coalesce(p.producto_padre_id,p.id) FROM public.stock s
     JOIN public.productos p ON p.id=s.producto_id
     JOIN public.productos root ON root.id=coalesce(p.producto_padre_id,p.id)
-    WHERE s.almacen_id=v_s.almacen_id AND p.activo=true AND root.activo=true AND root.archivado_at IS NULL AND root.producto_padre_id IS NULL AND root.created_at<v_cutoff
+    WHERE s.almacen_id=v_s.almacen_id AND root.producto_padre_id IS NULL AND root.created_at<v_cutoff
     UNION
     SELECT DISTINCT coalesce(p.producto_padre_id,p.id) FROM public.reinversiones r
     JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
     JOIN public.productos p ON p.id=rl.producto_id
     JOIN public.productos root ON root.id=coalesce(p.producto_padre_id,p.id)
-    WHERE r.turno_sesion_id=v_s.id AND r.estado='APROBADA' AND p.activo=true AND root.activo=true AND root.archivado_at IS NULL AND root.producto_padre_id IS NULL
+    WHERE r.turno_sesion_id=v_s.id AND r.estado='APROBADA' AND root.producto_padre_id IS NULL
     UNION
     SELECT DISTINCT coalesce(p.producto_padre_id,p.id) FROM public.transferencias t
     JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
@@ -154,7 +154,7 @@ BEGIN
         'es_familia',EXISTS(SELECT 1 FROM public.productos h WHERE h.producto_padre_id=p.id AND h.activo=true)
       ) ORDER BY p.nombre,p.id)
       FROM public.productos p
-      WHERE p.activo=true AND p.archivado_at IS NULL AND p.producto_padre_id IS NULL
+      WHERE p.producto_padre_id IS NULL
         AND EXISTS (
           SELECT 1
           FROM public.bc7_jornada_productos_corte(

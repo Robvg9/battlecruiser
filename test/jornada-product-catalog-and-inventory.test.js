@@ -21,6 +21,18 @@ test("Jornada inventory read and write share one exact product/family universe",
  assert.ok(writeFn.includes("expected.producto_id=p.id"));assert.ok(writeFn.includes("exactamente los productos/familias válidos"));
  assert.equal(readFn.includes("p.created_at < ("),false);
 });
+test("archiving a product does not erase it from a completed Jornada's historical final inventory",()=>{
+  const helper=MIGRATION.slice(MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_jornada_productos_corte"),MIGRATION.indexOf("ALTER TABLE public.productos"));
+  const openingEvidence=helper.slice(helper.indexOf("SELECT DISTINCT l.producto_id"),helper.indexOf("UNION"));
+  assert.ok(openingEvidence.includes("c.tipo='INICIAL'"));
+  assert.equal(openingEvidence.includes("archivado_at"),false);
+  assert.equal(openingEvidence.includes("root.activo=true"),false);
+  const getter=MIGRATION.slice(MIGRATION.indexOf("FUNCTION public.bc7_obtener_inventario_jornada"),MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_guardar_inventario_jornada"));
+  assert.ok(getter.includes("FROM public.productos p"));
+  assert.ok(getter.includes("WHERE p.producto_padre_id IS NULL"));
+  assert.equal(getter.includes("p.archivado_at IS NULL"),false);
+});
+
 test("product archive is reversible, audited and guarded by stock/open-cut checks",()=>{
  assert.ok(MIGRATION.includes("ADD COLUMN IF NOT EXISTS archivado_at"));assert.ok(MIGRATION.includes("CREATE TABLE IF NOT EXISTS public.productos_archivo_historial"));assert.ok(MIGRATION.includes("ON DELETE RESTRICT"));
  const archive=MIGRATION.slice(MIGRATION.indexOf("FUNCTION public.bc_producto_archivar"),MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc_producto_restaurar"));
