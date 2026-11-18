@@ -35,12 +35,12 @@ async function cargarAlmacenes() {
 async function cargarProductos() {
   return withCache("productos", async () => {
     const extended = await client.from("productos")
-      .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, inventario_mixto, producto_padre_id, variante_nombre, categorias(nombre), presentaciones(nombre)")
+      .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, inventario_mixto, producto_padre_id, variante_nombre, archivado_at, archivado_por, motivo_archivo, categorias(nombre), presentaciones(nombre)")
       .order("nombre");
     if (!extended.error) return extended;
     const errorText = String(extended.error.message || extended.error.code || extended.error).toLowerCase();
     // PR preview and pre-migration deployments keep the original catalog usable.
-    if (!/inventario_mixto|producto_padre_id|variante_nombre|column .* does not exist|schema cache/i.test(errorText)) return extended;
+    if (!/inventario_mixto|producto_padre_id|variante_nombre|archivado_at|archivado_por|motivo_archivo|column .* does not exist|schema cache/i.test(errorText)) return extended;
     return client.from("productos")
       .select("id, nombre, unidad, precio_normal, precio_mayorista, activo, imagen_url, categoria_id, presentacion_id, categorias(nombre), presentaciones(nombre)")
       .order("nombre");
@@ -56,10 +56,10 @@ function productosOperativos(rows) {
   const all = Array.isArray(rows) ? rows : (_cache.productos || []);
   const byId = new Map(all.map((p) => [String(p.id), p]));
   return all.filter((p) => {
-    if (!p || p.activo === false) return false;
+    if (!p || p.activo === false || p.archivado_at) return false;
     if (!p.producto_padre_id) return !p.inventario_mixto;
     const parent = byId.get(String(p.producto_padre_id));
-    return !!(parent && parent.activo !== false && parent.inventario_mixto);
+    return !!(parent && parent.activo !== false && !parent.archivado_at && parent.inventario_mixto);
   });
 }
 
@@ -295,28 +295,25 @@ function renderProductosLista() {
   const lista = document.getElementById("lista-productos");
   if (!lista) return;
   const todas = productosPrincipales(_cache.productos || []);
-  if (todas.length === 0) {
-    setEmpty("lista-productos", mensajeListaVacia("productos", "Todavía no hay productos cargados."));
-    actualizarContador("productos-contador", 0, 0);
-    return;
-  }
+  const archivados = todas.filter((p) => !!p.archivado_at);
+  const disponibles = todas.filter((p) => !p.archivado_at);
   const termino = _productosBusqueda.trim().toLowerCase();
   const filtradas = termino
-    ? todas.filter((p) => {
+    ? disponibles.filter((p) => {
         const nom = (p.nombre || "").toLowerCase();
         const cat = p.categorias && p.categorias.nombre ? p.categorias.nombre.toLowerCase() : "";
         const uni = (p.unidad || "").toLowerCase();
         return nom.includes(termino) || cat.includes(termino) || uni.includes(termino);
       })
-    : todas;
-  if (filtradas.length === 0) {
-    lista.innerHTML = '<p class="lista-estado">🔎 No encontramos productos con esos criterios.</p>'
-      + '<button type="button" class="cc-accion mov-ver-todas-btn" data-tipo="productos">Ver todos</button>';
-    actualizarContador("productos-contador", 0, todas.length);
-    return;
-  }
+    : disponibles;
   lista.innerHTML = "";
   const puedeEditar = tienePermiso("productos", "editar");
+  if (!filtradas.length) {
+    const empty = document.createElement("p");
+    empty.className = "lista-estado";
+    empty.textContent = "No hay productos activos que coincidan con la búsqueda.";
+    lista.appendChild(empty);
+  }
   filtradas.forEach((p) => {
     const div = document.createElement("div");
     div.className = "lista-item lista-item-accion" + (p.activo === false ? " lista-item-inactivo" : "");
@@ -327,25 +324,70 @@ function renderProductosLista() {
     const estadoTxt = p.activo === false ? '<span class="muted">· Inactivo</span>' : "";
     let botones = "";
     if (puedeEditar) {
-      botones = `<span class="lista-item-acciones">
-          <button type="button" class="btn-editar-producto" data-id="${p.id}">Editar</button>
-          ${p.activo !== false ? `<button type="button" class="btn-editar-producto btn-configurar-sabores" data-id="${p.id}">${p.inventario_mixto ? "Editar sabores" : "Configurar sabores"}</button>` : ""}
-          <button type="button" class="btn-toggle-producto" data-id="${p.id}" data-activo="${p.activo !== false}">${p.activo === false ? "Activar" : "Desactivar"}</button>
-        </span>`;
+      botones = '<span class="lista-item-acciones">' +
+        '<button type="button" class="btn-editar-producto" data-id="' + escHtml(p.id) + '">Editar</button>' +
+        (p.activo !== false ? '<button type="button" class="btn-editar-producto btn-configurar-sabores" data-id="' + escHtml(p.id) + '">' + (p.inventario_mixto ? 'Editar sabores' : 'Configurar sabores') + '</button>' : '') +
+        '<button type="button" class="btn-toggle-producto" data-id="' + escHtml(p.id) + '" data-activo="' + (p.activo !== false) + '">' + (p.activo === false ? 'Activar' : 'Desactivar') + '</button>' +
+        '<button type="button" class="btn-editar-producto btn-archivar-producto" data-id="' + escHtml(p.id) + '">Archivar</button>' +
+        '</span>';
     }
     const miniatura = p.imagen_url
-      ? `<img src="${escHtml(p.imagen_url)}" alt="" class="producto-thumb" loading="lazy">`
-      : `<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>`;
+      ? '<img src="' + escHtml(p.imagen_url) + '" alt="" class="producto-thumb" loading="lazy">'
+      : '<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>';
     const unidadTxt = p.unidad ? escHtml(p.unidad) : "—";
-
     const stockTot = stockTotalProducto(p.id);
-    div.innerHTML = `${miniatura}<span>${escHtml(p.nombre)} <span class="muted">${p.categorias ? "· " + escHtml(p.categorias.nombre) : ""} · Base: ${unidadTxt}${p.presentacion_id && p.presentaciones ? " · Mayorista: " + escHtml(p.presentaciones.nombre) : ""}</span> ${estadoTxt}</span>
-        <span class="muted">Normal $${money(p.precio_normal)} · Mayorista $${money(p.precio_mayorista)} · Stock ${fmtQtyProducto(stockTot)}</span>
-        ${botones}`;
+    div.innerHTML = miniatura + '<span>' + escHtml(p.nombre) + ' <span class="muted">' +
+      (p.categorias ? '· ' + escHtml(p.categorias.nombre) : '') + ' · Base: ' + unidadTxt +
+      (p.presentacion_id && p.presentaciones ? ' · Mayorista: ' + escHtml(p.presentaciones.nombre) : '') +
+      '</span> ' + estadoTxt + '</span><span class="muted">Normal $' + money(p.precio_normal) +
+      ' · Mayorista $' + money(p.precio_mayorista) + ' · Stock ' + fmtQtyProducto(stockTot) +
+      '</span>' + botones;
     if (p.inventario_mixto) div.innerHTML += '<small class="producto-mixto-tag">Inventario por sabores</small>';
     lista.appendChild(div);
   });
-  actualizarContador("productos-contador", filtradas.length, todas.length);
+  if (archivados.length) {
+    const details = document.createElement("details");
+    details.className = "productos-archivados";
+    const summary = document.createElement("summary");
+    summary.textContent = "Productos archivados · " + archivados.length + " (historial conservado)";
+    details.appendChild(summary);
+    const archivedList = document.createElement("div");
+    archivedList.className = "productos-archivados-lista";
+    archivados.filter((p) => !termino || String(p.nombre || "").toLowerCase().includes(termino)).forEach((p) => {
+      const row = document.createElement("div");
+      row.className = "lista-item lista-item-inactivo";
+      const copy = document.createElement("span");
+      const title = document.createElement("b");
+      title.textContent = p.nombre || "Producto";
+      copy.appendChild(title);
+      const status = document.createElement("span");
+      status.className = "muted";
+      status.textContent = p.archivado_at ? " · Archivado " + new Date(p.archivado_at).toLocaleDateString("es-ES") : " · Archivado";
+      copy.appendChild(status);
+      if (p.motivo_archivo) {
+        const reason = document.createElement("small");
+        reason.className = "muted";
+        reason.textContent = "Motivo: " + p.motivo_archivo;
+        copy.appendChild(reason);
+      }
+      row.appendChild(copy);
+      if (puedeEditar) {
+        const actions = document.createElement("span");
+        actions.className = "lista-item-acciones";
+        const restore = document.createElement("button");
+        restore.type = "button";
+        restore.className = "btn-editar-producto btn-restaurar-producto";
+        restore.dataset.id = p.id;
+        restore.textContent = "Restaurar";
+        actions.appendChild(restore);
+        row.appendChild(actions);
+      }
+      archivedList.appendChild(row);
+    });
+    details.appendChild(archivedList);
+    lista.appendChild(details);
+  }
+  actualizarContador("productos-contador", filtradas.length, disponibles.length);
 }
 
 async function refrescarProductos() {
@@ -366,7 +408,7 @@ async function refrescarProductos() {
   const ppProductoSelect = document.getElementById("pp-producto-select");
   if (ppProductoSelect) {
     const seleccionPPActual = ppProductoSelect.value;
-    const productosConfigurables = productosPrincipales(productos);
+    const productosConfigurables = productosPrincipales(productos).filter((p) => !p.archivado_at);
     fillSelect(ppProductoSelect, productosConfigurables, "id", (p) => p.nombre, true);
     if (seleccionPPActual && productosConfigurables.some((p) => p.id === seleccionPPActual)) {
       ppProductoSelect.value = seleccionPPActual;
@@ -397,6 +439,42 @@ safeInit("lista-productos", () => {
     if (btnEditar) {
       const producto = (_cache.productos || []).find((p) => p.id === btnEditar.dataset.id);
       if (producto) iniciarEdicionProducto(producto);
+      return;
+    }
+    const btnArchive = e.target.closest(".btn-archivar-producto");
+    if (btnArchive) {
+      const id = btnArchive.dataset.id;
+      const reason = window.prompt("Motivo para archivar este producto. Su historial se conservará:", "Temporalmente no disponible en el mercado.");
+      if (!reason || reason.trim().length < 5) return;
+      if (!window.confirm("Se archivará y desaparecerá de los selectores de operación. No se borrarán ventas, compras ni movimientos. Solo se permite sin existencias y sin una jornada abierta que lo esté contando. ¿Continuar?")) return;
+      btnArchive.disabled = true;
+      const response = await client.rpc("bc_producto_archivar", { p_producto_id: id, p_motivo: reason.trim() });
+      btnArchive.disabled = false;
+      if (response.error) {
+        setMsg("msg-productos", response.error.message || "No se pudo archivar el producto.", false);
+        return;
+      }
+      if (typeof window.bcNotificarCambioDatos === "function") window.bcNotificarCambioDatos("producto", false);
+      setMsg("msg-productos", "Producto archivado. Se conserva su historial y puede restaurarse.", true);
+      await refrescarProductos();
+      return;
+    }
+    const btnRestore = e.target.closest(".btn-restaurar-producto");
+    if (btnRestore) {
+      const id = btnRestore.dataset.id;
+      const reason = window.prompt("Motivo para restaurar este producto:", "Vuelve a estar disponible en el mercado.");
+      if (!reason || reason.trim().length < 5) return;
+      if (!window.confirm("El producto volverá al catálogo y a los selectores operativos. Su historial anterior se conserva. ¿Continuar?")) return;
+      btnRestore.disabled = true;
+      const response = await client.rpc("bc_producto_restaurar", { p_producto_id: id, p_motivo: reason.trim() });
+      btnRestore.disabled = false;
+      if (response.error) {
+        setMsg("msg-productos", response.error.message || "No se pudo restaurar el producto.", false);
+        return;
+      }
+      if (typeof window.bcNotificarCambioDatos === "function") window.bcNotificarCambioDatos("producto", false);
+      setMsg("msg-productos", "Producto restaurado y disponible para operar.", true);
+      await refrescarProductos();
       return;
     }
     const btnToggle = e.target.closest(".btn-toggle-producto");
