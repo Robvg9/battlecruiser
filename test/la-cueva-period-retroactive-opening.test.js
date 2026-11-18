@@ -189,16 +189,14 @@ test("opening preview imports the selected Excel quantities and exposes family m
 });
 
 
-test("known 07:15 delivery is already part of Adriana's closing count; only 09:07 and 15:16 are selectable",()=>{
+test("external importer renders live transfer rows without case-specific people, dates or times",()=>{
   const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
-  assert.ok(ui.includes("09:07 y 15:16"));
-  assert.ok(ui.includes("Ya incluida en el inventario final de Adriana"));
-  assert.ok(ui.includes("no se vinculará"));
-  const transferUI=ui.slice(ui.indexOf("function renderTransfers"),ui.indexOf("async function confirmOpening"));
-  assert.ok(transferUI.includes("time==='09:07'||time==='15:16'"));
-  assert.ok(transferUI.includes("No sumar"));
+  assert.ok(ui.includes("Revisa las fechas y horas reales antes de seleccionar entradas."));
+  assert.ok(ui.includes("t.hora_local"));
+  assert.ok(ui.includes("t.fecha_local"));
+  assert.ok(ui.includes("t.id"));
+  assert.equal(/Adriana|Sheyla|09:07|15:16|07:15|2026-11-09|2026-11-10/.test(ui),false);
 });
-
 
 test("minorista Jornada snapshots group flavour variants by parent family without inventing a split",()=>{
   const ui=fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
@@ -240,11 +238,11 @@ test("opening confirmation unlocks when the real start time or responsible chang
   assert.match(ui, /\$\('bc7-period-person'\)\.addEventListener\('change',updateConfirm\)/);
 });
 
-test("period opening form version 1.7 is loaded dynamically and precached",()=>{
+test("period opening form version 1.8 is loaded dynamically and precached",()=>{
   const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.7"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.8"));
 });
 
 
