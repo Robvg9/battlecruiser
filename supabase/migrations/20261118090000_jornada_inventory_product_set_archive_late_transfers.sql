@@ -26,7 +26,7 @@ BEGIN
     SELECT DISTINCT coalesce(p.producto_padre_id,p.id) FROM public.stock s
     JOIN public.productos p ON p.id=s.producto_id
     JOIN public.productos root ON root.id=coalesce(p.producto_padre_id,p.id)
-    WHERE s.almacen_id=v_s.almacen_id AND root.producto_padre_id IS NULL AND root.created_at<v_cutoff
+    WHERE s.almacen_id=v_s.almacen_id AND p.activo=true AND root.activo=true AND root.archivado_at IS NULL AND root.producto_padre_id IS NULL AND root.created_at<v_cutoff
     UNION
     SELECT DISTINCT coalesce(p.producto_padre_id,p.id) FROM public.reinversiones r
     JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
@@ -40,7 +40,7 @@ BEGIN
     JOIN public.productos root ON root.id=coalesce(p.producto_padre_id,p.id)
     WHERE t.almacen_destino_id=v_s.almacen_id AND lower(t.estado)='completada' AND t.fecha>=v_cutoff AND t.fecha<=now()
       AND NOT EXISTS (SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked WHERE linked.transferencia_id=t.id AND linked.turno_sesion_id<>v_s.id)
-      AND p.activo=true AND root.activo=true AND root.archivado_at IS NULL AND root.producto_padre_id IS NULL
+      AND root.producto_padre_id IS NULL
   ) SELECT e.producto_id FROM expected e ORDER BY e.producto_id;
 END;
 $function$;

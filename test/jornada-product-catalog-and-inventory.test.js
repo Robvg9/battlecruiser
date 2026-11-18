@@ -24,6 +24,15 @@ test("Jornada inventory read and write share one exact product/family universe",
 test("archiving a product does not erase it from a completed Jornada's historical final inventory",()=>{
   const helper=MIGRATION.slice(MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_jornada_productos_corte"),MIGRATION.indexOf("ALTER TABLE public.productos"));
   const openingEvidence=helper.slice(helper.indexOf("SELECT DISTINCT l.producto_id"),helper.indexOf("UNION"));
+  const stockEvidence=helper.slice(helper.indexOf("FROM public.stock"),helper.indexOf("UNION",helper.indexOf("FROM public.stock")));
+  const reinvestEvidence=helper.slice(helper.indexOf("FROM public.reinversiones"),helper.indexOf("UNION",helper.indexOf("FROM public.reinversiones")));
+  const transferEvidence=helper.slice(helper.indexOf("FROM public.transferencias"),helper.indexOf(") SELECT e.producto_id",helper.indexOf("FROM public.transferencias")));
+  assert.ok(stockEvidence.includes("root.archivado_at IS NULL"));
+  assert.equal(reinvestEvidence.includes("archivado_at"),false);
+  assert.equal(reinvestEvidence.includes("p.activo=true"),false);
+  assert.equal(transferEvidence.includes("archivado_at"),false);
+  assert.equal(transferEvidence.includes("p.activo=true"),false);
+
   assert.ok(openingEvidence.includes("c.tipo='INICIAL'"));
   assert.equal(openingEvidence.includes("archivado_at"),false);
   assert.equal(openingEvidence.includes("root.activo=true"),false);
