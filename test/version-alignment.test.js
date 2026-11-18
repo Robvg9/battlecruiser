@@ -172,7 +172,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.64"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.64/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.41"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7.42"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
@@ -187,8 +187,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(sw.includes("./js/m76-movimientos-operaciones.js?v=76.3"), "M76 must be precached for offline use");
   assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\.12/, "the offline shell must precache the same M75 module version");
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
-  assert.match(index, /<script src="js\/productos\.js\?v=20261111\.2"><\/script>/);
-  assert.match(sw, /\.\/js\/productos\.js\?v=20261111\.2/, "the offline shell must precache the updated product module version");
+  assert.match(index, /<script src="js\/productos\.js\?v=20261118.1"><\/script>/);
+  assert.match(sw, /\.\/js\/productos\.js\?v=20261118.1/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.117"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
@@ -197,7 +197,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.126 — Inventario final histórico por evidencia y rechazo de conteo legible/);
+  assert.match(app, /v9\.5\.126 — Inventario unificado, archivo de productos y entradas tardías/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.126"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.115',
@@ -216,7 +216,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7\.41/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.42/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
