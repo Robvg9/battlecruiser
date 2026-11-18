@@ -46,6 +46,7 @@ test("product archive is reversible, audited and guarded by stock/open-cut check
  assert.ok(MIGRATION.includes("ADD COLUMN IF NOT EXISTS archivado_at"));assert.ok(MIGRATION.includes("CREATE TABLE IF NOT EXISTS public.productos_archivo_historial"));assert.ok(MIGRATION.includes("ON DELETE RESTRICT"));
  const archive=MIGRATION.slice(MIGRATION.indexOf("FUNCTION public.bc_producto_archivar"),MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc_producto_restaurar"));
  const restore=MIGRATION.slice(MIGRATION.indexOf("FUNCTION public.bc_producto_restaurar"));
+ assert.ok(archive.includes("v_producto.activo IS DISTINCT FROM true"));
  assert.ok(archive.includes("s.cantidad<>0"));assert.ok(archive.includes("turno_jornada_inventario_cortes"));assert.ok(archive.includes("activo=false"));assert.ok(archive.includes("INSERT INTO public.productos_archivo_historial"));
  assert.ok(restore.includes("activo=true"));assert.ok(restore.includes("archivado_at=NULL"));assert.ok(restore.includes("INSERT INTO public.productos_archivo_historial"));
  assert.ok(MIGRATION.includes("REVOKE ALL ON TABLE public.productos_archivo_historial FROM PUBLIC,anon,authenticated"));

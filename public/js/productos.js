@@ -328,7 +328,7 @@ function renderProductosLista() {
         '<button type="button" class="btn-editar-producto" data-id="' + escHtml(p.id) + '">Editar</button>' +
         (p.activo !== false ? '<button type="button" class="btn-editar-producto btn-configurar-sabores" data-id="' + escHtml(p.id) + '">' + (p.inventario_mixto ? 'Editar sabores' : 'Configurar sabores') + '</button>' : '') +
         '<button type="button" class="btn-toggle-producto" data-id="' + escHtml(p.id) + '" data-activo="' + (p.activo !== false) + '">' + (p.activo === false ? 'Activar' : 'Desactivar') + '</button>' +
-        '<button type="button" class="btn-editar-producto btn-archivar-producto" data-id="' + escHtml(p.id) + '">Archivar</button>' +
+        (p.activo !== false ? '<button type="button" class="btn-editar-producto btn-archivar-producto" data-id="' + escHtml(p.id) + '">Archivar</button>' : '') +
         '</span>';
     }
     const miniatura = p.imagen_url

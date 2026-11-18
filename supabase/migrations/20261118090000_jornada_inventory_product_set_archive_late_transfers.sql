@@ -60,6 +60,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Producto no encontrado.' USING ERRCODE='P0002'; END IF;
   IF v_producto.producto_padre_id IS NOT NULL THEN RAISE EXCEPTION 'Archiva la familia desde su producto principal.' USING ERRCODE='23514'; END IF;
   IF v_producto.archivado_at IS NOT NULL THEN RETURN v_producto.id; END IF;
+  IF v_producto.activo IS DISTINCT FROM true THEN RAISE EXCEPTION 'Solo se pueden archivar productos activos; conserva la desactivación manual existente.' USING ERRCODE='23514'; END IF;
   IF EXISTS (SELECT 1 FROM public.stock s JOIN public.productos child ON child.id=s.producto_id WHERE (child.id=v_producto.id OR child.producto_padre_id=v_producto.id) AND s.cantidad<>0) THEN RAISE EXCEPTION 'No se puede archivar: el producto o alguno de sus sabores conserva existencias en un almacén.' USING ERRCODE='23514'; END IF;
   IF EXISTS (SELECT 1 FROM public.turno_jornada_inventario_cortes c JOIN public.turno_sesiones s ON s.id=c.turno_sesion_id JOIN public.turno_jornada_inventario_lineas l ON l.corte_id=c.id JOIN public.productos counted ON counted.id=l.producto_id WHERE s.estado IN ('PENDIENTE','PROGRAMADA','EN_CURSO') AND (counted.id=v_producto.id OR counted.producto_padre_id=v_producto.id)) THEN RAISE EXCEPTION 'No se puede archivar: el producto forma parte del inventario inicial de una jornada todavía abierta.' USING ERRCODE='23514'; END IF;
   UPDATE public.productos SET activo=false,archivado_at=now(),archivado_por=auth.uid(),motivo_archivo=v_motivo WHERE id=v_producto.id;
