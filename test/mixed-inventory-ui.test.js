@@ -147,7 +147,7 @@ test("Product catalog query falls back until the optional migration is deployed"
 
 test("Cache versions are bumped for the updated PWA inventory and admin assets", () => {
   assertPwaReleaseAligned(assert,{app:read("public/app.js"),serviceWorker:read("public/service-worker.js"),index});
-  assert.match(index, /productos\.js\?v=20261118\.2/);
+  assert.match(index, /productos\.js\?v=20261118\.1/);
   assert.match(index, /catalogos\.js\?v=20261106\.1/);
   assert.match(read("public/app.js"), /\["m53-inventario-centro\.js","53.9"\]/);
 });
