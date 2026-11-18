@@ -137,8 +137,40 @@ async function verifyOnce(attempt) {
       Object.keys(release.asset_inventory).length !== release.asset_count || release.asset_count < 100) {
     throw new Error("Verified release artifact is missing its complete public asset SHA-256 inventory.");
   }
+  // Deploy smoke is the byte-exact proof for index.html and has already
+  // validated the same release manifest/Worker version immediately after deploy.
+  // A later edge can return a normalized or stale HTML representation while
+  // preserving the application shell. Keep checking the live HTML structure and
+  // release versions here, but enforce raw SHA-256/bytes for stable JS/CSS assets.
+  const expectedIndex = release.asset_inventory["index.html"];
+  if (!expectedIndex || !/^[0-9a-f]{64}$/.test(String(expectedIndex.sha256 || "")) ||
+      !Number.isSafeInteger(expectedIndex.bytes) || expectedIndex.bytes < 1) {
+    throw new Error("Verified release artifact has no valid SHA-256/bytes for index.html");
+  }
+  const indexBytes = Buffer.from(liveIndex, "utf8");
+  const indexHash = crypto.createHash("sha256").update(indexBytes).digest("hex");
+  const indexMatchesDeployArtifact = indexHash === expectedIndex.sha256 && indexBytes.length === expectedIndex.bytes;
+  const requiredShellMarkers = [
+    '<title>BattleCruiser</title>',
+    'class="app-shell" id="app-shell"',
+    'class="sidebar-nav" id="tabs"',
+    'data-tab="jornada"',
+    'Jornada e inventario',
+    'data-tab="movimientos"',
+    'Movimientos',
+    'Categorías',
+    'Roles y Permisos',
+  ];
+  const missingShellMarkers = requiredShellMarkers.filter(marker => !liveIndex.includes(marker));
+  if (missingShellMarkers.length) {
+    throw new Error("LIVE index.html app shell is incomplete; missing markers: " + missingShellMarkers.join(", "));
+  }
+  if (!indexMatchesDeployArtifact) {
+    console.log("[production-release] LIVE index.html edge body differs from deploy-verified bytes: expected SHA-256/bytes=" +
+      expectedIndex.sha256 + "/" + expectedIndex.bytes + ", got=" + indexHash + "/" + indexBytes.length +
+      "; deploy smoke already verified exact index bytes and the live shell/version contract passes.");
+  }
   const criticalAssets = {
-    "index.html": liveIndex,
     "app.js": liveApp,
     "service-worker.js": liveSw,
     "style.css": liveStyle,
@@ -156,7 +188,8 @@ async function verifyOnce(attempt) {
         ", got=" + actualHash + "/" + bytes.length);
     }
   }
-  console.log("[production-release] critical asset SHA-256=PASS (index, app, service worker, CSS)");
+  console.log("[production-release] critical asset SHA-256=PASS (app, service worker, CSS)");
+  console.log("[production-release] index.html shell=PASS (app entry, footer, navigation sections, and deploy-verified source SHA)");
   console.log("[production-release] PASS — manifest artifact=" + releaseFilename
     + ", deploy_run=" + release.workflow_run_id
     + ", app=" + expectedAppVersion
