@@ -364,6 +364,8 @@ function applySql(file) {
     applySql("test/jornada-inventory-correction-isolation-contract.sql");
     log("Apply canonical Jornada product set and reversible archive contract.");
     applySql("supabase/migrations/20261118090000_jornada_inventory_product_set_archive_late_transfers.sql");
+    log("Apply Excel-aligned Jornada cash difference sign convention.");
+    applySql("supabase/migrations/20261118100000_jornada_cash_difference_excel_sign_convention.sql");
     applySql("test/jornada-product-catalog-and-inventory-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");

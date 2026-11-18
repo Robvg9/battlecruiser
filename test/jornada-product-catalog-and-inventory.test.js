@@ -5,6 +5,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const read=p=>fs.readFileSync(path.join(__dirname,"..",p),"utf8");
 const MIGRATION=read("supabase/migrations/20261118090000_jornada_inventory_product_set_archive_late_transfers.sql");
+const CASH_SIGN_MIGRATION=read("supabase/migrations/20261118100000_jornada_cash_difference_excel_sign_convention.sql");
 const PRODUCTS=read("public/js/productos.js");
 const JORNADA=read("public/js/bc7-jornada-ui.js");
 const IMPORTER=read("public/js/bc7-periodo-apertura-ui.js");
@@ -44,6 +45,13 @@ test("gross profit is foregrounded without an invented clean-profit formula",()=
  assert.ok(OWNER.includes("Ganancia bruta estimada"));assert.ok(OWNER.includes("Ganancia limpia"));assert.ok(OWNER.includes("Fórmula pendiente de definir"));
  assert.ok(OWNER.includes("Efectivo esperado (sin salario)"));assert.ok(OWNER.includes("positivo = sobrante; negativo = faltante"));
 });
+test("cash difference sign matches the spreadsheet convention",()=>{
+  assert.ok(CASH_SIGN_MIGRATION.includes("round(v_expected_cash-v_cash_received,2)"));
+  assert.equal(CASH_SIGN_MIGRATION.includes("round(v_cash_received-v_expected_cash,2)"),false);
+  assert.ok(OWNER.includes("negativo = sobrante; positivo = faltante"));
+  assert.ok(JORNADA.includes("− sobrante · + faltante"));
+});
+
 test("PWA release versions stay aligned",()=>{
  assert.ok(APP.includes('VERSION="9.5.126"'));assert.ok(SW.includes('BC_SW_VERSION = "9.5.126"'));assert.ok(INDEX.includes("9.5.126"));
  assert.ok(APP.includes('["bc7-jornada-ui.js","7.42"]'));assert.ok(SW.includes("bc7-jornada-ui.js?v=7.42"));

@@ -880,7 +880,7 @@
       ['Reinversiones aprobadas',result.reinversiones_aprobadas],
       ['Dinero recogido',result.dinero_recogido_total],
       ['Efectivo esperado (sin salario)',(result.efectivo_esperado_despues_de_gastos_reinversiones??result.efectivo_esperado_despues_de_gastos_reinversiones_salario)],
-      ['Sobrante / faltante de caja',result.diferencia]
+      ['Sobrante / faltante (− sobrante · + faltante)',result.diferencia]
     ];
     const cards='<div class="bc7-workspace-overview">'+summary.map(function(item){
       const value=item[1]==null?'Pendiente':money(item[1])+' CUP';
@@ -1535,7 +1535,7 @@
       ['Gastos aprobados',settlement.gastos_aprobados],
       ['Reinversiones aprobadas',settlement.reinversiones_aprobadas],
       ['Efectivo esperado (sin salario)',(settlement.efectivo_esperado_despues_de_gastos_reinversiones??settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario)],
-      ['Sobrante / faltante de caja',settlement.diferencia]
+      ['Sobrante / faltante (− sobrante · + faltante)',settlement.diferencia]
     ];
     return '<section class="bc7-calculation-phase is-ready"><h4>Fase 2 · Cálculos automáticos completados</h4>'+
       fifthCheck+'<div class="bc7-calculation-grid">'+

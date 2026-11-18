@@ -41,6 +41,7 @@ on:
       - 'test/step7-jornada-ui-contract.test.js'
       - 'test/step7-jornada-postgres-windows-ci.js'
       - 'supabase/migrations/20261118090000_jornada_inventory_product_set_archive_late_transfers.sql'
+      - 'supabase/migrations/20261118100000_jornada_cash_difference_excel_sign_convention.sql'
       - 'test/jornada-product-catalog-and-inventory-contract.sql'
       - 'test/jornada-product-catalog-and-inventory.test.js'
       - 'public/js/productos.js'
