@@ -174,6 +174,12 @@ BEGIN
     RAISE EXCEPTION 'FAIL: UI leaked a transfer already attributed to another Jornada';
   END IF;
 
+  SELECT count(*) INTO v_line_count
+  FROM public.bc7_jornada_productos_corte(v_session,'FINAL');
+  IF v_line_count<>8 THEN
+    RAISE EXCEPTION 'FAIL: canonical final product helper should return eight period/opening/evidence-backed products; got %',v_line_count;
+  END IF;
+
   -- A stale/partial client list must be rejected by a clear count error, not
   -- disguised as a schedule error.
   BEGIN
