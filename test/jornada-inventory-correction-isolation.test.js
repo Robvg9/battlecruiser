@@ -11,6 +11,8 @@ const sw=fs.readFileSync("public/service-worker.js","utf8");
 test("initial inventory correction is an audited overlay and leaves source rows immutable",()=>{
   assert.ok(migration.includes("CHECK (tipo IN ('FINAL','INICIAL'))"));
   assert.ok(migration.includes("CREATE OR REPLACE FUNCTION public.bc7_corregir_inventario_inicial_jornada"));
+  assert.ok(migration.includes("'PRECIO_HISTORICO_JORNADA'"));
+  assert.ok(migration.includes("precio histórico de la jornada cuando esté registrado"));
   assert.ok(migration.includes("'INVENTARIO_INICIAL_CORREGIDO'"));
   assert.ok(migration.includes("'corte_original_conservado',true"));
   assert.ok(migration.includes("'recepcion_original_conservada',true"));
