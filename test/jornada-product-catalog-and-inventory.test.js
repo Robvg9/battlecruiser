@@ -63,6 +63,11 @@ test("historical importer is generic and visibly exceptional",()=>{
  assert.ok(IMPORTER.includes("Importar cierre externo · uso excepcional"));assert.ok(IMPORTER.includes("recupera la jornada sucesora"));
  assert.equal(/Adriana|Sheyla|09:07|15:16|07:15|2026-11-09|2026-11-10/.test(IMPORTER),false);
 });
+test("owner review correction form uses a generic source description for any Jornada",()=>{
+ assert.ok(OWNER.includes("Evidencia documental de precios y costos históricos correspondiente a esta jornada."));
+ assert.equal(/Noviembre-09-10-Sheyla\.xlsx|Adriana|Sheyla/.test(OWNER),false);
+});
+
 test("gross profit is foregrounded without an invented clean-profit formula",()=>{
  assert.ok(OWNER.includes("Ganancia bruta estimada"));assert.ok(OWNER.includes("Ganancia limpia"));assert.ok(OWNER.includes("Fórmula pendiente de definir"));
  assert.ok(OWNER.includes("Efectivo esperado (sin salario)"));assert.ok(OWNER.includes("negativo = sobrante; positivo = faltante"));
