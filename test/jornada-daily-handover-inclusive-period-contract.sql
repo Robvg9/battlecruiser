@@ -2,6 +2,8 @@
 -- daily cash-handover dates. Dates outside the period remain rejected.
 \set ON_ERROR_STOP on
 
+BEGIN;
+
 DO $test$
 DECLARE
   v_today date := (now() AT TIME ZONE 'America/Havana')::date;
@@ -123,3 +125,5 @@ BEGIN
   RAISE NOTICE 'PASS: daily handovers accept both fecha and inclusive fecha_fin, preserve idempotency, and reject dates outside the period.';
 END
 $test$;
+
+ROLLBACK;
