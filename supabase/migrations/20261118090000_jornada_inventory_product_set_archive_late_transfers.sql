@@ -156,13 +156,15 @@ BEGIN
       FROM public.productos p
       WHERE p.activo=true AND p.archivado_at IS NULL AND p.producto_padre_id IS NULL
         AND EXISTS (
-          SELECT 1 FROM public.bc7_jornada_productos_corte(
+          SELECT 1
+          FROM public.bc7_jornada_productos_corte(
             v_s.id,
             CASE WHEN EXISTS (
               SELECT 1 FROM public.turno_jornada_inventario_cortes initial_cut
               WHERE initial_cut.turno_sesion_id=v_s.id AND initial_cut.tipo='INICIAL'
             ) THEN 'FINAL' ELSE 'INICIAL' END
-          ) expected WHERE expected.producto_id=p.id
+          ) expected
+          WHERE expected.producto_id=p.id
         )
     ),'[]'::jsonb) ELSE coalesce((
       SELECT jsonb_agg(jsonb_build_object(
@@ -180,11 +182,20 @@ BEGIN
         'origen_corte_id',c.origen_corte_id,
         'lineas',coalesce((
           SELECT jsonb_agg(jsonb_build_object(
-            'producto_id',l.producto_id,'cantidad_contada',l.cantidad_contada,
-            'stock_sistema',l.stock_sistema,'diferencia',l.cantidad_contada-l.stock_sistema
+            'producto_id',l.producto_id,
+            'cantidad_contada',coalesce(adj.cantidad_corregida,l.cantidad_contada),
+            'cantidad_original',l.cantidad_contada,
+            'cantidad_corregida',adj.cantidad_corregida,
+            'stock_sistema',l.stock_sistema,
+            'diferencia',coalesce(adj.cantidad_corregida,l.cantidad_contada)-l.stock_sistema
           ) ORDER BY p.nombre,p.id)
           FROM public.turno_jornada_inventario_lineas l
           JOIN public.productos p ON p.id=l.producto_id
+          LEFT JOIN public.turno_jornada_inventario_correcciones adj
+            ON adj.turno_sesion_id=v_s.id
+           AND adj.tipo=c.tipo
+           AND adj.producto_id=l.producto_id
+           AND adj.vigente
           WHERE l.corte_id=c.id
         ),'[]'::jsonb)
       ))
@@ -249,7 +260,7 @@ BEGIN
   RETURN v_result;
 END;
 $function$
-;
+
 
 CREATE OR REPLACE FUNCTION public.bc7_guardar_inventario_jornada(p_turno_sesion_id uuid, p_tipo text, p_lineas jsonb, p_observacion text DEFAULT NULL::text)
  RETURNS jsonb
@@ -308,9 +319,11 @@ BEGIN
   END IF;
   SELECT EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_s.almacen_id AND a.tipo='minorista') INTO v_grouped;
   IF v_grouped THEN
-    SELECT count(*) INTO v_expected FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo));
+    SELECT count(*) INTO v_expected
+    FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo));
   ELSE
-    SELECT count(*) INTO v_expected FROM public.stock s JOIN public.productos p ON p.id=s.producto_id
+    SELECT count(*) INTO v_expected
+    FROM public.stock s JOIN public.productos p ON p.id=s.producto_id
     WHERE s.almacen_id=v_s.almacen_id AND p.activo=true;
   END IF;
   SELECT count(*),count(DISTINCT (x.value->>'producto_id')::uuid)
@@ -325,15 +338,21 @@ BEGIN
     WHERE jsonb_typeof(x.value)<>'object' OR p.id IS NULL
       OR coalesce(x.value->>'cantidad','') !~ '^([0-9]+([.][0-9]{1,3})?|[.][0-9]{1,3})$'
       OR (v_grouped AND (
-        p.producto_padre_id IS NOT NULL OR NOT EXISTS (
-          SELECT 1 FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo)) expected WHERE expected.producto_id=p.id
+        p.producto_padre_id IS NOT NULL
+        OR NOT EXISTS (
+          SELECT 1 FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo)) expected
+          WHERE expected.producto_id=p.id
         )
       ))
       OR (NOT v_grouped AND NOT EXISTS(SELECT 1 FROM public.stock s WHERE s.almacen_id=v_s.almacen_id AND s.producto_id=p.id))
   ) THEN RAISE EXCEPTION 'Producto/familia o cantidad inválida en el conteo.' USING ERRCODE='22023'; END IF;
   IF v_grouped AND EXISTS (
-    SELECT expected.producto_id FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo)) expected
-    WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p_lineas) x(value) WHERE (x.value->>'producto_id')::uuid=expected.producto_id)
+    SELECT expected.producto_id
+    FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo)) expected
+    WHERE NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_lineas) x(value)
+      WHERE (x.value->>'producto_id')::uuid=expected.producto_id
+    )
   ) THEN
     RAISE EXCEPTION 'El inventario debe incluir exactamente los productos/familias válidos para este corte.' USING ERRCODE='22023';
   END IF;
@@ -361,6 +380,9 @@ BEGIN
     'cantidad_lineas',v_count,'origen_corte_id',v_origen_corte_id,'inventario_agrupado_por_familia',v_grouped);
 END;
 $function$
-;
 
-COMMIT;
+
+REVOKE ALL ON FUNCTION public.bc7_obtener_inventario_jornada(uuid) FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION public.bc7_guardar_inventario_jornada(uuid,text,jsonb,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_obtener_inventario_jornada(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc7_guardar_inventario_jornada(uuid,text,jsonb,text) TO authenticated;
