@@ -86,10 +86,10 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
 });
 
 test("PWA caches the new Jornada and admin approval modules",()=>{
-  assert.match(APP,/const VERSION="9\.5\.125"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.125"/);
-  assert.match(APP,/\["bc7-jornada-ui\.js","7\.41"\]/);
-  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.41/);
+  assert.match(APP,/const VERSION="9\.5\.126"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.126"/);
+  assert.match(APP,/\["bc7-jornada-ui\.js","7\.42"\]/);
+  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.42/);
   assert.match(APP,/\["aprobaciones-admin\.js","20261116\.1"\]/);
   assert.match(SW,/aprobaciones-admin\.js\?v=20261116\.1/);
 });

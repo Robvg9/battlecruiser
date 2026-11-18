@@ -135,7 +135,7 @@
     if(!panel||$('bc7-period-open-card'))return;
     const card=document.createElement('section');
     card.id='bc7-period-open-card';card.className='bc7-card';
-    card.innerHTML='<h3>Registrar una jornada ya iniciada</h3><p class="bc7-muted">Para jornadas que comenzaron físicamente antes de quedar registradas en BattleCruiser. Importa el inventario inicial y vincula entradas ya existentes, sin modificar el stock general.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" id="bc7-period-open-button">Registrar jornada ya iniciada</button></div><p class="bc7-msg" id="bc7-period-open-status" role="status" aria-live="polite"></p>';
+    card.innerHTML='<h3>Importar cierre externo · uso excepcional</h3><p class="bc7-muted">Solo cuando no exista un inventario final confirmado de la jornada anterior. Si hay una entrega pendiente, recupera la jornada sucesora para heredar el inventario automáticamente, sin Excel ni recaptura.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" id="bc7-period-open-button">Importar inventario externo</button></div><p class="bc7-msg" id="bc7-period-open-status" role="status" aria-live="polite"></p>';
     const first=panel.querySelector('form')||panel.firstElementChild;
     if(first)panel.insertBefore(card,first);else panel.appendChild(card);
   }
@@ -244,8 +244,6 @@
   function currentWarehouse(){
     const select=$('bc7-warehouse');if(!select)return '';
     if(select.value)return select.value;
-    const option=Array.from(select.options||[]).find(o=>norm(o.textContent).includes('la cueva'));
-    if(option){select.value=option.value;return select.value;}
     return '';
   }
   async function loadPeople(){
@@ -266,21 +264,21 @@
     style();
     modal=document.createElement('div');modal.id='bc7-period-modal';modal.className='bc7-period-overlay';
     const warehouse=currentWarehouse();
-    const whName=$('bc7-warehouse')?.selectedOptions?.[0]?.textContent||'La Cueva';
+    const whName=$('bc7-warehouse')?.selectedOptions?.[0]?.textContent||'Almacén seleccionado';
     modal.innerHTML='<div class="bc7-period-modal" role="dialog" aria-modal="true" aria-labelledby="bc7-period-title">'+
       '<h3 id="bc7-period-title">Registrar jornada ya iniciada</h3>'+
       '<p class="bc7-period-muted"><b>Columna Fin del cuadre anterior:</b> se importará únicamente esta cantidad por producto/familia. Las transferencias se vincularán por su ID y no se volverán a ejecutar.</p>'+
       '<div class="bc7-period-grid">'+
       '<label class="bc7-period-field">Almacén<select id="bc7-period-warehouse"><option value="'+esc(warehouse)+'">'+esc(whName)+'</option></select></label>'+
       '<label class="bc7-period-field">Responsable<select id="bc7-period-person"><option value="">Selecciona una responsable</option>'+people.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.nombre||p.nombre_usuario||p.email||p.id)+'</option>').join('')+'</select></label>'+
-      '<label class="bc7-period-field">Inicio del período<input id="bc7-period-start" type="date" value="2026-11-09" required></label>'+
-      '<label class="bc7-period-field">Final del período<input id="bc7-period-end" type="date" value="2026-11-10" required></label>'+
+      '<label class="bc7-period-field">Inicio del período<input id="bc7-period-start" type="date" value="" required></label>'+
+      '<label class="bc7-period-field">Final del período<input id="bc7-period-end" type="date" value="" required></label>'+
       '<label class="bc7-period-field">Fecha y hora real de inicio y conteo inicial (hora de Cuba)<input id="bc7-period-started" type="datetime-local" value="" required><small class="bc7-period-muted">Debe coincidir con el momento de referencia del inventario inicial; se usa para decidir qué entradas ocurrieron después.</small></label>'+
       '<label class="bc7-period-field">Inventario anterior (.xlsx o .csv)<input id="bc7-period-file" type="file" accept=".xlsx,.csv" required></label>'+
       '</div>'+
-      '<div class="bc7-period-box"><b>Inventario inicial heredado</b><div id="bc7-period-inventory-preview" class="bc7-period-muted">Selecciona el Excel de Adriana para revisar sus cantidades.</div><div id="bc7-period-inventory-actions"></div></div>'+
-      '<div class="bc7-period-box"><b>Entradas existentes en el período</b><p class="bc7-period-muted">Las entradas de 09:07 y 15:16 son posteriores al inventario heredado. La de 07:15 ya forma parte del cierre de Adriana y no se vinculará de nuevo.</p><div id="bc7-period-transfer-list" class="bc7-period-muted">Primero selecciona fechas para consultar las entradas.</div></div>'+
-      '<label class="bc7-period-field">Observación administrativa<input id="bc7-period-note" maxlength="1000" value="Apertura retroactiva: inventario final de Adriana (7–8 nov. 2026) como inventario inicial de Sheyla (9–10 nov. 2026)."></label>'+
+      '<div class="bc7-period-box"><b>Inventario inicial heredado</b><div id="bc7-period-inventory-preview" class="bc7-period-muted">Selecciona el archivo de inventario anterior para revisar sus cantidades.</div><div id="bc7-period-inventory-actions"></div></div>'+
+      '<div class="bc7-period-box"><b>Entradas existentes en el período</b><p class="bc7-period-muted">Revisa las fechas y horas reales antes de seleccionar entradas. No marques operaciones que ya estén incluidas en el inventario importado.</p><div id="bc7-period-transfer-list" class="bc7-period-muted">Primero selecciona fechas para consultar las entradas.</div></div>'+
+      '<label class="bc7-period-field">Observación administrativa<input id="bc7-period-note" maxlength="1000" value=""></label>'+
       '<p id="bc7-period-result" class="bc7-period-muted" role="status" aria-live="polite"></p>'+
       '<div class="bc7-period-actions"><button type="button" data-bc7-period-cancel>Cancelar</button><button type="button" class="primary" id="bc7-period-preview">Revisar inventario y entradas</button><button type="button" class="primary" id="bc7-period-confirm" disabled>Confirmar apertura</button></div>'+
       '</div>';
@@ -417,11 +415,7 @@
     if(!rows.length){host.textContent='No hay transferencias completadas hacia este almacén en las fechas elegidas.';return;}
     host.innerHTML=rows.map(t=>{
       const time=String(t.hora_local||'').slice(0,5),date=String(t.fecha_local||'').slice(0,10);
-      if(date==='2026-11-09'&&time==='07:15'){
-        return '<div class="bc7-period-transfer"><span><b>Entrada 07:15 · registro de jornada anterior</b><br>Ya incluida en el inventario final de Adriana (7–8 nov.); no se vinculará.</span><small>No sumar</small></div>';
-      }
-      const suggested=date==='2026-11-09'&&(time==='09:07'||time==='15:16');
-      const checked=transferSelectionState.has(String(t.id))?transferSelectionState.get(String(t.id)):suggested;
+      const checked=transferSelectionState.has(String(t.id))?transferSelectionState.get(String(t.id)):false;
       return '<label class="bc7-period-transfer"><input type="checkbox" data-bc7-period-transfer value="'+esc(t.id)+'" '+(checked?'checked':'')+'><span><b>'+esc(date)+' · '+esc(time)+'</b><br>'+esc(t.origen||'Almacén de origen')+' · '+esc(t.lineas||0)+' líneas</span><small>'+esc(t.unidades||0)+' unidades</small></label>';
     }).join('');
   }
@@ -444,7 +438,7 @@
     const label=peopleName(person);
     const sourceTotal=parsed.reduce((sum,row)=>sum+Number(row.cantidad||0),0);
     const draftCount=new Set(draftRows().map(row=>norm(row.nombre))).size;
-    if(!confirm('Vas a abrir la jornada '+start+' a '+end+' con responsable '+label+'.\nSe importarán '+parsed.length+' filas de la columna Fin ('+sourceTotal+' unidades), agrupadas en '+lines.length+' productos/familias. Se vincularán '+ids.length+' transferencias existentes. '+(draftCount?'Has marcado '+draftCount+' fichas nuevas como completadas y revisadas. ':'')+'La entrada de 07:15 no se repetirá y el stock general no se modificará. ¿Confirmas?'))return;
+    if(!confirm('Vas a abrir la jornada '+start+' a '+end+' con responsable '+label+'.\nSe importarán '+parsed.length+' filas de la columna Fin ('+sourceTotal+' unidades), agrupadas en '+lines.length+' productos/familias. Se vincularán '+ids.length+' transferencias existentes. '+(draftCount?'Has marcado '+draftCount+' fichas nuevas como completadas y revisadas. ':'')+'Las transferencias seleccionadas se vincularán por su ID y no se ejecutarán de nuevo. El stock general no se modificará. ¿Confirmas?'))return;
     btn.disabled=true;result.textContent='Registrando apertura…';
     try{
       const data=await callRpc('bc7_admin_abrir_jornada_existente',{
@@ -468,14 +462,11 @@
   }
   async function open(){
     if(!navigator.onLine){notify('Conecta el dispositivo para registrar una apertura.','error');return;}
-    if(!currentWarehouse()){notify('Selecciona La Cueva en el almacén del panel administrativo antes de abrir el formulario.','error');return;}
+    if(!currentWarehouse()){notify('Selecciona el almacén en el panel administrativo antes de abrir el formulario.','error');return;}
     try{
       const people=await loadPeople();
       if(!people.length)throw new Error('No se pudo cargar la lista de dependientas activas.');
       showModal(people);
-      const person=$('bc7-period-person');
-      const sheyla=people.find(p=>norm(p.nombre||p.nombre_usuario||'').includes('sheyla'));
-      if(sheyla)person.value=sheyla.id;
     }catch(e){notify(e.message||'No se pudo abrir el formulario.','error');}
   }
   document.addEventListener('click',e=>{

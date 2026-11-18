@@ -26,6 +26,12 @@
       .bcjr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:14px 0}
       .bcjr-card{border:1px solid var(--gold-dim,#9a7c3e);border-radius:12px;padding:12px;background:var(--stone-2,#1a3830)}
       .bcjr-card small{display:block;color:var(--mist,#c9c0a8);font-size:.78rem}.bcjr-card b{display:block;font-size:1.12rem;margin-top:5px;overflow-wrap:anywhere}
+      .bcjr-profit-highlight{display:grid;gap:7px;margin:12px 0;padding:14px;border:1px solid var(--gold-dim,#9a7c3e);border-radius:12px;background:var(--stone-2,#1a3830)}
+      .bcjr-profit-gross small,.bcjr-profit-clean small{display:block;color:var(--mist,#c9c0a8);font-size:.82rem}
+      .bcjr-profit-gross strong{display:block;margin-top:4px;font-size:1.65rem;font-weight:850;line-height:1.2;overflow-wrap:anywhere}
+      .bcjr-profit-clean{padding-top:7px;border-top:1px solid var(--gold-dim,#9a7c3e);color:#9fd2aa}
+      .bcjr-profit-clean b{display:block;margin-top:3px;font-size:.94rem;font-weight:750;color:#9fd2aa}
+      body.bc-theme-light .bcjr-profit-clean,body.bc-theme-light .bcjr-profit-clean b{color:#23683d}
       .bcjr-session{border:1px solid var(--gold-dim,#9a7c3e);border-radius:14px;margin:16px 0;padding:16px}
       .bcjr-session h3{margin:0 0 8px}.bcjr-muted{color:var(--mist,#c9c0a8);font-size:.88rem}
       .bcjr-pill{display:inline-block;border-radius:999px;padding:4px 9px;background:rgba(201,192,168,.16);color:var(--text,#f5efe3);font-size:.78rem;font-weight:700}
@@ -165,7 +171,7 @@
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
       ['Efectivo esperado (sin salario)',pendingPost?blocked:((l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP')],
-      ['Sobrante / faltante de caja',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
+      ['Sobrante / faltante (− sobrante · + faltante)',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
       ['Costo documentado',pendingPost?blocked:(qty(l.costos_con_cobertura)+' / '+qty(l.familias_total_costo)+' familias')]
     ];
     const entries=x=>Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0);
@@ -218,7 +224,10 @@
     const warningsPanel=warnings.length?'<details class="bcjr-detail"><summary>Validaciones pendientes <small>'+warnings.length+'</small></summary><div class="bcjr-detail-body"><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div></details>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>';
     const correctionPanel=correctionForm?'<details class="bcjr-detail"><summary>Correcciones de conteo <small>'+negative.length+' producto(s)</small></summary><div class="bcjr-detail-body">'+correctionForm+'</div></details>':'';
     const movementPanel=movements?'<details class="bcjr-detail"><summary>Bajas y mermas para clasificar <small>'+post.length+'</small></summary><div class="bcjr-detail-body">'+movements+'</div></details>':'';
-    const financePanel='<details class="bcjr-detail"><summary>Liquidación y desglose financiero</summary><div class="bcjr-detail-body"><div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div><p class="bcjr-muted">El salario se acumula en CuevaCoin y se paga después; no se descuenta del efectivo de esta jornada.</p></div></details>';
+    const grossProfitLabel=pendingPost?'Pendiente de clasificación':(l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL'));
+    const cleanProfitLabel=pendingPost?'Pendiente de clasificación':(l.ganancia_limpia==null?'Fórmula pendiente de definir':money(l.ganancia_limpia)+' CUP');
+    const profitHighlight='<section class="bcjr-profit-highlight" aria-label="Ganancias de la jornada"><div class="bcjr-profit-gross"><small>Ganancia bruta estimada</small><strong>'+esc(grossProfitLabel)+'</strong></div><div class="bcjr-profit-clean"><small>Ganancia limpia</small><b>'+esc(cleanProfitLabel)+'</b></div></section>';
+    const financePanel='<details class="bcjr-detail"><summary>Liquidación y desglose financiero</summary><div class="bcjr-detail-body">'+profitHighlight+'<div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div><p class="bcjr-muted">Efectivo esperado (sin salario) = ventas − gastos aprobados − reinversiones aprobadas. El salario se acumula en CuevaCoin y se paga por separado. Convención de caja unificada con la hoja de cuadre: negativo = sobrante; positivo = faltante.</p></div></details>';
     return '<section class="bcjr-session"><h3>'+esc(periodTitle)+(rectifications.length?' · RECTIFICACIÓN AUDITADA':'')+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · efectivo final '+esc(money(s.efectivo?.contado))+' CUP · '+esc(s.efectivo?.estado||'sin aprobación')+'</p>'+dailyCash+rectificationPanel+financePanel+salaryPanel+warningsPanel+correctionPanel+movementPanel+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+('Productos en los cortes · '+(lines.length?esc(lines.length):'Pendiente de cortes de inventario confirmados'))+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?tableSwitch+table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details></section>';
   }
   function render(data){
@@ -241,7 +250,7 @@
       card('Estado',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
       card('Ventas estimadas',sessions.length&&sessions.every(s=>s.liquidacion?.ventas_estimadas!=null)?money(totalSales)+' CUP':'Pendiente'),
       card('Efectivo total recogido',cashLabel),
-      card('Sobrante / faltante de caja',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?money(totalDifference)+' CUP':'Pendiente')
+      card('Sobrante / faltante (− sobrante · + faltante)',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?money(totalDifference)+' CUP':'Pendiente')
     ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{
@@ -372,7 +381,7 @@
     }).join('');
     const mapped=pending.filter(x=>verifiedHistoricCosts[normalizeProductName(x.nombre)]!=null).length;
     const box=document.createElement('div');box.className='bcjr-values-modal';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Costos históricos · carga en lote</h3><p class="bcjr-muted">Una sola lista para toda la jornada. '+mapped+' de '+pending.length+' costos vienen precargados desde el Excel verificado. Revisa los importes; puedes corregirlos aquí. Los vacíos no se guardarán. Esto solo modifica esta jornada, nunca el catálogo.</p><div class="bcjr-table-wrap" style="max-height:58dvh"><table class="bcjr-table" style="min-width:0"><thead><tr><th>Producto / vendidas</th><th>Costo CUP</th><th>Fuente</th></tr></thead><tbody>'+rows+'</tbody></table></div><label>Fuente común<textarea rows="2" maxlength="500" data-bcjr-bulk-reason>Verificado en Noviembre-09-10-Sheyla.xlsx, columna P.C.; costo histórico exclusivo de esta jornada.</textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-bulk-costs-save data-session="'+esc(button.dataset.session)+'">Guardar costos completados</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Costos históricos · carga en lote</h3><p class="bcjr-muted">Una sola lista para toda la jornada. '+mapped+' de '+pending.length+' costos vienen precargados desde el Excel verificado. Revisa los importes; puedes corregirlos aquí. Los vacíos no se guardarán. Esto solo modifica esta jornada, nunca el catálogo.</p><div class="bcjr-table-wrap" style="max-height:58dvh"><table class="bcjr-table" style="min-width:0"><thead><tr><th>Producto / vendidas</th><th>Costo CUP</th><th>Fuente</th></tr></thead><tbody>'+rows+'</tbody></table></div><label>Fuente común<textarea rows="2" maxlength="500" data-bcjr-bulk-reason>Evidencia documental de precios y costos históricos correspondiente a esta jornada.</textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-bulk-costs-save data-session="'+esc(button.dataset.session)+'">Guardar costos completados</button></div></section>';
     document.body.appendChild(box);
   }
   async function saveBulkCostsEditor(button){
