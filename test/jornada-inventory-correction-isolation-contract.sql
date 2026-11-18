@@ -45,6 +45,7 @@ BEGIN
      OR position('historical_price.precio_venta_unitario' IN v_liquidation)=0
      OR position('correction.turno_sesion_id=v_s.id' IN v_liquidation)=0
      OR position('PRECIO_HISTORICO_JORNADA' IN v_liquidation)=0
+     OR position('precio histórico de la jornada' IN v_liquidation)=0
      OR position('m.turno_sesion_id=v_s.id' IN v_liquidation)=0
      OR position('b.turno_sesion_id=v_s.id' IN v_liquidation)=0
      OR position('mr.turno_sesion_id=v_s.id' IN v_liquidation)=0 THEN
