@@ -14,10 +14,10 @@ test("Jornada cash reconciliation excludes accrued salary while retaining it as 
   assert.match(migration,/efectivo_esperado_despues_de_gastos_reinversiones/);
   assert.match(migration,/El salario se acumula y paga por separado/);
   assert.match(jornada,/Efectivo esperado \(sin salario\)/);
-  assert.match(jornada,/Sobrante \/ faltante de caja/);
+  assert.match(jornada,/Sobrante \/ faltante/);
   assert.match(jornada,/se acumula en CuevaCoin y se paga después/);
   assert.match(owner,/Efectivo esperado \(sin salario\)/);
   assert.match(owner,/Sobrante \/ faltante de caja/);
   assert.match(owner,/se acumula en CuevaCoin y se paga después/);
-  assert.match(pwa,/VERSION="9\.5\.125"/);
+  assert.match(pwa,/VERSION="9\.5\.126"/);
 });

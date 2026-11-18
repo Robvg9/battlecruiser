@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.41 — catálogo histórico de inventario final, correcciones auditadas y recuento de entregas obsoletas.
+// v7.42 — inventario unificado, archivo reversible y atribución de entradas tardías.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;

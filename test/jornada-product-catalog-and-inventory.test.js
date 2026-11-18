@@ -65,7 +65,7 @@ test("historical importer is generic and visibly exceptional",()=>{
 });
 test("gross profit is foregrounded without an invented clean-profit formula",()=>{
  assert.ok(OWNER.includes("Ganancia bruta estimada"));assert.ok(OWNER.includes("Ganancia limpia"));assert.ok(OWNER.includes("Fórmula pendiente de definir"));
- assert.ok(OWNER.includes("Efectivo esperado (sin salario)"));assert.ok(OWNER.includes("positivo = sobrante; negativo = faltante"));
+ assert.ok(OWNER.includes("Efectivo esperado (sin salario)"));assert.ok(OWNER.includes("negativo = sobrante; positivo = faltante"));
 });
 test("cash difference sign matches the spreadsheet convention in settlement and owner review",()=>{
   assert.ok(CASH_SIGN_MIGRATION.includes("round(v_expected_cash-v_cash_received,2)"));

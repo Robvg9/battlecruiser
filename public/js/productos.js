@@ -311,7 +311,13 @@ function renderProductosLista() {
   if (!filtradas.length) {
     const empty = document.createElement("p");
     empty.className = "lista-estado";
-    empty.textContent = "No hay productos activos que coincidan con la búsqueda.";
+    empty.textContent = "No encontramos productos activos que coincidan con la búsqueda.";
+    const verTodos = document.createElement("button");
+    verTodos.type = "button";
+    verTodos.className = "mov-ver-todas-btn";
+    verTodos.dataset.tipo = "productos";
+    verTodos.textContent = "Ver todos";
+    empty.appendChild(verTodos);
     lista.appendChild(empty);
   }
   filtradas.forEach((p) => {
