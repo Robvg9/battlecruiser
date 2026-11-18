@@ -143,7 +143,15 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
   assert.match(verifier, /EXACT_SHA=PASS/);
   assert.ok(verifier.includes("release.asset_inventory"));
   assert.ok(verifier.includes("critical asset SHA-256=PASS"));
+  assert.ok(verifier.includes('"app.js": liveApp'));
+  assert.ok(verifier.includes('"service-worker.js": liveSw'));
   assert.ok(verifier.includes('"style.css": liveStyle'));
+  assert.doesNotMatch(verifier, /"index\.html": liveIndex/,
+    "post-deploy Quality must not compare an edge-normalized HTML response as raw source bytes");
+  assert.ok(verifier.includes('class="app-shell" id="app-shell"'));
+  assert.ok(verifier.includes('data-tab="jornada"'));
+  assert.ok(verifier.includes('data-tab="movimientos"'));
+  assert.ok(verifier.includes("Roles y Permisos"));
   assert.doesNotMatch(verifier, /request\(baseUrl \+ "\/" \+ releaseFilename/);
 });
 
@@ -217,4 +225,14 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
 test("hosted Windows regression does not race exact-SHA release verification against deploy", () => {
   assert.match(selfHosted, /Exact LIVE SHA verification is serialized in quality\.yml's workflow_run/);
   assert.doesNotMatch(selfHosted, /node test\/verify-production-version\.js/);
+});
+
+test("post-deploy Quality treats LIVE index.html as a shell contract while Deploy smoke retains byte-exact proof", () => {
+  assert.ok(verifier.includes('const expectedIndex = release.asset_inventory["index.html"]'));
+  assert.ok(verifier.includes("indexMatchesDeployArtifact"));
+  assert.ok(verifier.includes("requiredShellMarkers"));
+  assert.ok(verifier.includes("LIVE index.html app shell is incomplete"));
+  assert.ok(verifier.includes("LIVE index.html edge body differs from deploy-verified bytes"));
+  assert.ok(deployScript.includes('"index.html": index.body'));
+  assert.ok(deployScript.includes("criticalMismatch"));
 });
