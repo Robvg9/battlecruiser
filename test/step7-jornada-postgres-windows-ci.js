@@ -368,6 +368,9 @@ function applySql(file) {
     log("Keep all active products created during the scheduled period in the final physical inventory set.");
     applySql("supabase/migrations/20261118190000_jornada_final_inventory_includes_period_products.sql");
     applySql("test/jornada-final-inventory-period-products-contract.sql");
+    log("Verify inclusive final-day acceptance for daily cash handovers in a multi-day Jornada.");
+    applySql("supabase/migrations/20261118195000_jornada_daily_handover_inclusive_end_date.sql");
+    applySql("test/jornada-daily-handover-inclusive-period-contract.sql");
     applySql("test/jornada-product-catalog-and-inventory-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
