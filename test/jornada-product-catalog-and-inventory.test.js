@@ -45,9 +45,11 @@ test("gross profit is foregrounded without an invented clean-profit formula",()=
  assert.ok(OWNER.includes("Ganancia bruta estimada"));assert.ok(OWNER.includes("Ganancia limpia"));assert.ok(OWNER.includes("Fórmula pendiente de definir"));
  assert.ok(OWNER.includes("Efectivo esperado (sin salario)"));assert.ok(OWNER.includes("positivo = sobrante; negativo = faltante"));
 });
-test("cash difference sign matches the spreadsheet convention",()=>{
+test("cash difference sign matches the spreadsheet convention in settlement and owner review",()=>{
   assert.ok(CASH_SIGN_MIGRATION.includes("round(v_expected_cash-v_cash_received,2)"));
   assert.equal(CASH_SIGN_MIGRATION.includes("round(v_cash_received-v_expected_cash,2)"),false);
+  assert.ok(CASH_SIGN_MIGRATION.includes("bc7_obtener_revision_jornada_rectificada"));
+  assert.ok(CASH_SIGN_MIGRATION.includes("round(v_expected-(v_liq->>'dinero_recogido_total')::numeric,2)"));
   assert.ok(OWNER.includes("negativo = sobrante; positivo = faltante"));
   assert.ok(JORNADA.includes("− sobrante · + faltante"));
 });

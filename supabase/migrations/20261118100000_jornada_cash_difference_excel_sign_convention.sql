@@ -410,5 +410,152 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.bc7_obtener_revision_jornada_rectificada(p_turno_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_report jsonb;
+  v_session jsonb;
+  v_liq jsonb;
+  v_lines jsonb;
+  v_rectifications jsonb;
+  v_sessions jsonb := '[]'::jsonb;
+  v_session_id uuid;
+  v_missing integer;
+  v_negative integer;
+  v_revenue numeric;
+  v_profit numeric;
+  v_sales numeric;
+  v_salary numeric;
+  v_expected numeric;
+  v_difference numeric;
+  v_line_count integer;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo el Dueño/Admin puede consultar la revisión rectificada posterior al cierre.'
+      USING ERRCODE = '42501';
+  END IF;
+
+  v_report := public.bc7_obtener_revision_jornada(p_turno_id);
+  FOR v_session IN
+    SELECT value FROM jsonb_array_elements(coalesce(v_report->'sesiones','[]'::jsonb)) x(value)
+  LOOP
+    v_session_id := (v_session->>'id')::uuid;
+    v_liq := coalesce(v_session->'liquidacion','{}'::jsonb);
+
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+      'id',r.id,'producto_id',r.producto_id,'producto',p.nombre,
+      'version',r.version,'cantidad_vendida',r.cantidad_vendida,
+      'tramos',r.tramos_precio,'precio_promedio',r.precio_promedio,
+      'importe_total',r.importe_total,'estado_anterior',r.estado_anterior,
+      'estado_corregido',r.estado_corregido,'comentario',r.comentario,
+      'fuente_documental',r.fuente_documental,'fuente_content_hash',r.fuente_content_hash,
+      'creado_en',r.creado_en,'creado_por',r.creado_por,
+      'creado_nombre',coalesce(u.nombre,'ADMIN')
+    ) ORDER BY p.nombre,r.version),'[]'::jsonb)
+    INTO v_rectifications
+    FROM public.turno_jornada_rectificaciones_post_cierre r
+    JOIN public.productos p ON p.id = r.producto_id
+    LEFT JOIN public.usuarios u ON u.id = r.creado_por
+    WHERE r.turno_sesion_id = v_session_id;
+
+    SELECT coalesce(jsonb_agg(
+      CASE WHEN r.id IS NULL THEN x.value
+      ELSE x.value || jsonb_build_object(
+        'precio_unitario',r.precio_promedio,
+        'precio_corregido_jornada',r.precio_promedio,
+        'precio_tramos',r.tramos_precio,
+        'estado_precio','RECTIFICACION_POST_CIERRE',
+        'importe_estimado',r.importe_total,
+        'ganancia_bruta_estimada',CASE
+          WHEN x.value->>'costo_vendido_estimado' IS NOT NULL
+          THEN round(r.importe_total - (x.value->>'costo_vendido_estimado')::numeric,2)
+          ELSE NULL END,
+        'margen_bruto_estimado',CASE
+          WHEN x.value->>'costo_vendido_estimado' IS NOT NULL AND r.importe_total <> 0
+          THEN round(100*(r.importe_total-(x.value->>'costo_vendido_estimado')::numeric)/r.importe_total,2)
+          ELSE NULL END,
+        'rectificacion_post_cierre_id',r.id,
+        'rectificacion_post_cierre_version',r.version
+      ) END
+      ORDER BY x.value->>'nombre'
+    ),'[]'::jsonb)
+    INTO v_lines
+    FROM jsonb_array_elements(coalesce(v_liq->'lineas','[]'::jsonb)) x(value)
+    LEFT JOIN LATERAL (
+      SELECT r.id,r.tramos_precio,r.precio_promedio,r.importe_total,r.version
+      FROM public.turno_jornada_rectificaciones_post_cierre r
+      WHERE r.turno_sesion_id = v_session_id
+        AND r.producto_id = (x.value->>'producto_id')::uuid
+      ORDER BY r.version DESC,r.creado_en DESC
+      LIMIT 1
+    ) r ON true;
+
+    SELECT
+      count(*) FILTER (WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)>0
+        AND x.value->>'importe_estimado' IS NULL),
+      count(*) FILTER (WHERE coalesce((x.value->>'unidades_vendidas')::numeric,0)<0),
+      round(coalesce(sum((x.value->>'importe_estimado')::numeric),0),2),
+      round(coalesce(sum((x.value->>'ganancia_bruta_estimada')::numeric)
+        FILTER (WHERE x.value->>'ganancia_bruta_estimada' IS NOT NULL),0),2),
+      count(*)
+    INTO v_missing,v_negative,v_revenue,v_profit,v_line_count
+    FROM jsonb_array_elements(coalesce(v_lines,'[]'::jsonb)) x(value);
+
+    IF coalesce((v_liq->>'faltan_cortes')::boolean,true)=false
+       AND coalesce(v_missing,0)=0
+       AND coalesce(v_negative,0)=0
+       AND coalesce((v_liq->>'movimientos_posteriores_pendientes')::integer,0)=0
+       AND v_line_count>0 THEN
+      v_sales := v_revenue;
+    ELSE
+      v_sales := NULL;
+    END IF;
+
+    v_salary := CASE
+      WHEN v_sales IS NOT NULL AND v_liq->>'salario_porcentaje' IS NOT NULL
+      THEN round(v_sales*(v_liq->>'salario_porcentaje')::numeric/100,2)
+      ELSE NULL END;
+    v_expected := CASE
+      WHEN v_sales IS NOT NULL
+      THEN round(v_sales-coalesce((v_liq->>'gastos_aprobados')::numeric,0)
+        -coalesce((v_liq->>'reinversiones_aprobadas')::numeric,0),2)
+      ELSE NULL END;
+    v_difference := CASE
+      WHEN v_expected IS NOT NULL AND v_liq->>'dinero_recogido_total' IS NOT NULL
+      THEN round(v_expected-(v_liq->>'dinero_recogido_total')::numeric,2)
+      ELSE NULL END;
+
+    v_liq := v_liq || jsonb_build_object(
+      'lineas',coalesce(v_lines,'[]'::jsonb),
+      'rectificaciones_post_cierre',coalesce(v_rectifications,'[]'::jsonb),
+      'rectificacion_post_cierre_aplicada',jsonb_array_length(coalesce(v_rectifications,'[]'::jsonb))>0,
+      'ventas_estimadas',v_sales,
+      'salario_calculado',v_salary,
+      'efectivo_esperado_despues_de_gastos_reinversiones',v_expected,
+      'efectivo_esperado_despues_de_gastos_reinversiones_salario',v_expected,
+      'formula_efectivo','Ventas rectificadas - gastos aprobados - reinversiones aprobadas. El salario se acumula y paga por separado.',
+      'diferencia',v_difference,
+      'familias_sin_precio',coalesce(v_missing,0),
+      'productos_vendidos_con_precio_faltante',coalesce(v_missing,0),
+      'ganancia_bruta_parcial',v_profit,
+      'rectificacion_post_cierre_fuente','Noviembre-09-10-Sheyla.xlsx'
+    );
+
+    v_sessions := v_sessions || jsonb_build_array(
+      v_session || jsonb_build_object('liquidacion',v_liq)
+    );
+  END LOOP;
+
+  RETURN v_report || jsonb_build_object('sesiones',v_sessions);
+END;
+$function$
+;
+REVOKE ALL ON FUNCTION public.bc7_obtener_revision_jornada_rectificada(uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.bc7_obtener_revision_jornada_rectificada(uuid) TO authenticated;
+
 REVOKE ALL ON FUNCTION public.bc7_liquidacion_inventario_jornada(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.bc7_liquidacion_inventario_jornada(uuid) TO authenticated;

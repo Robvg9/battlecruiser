@@ -12,6 +12,11 @@ BEGIN
   IF position('round(v_expected_cash-v_cash_received,2)' IN v_definition)=0 OR position('round(v_cash_received-v_expected_cash,2)' IN v_definition)>0 THEN
     RAISE EXCEPTION 'Jornada cash difference must be negative for surplus and positive for shortage';
   END IF;
+  SELECT pg_get_functiondef('public.bc7_obtener_revision_jornada_rectificada(uuid)'::regprocedure) INTO v_definition;
+  IF position($needle$round(v_expected-(v_liq->>'dinero_recogido_total')::numeric,2)$needle$ IN v_definition)=0
+     OR position($needle$round((v_liq->>'dinero_recogido_total')::numeric-v_expected,2)$needle$ IN v_definition)>0 THEN
+    RAISE EXCEPTION 'Owner review cash difference must match the settlement sign convention';
+  END IF;
   IF to_regclass('public.productos_archivo_historial') IS NULL THEN RAISE EXCEPTION 'Product archive audit table is missing'; END IF;
   SELECT c.relrowsecurity INTO v_has_rls FROM pg_class c WHERE c.oid='public.productos_archivo_historial'::regclass;
   IF v_has_rls IS DISTINCT FROM true THEN RAISE EXCEPTION 'Product archive audit table must keep RLS enabled'; END IF;
