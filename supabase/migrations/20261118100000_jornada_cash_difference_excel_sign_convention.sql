@@ -408,7 +408,7 @@ BEGIN
     )
   );
 END;
-$function$
+$function$;
 
 REVOKE ALL ON FUNCTION public.bc7_liquidacion_inventario_jornada(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.bc7_liquidacion_inventario_jornada(uuid) TO authenticated;

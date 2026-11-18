@@ -259,8 +259,7 @@ BEGIN
   ) INTO v_result;
   RETURN v_result;
 END;
-$function$
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.bc7_guardar_inventario_jornada(p_turno_sesion_id uuid, p_tipo text, p_lineas jsonb, p_observacion text DEFAULT NULL::text)
  RETURNS jsonb
@@ -379,8 +378,7 @@ BEGIN
   RETURN jsonb_build_object('id',v_corte_id,'tipo',upper(p_tipo),'estado','CONFIRMADO',
     'cantidad_lineas',v_count,'origen_corte_id',v_origen_corte_id,'inventario_agrupado_por_familia',v_grouped);
 END;
-$function$
-
+$function$;
 
 REVOKE ALL ON FUNCTION public.bc7_obtener_inventario_jornada(uuid) FROM PUBLIC,anon;
 REVOKE ALL ON FUNCTION public.bc7_guardar_inventario_jornada(uuid,text,jsonb,text) FROM PUBLIC,anon;
