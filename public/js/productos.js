@@ -441,7 +441,7 @@ safeInit("lista-productos", () => {
       await window.bcAbrirConfiguracionSabores(btnConfigurarSabores.dataset.id);
       return;
     }
-    const btnEditar = e.target.closest(".btn-editar-producto");
+    const btnEditar = e.target.closest(".btn-editar-producto:not(.btn-archivar-producto):not(.btn-restaurar-producto)");
     if (btnEditar) {
       const producto = (_cache.productos || []).find((p) => p.id === btnEditar.dataset.id);
       if (producto) iniciarEdicionProducto(producto);

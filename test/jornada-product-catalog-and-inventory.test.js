@@ -53,7 +53,8 @@ test("product archive is reversible, audited and guarded by stock/open-cut check
 });
 test("archived products leave operational selectors and can be restored from their own list",()=>{
  assert.ok(PRODUCTS.includes("p.archivado_at"));assert.ok(PRODUCTS.includes("Productos archivados"));assert.ok(PRODUCTS.includes("btn-archivar-producto"));assert.ok(PRODUCTS.includes("btn-restaurar-producto"));
- assert.ok(PRODUCTS.includes("bc_producto_archivar"));assert.ok(PRODUCTS.includes("bc_producto_restaurar"));assert.ok(PRODUCTS.includes("No se borrarán ventas, compras ni movimientos"));
+ assert.ok(PRODUCTS.includes("bc_producto_archivar"));
+ assert.ok(PRODUCTS.includes("btn-editar-producto:not(.btn-archivar-producto):not(.btn-restaurar-producto)"));assert.ok(PRODUCTS.includes("bc_producto_restaurar"));assert.ok(PRODUCTS.includes("No se borrarán ventas, compras ni movimientos"));
 });
 test("Jornada Movimientos displays pending late inbound transfers and supports one-time attribution",()=>{
  assert.ok(JORNADA.includes("bc7_transferencias_pendientes_vinculo_jornada"));assert.ok(JORNADA.includes("renderPendingInboundTransfers"));assert.ok(JORNADA.includes("data-bc7-movement-link-transfer"));
