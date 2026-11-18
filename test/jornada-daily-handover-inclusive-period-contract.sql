@@ -9,7 +9,7 @@ DECLARE
   v_warehouse uuid := '10000000-0000-0000-0000-000000000009';
   v_turno uuid := '94000000-0000-0000-0000-000000000001';
   v_programacion uuid := '95000000-0000-0000-0000-000000000001';
-  v_sesion uuid := '96000000-0000-0000-0000-000000000001';
+  v_sesion uuid := 'a3000000-0000-0000-0000-000000000001';
   v_tramo uuid;
   v_first uuid;
   v_last uuid;
