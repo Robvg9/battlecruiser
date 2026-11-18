@@ -282,6 +282,451 @@ BEGIN
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
 
+  v_old := $old
+
+-- Apply the same session ownership rule to the live operational balance projection.
+DO $patch_saldos$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_jornada_saldos_operativos(uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$  WITH initial_rows AS (
+    SELECT
+      l.producto_id,
+      SUM(l.cantidad_contada)::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+  ),
+  movement_rows AS ($old$;
+  v_new := $new$  WITH initial_rows AS (
+    SELECT
+      l.producto_id,
+      SUM(coalesce(c.cantidad_corregida,l.cantidad_contada))::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=p_turno_sesion_id
+     AND c.tipo='INICIAL'
+     AND c.producto_id=l.producto_id
+     AND c.vigente
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+  ),
+  movement_rows AS ($new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única el inventario inicial del saldo operativo.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$    WHERE m.almacen_id = v_session.almacen_id
+      AND m.estado = 'APROBADA'
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) > v_start_at$old$;
+  v_new := $new$    WHERE m.almacen_id = v_session.almacen_id
+      AND m.turno_sesion_id = p_turno_sesion_id
+      AND m.estado = 'APROBADA'
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) > v_start_at$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo limitar de forma única las mermas del saldo operativo a su jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$    WHERE b.almacen_id = v_session.almacen_id
+      AND b.estado = 'APROBADA'
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) > v_start_at$old$;
+  v_new := $new$    WHERE b.almacen_id = v_session.almacen_id
+      AND b.turno_sesion_id = p_turno_sesion_id
+      AND b.estado = 'APROBADA'
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) > v_start_at$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo limitar de forma única las bajas del saldo operativo a su jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  EXECUTE v_definition;
+END;
+$patch_saldos$;
+
+-- Return corrected quantities to the inventory workspace while preserving raw counts.
+DO $patch_inventario_read$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_obtener_inventario_jornada(uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$            'producto_id',l.producto_id,'cantidad_contada',l.cantidad_contada,
+            'stock_sistema',l.stock_sistema,'diferencia',l.cantidad_contada-l.stock_sistema
+          ) ORDER BY p.nombre,p.id)
+          FROM public.turno_jornada_inventario_lineas l
+          JOIN public.productos p ON p.id=l.producto_id
+          WHERE l.corte_id=c.id$old$;
+  v_new := $new$            'producto_id',l.producto_id,
+            'cantidad_contada',coalesce(adj.cantidad_corregida,l.cantidad_contada),
+            'cantidad_original',l.cantidad_contada,
+            'cantidad_corregida',adj.cantidad_corregida,
+            'stock_sistema',l.stock_sistema,
+            'diferencia',coalesce(adj.cantidad_corregida,l.cantidad_contada)-l.stock_sistema
+          ) ORDER BY p.nombre,p.id)
+          FROM public.turno_jornada_inventario_lineas l
+          JOIN public.productos p ON p.id=l.producto_id
+          LEFT JOIN public.turno_jornada_inventario_correcciones adj
+            ON adj.turno_sesion_id=v_s.id
+           AND adj.tipo=c.tipo
+           AND adj.producto_id=l.producto_id
+           AND adj.vigente
+          WHERE l.corte_id=c.id$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo actualizar de forma única la lectura de cortes corregidos.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+  EXECUTE v_definition;
+END;
+$patch_inventario_read$;
+
+-- Never auto-accept a physical receipt against a stale handover snapshot.
+-- If the source FINAL acquired a correction after this delivery was prepared,
+-- refresh the declaration, mark the handover REQUIERE_RECUENTO and return before
+-- inserting a reception attempt. The UI then reloads the fresh quantities.
+DO $patch_receipt_freshness$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_recibir_entrega_jornada(uuid,jsonb,text,uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$ v_attempt integer; v_hash text; v_has_diff boolean; v_initial uuid; v_grouped boolean:=false;$old$;
+  v_new := $new$ v_attempt integer; v_hash text; v_has_diff boolean; v_initial uuid; v_grouped boolean:=false;
+ v_stale boolean:=false; v_synced integer:=0;$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única la declaración de variables de recepción.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$ SELECT EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_s.almacen_id AND a.tipo='minorista') INTO v_grouped;$old$;
+  v_new := $new$ -- The source cut is immutable, but its effective approved correction is authoritative.
+ SELECT EXISTS(
+  SELECT 1
+  FROM public.turno_jornada_inventario_entrega_lineas dl
+  JOIN public.turno_jornada_inventario_cortes source_cut
+    ON source_cut.id=v_e.origen_corte_id
+   AND source_cut.tipo='FINAL'
+   AND source_cut.estado='CONFIRMADO'
+  JOIN public.turno_jornada_inventario_lineas source_line
+    ON source_line.corte_id=source_cut.id
+   AND source_line.producto_id=dl.producto_id
+  LEFT JOIN public.turno_jornada_inventario_correcciones correction
+    ON correction.turno_sesion_id=source_cut.turno_sesion_id
+   AND correction.tipo='FINAL'
+   AND correction.producto_id=source_line.producto_id
+   AND correction.vigente
+  WHERE dl.entrega_id=v_e.id
+    AND dl.cantidad_declarada IS DISTINCT FROM coalesce(correction.cantidad_corregida,source_line.cantidad_contada)
+ ) INTO v_stale;
+
+ IF v_stale THEN
+  WITH source_rows AS (
+    SELECT
+      dl.id AS delivery_line_id,
+      coalesce(correction.cantidad_corregida,source_line.cantidad_contada) AS effective_source_qty
+    FROM public.turno_jornada_inventario_entrega_lineas dl
+    JOIN public.turno_jornada_inventario_cortes source_cut
+      ON source_cut.id=v_e.origen_corte_id
+     AND source_cut.tipo='FINAL'
+     AND source_cut.estado='CONFIRMADO'
+    JOIN public.turno_jornada_inventario_lineas source_line
+      ON source_line.corte_id=source_cut.id
+     AND source_line.producto_id=dl.producto_id
+    LEFT JOIN public.turno_jornada_inventario_correcciones correction
+      ON correction.turno_sesion_id=source_cut.turno_sesion_id
+     AND correction.tipo='FINAL'
+     AND correction.producto_id=source_line.producto_id
+     AND correction.vigente
+    WHERE dl.entrega_id=v_e.id
+  ),
+  changed AS (
+    UPDATE public.turno_jornada_inventario_entrega_lineas dl
+    SET cantidad_declarada=source_rows.effective_source_qty,
+        cantidad_efectiva=NULL
+    FROM source_rows
+    WHERE dl.id=source_rows.delivery_line_id
+      AND dl.cantidad_declarada IS DISTINCT FROM source_rows.effective_source_qty
+    RETURNING dl.producto_id
+  )
+  SELECT count(*)::integer INTO v_synced FROM changed;
+
+  UPDATE public.turno_jornada_inventario_entregas
+  SET estado='REQUIERE_RECUENTO',actualizado_en=now()
+  WHERE id=v_e.id;
+
+  INSERT INTO public.turno_jornada_eventos(
+    almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
+  ) VALUES(
+    v_e.almacen_id,v_s.jornada_programacion_id,v_uid,
+    'INVENTARIO_ENTREGA_REQUIERE_RECUENTO_POR_CORRECCION_ORIGEN',
+    'La recepción se detuvo porque el inventario FINAL de origen fue rectificado después de preparar esta entrega.',
+    jsonb_build_object('entrega_id',v_e.id,'estado_anterior',v_e.estado,
+      'corte_final_origen_id',v_e.origen_corte_id),
+    jsonb_build_object('entrega_id',v_e.id,'estado','REQUIERE_RECUENTO',
+      'lineas_actualizadas',v_synced,'recepcion_creada',false)
+  );
+
+  RETURN jsonb_build_object(
+    'id',v_e.id,
+    'estado','REQUIERE_RECUENTO',
+    'requiere_recuento',true,
+    'lineas_actualizadas',v_synced,
+    'recepcion_creada',false,
+    'mensaje','El inventario FINAL de origen fue corregido. Se actualizó la entrega; vuelve a abrirla y realiza el conteo físico con las cantidades vigentes.'
+  );
+ END IF;
+
+ SELECT EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_s.almacen_id AND a.tipo='minorista') INTO v_grouped;$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única el punto de validación de recepción.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+  EXECUTE v_definition;
+END;
+$patch_receipt_freshness$;
+
+COMMIT;
+formula','Inicial + entradas (transferencias/compras/reinversiones) - salidas aprobadas (transferencias/vales/mermas/bajas) - final = unidades vendidas; valoradas al precio normal.'$old$;
+  v_new := $new
+
+-- Apply the same session ownership rule to the live operational balance projection.
+DO $patch_saldos$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_jornada_saldos_operativos(uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$  WITH initial_rows AS (
+    SELECT
+      l.producto_id,
+      SUM(l.cantidad_contada)::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+  ),
+  movement_rows AS ($old$;
+  v_new := $new$  WITH initial_rows AS (
+    SELECT
+      l.producto_id,
+      SUM(coalesce(c.cantidad_corregida,l.cantidad_contada))::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=p_turno_sesion_id
+     AND c.tipo='INICIAL'
+     AND c.producto_id=l.producto_id
+     AND c.vigente
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+  ),
+  movement_rows AS ($new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única el inventario inicial del saldo operativo.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$    WHERE m.almacen_id = v_session.almacen_id
+      AND m.estado = 'APROBADA'
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) > v_start_at$old$;
+  v_new := $new$    WHERE m.almacen_id = v_session.almacen_id
+      AND m.turno_sesion_id = p_turno_sesion_id
+      AND m.estado = 'APROBADA'
+      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) > v_start_at$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo limitar de forma única las mermas del saldo operativo a su jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$    WHERE b.almacen_id = v_session.almacen_id
+      AND b.estado = 'APROBADA'
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) > v_start_at$old$;
+  v_new := $new$    WHERE b.almacen_id = v_session.almacen_id
+      AND b.turno_sesion_id = p_turno_sesion_id
+      AND b.estado = 'APROBADA'
+      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) > v_start_at$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo limitar de forma única las bajas del saldo operativo a su jornada.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  EXECUTE v_definition;
+END;
+$patch_saldos$;
+
+-- Return corrected quantities to the inventory workspace while preserving raw counts.
+DO $patch_inventario_read$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_obtener_inventario_jornada(uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$            'producto_id',l.producto_id,'cantidad_contada',l.cantidad_contada,
+            'stock_sistema',l.stock_sistema,'diferencia',l.cantidad_contada-l.stock_sistema
+          ) ORDER BY p.nombre,p.id)
+          FROM public.turno_jornada_inventario_lineas l
+          JOIN public.productos p ON p.id=l.producto_id
+          WHERE l.corte_id=c.id$old$;
+  v_new := $new$            'producto_id',l.producto_id,
+            'cantidad_contada',coalesce(adj.cantidad_corregida,l.cantidad_contada),
+            'cantidad_original',l.cantidad_contada,
+            'cantidad_corregida',adj.cantidad_corregida,
+            'stock_sistema',l.stock_sistema,
+            'diferencia',coalesce(adj.cantidad_corregida,l.cantidad_contada)-l.stock_sistema
+          ) ORDER BY p.nombre,p.id)
+          FROM public.turno_jornada_inventario_lineas l
+          JOIN public.productos p ON p.id=l.producto_id
+          LEFT JOIN public.turno_jornada_inventario_correcciones adj
+            ON adj.turno_sesion_id=v_s.id
+           AND adj.tipo=c.tipo
+           AND adj.producto_id=l.producto_id
+           AND adj.vigente
+          WHERE l.corte_id=c.id$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo actualizar de forma única la lectura de cortes corregidos.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+  EXECUTE v_definition;
+END;
+$patch_inventario_read$;
+
+-- Never auto-accept a physical receipt against a stale handover snapshot.
+-- If the source FINAL acquired a correction after this delivery was prepared,
+-- refresh the declaration, mark the handover REQUIERE_RECUENTO and return before
+-- inserting a reception attempt. The UI then reloads the fresh quantities.
+DO $patch_receipt_freshness$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_recibir_entrega_jornada(uuid,jsonb,text,uuid)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$ v_attempt integer; v_hash text; v_has_diff boolean; v_initial uuid; v_grouped boolean:=false;$old$;
+  v_new := $new$ v_attempt integer; v_hash text; v_has_diff boolean; v_initial uuid; v_grouped boolean:=false;
+ v_stale boolean:=false; v_synced integer:=0;$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única la declaración de variables de recepción.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  v_old := $old$ SELECT EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_s.almacen_id AND a.tipo='minorista') INTO v_grouped;$old$;
+  v_new := $new$ -- The source cut is immutable, but its effective approved correction is authoritative.
+ SELECT EXISTS(
+  SELECT 1
+  FROM public.turno_jornada_inventario_entrega_lineas dl
+  JOIN public.turno_jornada_inventario_cortes source_cut
+    ON source_cut.id=v_e.origen_corte_id
+   AND source_cut.tipo='FINAL'
+   AND source_cut.estado='CONFIRMADO'
+  JOIN public.turno_jornada_inventario_lineas source_line
+    ON source_line.corte_id=source_cut.id
+   AND source_line.producto_id=dl.producto_id
+  LEFT JOIN public.turno_jornada_inventario_correcciones correction
+    ON correction.turno_sesion_id=source_cut.turno_sesion_id
+   AND correction.tipo='FINAL'
+   AND correction.producto_id=source_line.producto_id
+   AND correction.vigente
+  WHERE dl.entrega_id=v_e.id
+    AND dl.cantidad_declarada IS DISTINCT FROM coalesce(correction.cantidad_corregida,source_line.cantidad_contada)
+ ) INTO v_stale;
+
+ IF v_stale THEN
+  WITH source_rows AS (
+    SELECT
+      dl.id AS delivery_line_id,
+      coalesce(correction.cantidad_corregida,source_line.cantidad_contada) AS effective_source_qty
+    FROM public.turno_jornada_inventario_entrega_lineas dl
+    JOIN public.turno_jornada_inventario_cortes source_cut
+      ON source_cut.id=v_e.origen_corte_id
+     AND source_cut.tipo='FINAL'
+     AND source_cut.estado='CONFIRMADO'
+    JOIN public.turno_jornada_inventario_lineas source_line
+      ON source_line.corte_id=source_cut.id
+     AND source_line.producto_id=dl.producto_id
+    LEFT JOIN public.turno_jornada_inventario_correcciones correction
+      ON correction.turno_sesion_id=source_cut.turno_sesion_id
+     AND correction.tipo='FINAL'
+     AND correction.producto_id=source_line.producto_id
+     AND correction.vigente
+    WHERE dl.entrega_id=v_e.id
+  ),
+  changed AS (
+    UPDATE public.turno_jornada_inventario_entrega_lineas dl
+    SET cantidad_declarada=source_rows.effective_source_qty,
+        cantidad_efectiva=NULL
+    FROM source_rows
+    WHERE dl.id=source_rows.delivery_line_id
+      AND dl.cantidad_declarada IS DISTINCT FROM source_rows.effective_source_qty
+    RETURNING dl.producto_id
+  )
+  SELECT count(*)::integer INTO v_synced FROM changed;
+
+  UPDATE public.turno_jornada_inventario_entregas
+  SET estado='REQUIERE_RECUENTO',actualizado_en=now()
+  WHERE id=v_e.id;
+
+  INSERT INTO public.turno_jornada_eventos(
+    almacen_id,programacion_id,actor_user_id,tipo,motivo,estado_antes,estado_despues
+  ) VALUES(
+    v_e.almacen_id,v_s.jornada_programacion_id,v_uid,
+    'INVENTARIO_ENTREGA_REQUIERE_RECUENTO_POR_CORRECCION_ORIGEN',
+    'La recepción se detuvo porque el inventario FINAL de origen fue rectificado después de preparar esta entrega.',
+    jsonb_build_object('entrega_id',v_e.id,'estado_anterior',v_e.estado,
+      'corte_final_origen_id',v_e.origen_corte_id),
+    jsonb_build_object('entrega_id',v_e.id,'estado','REQUIERE_RECUENTO',
+      'lineas_actualizadas',v_synced,'recepcion_creada',false)
+  );
+
+  RETURN jsonb_build_object(
+    'id',v_e.id,
+    'estado','REQUIERE_RECUENTO',
+    'requiere_recuento',true,
+    'lineas_actualizadas',v_synced,
+    'recepcion_creada',false,
+    'mensaje','El inventario FINAL de origen fue corregido. Se actualizó la entrega; vuelve a abrirla y realiza el conteo físico con las cantidades vigentes.'
+  );
+ END IF;
+
+ SELECT EXISTS(SELECT 1 FROM public.almacenes a WHERE a.id=v_s.almacen_id AND a.tipo='minorista') INTO v_grouped;$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única el punto de validación de recepción.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+  EXECUTE v_definition;
+END;
+$patch_receipt_freshness$;
+
+COMMIT;
+formula','Inicial + entradas (transferencias/compras/reinversiones) - salidas aprobadas (transferencias/vales/mermas/bajas) - final = unidades vendidas; valoradas al precio histórico de la jornada cuando esté registrado y, en su defecto, al precio normal del catálogo.'$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única la descripción de valoración de la liquidación.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
   EXECUTE v_definition;
 END;
 $patch_liquidacion$;
