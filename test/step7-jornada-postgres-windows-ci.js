@@ -359,6 +359,9 @@ function applySql(file) {
     log("Apply the historical final inventory product-set correction and verify late reinvestment/transfer evidence.");
     applySql("supabase/migrations/20261117040544_jornada_final_inventory_period_products.sql");
     applySql("test/jornada-final-inventory-period-products-contract.sql");
+    log("Apply PR #355 historical inventory correction overlay, session-scoped Bajas/Mermas and stale-handover recount guard.");
+    applySql("supabase/migrations/20261118000001_jornada_inventory_correction_isolation.sql");
+    applySql("test/jornada-inventory-correction-isolation-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
