@@ -102,15 +102,15 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   const ui = fs.readFileSync(path.join(__dirname, "../public/js/bc7-periodo-apertura-ui.js"), "utf8");
   const app = fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw = fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
-  assert.match(ui, /Registrar jornada ya iniciada/);
+  assert.match(ui, /Importar cierre externo/);
   assert.match(ui, /bc7_previsualizar_apertura_existente/);
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
   assert.match(ui, /stock general no se modificará/i);
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.7"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.7"));
-  assert.ok(app.includes('VERSION="9.5.125"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.125"'));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.8"));
+  assert.ok(app.includes('VERSION="9.5.126"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.126"'));
 });
 
 

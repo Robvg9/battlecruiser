@@ -362,6 +362,9 @@ function applySql(file) {
     log("Apply PR #355 historical inventory correction overlay, session-scoped Bajas/Mermas and stale-handover recount guard.");
     applySql("supabase/migrations/20261118000001_jornada_inventory_correction_isolation.sql");
     applySql("test/jornada-inventory-correction-isolation-contract.sql");
+    log("Apply canonical Jornada product set and reversible archive contract.");
+    applySql("supabase/migrations/20261118090000_jornada_inventory_product_set_archive_late_transfers.sql");
+    applySql("test/jornada-product-catalog-and-inventory-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
