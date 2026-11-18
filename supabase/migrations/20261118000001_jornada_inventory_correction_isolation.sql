@@ -217,6 +217,71 @@ BEGIN
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
 
+  v_old := $old$  price_info AS (
+    SELECT p.id product_id,p.nombre,p.unidad,
+      CASE
+        WHEN coalesce(p.precio_normal,0)>0 THEN p.precio_normal
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN min(ch.precio_normal)
+        ELSE NULL
+      END precio_unitario,
+      CASE
+        WHEN coalesce(p.precio_normal,0)>0 THEN 'PRECIO_FAMILIA'
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN 'PRECIO_VARIANTES_UNIFORME'
+        WHEN count(ch.id)>0 THEN 'PRECIO_VARIANTES_DIFERENTE_O_INCOMPLETO'
+        ELSE 'SIN_PRECIO'
+      END estado_precio
+    FROM public.productos p
+    LEFT JOIN public.productos ch ON ch.producto_padre_id=p.id AND ch.activo=true
+    WHERE p.activo=true AND p.producto_padre_id IS NULL
+    GROUP BY p.id,p.nombre,p.unidad,p.precio_normal
+  ),$old$;
+  v_new := $new$  price_info AS (
+    SELECT p.id product_id,p.nombre,p.unidad,
+      CASE
+        WHEN coalesce(historical_price.precio_venta_unitario,0)>0
+          THEN historical_price.precio_venta_unitario
+        WHEN coalesce(p.precio_normal,0)>0 THEN p.precio_normal
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN min(ch.precio_normal)
+        ELSE NULL
+      END precio_unitario,
+      CASE
+        WHEN coalesce(historical_price.precio_venta_unitario,0)>0 THEN 'PRECIO_HISTORICO_JORNADA'
+        WHEN coalesce(p.precio_normal,0)>0 THEN 'PRECIO_FAMILIA'
+        WHEN count(ch.id)>0
+          AND count(ch.precio_normal)=count(ch.id)
+          AND min(ch.precio_normal)=max(ch.precio_normal)
+          AND min(ch.precio_normal)>0 THEN 'PRECIO_VARIANTES_UNIFORME'
+        WHEN count(ch.id)>0 THEN 'PRECIO_VARIANTES_DIFERENTE_O_INCOMPLETO'
+        ELSE 'SIN_PRECIO'
+      END estado_precio
+    FROM public.productos p
+    LEFT JOIN LATERAL (
+      SELECT correction.precio_venta_unitario
+      FROM public.turno_jornada_valores_correcciones correction
+      WHERE correction.turno_sesion_id=v_s.id
+        AND correction.producto_id=p.id
+        AND correction.vigente
+      ORDER BY correction.creado_en DESC,correction.id DESC
+      LIMIT 1
+    ) historical_price ON true
+    LEFT JOIN public.productos ch ON ch.producto_padre_id=p.id AND ch.activo=true
+    WHERE p.activo=true AND p.producto_padre_id IS NULL
+    GROUP BY p.id,p.nombre,p.unidad,p.precio_normal,historical_price.precio_venta_unitario
+  ),$new$;
+  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'No se pudo localizar de forma única la valoración histórica de precios en la liquidación.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
   EXECUTE v_definition;
 END;
 $patch_liquidacion$;
