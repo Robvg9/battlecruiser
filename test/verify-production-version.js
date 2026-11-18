@@ -39,9 +39,8 @@ function describeError(error) {
 function requestWithHttps(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, { headers: {
-      "Cache-Control": "no-store, no-cache, max-age=0",
-      Pragma: "no-cache",
-      Expires: "0",
+      "cache-control": "no-cache",
+      pragma: "no-cache",
       "Cloudflare-Workers-Version-Key": versionAffinityKey,
     } }, (res) => {
       let body = "";
@@ -57,23 +56,20 @@ function requestWithHttps(url) {
   });
 }
 async function requestWithFetch(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
-  try {
-    const response = await fetch(url, {
-      cache: "no-store",
-      redirect: "follow",
-      headers: {
-        "Cache-Control": "no-store, no-cache, max-age=0",
-        Pragma: "no-cache",
-        Expires: "0",
-        "Cloudflare-Workers-Version-Key": versionAffinityKey,
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
-    return await response.text();
-  } finally { clearTimeout(timer); }
+  // Keep the post-deploy verifier byte-for-byte aligned with the deploy smoke:
+  // same no-store fetch mode, cache headers, redirect behavior and Worker affinity.
+  const response = await fetch(url, {
+    cache: "no-store",
+    redirect: "follow",
+    headers: {
+      "cache-control": "no-cache",
+      pragma: "no-cache",
+      "Cloudflare-Workers-Version-Key": versionAffinityKey,
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
+  return await response.text();
 }
 async function request(url) {
   if (typeof fetch === "function") {
@@ -109,12 +105,12 @@ function readVerifiedReleaseArtifact() {
   return release;
 }
 async function verifyOnce(attempt) {
-  const stamp = Date.now() + "-" + attempt;
+  const stamp = encodeURIComponent(expectedRunId + "-" + attempt);
   const [liveIndex, liveApp, liveSw, liveStyle] = await Promise.all([
-    request(baseUrl + "/?bc_verify=" + stamp + "-index"),
-    request(baseUrl + "/app.js?bc_verify=" + stamp + "-app"),
-    request(baseUrl + "/service-worker.js?bc_verify=" + stamp + "-sw"),
-    request(baseUrl + "/style.css?bc_verify=" + stamp + "-style"),
+    request(baseUrl + "/?bc_deploy_ready=" + stamp),
+    request(baseUrl + "/app.js?bc_deploy_ready=" + stamp + "-app"),
+    request(baseUrl + "/service-worker.js?bc_deploy_ready=" + stamp + "-sw"),
+    request(baseUrl + "/style.css?bc_deploy_ready=" + stamp + "-style"),
   ]);
   const liveAppMatch = liveApp.match(/const VERSION=["']([^"']+)["']/);
   const liveSwMatch = liveSw.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/);

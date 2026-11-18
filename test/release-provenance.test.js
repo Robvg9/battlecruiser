@@ -148,6 +148,21 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
 });
 
 
+test("post-deploy verifier uses the exact no-store URL and cache-header contract as deploy smoke", () => {
+  assert.ok(deployScript.includes('cache: "no-store"'));
+  assert.ok(verifier.includes('cache: "no-store"'));
+  assert.ok(deployScript.includes('"cache-control": "no-cache"'));
+  assert.ok(verifier.includes('"cache-control": "no-cache"'));
+  assert.ok(deployScript.includes('"Cloudflare-Workers-Version-Key": versionKey'));
+  assert.ok(verifier.includes('"Cloudflare-Workers-Version-Key": versionAffinityKey'));
+  assert.ok(deployScript.includes('"/?bc_deploy_ready=" + stamp'));
+  assert.ok(verifier.includes('"/?bc_deploy_ready=" + stamp'));
+  assert.ok(deployScript.includes('"/app.js?bc_deploy_ready=" + stamp + "-app"'));
+  assert.ok(verifier.includes('"/app.js?bc_deploy_ready=" + stamp + "-app"'));
+  assert.doesNotMatch(verifier, /bc_verify=|Expires:/,
+    "the post-deploy verifier must not use a different cache key or extra cache directives");
+});
+
 test("deploy smoke and post-deploy LIVE verifier pin related requests to the same Cloudflare Worker version", () => {
   assert.ok(deployScript.includes('"Cloudflare-Workers-Version-Key": versionKey'));
   assert.ok(verifier.includes('"Cloudflare-Workers-Version-Key": versionAffinityKey'));
