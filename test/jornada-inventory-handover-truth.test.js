@@ -58,8 +58,17 @@ test("owner review messaging no longer promises to rewrite the previous FINAL",(
 });
 
 test("jornada UI asset cache keys are refreshed coherently",()=>{
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.40"]'));
-  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.40"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.41"]'));
+  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.41"));
   assert.equal(app.includes('["bc7-jornada-ui.js","7.35"]'),false);
   assert.equal(sw.includes("bc7-jornada-ui.js?v=7.35"),false);
+});
+
+
+test("a stale source FINAL correction blocks automatic receipt acceptance and asks for recount",()=>{
+  const corrective=fs.readFileSync("supabase/migrations/20261118000001_jornada_inventory_correction_isolation.sql","utf8");
+  assert.ok(corrective.includes("INVENTARIO_ENTREGA_REQUIERE_RECUENTO_POR_CORRECCION_ORIGEN"));
+  assert.ok(corrective.includes("'requiere_recuento',true"));
+  assert.ok(ui.includes("result&&result.requiere_recuento"));
+  assert.ok(ui.includes("la recepción NO se guardó"));
 });

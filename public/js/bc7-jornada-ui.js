@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.40 — catálogo histórico de inventario final y errores de conteo específicos.
+// v7.41 — catálogo histórico de inventario final, correcciones auditadas y recuento de entregas obsoletas.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1857,7 +1857,9 @@
     try{
       const result=await rpc('bc7_recibir_entrega_jornada',{...payload,p_idempotency_key:idempotencyKey});
       const diffCount=mode==='diff'?payloadLines.filter((l,i)=>Math.round((Number(l.cantidad)-Number(lineDefs[i].cantidad_declarada))*1000)!==0).length:(result&&result.requiere_revision?null:0);
-      if(result&&result.requiere_revision){
+      if(result&&result.requiere_recuento){
+        attempt.inline={text:'Se detectó una corrección posterior en el inventario de origen. La entrega se actualizó y la recepción NO se guardó. Reabre el conteo y verifica las cantidades vigentes.',kind:'ok'};
+      }else if(result&&result.requiere_revision){
         attempt.inline={text:'Recepción enviada a revisión del Dueño: '+(diffCount!=null?diffCount+' diferencias':'hay diferencias')+'; jornada bloqueada hasta la decisión.',kind:'ok'};
       }else{
         attempt.inline={text:'Recepción coincidente aceptada; inventario inicial compartido confirmado.',kind:'ok'};
