@@ -47,7 +47,7 @@ test("Jornada consulta movimientos por el ID exacto de sesión, nunca solo por f
   const loader = JOURNADA_UI.slice(start, end);
   assert.match(loader, /rpc\('bc7_movimientos_sesion',\{p_turno_sesion_id:detail\.sesion\.id\}\)/);
   assert.doesNotMatch(loader, /rpc\('movimientos_producto'/);
-  assert.match(loader, /renderMovementRows\(arr\(r\),detail\.sesion\)/);
+  assert.match(loader, /bc7_transferencias_pendientes_vinculo_jornada/);\n  assert.match(loader, /renderMovementRows\(arr\(r\),detail\.sesion\)/);
 });
 
 test("Turnos agrupa el archivo por día y consulta cada sesión mediante el RPC protegido", () => {
