@@ -5,7 +5,7 @@
 DO $test$
 DECLARE
   v_today date := (now() AT TIME ZONE 'America/Havana')::date;
-  v_owner uuid := '20000000-0000-0000-0000-000000000001';
+  v_owner uuid := '20000000-0000-0000-0000-000000000003';
   v_warehouse uuid := '10000000-0000-0000-0000-000000000009';
   v_turno uuid := '94000000-0000-0000-0000-000000000001';
   v_programacion uuid := '95000000-0000-0000-0000-000000000001';
@@ -17,6 +17,10 @@ DECLARE
   v_error boolean := false;
   v_rows integer;
 BEGIN
+  INSERT INTO auth.users(id) VALUES(v_owner);
+  INSERT INTO public.usuarios(id,activo,role_id,nombre)
+  VALUES(v_owner,true,'30000000-0000-0000-0000-000000000002','Daily Cash Contract Worker');
+
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver',false);
