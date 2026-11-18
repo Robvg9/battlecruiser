@@ -1405,13 +1405,55 @@
     const value=r=>r.costo_unitario==null?'—':esc(money(r.costo_unitario))+' CUP'+(financeTypes.test(String(r.tipo||''))?'':'/u');
     return heading+'<div class="bc7-table-wrap"><table class="bc7-table bc7-movements-table"><thead><tr><th>Hora</th><th>Tipo</th><th>Producto / concepto</th><th>Cantidad</th><th>Valor</th><th>Usuario</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(String(r.fecha||'').replace('T',' ').slice(0,16))+'</td><td>'+esc(labels[r.tipo]||r.tipo||'—')+'</td><td>'+esc(r.producto||'—')+'</td><td>'+esc(r.cantidad==null?'—':qty(r.cantidad))+'</td><td>'+value(r)+'</td><td>'+esc(r.usuario||'—')+'</td></tr>').join('')+'</tbody></table></div>';
   }
+  function renderPendingInboundTransfers(rows,session,isAdmin){
+    const groups=new Map();
+    arr(rows).forEach(item=>{
+      const id=String(item.transferencia_id||'');if(!id)return;
+      if(!groups.has(id))groups.set(id,{id,fecha:item.fecha_registro,origen:item.almacen_origen||'Origen no identificado',destino:item.almacen_destino||'Destino no identificado',lineas:[]});
+      groups.get(id).lineas.push(item);
+    });
+    if(!groups.size)return '<section class="bc7-pending-inbound"><h4>Entradas pendientes de atribución</h4><p class="bc7-empty">No hay entradas tardías completadas pendientes de vincular a esta jornada.</p></section>';
+    const cards=Array.from(groups.values()).map(group=>{
+      const units=group.lineas.reduce((sum,line)=>sum+Number(line.cantidad||0),0);
+      const stamp=String(group.fecha||'').replace('T',' ').slice(0,16);
+      const rowsHtml=group.lineas.map(line=>'<tr><td>'+esc(line.producto||'Producto')+'</td><td>'+esc(qty(line.cantidad))+'</td></tr>').join('');
+      return '<article class="bc7-card bc7-pending-inbound-card"><b>Entrada pendiente · '+group.lineas.length+' líneas</b>'+
+        '<p class="bc7-muted">Fecha real de registro: '+esc(stamp)+'<br>'+esc(group.origen)+' → '+esc(group.destino)+'<br>Total: '+esc(qty(units))+' unidades</p>'+
+        '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Cantidad</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+        '<p class="bc7-muted">La transferencia ya existe. Atribuirla conserva el movimiento real y no vuelve a mover existencias.</p>'+
+        (isAdmin?'<button type="button" class="bc7-btn primary" data-bc7-movement-link-transfer="'+esc(group.id)+'">Atribuir a esta jornada</button>':'<small class="bc7-muted">Solo Administración puede atribuir una entrada histórica.</small>')+
+        '</article>';
+    }).join('');
+    return '<section class="bc7-pending-inbound"><h4>Entradas pendientes de atribución · '+groups.size+'</h4>'+cards+'</section>';
+  }
   async function loadMovements(detail){
     const host=$('bc7-movements');if(!host)return;
-    host.innerHTML='<div class="bc7-empty">Consultando movimientos atribuidos al día y turno…</div>';
-    try{
-      const r=await rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id});
-      host.innerHTML=renderMovementRows(arr(r),detail.sesion);
-    }catch(e){host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se han modificado datos.</div>';}
+    host.innerHTML='<div class="bc7-empty">Consultando movimientos y entradas del período…</div>';
+    const results=await Promise.allSettled([
+      rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id}),
+      rpc('bc7_transferencias_pendientes_vinculo_jornada',{p_turno_sesion_id:detail.sesion.id})
+    ]);
+    if(results[0].status==='rejected'){
+      host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(results[0].reason,'calendar'))+' No se han modificado datos.</div>';return;
+    }
+    const pending=results[1].status==='fulfilled'?arr(results[1].value):[];
+    const pendingError=results[1].status==='rejected'
+      ?'<p class="bc7-muted">No se pudo consultar la lista de entradas pendientes. Los movimientos ya atribuidos siguen disponibles.</p>':'';
+    host.innerHTML=renderMovementRows(arr(results[0].value),detail.sesion)+pendingError+renderPendingInboundTransfers(pending,detail.sesion,detail.is_admin===true);
+    host.onclick=async e=>{
+      const button=e.target&&e.target.closest?e.target.closest('[data-bc7-movement-link-transfer]'):null;if(!button)return;
+      const transferId=button.dataset.bc7MovementLinkTransfer;
+      const period=String(detail.sesion.fecha||'')+' a '+String(detail.sesion.fecha_fin||detail.sesion.fecha||'');
+      const reason=window.prompt('Motivo obligatorio de atribución histórica para el período '+period+'. La fecha real se conservará.','');
+      if(!reason||reason.trim().length<10)return;
+      if(!window.confirm('Se atribuirá una sola vez a la jornada '+period+'. La fecha real se conserva y no se ejecuta otra transferencia. ¿Confirmas?'))return;
+      button.disabled=true;
+      try{
+        await rpc('bc7_vincular_transferencia_jornada',{p_turno_sesion_id:detail.sesion.id,p_transferencia_id:transferId,p_motivo:reason.trim()});
+        await openWorkspace(detail.sesion.id);
+        setStatus('Entrada atribuida a esta jornada. Revisa movimientos e inventario final.','ok');
+      }catch(error){button.disabled=false;alert(friendlyError(error,'calendar')+' No se modificó la transferencia.');}
+    };
   }
   function checklistHtml(detail,isAssigned,status){
     if(status!=='EN_CURSO'||detail.sesion?.es_minorista!==true)return '';
