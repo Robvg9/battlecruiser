@@ -31,6 +31,11 @@ test("final inventory includes products created during the scheduled period even
  assert.ok(helper.includes("period_products.producto_id"));
  assert.ok(helper.includes("c.tipo='INICIAL'"));
  assert.ok(helper.includes("root.archivado_at IS NULL"));
+ const writer=PERIOD_PRODUCTS_MIGRATION.slice(
+  PERIOD_PRODUCTS_MIGRATION.indexOf("CREATE OR REPLACE FUNCTION public.bc7_guardar_inventario_jornada")
+ );
+ assert.ok(writer.includes("FROM public.bc7_jornada_productos_corte(v_s.id,upper(p_tipo))"));
+ assert.ok(writer.includes("exactamente los productos/familias válidos para este corte"));
 });
 
 test("archiving a product does not erase it from a completed Jornada's historical final inventory",()=>{
