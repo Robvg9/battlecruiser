@@ -1,0 +1,58 @@
+"use strict";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+
+const migration=fs.readFileSync("supabase/migrations/20261118210000_jornada_persistent_price_changes.sql","utf8");
+const ui=fs.readFileSync("public/js/jornada-price-changes.js","utf8");
+const app=fs.readFileSync("public/app.js","utf8");
+const sw=fs.readFileSync("public/service-worker.js","utf8");
+
+test("Jornada price changes are server-owned, audited, and wait for a physical count",()=>{
+  assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_cambios_precio/);
+  assert.match(migration,/estado='PENDIENTE_CONTEO'/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.bc7_solicitar_cambios_precio_jornada/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.bc7_confirmar_cambios_precio_conteo/);
+  assert.match(migration,/precio_normal=v_change\.precio_anterior/);
+  assert.match(migration,/SET precio_normal=v_change\.precio_nuevo/);
+  assert.match(migration,/stock_sistema=v_expected/);
+  assert.match(migration,/stock_contado=v_counted/);
+  assert.match(migration,/unidades_vendidas_precio_anterior=v_sold_before/);
+  assert.match(migration,/bc7_jornada_saldos_operativos\(v_s\.id\)/);
+  assert.match(migration,/bc7_jornada_cambios_precio.*estado='PENDIENTE_CONTEO'/);
+  assert.match(migration,/bc7_jornada_precio_pendiente_close_guard/);
+  assert.match(migration,/REVOKE ALL ON public\.turno_jornada_cambios_precio FROM PUBLIC, anon, authenticated/);
+  assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.bc7_confirmar_cambios_precio_conteo\(uuid,jsonb\) TO authenticated/);
+});
+
+test("The price-change gate values each sale tranche once and blocks inconsistent totals",()=>{
+  assert.match(migration,/sum\(c\.unidades_vendidas_precio_anterior\)/);
+  assert.match(migration,/sum\(c\.unidades_vendidas_precio_anterior\*c\.precio_anterior\)/);
+  assert.match(migration,/greatest\(0,\(x\.value->>'unidades_vendidas'\)::numeric-pt\.old_price_units\)\*pt\.latest_price/);
+  assert.match(migration,/precio_tramos_inconsistentes/);
+  assert.match(migration,/precio_cambios_aplicado/);
+  assert.match(migration,/Expected liquidation insertion point not found exactly once/);
+  assert.match(migration,/Expected Owner review pricing expression not found exactly once/);
+});
+
+test("Movimientos exposes bulk price changes and the assigned worker cannot dismiss the stock-count gate",()=>{
+  assert.match(ui,/data-bc-jpc-owner-open/);
+  assert.match(ui,/Cambios de precio/);
+  assert.match(ui,/bc7_cambios_precio_contexto/);
+  assert.match(ui,/bc7_solicitar_cambios_precio_jornada/);
+  assert.match(ui,/bc7_mis_cambios_precio_pendientes/);
+  assert.match(ui,/bc7_confirmar_cambios_precio_conteo/);
+  assert.match(ui,/Conteo obligatorio por cambio de precio/);
+  assert.match(ui,/Cuenta cada producto ahora/);
+  assert.match(ui,/data-bc-jpc-count/);
+  assert.doesNotMatch(ui,/data-bc-jpc-close/);
+  assert.match(ui,/setInterval\(refreshPending, 20000\)/);
+  assert.match(ui,/No se activó ningún precio/);
+});
+
+test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
+  assert.match(app,/const VERSION="9\.5\.127"/);
+  assert.match(app,/\["jornada-price-changes\.js","1\.0\.0"\]/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.127"/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.0/);
+});
