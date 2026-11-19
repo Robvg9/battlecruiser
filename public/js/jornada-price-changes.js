@@ -120,12 +120,13 @@
       return !query || String(item.nombre || '').toLocaleLowerCase().includes(query);
     });
     host.innerHTML = visible.map(function (item) {
-      return '<label class="bc-jpc-product">' +
-        '<input type="checkbox" data-bc-jpc-select="' + esc(item.producto_id) + '">' +
-        '<span class="bc-jpc-product-name"><strong>' + esc(item.nombre) + '</strong><small>' + esc(item.unidad || 'unidad') + ' · Stock de sistema: ' + esc(money(item.stock_sistema)) + '</small></span>' +
+      const checkboxId = 'bc-jpc-select-' + item.producto_id;
+      return '<div class="bc-jpc-product">' +
+        '<input type="checkbox" id="' + esc(checkboxId) + '" data-bc-jpc-select="' + esc(item.producto_id) + '">' +
+        '<label for="' + esc(checkboxId) + '" class="bc-jpc-product-name"><strong>' + esc(item.nombre) + '</strong><small>' + esc(item.unidad || 'unidad') + ' · Stock de sistema: ' + esc(money(item.stock_sistema)) + '</small></label>' +
         '<span class="bc-jpc-product-price">Actual: <b>' + esc(money(item.precio_actual)) + '</b></span>' +
         '<input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Nuevo precio" data-bc-jpc-price="' + esc(item.producto_id) + '" aria-label="Nuevo precio de ' + esc(item.nombre) + '">' +
-      '</label>';
+      '</div>';
     }).join('') || '<p class="bc-jpc-status">No hay productos que coincidan con la búsqueda.</p>';
     host.querySelectorAll('[data-bc-jpc-select]').forEach(function (box) {
       box.addEventListener('change', function () {
