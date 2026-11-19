@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.127 — Conteo único de efectivo final y corte retroactivo de inventario
+// v9.5.127 — Inventario unificado, archivo de productos y entradas tardías · conteo único de efectivo y corte retroactivo
 (function hotfixV9475(){
   const VERSION="9.5.127";
   window.__BC_VERSION__=VERSION;
