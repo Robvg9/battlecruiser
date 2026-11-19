@@ -90,11 +90,15 @@
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
-      button.className = 'bc-jpc-trigger';
+      button.className = 'bc165-action';
       button.setAttribute('data-bc-jpc-owner-open', '1');
-      button.textContent = '↗ Cambios de precio';
+      button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span class="bc165-sr-only">Cambios de precio</span>';
+      button.setAttribute('aria-label', 'Cambios de precio');
+      button.title = 'Cambios de precio';
       const hero = tab.querySelector('.bc-m51-hero');
-      if (hero && hero.parentNode) hero.insertAdjacentElement('afterend', button);
+      let actions = hero && hero.querySelector('.bc165-actions');
+      if (!actions && hero) { actions = document.createElement('div'); actions.className = 'bc165-actions'; hero.appendChild(actions); }
+      if (actions) actions.appendChild(button);
       else tab.prepend(button);
       button.addEventListener('click', openOwnerModal);
     }
@@ -143,9 +147,9 @@
     const options = contexts.map(function (item) {
       return '<option value="' + esc(item.sesion_id) + '">' + esc(item.almacen_nombre) + ' · ' + esc(item.fecha) + ' · Jornada ' + esc(item.sesion_id.slice(0, 8)) + '</option>';
     }).join('');
-    return '<div class="bc-jpc-overlay" id="' + MODAL_ID + '">' +
-      '<section class="bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
-        '<header class="bc-jpc-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio no cambia hasta que la dependienta cuente el stock físico.</p></div><button type="button" class="bc-jpc-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
+    return '<div class="bc-jpc-overlay bc165-overlay" id="' + MODAL_ID + '">' +
+      '<section class="bc-jpc-dialog bc165-modal" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
+        '<header class="bc-jpc-head bc165-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio no cambia hasta que la dependienta cuente el stock físico.</p></div><button type="button" class="bc-jpc-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
         '<div class="bc-jpc-body">' +
           '<label class="bc-jpc-field">Jornada activa<select id="bc-jpc-session">' + options + '</select></label>' +
           '<div class="bc-jpc-summary" id="bc-jpc-session-summary"></div>' +
