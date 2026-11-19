@@ -232,17 +232,14 @@ function bcScheduleGetSessionRetry() {
   }, attempt === 1 ? 650 : 1400);
 }
 function bcAuthDiagnostic(code, visible, cause, shape, fingerprint, trace) {
-  var diagnostic = {
-    code: code,
-    storage: bcAuthStoragePresence(),
-    cause: cause || "NONE",
-    shape: shape || "NONE",
-    fingerprint: fingerprint || "NONE",
-    trace: trace || "NONE"
-  };
+  var storage = bcAuthStoragePresence();
+  var safeCause = cause || "NONE";
+  var safeShape = shape || "NONE";
+  var safeFingerprint = fingerprint || "NONE";
+  var safeTrace = trace || "NONE";
+  var diagnostic = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace };
   window.__BC_AUTH_DIAGNOSTIC__ = diagnostic;
-  // Keep diagnostics available to support tooling, but never expose technical
-  // session details on the login screen.
+  // Keep allowlisted diagnostics for support, but never render session internals on the login screen.
   console.warn("[BattleCruiser] auth diagnostic", diagnostic);
 }
 // Recovery links must open the password form directly; do not make the user hunt for Ajustes.
