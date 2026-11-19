@@ -46,7 +46,7 @@ test("final cash declaration and physical count are resolved in one Owner action
   const admin = read("public/js/aprobaciones-admin.js");
   const migration = read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
   assert.match(admin, /Confirmar conteo físico/);
-  assert.match(admin, /rpc\\('bc5_contar_dinero_entregado'/);
+  assert.match(admin, /rpc\('bc5_contar_dinero_entregado'/);
   assert.doesNotMatch(admin, /Aprobar declaración/);
   assert.match(admin, /Solicitar corrección/);
   assert.match(migration, /La declaración final debe confirmarse con el conteo físico en una sola acción/);
