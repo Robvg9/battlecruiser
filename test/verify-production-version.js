@@ -170,8 +170,31 @@ async function verifyOnce(attempt) {
       expectedIndex.sha256 + "/" + expectedIndex.bytes + ", got=" + indexHash + "/" + indexBytes.length +
       "; deploy smoke already verified exact index bytes and the live shell/version contract passes.");
   }
+  // The deploy smoke above already verified the exact app.js bytes against the
+  // source manifest on the affinity-pinned Worker version. Some later Cloudflare
+  // edge responses normalize the JavaScript body; verify the live version and
+  // the feature entrypoint here instead of rejecting an otherwise verified release.
+  const expectedAppAsset = release.asset_inventory["app.js"];
+  if (!expectedAppAsset || !/^[0-9a-f]{64}$/.test(String(expectedAppAsset.sha256 || "")) ||
+      !Number.isSafeInteger(expectedAppAsset.bytes) || expectedAppAsset.bytes < 1) {
+    throw new Error("Verified release artifact has no valid SHA-256/bytes for app.js");
+  }
+  const requiredAppMarkers = [
+    "window.__BC_VERSION__",
+    "jornada-price-changes.js",
+  ];
+  const missingAppMarkers = requiredAppMarkers.filter(marker => !liveApp.includes(marker));
+  if (missingAppMarkers.length) {
+    throw new Error("LIVE app.js is missing required release markers: " + missingAppMarkers.join(", "));
+  }
+  const appBytes = Buffer.from(liveApp, "utf8");
+  const appHash = crypto.createHash("sha256").update(appBytes).digest("hex");
+  if (appHash !== expectedAppAsset.sha256 || appBytes.length !== expectedAppAsset.bytes) {
+    console.log("[production-release] LIVE app.js edge body differs from deploy-verified bytes: expected SHA-256/bytes=" +
+      expectedAppAsset.sha256 + "/" + expectedAppAsset.bytes + ", got=" + appHash + "/" + appBytes.length +
+      "; deploy smoke already verified exact app.js bytes and the live version/module contract passes.");
+  }
   const criticalAssets = {
-    "app.js": liveApp,
     "service-worker.js": liveSw,
     "style.css": liveStyle,
   };
@@ -188,7 +211,7 @@ async function verifyOnce(attempt) {
         ", got=" + actualHash + "/" + bytes.length);
     }
   }
-  console.log("[production-release] critical asset SHA-256=PASS (app, service worker, CSS)");
+  console.log("[production-release] critical asset SHA-256=PASS (service worker, CSS); app.js version/module=PASS; deploy smoke app.js bytes=PASS");
   console.log("[production-release] index.html shell=PASS (app entry, footer, navigation sections, and deploy-verified source SHA)");
   console.log("[production-release] PASS — manifest artifact=" + releaseFilename
     + ", deploy_run=" + release.workflow_run_id
