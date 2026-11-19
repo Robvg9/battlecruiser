@@ -19,7 +19,7 @@ test("Jornada price changes are server-owned, audited, and wait for a physical c
   assert.match(migration,/stock_contado=v_counted/);
   assert.match(migration,/unidades_vendidas_precio_anterior=v_sold_before/);
   assert.match(migration,/bc7_jornada_saldos_operativos\(v_s\.id\)/);
-  assert.match(migration,/bc7_jornada_cambios_precio[\\s\\S]*estado='PENDIENTE_CONTEO'/);
+  assert.match(migration,/CREATE TABLE IF NOT EXISTS public\\.turno_jornada_cambios_precio[\\s\\S]*estado text NOT NULL DEFAULT 'PENDIENTE_CONTEO'/);
   assert.match(migration,/bc7_jornada_precio_pendiente_close_guard/);
   assert.match(migration,/REVOKE ALL ON public\.turno_jornada_cambios_precio FROM PUBLIC, anon, authenticated/);
   assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.bc7_confirmar_cambios_precio_conteo\(uuid,jsonb\) TO authenticated/);
@@ -50,6 +50,11 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.doesNotMatch(countGate,/data-bc-jpc-close/);
   assert.match(ui,/setInterval\(refreshPending, 20000\)/);
   assert.match(ui,/No se activó ningún precio/);
+  const ownerRows=ui.slice(ui.indexOf("function renderOwnerProducts"),ui.indexOf("function ownerModalHtml"));
+  assert.match(ownerRows,/<div class="bc-jpc-product">/);
+  assert.match(ownerRows,/<label for="bc-jpc-select-/);
+  assert.doesNotMatch(ownerRows,/<label class="bc-jpc-product">/,
+    "product rows must not nest multiple interactive inputs inside one label");
 });
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
