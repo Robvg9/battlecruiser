@@ -376,7 +376,10 @@ function applySql(file) {
     applySql("test/jornada-owner-review-continuity-contract.sql");
     applySql("test/jornada-owner-checklist-contract.sql");
     applySql("test/jornada-pending-cash-visibility-contract.sql");
-    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist, pre-close physical cash count, automatic calculation, final Turn handover and reinvestment stock-minimum preservation.");
+    log("\\r\\n=== Apply persistent Jornada price changes and verify stock-count / sale-price tranches ===");
+    applySql("supabase/migrations/20261118210000_jornada_persistent_price_changes.sql");
+    applySql("test/jornada-price-changes-contract.sql");
+    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price changes with mandatory stock count and historical sale tranches.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
