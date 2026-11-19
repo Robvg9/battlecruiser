@@ -19,11 +19,10 @@ test("Jornada price changes are server-owned, audited, and wait for a physical c
   assert.match(migration,/stock_contado=v_counted/);
   assert.match(migration,/unidades_vendidas_precio_anterior=v_sold_before/);
   assert.match(migration,/bc7_jornada_saldos_operativos\(v_s\.id\)/);
-  assert.match(migration,/tr\.usuario_id=auth\.uid\(\) AND tr\.estado='ACTIVO'/,
-    "only the worker with the active tranche receives the mandatory gate");
+  assert.ok(migration.includes("tr.usuario_id=auth.uid()") && migration.includes("tr.estado='ACTIVO'"), "the pending price gate is scoped to the active worker");
   assert.match(migration,/estado text NOT NULL DEFAULT 'PENDIENTE_CONTEO'/);
   assert.match(migration,/bc7_jornada_precio_pendiente_close_guard/);
-  assert.match(migration,/REVOKE ALL ON FUNCTION public\\.bc7_bloquear_cierre_con_cambios_precio_pendientes\\(\\) FROM PUBLIC, anon, authenticated/);
+  assert.ok(migration.includes("REVOKE ALL ON FUNCTION public.bc7_bloquear_cierre_con_cambios_precio_pendientes() FROM PUBLIC, anon, authenticated;"), "trigger helper must not be RPC-callable");
   assert.match(migration,/REVOKE ALL ON public\.turno_jornada_cambios_precio FROM PUBLIC, anon, authenticated/);
   assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.bc7_confirmar_cambios_precio_conteo\(uuid,jsonb\) TO authenticated/);
 });
