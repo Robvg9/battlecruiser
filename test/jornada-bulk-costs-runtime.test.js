@@ -167,14 +167,14 @@ test("a confirmed save followed by a failed review refresh never offers a duplic
   box.querySelector("[data-bcjr-bulk-reason]").value = "Factura verificada del proveedor";
   save.click();
 
-  assert.ok(await waitFor(() => box.querySelector("[data-bcjr-values-status]")?.textContent.includes("Los costos sí se guardaron")));
+  assert.ok(await waitFor(() => box.querySelector("[data-bcjr-values-status]")?.textContent.includes("Los costos se guardaron")));
   assert.equal(save.disabled, true, "a saved batch remains locked even if the visual refresh fails");
   assert.equal(save.textContent, "Guardado");
   assert.equal(c.calls.filter(call => call.name === "bc7_ajustar_valores_producto_jornada").length, 1);
 });
 
 test("an unconfirmed RPC receipt blocks retry until the owner reopens the Jornada", async t => {
-  const c = setup(t, { adjustmentResult: { ok: true, productos_ajustados: 0, catalogo_modificado: false } });
+  const c = setup(t, { adjustmentResult: { ok: true, productos_ajustados: 0, catalogo_modificado: false, valores_producto_persistidos: true } });
   const box = await c.openEditor();
   const save = box.querySelector("[data-bcjr-bulk-costs-save]");
   box.querySelector("[data-bcjr-bulk-cost]").value = "20";
