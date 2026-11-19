@@ -371,6 +371,9 @@ function applySql(file) {
     log("Verify inclusive final-day acceptance for daily cash handovers in a multi-day Jornada.");
     applySql("supabase/migrations/20261118195000_jornada_daily_handover_inclusive_end_date.sql");
     applySql("test/jornada-daily-handover-inclusive-period-contract.sql");
+    log("Apply effective-dated product price/cost history before price-change contracts.");
+    applySql("supabase/migrations/20261119133401_jornada_persist_historical_product_values.sql");
+    applySql("test/jornada-persistent-historical-values-contract.sql");
     applySql("test/jornada-product-catalog-and-inventory-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
     applySql("test/jornada-owner-review-continuity-contract.sql");
