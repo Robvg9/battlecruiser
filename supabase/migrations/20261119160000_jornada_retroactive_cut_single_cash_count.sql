@@ -94,4 +94,35 @@ BEGIN
 END;
 $disable_approval_only_final_cash$;
 
+
+-- Do not expose a declaration in the Owner's approval queue before the
+-- responsible person has completed and handed over the Jornada. This makes
+-- the single physical count action available exactly when the server allows it.
+DO $show_final_cash_only_after_handover$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure)
+  INTO v_definition;
+
+  v_old := $old$WHERE s.bloque='JORNADA'
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')
+      AND d.monto_contado IS NULL
+      AND (public.tiene_permiso('entregas_caja','editar_any')$old$;
+  v_new := $new$WHERE s.bloque='JORNADA'
+      AND s.estado='COMPLETADA'
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')
+      AND d.monto_contado IS NULL
+      AND (public.tiene_permiso('entregas_caja','editar_any')$new$;
+  IF position(v_old in v_definition)=0 THEN
+    RAISE EXCEPTION 'Expected final-cash admin queue branch not found.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  EXECUTE v_definition;
+END;
+$show_final_cash_only_after_handover$;
+
 COMMIT;
