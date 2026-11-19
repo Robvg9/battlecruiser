@@ -171,7 +171,7 @@ test("Dependienta can open her active jornada without searching a future-only ca
   assert.match(ui,/id="bc7-current-session-card"/);
   assert.match(ui,/data-bc7-current-open/);
   assert.match(ui,/data-bc7-current-finance/);
-  assert.match(ui,/addDays\(today,-7\)/);
+  assert.match(ui,/\$\('bc7-list-from'\)\.value=today/);
   assert.match(ui,/state\.currentSession\?\.turno_sesion_id/);
 });
 
