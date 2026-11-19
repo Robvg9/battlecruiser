@@ -63,10 +63,10 @@
       '.bc-jpc-summary{padding:9px 11px;border-radius:8px;background:rgba(180,150,90,.09);font-size:12px;line-height:1.5;margin:8px 0 13px}',
       '.bc-jpc-search{margin:8px 0 10px}',
       '.bc-jpc-products{display:grid;gap:7px}',
-      '.bc-jpc-product{display:grid;grid-template-columns:24px minmax(0,1fr) 100px 120px;align-items:center;gap:9px;padding:9px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px}',
+      '.bc-jpc-product{display:grid;grid-template-columns:24px minmax(0,1fr) 118px minmax(220px,260px);align-items:center;gap:10px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px}',
       '.bc-jpc-product-name{min-width:0}.bc-jpc-product-name strong{display:block;font-size:13px}.bc-jpc-product-name small{display:block;color:var(--muted,#aaa);font-size:11px;margin-top:2px}',
-      '.bc-jpc-product-price{font-size:12px;text-align:right;white-space:nowrap}',
-      '.bc-jpc-product input[type=number]{padding:8px;font-size:13px}',
+      '.bc-jpc-product-price{font-size:12px;display:flex;flex-direction:column;gap:4px;white-space:nowrap}.bc-jpc-product-price small{color:var(--muted,#aaa);font-size:10px}',
+      '.bc-jpc-product-fields{display:grid;grid-template-columns:1fr;gap:6px}.bc-jpc-product-fields label{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--muted,#aaa)}.bc-jpc-product-fields label span{flex:0 0 76px}.bc-jpc-product-fields input{flex:1;min-width:0;width:100%;padding:8px;font-size:13px}',
       '.bc-jpc-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line,rgba(255,255,255,.12))}',
       '.bc-jpc-btn{border:1px solid var(--line,rgba(255,255,255,.18));border-radius:8px;padding:10px 13px;background:transparent;color:var(--text,#f2eee5);font-weight:600;cursor:pointer}',
       '.bc-jpc-btn.primary{background:var(--gold,#a88a50);border-color:var(--gold,#a88a50);color:#171717}.bc-jpc-btn:disabled{opacity:.5;cursor:wait}',
@@ -128,17 +128,20 @@
       return '<div class="bc-jpc-product">' +
         '<input type="checkbox" id="' + esc(checkboxId) + '" data-bc-jpc-select="' + esc(item.producto_id) + '">' +
         '<label for="' + esc(checkboxId) + '" class="bc-jpc-product-name"><strong>' + esc(item.nombre) + '</strong><small>' + esc(item.unidad || 'unidad') + ' · Stock de sistema: ' + esc(money(item.stock_sistema)) + '</small></label>' +
-        '<span class="bc-jpc-product-price">Actual: <b>' + esc(money(item.precio_actual)) + '</b></span>' +
-        '<input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Nuevo precio" data-bc-jpc-price="' + esc(item.producto_id) + '" aria-label="Nuevo precio de ' + esc(item.nombre) + '">' +
+        '<span class="bc-jpc-product-price"><span>Venta actual: <b>' + esc(money(item.precio_actual)) + '</b></span><small>Costo actual: ' + esc(item.costo_actual==null?'Sin costo':money(item.costo_actual)) + '</small></span>' +
+        '<div class="bc-jpc-product-fields"><label><span>Nuevo precio</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Precio de venta" data-bc-jpc-price="' + esc(item.producto_id) + '" aria-label="Nuevo precio de venta de ' + esc(item.nombre) + '"></label>' +
+        '<label><span>Nuevo costo (opcional)</span><input type="number" min="0" step="0.0001" inputmode="decimal" placeholder="Sin cambio" data-bc-jpc-cost="' + esc(item.producto_id) + '" aria-label="Nuevo costo unitario de ' + esc(item.nombre) + '"></label></div>' +
       '</div>';
     }).join('') || '<p class="bc-jpc-status">No hay productos que coincidan con la búsqueda.</p>';
     host.querySelectorAll('[data-bc-jpc-select]').forEach(function (box) {
       box.addEventListener('change', function () {
         const input = host.querySelector('[data-bc-jpc-price="' + CSS.escape(box.dataset.bcJpcSelect) + '"]');
+        const cost = host.querySelector('[data-bc-jpc-cost="' + CSS.escape(box.dataset.bcJpcSelect) + '"]');
         if (input) input.disabled = !box.checked;
+        if (cost) cost.disabled = !box.checked;
       });
     });
-    host.querySelectorAll('[data-bc-jpc-price]').forEach(function (input) { input.disabled = true; });
+    host.querySelectorAll('[data-bc-jpc-price],[data-bc-jpc-cost]').forEach(function (input) { input.disabled = true; });
     const summary = document.getElementById('bc-jpc-session-summary');
     if (summary) summary.textContent = context.almacen_nombre + ' · ' + context.fecha + ' · Responsable asignada: ' + (context.responsable_id ? String(context.responsable_id).slice(0, 8) : 'sin identificar') + '. Los cambios esperarán al conteo físico de la dependienta.';
   }
@@ -199,7 +202,8 @@
     const selected = Array.from(document.querySelectorAll('#bc-jpc-products [data-bc-jpc-select]:checked'));
     const changes = selected.map(function (check) {
       const input = document.querySelector('#bc-jpc-products [data-bc-jpc-price="' + CSS.escape(check.dataset.bcJpcSelect) + '"]');
-      return { producto_id: check.dataset.bcJpcSelect, precio_nuevo: input ? input.value.trim() : '' };
+      const cost = document.querySelector('#bc-jpc-products [data-bc-jpc-cost="' + CSS.escape(check.dataset.bcJpcSelect) + '"]');
+      return { producto_id: check.dataset.bcJpcSelect, precio_nuevo: input ? input.value.trim() : '', costo_nuevo: cost && cost.value.trim()!=='' ? cost.value.trim() : null };
     });
     const reason = (document.getElementById('bc-jpc-reason')?.value || '').trim();
     if (!changes.length) {
