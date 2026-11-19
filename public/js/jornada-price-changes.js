@@ -14,7 +14,7 @@
   let workerBusy = false;
   let priorBodyOverflow = '';
 
-  function client() {
+  function getDbClient() {
     try {
       if (typeof client !== 'undefined' && client && typeof client.rpc === 'function') return client;
       if (window.client && typeof window.client.rpc === 'function') return window.client;
@@ -37,7 +37,7 @@
   }
 
   function rpc(name, params) {
-    const db = client();
+    const db = getDbClient();
     if (!db) return Promise.reject(new Error('La conexión de BattleCruiser aún no está preparada.'));
     if (!navigator.onLine) return Promise.reject(new Error('Conéctate a Internet para realizar esta operación.'));
     return db.rpc(name, params || {}).then(function (response) {
@@ -260,10 +260,11 @@
     if (currentGate && currentGate.sesion_id === session.sesion_id &&
         currentGate._signature === signature && document.getElementById(GATE_ID)) return;
     session._signature = signature;
+    const gateAlreadyOpen = !!document.getElementById(GATE_ID);
     currentGate = session;
     document.getElementById(GATE_ID)?.remove();
     injectStyles();
-    priorBodyOverflow = document.body.style.overflow || '';
+    if (!gateAlreadyOpen) priorBodyOverflow = document.body.style.overflow || '';
     document.body.style.overflow = 'hidden';
     document.body.insertAdjacentHTML('beforeend', gateHtml(session));
     document.getElementById('bc-jpc-confirm-count')?.addEventListener('click', confirmWorkerCount);
@@ -314,7 +315,7 @@
   }
 
   async function refreshPending() {
-    if (refreshing || !navigator.onLine || !client()) return;
+    if (refreshing || !navigator.onLine || !getDbClient()) return;
     refreshing = true;
     try {
       const sessions = await rpc('bc7_mis_cambios_precio_pendientes', {});
@@ -344,7 +345,7 @@
       refreshPending();
     });
     window.setInterval(refreshPending, 20000);
-    const db = client();
+    const db = getDbClient();
     if (db && db.auth && typeof db.auth.onAuthStateChange === 'function') {
       db.auth.onAuthStateChange(function () {
         window.setTimeout(refreshPending, 250);
