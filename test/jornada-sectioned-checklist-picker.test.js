@@ -42,34 +42,16 @@ test("each attendant checklist item opens its own operational section", () => {
   assert.match(ui, /Cerrar jornada y enviar a Administración/);
 });
 
-test("final cash declaration can be approved while the Jornada is open; physical count stays post-handover", () => {
+test("final cash declaration and physical count are resolved in one Owner action", () => {
   const admin = read("public/js/aprobaciones-admin.js");
-  const migration = read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
-  assert.match(admin, /Aprobar declaración/);
-  assert.match(admin, /rpc\('bc7_resolver_declaracion_jornada'/);
-  assert.ok(admin.includes("acceptButton.disabled=false;"));
-  assert.doesNotMatch(admin, /rpc\('bc5_contar_dinero_entregado'/,
-    "approval UI must not perform the later physical cash count");
-
-  const queueStart = migration.indexOf("'declaracion_jornada'::text");
-  const queueEnd = migration.indexOf("'recepcion_inventario_jornada'::text", queueStart);
-  assert.ok(queueStart >= 0 && queueEnd > queueStart, "pending declaration queue must be defined");
-  const queue = migration.slice(queueStart, queueEnd);
-  assert.match(queue, /d\.estado_aprobacion IN \('PENDIENTE','ESPERANDO_APROBACION'\)/);
-  assert.match(queue, /d\.monto_contado IS NULL/);
-  assert.doesNotMatch(queue, /AND s\.estado='COMPLETADA'/,
-    "declaration review must remain visible before handover");
-
-  const countStart = migration.indexOf("CREATE OR REPLACE FUNCTION public.bc5_contar_dinero_entregado");
-  const approvalStart = migration.indexOf("CREATE OR REPLACE FUNCTION public.bc7_resolver_declaracion_jornada");
-  assert.ok(countStart >= 0 && approvalStart > countStart);
-  const countGate = migration.slice(countStart, approvalStart);
-  assert.match(countGate, /IF v_s\.estado<>'COMPLETADA' THEN/);
-  assert.match(countGate, /lista_para_conteo/);
-  assert.match(countGate, /IF coalesce\(v_d\.estado_aprobacion,''\)<>'DECLARACION_APROBADA' THEN/);
-  const approval = migration.slice(approvalStart);
-  assert.match(approval, /DECLARACION_APROBADA/);
-  assert.match(approval, /public\.tiene_permiso/);
+  const migration = read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
+  assert.match(admin, /Confirmar conteo físico/);
+  assert.match(admin, /rpc\\('bc5_contar_dinero_entregado'/);
+  assert.doesNotMatch(admin, /Aprobar declaración/);
+  assert.match(admin, /Solicitar corrección/);
+  assert.match(migration, /La declaración final debe confirmarse con el conteo físico en una sola acción/);
+  const countStart = migration.indexOf("DO $patch_one_step_final_cash_count$");
+  assert.ok(countStart >= 0);
 });
 
 test("PWA release versions stay aligned after the jornada UX update", () => {
