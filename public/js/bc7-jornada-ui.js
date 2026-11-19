@@ -290,6 +290,11 @@
       '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><h3>Calendario</h3><span class="bc7-muted">Jornadas asignadas</span></div><div class="bc7-calendar-controls"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
       '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
       '</div>';
+    const buildDaysButton=tab.querySelector('[data-bc7-build]');
+    if(buildDaysButton&&!buildDaysButton.dataset.bc7Bound){
+      buildDaysButton.dataset.bc7Bound='1';
+      buildDaysButton.addEventListener('click',function(e){e.preventDefault();buildDayRows();});
+    }
     return tab;
   }
   function setPageMode(workspace){
@@ -2681,8 +2686,6 @@
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
   document.addEventListener('click',function(e){
-    const buildDays=e.target&&e.target.closest?e.target.closest('[data-bc7-build]'):null;
-    if(buildDays){e.preventDefault();buildDayRows();return;}
     const ownerReview=e.target&&e.target.closest?e.target.closest('[data-bc7-open-owner-review]'):null;
     if(ownerReview){e.preventDefault();if(typeof window.bcAbrirRevisionJornada==='function')window.bcAbrirRevisionJornada(ownerReview.getAttribute('data-bc7-open-owner-review'));else if(typeof window.alert==='function')alert('La revisión del Dueño todavía no está cargada. Actualiza la aplicación.');return;}
     const checklistOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-open]'):null;
