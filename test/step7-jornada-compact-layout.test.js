@@ -24,9 +24,9 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9.5.127"/);
+ assert.match(app,/const VERSION="9.5.128"/);
  assert.match(app,/\["bc7-jornada-ui\.js","7\.44"\]/);
- assert.match(sw,/BC_SW_VERSION = "9.5.127"/);
+ assert.match(sw,/BC_SW_VERSION = "9.5.128"/);
  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.44/);
  assert.ok(ui.includes("v7.44 — planificador sin duración predeterminada y calendario desde hoy."));
 });
