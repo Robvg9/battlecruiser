@@ -3,7 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 
-const migration=fs.readFileSync("supabase/migrations/20261118210000_jornada_persistent_price_changes.sql","utf8");
+const migration=fs.readFileSync("supabase/migrations/20261119000000_jornada_persistent_price_changes.sql","utf8");
 const ui=fs.readFileSync("public/js/jornada-price-changes.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
@@ -23,6 +23,7 @@ test("Jornada price changes are server-owned, audited, and wait for a physical c
     "only the worker with the active tranche receives the mandatory gate");
   assert.match(migration,/estado text NOT NULL DEFAULT 'PENDIENTE_CONTEO'/);
   assert.match(migration,/bc7_jornada_precio_pendiente_close_guard/);
+  assert.match(migration,/REVOKE ALL ON FUNCTION public\\.bc7_bloquear_cierre_con_cambios_precio_pendientes\\(\\) FROM PUBLIC, anon, authenticated/);
   assert.match(migration,/REVOKE ALL ON public\.turno_jornada_cambios_precio FROM PUBLIC, anon, authenticated/);
   assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.bc7_confirmar_cambios_precio_conteo\(uuid,jsonb\) TO authenticated/);
 });
