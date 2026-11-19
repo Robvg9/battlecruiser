@@ -51,12 +51,6 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = [
-      '.bc-jpc-trigger{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--gold-dim,#a78a52);border-radius:8px;padding:10px 13px;background:var(--panel,#17191d);color:var(--text,#f2eee5);font:600 13px inherit;cursor:pointer;margin:8px 0 12px}',
-      '.bc-jpc-trigger:hover{border-color:var(--gold,#c5a66a)}',
-      '.bc-jpc-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.78);overflow:auto}',
-      '.bc-jpc-dialog{width:min(780px,100%);max-height:min(92dvh,900px);display:flex;flex-direction:column;background:var(--panel,#17191d);color:var(--text,#f2eee5);border:1px solid var(--gold-dim,#8b754c);border-radius:14px;box-shadow:0 20px 70px rgba(0,0,0,.48);overflow:hidden}',
-      '.bc-jpc-head{padding:15px 17px;border-bottom:1px solid var(--line,rgba(255,255,255,.12));display:flex;align-items:flex-start;justify-content:space-between;gap:10px}',
-      '.bc-jpc-head h3{margin:0;font-size:17px}.bc-jpc-head p{margin:5px 0 0;color:var(--muted,#a9a9a9);font-size:12px;line-height:1.45}',
       '.bc-jpc-body{padding:14px 16px;overflow:auto;min-height:0}',
       '.bc-jpc-field{display:flex;flex-direction:column;gap:5px;margin:0 0 11px;font-size:12px;color:var(--muted,#c0c0c0)}',
       '.bc-jpc-field input,.bc-jpc-field select,.bc-jpc-product input{width:100%;min-width:0;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.16));border-radius:7px;color:var(--text,#f2eee5);padding:9px;font:inherit}',
@@ -70,14 +64,13 @@
       '.bc-jpc-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line,rgba(255,255,255,.12))}',
       '.bc-jpc-btn{border:1px solid var(--line,rgba(255,255,255,.18));border-radius:8px;padding:10px 13px;background:transparent;color:var(--text,#f2eee5);font-weight:600;cursor:pointer}',
       '.bc-jpc-btn.primary{background:var(--gold,#a88a50);border-color:var(--gold,#a88a50);color:#171717}.bc-jpc-btn:disabled{opacity:.5;cursor:wait}',
-      '.bc-jpc-close{font-size:22px;line-height:1;border:0;background:transparent;color:var(--muted,#aaa);cursor:pointer}',
       '.bc-jpc-status{font-size:12px;line-height:1.5;margin:8px 0;color:var(--muted,#b8b8b8)}.bc-jpc-status.error{color:#ff9d9d}.bc-jpc-status.success{color:#a4dfb6}',
       '.bc-jpc-gate .bc-jpc-dialog{width:min(620px,100%);border-color:#bd8d43}.bc-jpc-gate .bc-jpc-body{padding:16px}',
       '.bc-jpc-count-row{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;align-items:center;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:9px;padding:11px;margin:8px 0}',
       '.bc-jpc-count-row strong{display:block;font-size:13px}.bc-jpc-count-row small{display:block;color:var(--muted,#aaa);font-size:11px;margin-top:3px}',
       '.bc-jpc-count-row input{width:100%;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.18));border-radius:7px;color:var(--text,#f2eee5);padding:10px;font-size:16px}',
       '.bc-jpc-required{font-size:11px;color:#e4bf7e;margin:8px 0 0}',
-      '@media(max-width:560px){.bc-jpc-overlay{padding:6px}.bc-jpc-dialog{max-height:96dvh;border-radius:10px}.bc-jpc-product{grid-template-columns:22px minmax(0,1fr) 90px}.bc-jpc-product-price{grid-column:2;grid-row:2;text-align:left}.bc-jpc-product input{grid-column:3;grid-row:1/3}.bc-jpc-count-row{grid-template-columns:minmax(0,1fr) 108px}.bc-jpc-head{padding:12px}.bc-jpc-body{padding:12px}}'
+      '@media(max-width:560px){.bc-jpc-product{grid-template-columns:22px minmax(0,1fr);align-items:start}.bc-jpc-product-name{grid-column:2;grid-row:1}.bc-jpc-product-price{grid-column:2;grid-row:2;white-space:normal}.bc-jpc-product-fields{grid-column:2;grid-row:3;width:100%}.bc-jpc-product-fields label{align-items:stretch}.bc-jpc-product-fields label span{flex-basis:105px}.bc-jpc-count-row{grid-template-columns:minmax(0,1fr) 108px}.bc-jpc-body{padding:12px}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -150,9 +143,9 @@
     const options = contexts.map(function (item) {
       return '<option value="' + esc(item.sesion_id) + '">' + esc(item.almacen_nombre) + ' · ' + esc(item.fecha) + ' · Jornada ' + esc(item.sesion_id.slice(0, 8)) + '</option>';
     }).join('');
-    return '<div class="bc-jpc-overlay bc165-overlay" id="' + MODAL_ID + '">' +
-      '<section class="bc-jpc-dialog bc165-modal" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
-        '<header class="bc-jpc-head bc165-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio no cambia hasta que la dependienta cuente el stock físico.</p></div><button type="button" class="bc-jpc-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
+    return '<div class="bc165-overlay" id="' + MODAL_ID + '">' +
+      '<section class="bc165-modal bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
+        '<header class="bc165-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio y el costo solo se activarán después del conteo físico.</p></div><button type="button" class="bc165-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
         '<div class="bc-jpc-body">' +
           '<label class="bc-jpc-field">Jornada activa<select id="bc-jpc-session">' + options + '</select></label>' +
           '<div class="bc-jpc-summary" id="bc-jpc-session-summary"></div>' +
@@ -214,6 +207,13 @@
       if (status) { status.textContent = 'Introduce un nuevo precio válido para cada producto seleccionado.'; status.className = 'bc-jpc-status error'; }
       return;
     }
+    if (changes.some(function (item) {
+      return item.costo_nuevo !== null &&
+        (!Number.isFinite(Number(item.costo_nuevo)) || Number(item.costo_nuevo) < 0 || !/^\\d+(?:\\.\\d{1,4})?$/.test(item.costo_nuevo));
+    })) {
+      if (status) { status.textContent = 'El costo opcional debe ser un número no negativo con hasta 4 decimales.'; status.className = 'bc-jpc-status error'; }
+      return;
+    }
     if (reason.length < 5) {
       if (status) { status.textContent = 'Explica el motivo del cambio (mínimo 5 caracteres).'; status.className = 'bc-jpc-status error'; }
       return;
@@ -221,7 +221,7 @@
     ownerBusy = true;
     button.disabled = true;
     button.textContent = 'Enviando solicitud…';
-    if (status) { status.textContent = 'Registrando la solicitud. Los precios siguen sin cambiar hasta el conteo.'; status.className = 'bc-jpc-status'; }
+    if (status) { status.textContent = 'Registrando la solicitud. El catálogo no cambia hasta el conteo físico.'; status.className = 'bc-jpc-status'; }
     try {
       const result = await rpc('bc7_solicitar_cambios_precio_jornada', {
         p_turno_sesion_id: context.sesion_id,
@@ -242,9 +242,9 @@
 
   function gateHtml(session) {
     const rows = Array.isArray(session.cambios) ? session.cambios : [];
-    return '<div class="bc-jpc-overlay bc-jpc-gate" id="' + GATE_ID + '">' +
-      '<section class="bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-gate-title">' +
-        '<header class="bc-jpc-head"><div><h3 id="bc-jpc-gate-title">Conteo obligatorio por cambio de precio</h3><p>Antes de activar los nuevos precios debes contar físicamente las existencias actuales. Las unidades que ya no estén quedarán valoradas al precio anterior.</p></div></header>' +
+    return '<div class="bc165-overlay bc-jpc-gate" id="' + GATE_ID + '">' +
+      '<section class="bc165-modal bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-gate-title">' +
+        '<header class="bc165-head"><div><h3 id="bc-jpc-gate-title">Conteo obligatorio por cambio de precio</h3><p>Antes de activar los nuevos valores debes contar físicamente las existencias actuales. Las unidades que ya no estén quedarán valoradas al precio anterior.</p></div></header>' +
         '<div class="bc-jpc-body">' +
           '<div class="bc-jpc-summary">' + esc(session.fecha || '') + ' · Hay ' + rows.length + ' producto(s) pendientes. Esta ventana no se puede cerrar sin completar el conteo.</div>' +
           rows.map(function (item) {
@@ -297,13 +297,13 @@
     workerBusy = true;
     button.disabled = true;
     button.textContent = 'Guardando conteo…';
-    if (status) { status.textContent = 'Guardando el conteo físico y aplicando los nuevos precios…'; status.className = 'bc-jpc-status'; }
+    if (status) { status.textContent = 'Guardando el conteo físico y aplicando los nuevos valores…'; status.className = 'bc-jpc-status'; }
     try {
       await rpc('bc7_confirmar_cambios_precio_conteo', {
         p_turno_sesion_id: currentGate.sesion_id,
         p_conteos: counts.map(function (item) { return { producto_id: item.producto_id, cantidad: Number(item.cantidad) }; })
       });
-      if (status) { status.textContent = 'Conteo confirmado. Los precios nuevos ya están activos.'; status.className = 'bc-jpc-status success'; }
+      if (status) { status.textContent = 'Conteo confirmado. Los nuevos valores ya están activos.'; status.className = 'bc-jpc-status success'; }
       const completedSessionId = currentGate.sesion_id;
       document.getElementById(GATE_ID)?.remove();
       document.body.style.overflow = priorBodyOverflow;
