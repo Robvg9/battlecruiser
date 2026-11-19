@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.42 — inventario unificado, archivo reversible y atribución de entradas tardías.
+// v7.43 — recuperación retroactiva de períodos en curso con recepción física heredada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
