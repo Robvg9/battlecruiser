@@ -53,7 +53,7 @@
     style.textContent = [
       '.bc-jpc-body{padding:14px 16px;overflow:auto;min-height:0}',
       '.bc-jpc-field{display:flex;flex-direction:column;gap:5px;margin:0 0 11px;font-size:12px;color:var(--muted,#c0c0c0)}',
-      '.bc-jpc-field input,.bc-jpc-field select,.bc-jpc-product input{width:100%;min-width:0;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.16));border-radius:7px;color:var(--text,#f2eee5);padding:9px;font:inherit}',
+      '.bc-jpc-field input,.bc-jpc-field select,.bc-jpc-product-fields input{width:100%;min-width:0;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.16));border-radius:7px;color:var(--text,#f2eee5);padding:9px;font:inherit}',
       '.bc-jpc-summary{padding:9px 11px;border-radius:8px;background:rgba(180,150,90,.09);font-size:12px;line-height:1.5;margin:8px 0 13px}',
       '.bc-jpc-search{margin:8px 0 10px}',
       '.bc-jpc-products{display:grid;gap:7px}',
