@@ -47,7 +47,7 @@ test("stale shared handovers are refreshed and forced to recount before a receip
 
 test("PWA loads the changed Jornada module from a refreshed release cache",()=>{
   assert.ok(app.includes('const VERSION="9.5.127"'));
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.42"]'));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.43"]'));
   assert.ok(sw.includes('var BC_SW_VERSION = "9.5.127"'));
-  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.42"));
+  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.43"));
 });
