@@ -23,7 +23,7 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
 
-  INSERT INTO auth.users(id) VALUES(v_worker);
+  INSERT INTO auth.users(id) VALUES(v_worker) ON CONFLICT (id) DO NOTHING;
   INSERT INTO public.usuarios(id,activo,role_id)
   VALUES(v_worker,true,'30000000-0000-0000-0000-000000000002');
 
