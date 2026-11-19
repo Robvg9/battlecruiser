@@ -139,7 +139,7 @@ test("Step 7 exposes a retry after staff lookup failure and preserves a selected
   // This fixture deliberately does not complete the full Auth boot. Exercise the
   // responsible-catalog RPC directly, then build the planner from that verified state.
   const firstAttempt = await window.__BC7_JORNADA__.refreshResponsibleStaff();
-  assert.deepEqual(firstAttempt, [], "a failed staff lookup must not expose unverified people");
+  assert.equal(firstAttempt.length, 0, "a failed staff lookup must not expose unverified people");
   assert.equal(staffAttempt, 1);
   window.document.getElementById("bc7-days-count").value = "7";
   window.document.querySelector("[data-bc7-build]").click();
