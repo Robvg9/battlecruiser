@@ -99,10 +99,3 @@ test("cash exception inbox cache key is refreshed with the new UI contract",()=>
   assert.ok(APP.includes('"turno-cash-handover-ui.js","1.2"'));
   assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
 });
-
-test("cash count module cache key is refreshed with the new UI contract",()=>{
-  const APP=read("public/app.js");
-  const SW=read("public/service-worker.js");
-  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.1"'));
-  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.1"));
-});
