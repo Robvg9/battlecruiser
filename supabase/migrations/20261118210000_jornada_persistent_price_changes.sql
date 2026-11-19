@@ -74,7 +74,7 @@ BEGIN
         SELECT jsonb_agg(jsonb_build_object(
           'producto_id',p.producto_id,
           'nombre',p.nombre,
-          'unidad',p.producto_padre_id,
+          'unidad',pr.unidad,
           'precio_actual',coalesce(pr.precio_normal,0),
           'stock_sistema',p.stock_actual
         ) ORDER BY p.nombre,p.producto_id)
@@ -279,6 +279,7 @@ DECLARE
   v_counted numeric;
   v_expected numeric;
   v_sold_before numeric;
+  v_previous_sold numeric;
   v_pending integer;
   v_confirmed integer:=0;
   v_before jsonb:='[]'::jsonb;
@@ -315,10 +316,12 @@ BEGIN
 
   SELECT * INTO v_program FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id;
 
-  SELECT count(*)::integer INTO v_pending
-  FROM public.turno_jornada_cambios_precio
+  PERFORM 1 FROM public.turno_jornada_cambios_precio
   WHERE turno_sesion_id=v_s.id AND estado='PENDIENTE_CONTEO'
   FOR UPDATE;
+  SELECT count(*)::integer INTO v_pending
+  FROM public.turno_jornada_cambios_precio
+  WHERE turno_sesion_id=v_s.id AND estado='PENDIENTE_CONTEO';
 
   IF v_pending=0 OR v_pending<>(SELECT count(*) FROM jsonb_array_elements(p_conteos)) THEN
     RAISE EXCEPTION 'Debes contar todos los productos pendientes en una sola confirmación.' USING ERRCODE='23514';
@@ -342,7 +345,11 @@ BEGIN
     FROM public.bc7_jornada_saldos_operativos(v_s.id) s
     WHERE s.producto_id=v_product_id;
     v_expected:=coalesce(v_expected,0);
-    v_sold_before:=greatest(0,v_expected-v_counted);
+    SELECT coalesce(sum(c.unidades_vendidas_precio_anterior),0)::numeric
+      INTO v_previous_sold
+    FROM public.turno_jornada_cambios_precio c
+    WHERE c.turno_sesion_id=v_s.id AND c.producto_id=v_product_id AND c.estado='APLICADO';
+    v_sold_before:=greatest(0,v_expected-v_counted-coalesce(v_previous_sold,0));
 
     UPDATE public.productos
     SET precio_normal=v_change.precio_nuevo
