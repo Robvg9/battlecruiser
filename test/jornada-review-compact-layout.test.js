@@ -30,9 +30,9 @@ test("Review evidence is optional in collapsible panels",()=>{
   assert.match(REVIEW,/Bajas y mermas para clasificar/);
   assert.match(REVIEW,/Liquidación y desglose financiero/);
 });
-test("Historical product values are edited through an audited session-only RPC",()=>{
+test("Historical product values are edited through an audited RPC and persist to future Jornadas",()=>{
   assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);
-  assert.match(REVIEW,/No modifican el catálogo ni las ventas futuras/);
+  assert.match(REVIEW,/Valores guardados y persistidos para futuras Jornadas/);
   assert.match(MIGRATION,/turno_jornada_valores_correcciones/);
   assert.match(MIGRATION,/CHECK \(precio_venta_unitario IS NOT NULL OR costo_unitario IS NOT NULL\)/);
   assert.match(MIGRATION,/VALORES_HISTORICOS_JORNADA_CORREGIDOS/);
@@ -44,7 +44,7 @@ test("Historical product values are edited through an audited session-only RPC",
 
 test("Historical value and final-count editors show save progress and backend errors inside the floating modal",()=>{
   assert.match(REVIEW,/data-bcjr-values-status/);
-  assert.match(REVIEW,/Guardando valores históricos de esta Jornada/);
+  assert.match(REVIEW,/Guardando valores de esta Jornada y fijándolos para futuras Jornadas/);
   assert.match(REVIEW,/No se pudo guardar: /);
   assert.match(REVIEW,/Reintentar guardado/);
   assert.match(REVIEW,/data-bcjr-count-status/);
@@ -89,5 +89,5 @@ test("Historical costs can be reviewed and saved for all missing-cost products i
   assert.match(REVIEW,/p_ajustes:adjustments/);
   assert.match(REVIEW,/verifiedHistoricCosts/);
   assert.match(REVIEW,/Los vacíos no se guardarán/);
-  assert.match(REVIEW,/No modifican el catálogo/);
+  assert.match(REVIEW,/referencia global del producto para futuras Jornadas/);
 });

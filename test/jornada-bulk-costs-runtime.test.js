@@ -97,7 +97,8 @@ function setup(t, { adjustmentResult, reviewFailsOn = 0 } = {}) {
           data: adjustmentResult || {
             ok: true,
             productos_ajustados: args.p_ajustes.length,
-            catalogo_modificado: false
+            catalogo_modificado: false,
+            valores_producto_persistidos: true
           },
           error: null
         };
@@ -174,7 +175,7 @@ test("a confirmed save followed by a failed review refresh never offers a duplic
 });
 
 test("an unconfirmed RPC receipt blocks retry until the owner reopens the Jornada", async t => {
-  const c = setup(t, { adjustmentResult: { ok: true, productos_ajustados: 0, catalogo_modificado: false } });
+  const c = setup(t, { adjustmentResult: { ok: true, productos_ajustados: 0, catalogo_modificado: false, valores_producto_persistidos: true } });
   const box = await c.openEditor();
   const save = box.querySelector("[data-bcjr-bulk-costs-save]");
   box.querySelector("[data-bcjr-bulk-cost]").value = "20";
