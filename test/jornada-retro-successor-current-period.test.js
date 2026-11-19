@@ -44,7 +44,8 @@ test("the form inherits the previous period length and explains genuine date con
   assert.ok(ui.includes("successorEndDate(d)"));
   assert.ok(ui.includes("ya existe una programacion que se cruza con el periodo sucesor"));
   assert.ok(ui.includes("fecha inicial de la sucesora debe ser anterior a hoy"));
-  assert.ok(!ui.includes("programacion.*fecha"));
+  assert.ok(ui.includes("programacion.*fecha"));
+  assert.ok(ui.includes("opcion se reserva para periodos ya terminados"));
 });
 
 test("the updated Jornada UI is invalidated in the online loader and offline shell",()=>{
