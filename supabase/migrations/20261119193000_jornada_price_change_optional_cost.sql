@@ -124,7 +124,16 @@ BEGIN
       OR (
         nullif(x.value->>'costo_nuevo','') IS NOT NULL
         AND (
-          nullif(x.value->>'costo_nuevo','') !~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})
+          nullif(x.value->>'costo_nuevo','') !~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})$'
+          OR CASE
+            WHEN nullif(x.value->>'costo_nuevo','') ~ '^([0-9]+([.][0-9]{1,4})?|[.][0-9]{1,4})$'
+            THEN nullif(x.value->>'costo_nuevo','')::numeric < 0
+            ELSE false
+          END
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION 'El precio nuevo y el costo opcional deben ser números válidos y no negativos.' USING ERRCODE='22023';
   END IF;
   IF (SELECT count(*) FROM jsonb_array_elements(p_cambios))
      <> (SELECT count(DISTINCT (x.value->>'producto_id')::uuid) FROM jsonb_array_elements(p_cambios) x(value)) THEN
