@@ -3,7 +3,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 
-const migration=fs.readFileSync("supabase/migrations/20261119120000_jornada_persist_historical_product_values.sql","utf8");
+const migration=fs.readFileSync("supabase/migrations/20261119133401_jornada_persist_historical_product_values.sql","utf8");
 const ui=fs.readFileSync("public/js/jornada-owner-review.js","utf8");
 const contract=fs.readFileSync("test/jornada-persistent-historical-values-contract.sql","utf8");
 
