@@ -211,7 +211,7 @@ async function verifyOnce(attempt) {
         ", got=" + actualHash + "/" + bytes.length);
     }
   }
-  console.log("[production-release] critical asset SHA-256=PASS (app, service worker, CSS)");
+  console.log("[production-release] critical asset SHA-256=PASS (service worker, CSS); app.js version/module=PASS; deploy smoke app.js bytes=PASS");
   console.log("[production-release] index.html shell=PASS (app entry, footer, navigation sections, and deploy-verified source SHA)");
   console.log("[production-release] PASS — manifest artifact=" + releaseFilename
     + ", deploy_run=" + release.workflow_run_id
