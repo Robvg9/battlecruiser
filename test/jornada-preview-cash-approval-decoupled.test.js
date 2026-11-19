@@ -19,18 +19,17 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
   assert.match(UI,/Declaración de dinero/);
 });
 
-test("Final declaration approval is independent and available before session completion",()=>{
-  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_resolver_declaracion_jornada/);
-  assert.match(MIGRATION,/DECLARACION_APROBADA/);
-  assert.match(MIGRATION,/turno_declaraciones_estado_aprobacion_check/);
-  assert.match(MIGRATION,/GRANT EXECUTE ON FUNCTION public\.bc7_resolver_declaracion_jornada/);
-  assert.match(MIGRATION,/d\.estado_aprobacion,/);
-  assert.doesNotMatch(MIGRATION,/CASE WHEN s\.estado='COMPLETADA' THEN d\.estado_aprobacion ELSE 'ESPERANDO_ENTREGA'/);
-  assert.match(ADMIN,/Aprobar declaración/);
-  assert.match(ADMIN,/rpc\('bc7_resolver_declaracion_jornada'/);
-  assert.doesNotMatch(ADMIN,/rpc\('bc5_contar_dinero_entregado'/);
-  assert.match(MIGRATION,/IF v_s\.estado<>'COMPLETADA' THEN/,"physical cash count remains blocked until handover");
-  assert.match(MIGRATION,/DECLARACION_APROBADA/,"approved declaration remains eligible for later physical count");
+test("Final declaration and physical cash count are one Owner action in Centro de Control",()=>{
+  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\\.bc7_resolver_declaracion_jornada/);
+  assert.match(FIX,/bc5_contar_dinero_entregado/);
+  assert.match(FIX,/La declaración final debe confirmarse con el conteo físico en una sola acción/);
+  assert.match(FIX,/NOT IN \\('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA'\\)/);
+  assert.match(ADMIN,/Confirmar conteo físico/);
+  assert.match(ADMIN,/rpc\\('bc5_contar_dinero_entregado'/);
+  assert.match(ADMIN,/rpc\\('bc7_resolver_declaracion_jornada'/,"rejection remains available to request correction");
+  assert.doesNotMatch(ADMIN,/Aprobar declaración/);
+  assert.match(ADMIN,/Registra aquí el efectivo contado físicamente/);
+  assert.match(FIX,/IF v_s\\.estado<>'COMPLETADA' THEN/,"physical cash count remains blocked until handover");
 });
 
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
@@ -83,6 +82,17 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   assert.doesNotMatch(block,/previewTable\(\['Producto','Inicial','Entradas','Salidas','Bajas','Mermas'/,"inventory presents one combined Bajas column");
   assert.doesNotMatch(block,/rpc\('(bc7_guardar|bc7_registrar|bc5_cerrar|bc_declarar)/,
     "preview must not write or close the Jornada");
+});
+
+test("PWA caches the new Jornada and single-count modules",()=>{
+  assert.match(APP,/const VERSION="9\\.5\\.128"/);
+  assert.match(SW,/BC_SW_VERSION = "9\\.5\\.128"/);
+  assert.match(APP,/\\["bc7-jornada-ui\\.js","7\\.42"\\]/);
+  assert.match(SW,/bc7-jornada-ui\\.js\\?v=7\\.42/);
+  assert.match(APP,/\\["aprobaciones-admin\\.js","20261119\\.1"\\]/);
+  assert.match(SW,/aprobaciones-admin\\.js\\?v=20261119\\.1/);
+  assert.match(APP,/\\["turno-cash-handover-ui\\.js","1\\.2"\\]/);
+  assert.match(SW,/turno-cash-handover-ui\\.js\\?v=1\\.2/);
 });
 
 test("PWA caches the new Jornada and admin approval modules",()=>{
