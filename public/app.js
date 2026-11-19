@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
 // v9.5.126 — Inventario unificado, archivo de productos y entradas tardías
 (function hotfixV9475(){
-  const VERSION="9.5.126";
+  const VERSION="9.5.127";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -108,7 +108,7 @@
     ["hotfix-14-regresiones-20260902.js","14.2"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.4"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.7"],["hotfix-17-final-loader-20260903.js","20261030.2"],
     ["hotfix-pulido-20260903.js","20261105.4"],["hotfix-pulido-20260903b.js","20261105.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20261103.1"],
-    ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.12"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.2"],["bajas-multiple.js","1.6"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.0"]
+    ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["mi-cuenta.js","1.2"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.12"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.2"],["bajas-multiple.js","1.6"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.0"],["jornada-price-changes.js","1.0.0"]
   ];
   let resolveUIReady;
   window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});
