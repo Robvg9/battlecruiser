@@ -137,6 +137,7 @@ test("Step 7 exposes a retry after staff lookup failure and preserves a selected
     throw new Error("Unexpected RPC: " + name);
   });
   window.document.getElementById("bc7-days-count").value = "7";
+  window.document.getElementById("bc7-days-count").value = "7";
   window.document.querySelector("[data-bc7-build]").click();
 
   const failed = await waitFor(() => {
