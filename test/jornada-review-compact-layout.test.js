@@ -32,7 +32,7 @@ test("Review evidence is optional in collapsible panels",()=>{
 });
 test("Historical product values are edited through an audited RPC and persist to future Jornadas",()=>{
   assert.match(REVIEW,/bc7_ajustar_valores_producto_jornada/);
-  assert.match(REVIEW,/valores corregidos persisten para futuras Jornadas/);
+  assert.match(REVIEW,/Valores guardados y persistidos para futuras Jornadas/);
   assert.match(MIGRATION,/turno_jornada_valores_correcciones/);
   assert.match(MIGRATION,/CHECK \(precio_venta_unitario IS NOT NULL OR costo_unitario IS NOT NULL\)/);
   assert.match(MIGRATION,/VALORES_HISTORICOS_JORNADA_CORREGIDOS/);
