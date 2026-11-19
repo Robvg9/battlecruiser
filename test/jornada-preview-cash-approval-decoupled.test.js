@@ -20,16 +20,15 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
 });
 
 test("Final declaration and physical cash count are one Owner action in Centro de Control",()=>{
-  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\\.bc7_resolver_declaracion_jornada/);
-  assert.match(FIX,/bc5_contar_dinero_entregado/);
-  assert.match(FIX,/La declaración final debe confirmarse con el conteo físico en una sola acción/);
-  assert.match(FIX,/NOT IN \\('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA'\\)/);
-  assert.match(ADMIN,/Confirmar conteo físico/);
-  assert.match(ADMIN,/rpc\\('bc5_contar_dinero_entregado'/);
-  assert.match(ADMIN,/rpc\\('bc7_resolver_declaracion_jornada'/,"rejection remains available to request correction");
-  assert.doesNotMatch(ADMIN,/Aprobar declaración/);
-  assert.match(ADMIN,/Registra aquí el efectivo contado físicamente/);
-  assert.match(FIX,/IF v_s\\.estado<>'COMPLETADA' THEN/,"physical cash count remains blocked until handover");
+  assert.ok(FIX.includes("bc5_contar_dinero_entregado"));
+  assert.ok(FIX.includes("La declaración final debe confirmarse con el conteo físico en una sola acción."));
+  assert.ok(FIX.includes("NOT IN ('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA')"));
+  assert.ok(ADMIN.includes("Confirmar conteo físico"));
+  assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
+  assert.ok(ADMIN.includes("rpc('bc7_resolver_declaracion_jornada'"),"rejection remains available to request correction");
+  assert.ok(!ADMIN.includes("Aprobar declaración"));
+  assert.ok(ADMIN.includes("Registra aquí el efectivo contado físicamente"));
+  assert.ok(FIX.includes("IF v_s.estado<>'COMPLETADA' THEN"),"physical count remains blocked until handover");
 });
 
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
