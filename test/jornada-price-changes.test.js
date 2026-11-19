@@ -54,7 +54,7 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/No se activó ningún precio/);
   const ownerRows=ui.slice(ui.indexOf("function renderOwnerProducts"),ui.indexOf("function ownerModalHtml"));
   assert.match(ownerRows,/<div class="bc-jpc-product">/);
-  assert.match(ownerRows,/<label for="bc-jpc-select-/);
+  assert.ok(ownerRows.includes("const checkboxId = 'bc-jpc-select-'") && ownerRows.includes("<label for=\"' + esc(checkboxId)"), "each product checkbox has an explicit associated label");
   assert.doesNotMatch(ownerRows,/<label class="bc-jpc-product">/,
     "product rows must not nest multiple interactive inputs inside one label");
 });
