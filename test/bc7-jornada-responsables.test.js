@@ -136,7 +136,12 @@ test("Step 7 exposes a retry after staff lookup failure and preserves a selected
     if (name === "bc5_mis_jornadas") return { data: [], error: null };
     throw new Error("Unexpected RPC: " + name);
   });
-  window.document.getElementById("bc7-days-count").value = "7";
+  const booted = await waitFor(() =>
+    /Acceso administrativo verificado/.test(
+      window.document.getElementById("bc7-status")?.textContent || ""
+    )
+  );
+  assert.ok(booted, "the authenticated Jornada boot must finish before testing the staff retry");
   window.document.getElementById("bc7-days-count").value = "7";
   window.document.querySelector("[data-bc7-build]").click();
 
