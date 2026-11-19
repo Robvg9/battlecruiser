@@ -2681,6 +2681,8 @@
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
   document.addEventListener('click',function(e){
+    const buildDays=e.target&&e.target.closest?e.target.closest('[data-bc7-build]'):null;
+    if(buildDays){e.preventDefault();buildDayRows();return;}
     const ownerReview=e.target&&e.target.closest?e.target.closest('[data-bc7-open-owner-review]'):null;
     if(ownerReview){e.preventDefault();if(typeof window.bcAbrirRevisionJornada==='function')window.bcAbrirRevisionJornada(ownerReview.getAttribute('data-bc7-open-owner-review'));else if(typeof window.alert==='function')alert('La revisión del Dueño todavía no está cargada. Actualiza la aplicación.');return;}
     const checklistOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-checklist-open]'):null;
