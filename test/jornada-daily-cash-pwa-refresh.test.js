@@ -24,8 +24,8 @@ test("PWA shell pins one fresh 9.5.127 release and Jornada UI 7.42", () => {
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.42"]'));
   assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.42'));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261116.1"]'));
-  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261116.1'));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261119.1"]'));
+  assert.ok(SW.includes('./js/aprobaciones-admin.js?v=20261119.1'));
 });
 
 test("PWA update banner waits for the user-approved worker activation before reloading", () => {
