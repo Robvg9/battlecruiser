@@ -39,7 +39,10 @@ test("The price-change gate values each sale tranche once and blocks inconsisten
 
 test("Movimientos exposes bulk price changes and the assigned worker cannot dismiss the stock-count gate",()=>{
   assert.match(ui,/data-bc-jpc-owner-open/);
+  assert.match(ui,/actions\.appendChild\(button\)/,"price change action joins the shared movements action bar");
+  assert.match(ui,/bc165-action/,"price change button uses the same icon-button style as transfer and purchase");
   assert.match(ui,/Cambios de precio/);
+  assert.match(ui,/bc-jpc-dialog bc165-modal/,"price change modal reuses the shared operation modal shell");
   assert.match(ui,/bc7_cambios_precio_contexto/);
   assert.match(ui,/bc7_solicitar_cambios_precio_jornada/);
   assert.match(ui,/bc7_mis_cambios_precio_pendientes/);
@@ -60,8 +63,8 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
 });
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
-  assert.match(app,/const VERSION="9\.5\.127"/);
-  assert.match(app,/\["jornada-price-changes\.js","1\.0\.0"\]/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.127"/);
+  assert.match(app,/const VERSION="9.5.128"/);
+  assert.match(app,/\["jornada-price-changes.js","1.0.1"\]/);
+  assert.match(sw,/BC_SW_VERSION = "9.5.128"/);
   assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.0/);
 });
