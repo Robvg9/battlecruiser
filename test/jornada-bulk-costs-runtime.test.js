@@ -97,7 +97,8 @@ function setup(t, { adjustmentResult, reviewFailsOn = 0 } = {}) {
           data: adjustmentResult || {
             ok: true,
             productos_ajustados: args.p_ajustes.length,
-            catalogo_modificado: false
+            catalogo_modificado: false,
+            valores_producto_persistidos: true
           },
           error: null
         };
@@ -167,7 +168,7 @@ test("a confirmed save followed by a failed review refresh never offers a duplic
   box.querySelector("[data-bcjr-bulk-reason]").value = "Factura verificada del proveedor";
   save.click();
 
-  assert.ok(await waitFor(() => box.querySelector("[data-bcjr-values-status]")?.textContent.includes("Los costos se guardaron")));
+  assert.ok(await waitFor(() => box.querySelector("[data-bcjr-values-status]")?.textContent.includes("Costos guardados como referencia global del producto")));
   assert.equal(save.disabled, true, "a saved batch remains locked even if the visual refresh fails");
   assert.equal(save.textContent, "Guardado");
   assert.equal(c.calls.filter(call => call.name === "bc7_ajustar_valores_producto_jornada").length, 1);
