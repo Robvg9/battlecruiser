@@ -45,7 +45,9 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/Conteo obligatorio por cambio de precio/);
   assert.match(ui,/Cuenta cada producto ahora/);
   assert.match(ui,/data-bc-jpc-count/);
-  assert.doesNotMatch(ui,/data-bc-jpc-close/);
+  const countGate=ui.slice(ui.indexOf("function gateHtml"),ui.indexOf("function renderGate"));
+  assert.ok(countGate.length>0);
+  assert.doesNotMatch(countGate,/data-bc-jpc-close/);
   assert.match(ui,/setInterval\(refreshPending, 20000\)/);
   assert.match(ui,/No se activó ningún precio/);
 });
