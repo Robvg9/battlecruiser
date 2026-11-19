@@ -88,7 +88,7 @@ test("PWA and service worker cache are aligned at 9.5.128 / Jornada module 7.44"
   assert.ok(version&&swVersion,"app/service worker version declaration missing");
   assert.equal(version[1],"9.5.127");
   assert.equal(swVersion[1],version[1]);
-  for(const marker of ['["bc7-jornada-ui.js","7.44"]','["m68-ventas-pos-definitivo.js","9.5.127"]']){
+  for(const marker of ['["bc7-jornada-ui.js","7.44"]','["m68-ventas-pos-definitivo.js","9.5.128"]']){
     assert.ok(app.includes(marker),"dynamic module cache missing "+marker);
   }
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.44"));
