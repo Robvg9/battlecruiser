@@ -85,21 +85,12 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
 });
 
 test("PWA caches the new Jornada and single-count modules",()=>{
-  assert.match(APP,/const VERSION="9\\.5\\.128"/);
-  assert.match(SW,/BC_SW_VERSION = "9\\.5\\.128"/);
-  assert.match(APP,/\\["bc7-jornada-ui\\.js","7\\.42"\\]/);
-  assert.match(SW,/bc7-jornada-ui\\.js\\?v=7\\.42/);
-  assert.match(APP,/\\["aprobaciones-admin\\.js","20261119\\.1"\\]/);
-  assert.match(SW,/aprobaciones-admin\\.js\\?v=20261119\\.1/);
-  assert.match(APP,/\\["turno-cash-handover-ui\\.js","1\\.2"\\]/);
-  assert.match(SW,/turno-cash-handover-ui\\.js\\?v=1\\.2/);
-});
-
-test("PWA caches the new Jornada and admin approval modules",()=>{
-  assert.match(APP,/const VERSION="9\.5\.127"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.127"/);
-  assert.match(APP,/\["bc7-jornada-ui\.js","7\.42"\]/);
-  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.42/);
-  assert.match(APP,/\["aprobaciones-admin\.js","20261116\.1"\]/);
-  assert.match(SW,/aprobaciones-admin\.js\?v=20261116\.1/);
+  assert.ok(APP.includes('const VERSION="9.5.128"'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.128"'));
+  assert.ok(APP.includes('["bc7-jornada-ui.js","7.42"]'));
+  assert.ok(SW.includes("bc7-jornada-ui.js?v=7.42"));
+  assert.ok(APP.includes('["aprobaciones-admin.js","20261119.1"]'));
+  assert.ok(SW.includes("aprobaciones-admin.js?v=20261119.1"));
+  assert.ok(APP.includes('["turno-cash-handover-ui.js","1.2"]'));
+  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
 });
