@@ -23,6 +23,12 @@ test("BEFORE_CORTE classification cannot re-add a movement already contained in 
   assert.ok(FIX.includes("coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>v_start_at"));
 });
 
+test("final declaration enters the single-step Owner queue only after the Jornada is completed",()=>{
+  assert.ok(FIX.includes("public.listar_aprobaciones_admin()"));
+  assert.ok(FIX.includes("AND s.estado='COMPLETADA'"));
+  assert.ok(FIX.includes("Expected final-cash admin queue branch not found."));
+});
+
 test("final cash count is atomic, idempotent, and requires a completed handover",()=>{
   assert.ok(FIX.includes("NOT IN ('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA')"));
   assert.ok(FIX.includes("La declaración final debe confirmarse con el conteo físico en una sola acción."));
