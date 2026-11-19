@@ -143,9 +143,14 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
   assert.match(verifier, /EXACT_SHA=PASS/);
   assert.ok(verifier.includes("release.asset_inventory"));
   assert.ok(verifier.includes("critical asset SHA-256=PASS"));
-  assert.ok(verifier.includes('"app.js": liveApp'));
+  assert.ok(deployScript.includes('"app.js": app.body'),
+    "the deploy smoke must keep the byte-exact app.js proof");
+  assert.ok(verifier.includes('const requiredAppMarkers = ['));
+  assert.ok(verifier.includes('"jornada-price-changes.js"'));
   assert.ok(verifier.includes('"service-worker.js": liveSw'));
   assert.ok(verifier.includes('"style.css": liveStyle'));
+  assert.doesNotMatch(verifier, /"app\\.js": liveApp/,
+    "the later edge verifier uses the live app version/feature markers after the deploy smoke's byte-exact proof");
   assert.doesNotMatch(verifier, /"index\.html": liveIndex/,
     "post-deploy Quality must not compare an edge-normalized HTML response as raw source bytes");
   assert.ok(verifier.includes('class="app-shell" id="app-shell"'));
