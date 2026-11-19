@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.126 — Inventario unificado, archivo de productos y entradas tardías
+// v9.5.127 — Inventario unificado, archivo de productos y entradas tardías
 (function hotfixV9475(){
   const VERSION="9.5.127";
   window.__BC_VERSION__=VERSION;
