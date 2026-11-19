@@ -95,6 +95,11 @@ test("assigned staff can declare handed-over cash and close their legacy active 
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
 });
 
+test("the separate cash panel is an exception inbox for physical-count differences only", () => {
+  assert.match(ADMIN_UI, /DIFERENCIAS DE EFECTIVO/);
+  assert.match(ADMIN_UI, /CON_DIFERENCIA/);
+  assert.match(ADMIN_UI, /estado_aprobacion \\|\\| ''/);
+});
 test("the owner inbox is RPC-only and exposes count, difference and explicit review", () => {
   assert.match(ADMIN_UI, /bc5_listar_dinero_pendiente_contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
