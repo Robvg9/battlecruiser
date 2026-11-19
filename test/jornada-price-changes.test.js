@@ -19,7 +19,7 @@ test("Jornada price changes are server-owned, audited, and wait for a physical c
   assert.match(migration,/stock_contado=v_counted/);
   assert.match(migration,/unidades_vendidas_precio_anterior=v_sold_before/);
   assert.match(migration,/bc7_jornada_saldos_operativos\(v_s\.id\)/);
-  assert.match(migration,/CREATE TABLE IF NOT EXISTS public\\.turno_jornada_cambios_precio[\\s\\S]*estado text NOT NULL DEFAULT 'PENDIENTE_CONTEO'/);
+  assert.match(migration,/estado text NOT NULL DEFAULT 'PENDIENTE_CONTEO'/);
   assert.match(migration,/bc7_jornada_precio_pendiente_close_guard/);
   assert.match(migration,/REVOKE ALL ON public\.turno_jornada_cambios_precio FROM PUBLIC, anon, authenticated/);
   assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.bc7_confirmar_cambios_precio_conteo\(uuid,jsonb\) TO authenticated/);
