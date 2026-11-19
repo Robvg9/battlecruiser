@@ -370,6 +370,7 @@ function applySql(file) {
     applySql("test/jornada-final-inventory-period-products-contract.sql");
     log("Verify inclusive final-day acceptance for daily cash handovers in a multi-day Jornada.");
     applySql("supabase/migrations/20261118195000_jornada_daily_handover_inclusive_end_date.sql");
+    applySql("supabase/migrations/20261119133401_jornada_persist_historical_product_values.sql");
     applySql("test/jornada-daily-handover-inclusive-period-contract.sql");
     applySql("test/jornada-product-catalog-and-inventory-contract.sql");
     applySql("test/la-cueva-period-settlement-contract.sql");
@@ -378,8 +379,9 @@ function applySql(file) {
     applySql("test/jornada-pending-cash-visibility-contract.sql");
     log("\\r\\n=== Apply persistent Jornada price changes and verify stock-count / sale-price tranches ===");
     applySql("supabase/migrations/20261119000000_jornada_persistent_price_changes.sql");
+    applySql("supabase/migrations/20261119193000_jornada_price_change_optional_cost.sql");
     applySql("test/jornada-price-changes-contract.sql");
-    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price changes with mandatory stock count and historical sale tranches.");
+    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with mandatory physical count and effective-dated price/cost history.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
