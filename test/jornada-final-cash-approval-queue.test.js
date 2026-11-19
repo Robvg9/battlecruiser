@@ -22,16 +22,17 @@ test("Centro de Control includes pending final-cash declarations for JORNADA ses
   assert.ok(QUEUE.includes("s.estado::text"));
 });
 
-test("Final cash declaration approval is independent from the later physical count",()=>{
+test("Final cash declaration is counted once from the administrative approval modal",()=>{
+  const FIX=read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
   assert.ok(ADMIN.includes("x.tipo==='declaracion_jornada'"));
-  assert.ok(ADMIN.includes("Aprobar declaración"));
-  assert.ok(ADMIN.includes("rpc('bc7_resolver_declaracion_jornada'"));
-  assert.ok(ADMIN.includes("Esta decisión aprueba la declaración del importe, no certifica un conteo físico"));
-  assert.ok(!ADMIN.includes("acceptButton.disabled=isFinalCash&&!finalCashReady"));
-  assert.ok(!ADMIN.includes("rejectButton.hidden=isFinalCash"));
-  assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'")===false,
-    "the admin declaration modal must not perform the physical count");
-  assert.ok(PHASE.includes("IF v_s.estado<>'COMPLETADA' THEN"),"the server still blocks physical count until handover");
+  assert.ok(ADMIN.includes("Confirmar conteo físico"));
+  assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
+  assert.ok(!ADMIN.includes("Aprobar declaración"));
+  assert.ok(ADMIN.includes("rpc('bc7_resolver_declaracion_jornada'"),"rejection remains available for corrections");
+  assert.ok(ADMIN.includes("Registra aquí el efectivo contado físicamente"));
+  assert.ok(FIX.includes("La declaración final debe confirmarse con el conteo físico en una sola acción."));
+  assert.ok(FIX.includes("NOT IN ('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA')"));
+  assert.ok(PHASE.includes("IF v_s.estado<>'COMPLETADA' THEN"),"the server still blocks count until the handover is complete");
   assert.ok(PHASE.includes("lista_para_conteo"),"physical count still requires the employee checklist");
   assert.ok(QUEUE.includes("s.estado::text"),"the queue retains the real session state while exposing pending declarations");
 });
@@ -78,14 +79,10 @@ test("final cash label follows the actual handover phase, not a generic pending 
   assert.match(block,/sessionState==='EN_CURSO'\?'Esperando entrega'/);
 });
 
-test("Approved final cash declarations become countable by the Owner only after handover",()=>{
-  const CASH_QUEUE=read("supabase/migrations/20261117220000_jornada_cash_owner_pending_count.sql");
+test("Separate cash panel is now only an exception inbox for counted differences",()=>{
   const CASH_UI=read("public/js/turno-cash-handover-ui.js");
-  assert.ok(CASH_QUEUE.includes("'DECLARACION_APROBADA'"));
-  assert.ok(CASH_QUEUE.includes("s.estado='COMPLETADA'"));
-  assert.ok(CASH_UI.includes("status === 'DECLARACION_APROBADA' && row.monto_contado == null"));
-  assert.ok(CASH_UI.includes("if (approvedForCount && completed)"));
-  assert.ok(CASH_UI.includes("rpc('bc5_contar_dinero_entregado'"));
+  assert.ok(CASH_UI.includes("estado_aprobacion || '').toUpperCase() === 'CON_DIFERENCIA'"));
+  assert.ok(CASH_UI.includes("DIFERENCIAS DE EFECTIVO"));
 });
 
 test("Owner review shows declared final cash separately from physical cash counted",()=>{
@@ -96,9 +93,9 @@ test("Owner review shows declared final cash separately from physical cash count
   assert.ok(OWNER_REVIEW.includes("Conteo final de caja"));
 });
 
-test("cash count module cache key is refreshed with the new UI contract",()=>{
+test("cash exception inbox cache key is refreshed with the new UI contract",()=>{
   const APP=read("public/app.js");
   const SW=read("public/service-worker.js");
-  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.1"'));
-  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.1"));
+  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.2"'));
+  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
 });

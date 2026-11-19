@@ -190,15 +190,15 @@ function renderApprovalDetails(x,detail){
     });
     html+='</div>';
   }else if(isMoney){
-    const amountLabel=isDailyCash?'Dinero contado realmente':'Importe informado';
-    const minAmount=isDailyCash?'0':'0.01';
+    const amountLabel=isDailyCash?'Dinero contado realmente':isFinalCash?'Conteo físico realizado por el Dueño':'Importe informado';
+    const minAmount=(isDailyCash||isFinalCash)?'0':'0.01';
     const declaredFinal=isFinalCash?'<span>Importe declarado por la responsable: '+esc(money(x.monto))+' CUP. Estado de la jornada: '+esc(x.motivo||'EN CURSO')+'.</span>':'<span>'+esc(x.motivo||'Sin descripción adicional')+'</span>';
     const finalCashNote=isFinalCash
-      ?'<p class="bc-admin-approval-message">Esta decisión aprueba la declaración del importe, no certifica un conteo físico. Puedes aprobarla ahora aunque la jornada siga EN CURSO. El Dueño contará el efectivo por separado después de que se entregue la jornada.</p>'
+      ?'<p class="bc-admin-approval-message">Registra aquí el efectivo contado físicamente. Esta única acción confirma la declaración si ambos importes coinciden; si existe diferencia, se registra para revisión. No hace falta una aprobación previa.</p>'
       :'';
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.resumen||(isReinvestment?'Reinversión':isDailyCash?'Entrega diaria':isFinalCash?'Declaración final':'Gasto'))+'</strong>'+
       declaredFinal+'</section>'+
-      (isFinalCash?'':'<label class="bc-admin-approval-field"><span>'+amountLabel+' (CUP)</span><input id="admin-approval-real" type="number" min="'+minAmount+'" step="0.01" inputmode="decimal" autocomplete="off" value="'+esc(x.monto)+'" '+(isReinvestment?'disabled':'')+'></label>')+(isReinvestment?'<p class="bc-admin-approval-message">La aprobación aplica al mismo tiempo la salida de caja y la entrada de inventario. Para cambiar el importe, rechaza y solicita una corrección.</p>':isDailyCash?'<p class="bc-admin-approval-message">Solo el importe aprobado se suma al dinero recogido de la jornada.</p>':finalCashNote);
+      '<label class="bc-admin-approval-field"><span>'+amountLabel+' (CUP)</span><input id="admin-approval-real" type="number" min="'+minAmount+'" step="0.01" inputmode="decimal" autocomplete="off" value="'+(isFinalCash?'':esc(x.monto))+'" '+(isReinvestment?'disabled':'')+'></label>'+(isReinvestment?'<p class="bc-admin-approval-message">La aprobación aplica al mismo tiempo la salida de caja y la entrada de inventario. Para cambiar el importe, rechaza y solicita una corrección.</p>':isDailyCash?'<p class="bc-admin-approval-message">Solo el importe aprobado se suma al dinero recogido de la jornada.</p>':finalCashNote);
   }else if(isStockChange){
     html+='<section class="bc-admin-approval-summary"><strong>'+esc(x.producto_nombre||'Producto')+'</strong>'+
       '<span>Motivo: '+esc(x.motivo||'—')+'</span></section>'+
@@ -213,9 +213,9 @@ function renderApprovalDetails(x,detail){
   body.innerHTML=html;
   const rejectButton=modal.querySelector('#admin-approval-reject');
   const acceptButton=modal.querySelector('#admin-approval-accept');
-  rejectButton.textContent=isList?'Rechazar lista completa':isReceipt?'Rechazar y exigir recuento':'Rechazar';
+  rejectButton.textContent=isList?'Rechazar lista completa':isReceipt?'Rechazar y exigir recuento':isFinalCash?'Solicitar corrección':'Rechazar';
   rejectButton.hidden=false;
-  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?'Aprobar declaración':isReceipt?'Aprobar recepción':'Aceptar y aprobar';
+  acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?'Confirmar conteo físico':isReceipt?'Aprobar recepción':'Aceptar y aprobar';
   acceptButton.disabled=false;
   modal.hidden=false;
   footer.hidden=false;
@@ -263,7 +263,7 @@ async function resolverDesdeModal(decision){
   }
   const accept=modal.querySelector('#admin-approval-accept'),reject=modal.querySelector('#admin-approval-reject');
   accept.disabled=true;reject.disabled=true;
-  setApprovalMessage(decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
+  setApprovalMessage(type==='declaracion_jornada'&&decision==='APROBAR'?'Guardando conteo físico…':decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
   try{
     if(type==='recepcion_inventario_jornada'){
       await rpc('bc7_resolver_entrega_jornada',{
@@ -288,14 +288,25 @@ async function resolverDesdeModal(decision){
       const isMoney=isExpense||type==='reinversion'||isDailyCash||isFinalCash;
       const input=modal.querySelector('#admin-approval-real');
       const real=input?Number(input.value):null;
-      if(decision==='APROBAR'&&input&&(!Number.isFinite(real)||((isDailyCash||isFinalCash)?real<0:real<=0))){
+      if(decision==='APROBAR'&&input&&((isFinalCash&&input.value.trim()==='')||!Number.isFinite(real)||((isDailyCash||isFinalCash)?real<0:real<=0))){
         throw new Error((isDailyCash||isFinalCash)?'El conteo físico no puede ser negativo.':'El valor real debe ser mayor que cero.');
       }
       if(isFinalCash){
-        if(!confirm((decision==='APROBAR'?'Vas a aprobar':'Vas a rechazar')+' la declaración de '+money(Number(modal.dataset.declaredAmount))+' CUP. '+(decision==='APROBAR'?'Esto no registra el conteo físico, que seguirá pendiente hasta que la jornada sea entregada.':'El rechazo requiere que la responsable corrija y vuelva a presentar el importe.')+' ¿Confirmas?')){accept.disabled=false;reject.disabled=false;return;}
-        await rpc('bc7_resolver_declaracion_jornada',{
-          p_declaracion_id:id,p_decision:decision,p_comentario:comment||null
-        });
+        if(decision==='APROBAR'){
+          if(!confirm('Importe declarado: '+money(Number(modal.dataset.declaredAmount))+' CUP. Conteo físico: '+money(real)+' CUP. Esta única acción confirmará el efectivo o registrará la diferencia para revisión. ¿Confirmas?')){accept.disabled=false;reject.disabled=false;return;}
+          const countResult=await rpc('bc5_contar_dinero_entregado',{
+            p_declaracion_id:id,p_monto_contado:real,p_observacion:comment||null
+          });
+          if(countResult&&countResult.estado==='APROBADA'){
+            alert('✓ Conteo físico confirmado. Declarado y contado: '+money(countResult.monto_contado)+' CUP.');
+          }else{
+            alert('Diferencia de efectivo registrada: '+money(countResult&&countResult.diferencia)+' CUP. Queda pendiente de revisión; no se ajustó dinero automáticamente.');
+          }
+        }else{
+          await rpc('bc7_resolver_declaracion_jornada',{
+            p_declaracion_id:id,p_decision:decision,p_comentario:comment||null
+          });
+        }
       }else{
         await rpc('resolver_aprobacion_operativa',{
           p_tipo:type,p_id:id,p_decision:decision,p_comentario:comment||null,

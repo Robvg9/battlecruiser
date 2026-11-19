@@ -78,7 +78,7 @@
     host = document.createElement('section');
     host.id = PANEL_ID;
     host.setAttribute('aria-live', 'polite');
-    host.innerHTML = '<div class="bc5-cash-head"><h3>ENTREGAS DE EFECTIVO</h3><button type="button" data-bc5-cash-refresh>Actualizar</button></div><div data-bc5-cash-list></div>';
+    host.innerHTML = '<div class="bc5-cash-head"><h3>DIFERENCIAS DE EFECTIVO</h3><button type="button" data-bc5-cash-refresh>Actualizar</button></div><div data-bc5-cash-list></div>';
     const anchor = document.getElementById('cc-atencion');
     const block = anchor && anchor.closest('.cc-bloque');
     if (block && block.parentNode) block.parentNode.insertBefore(host, block.nextSibling);
@@ -136,13 +136,18 @@
     if (!host) return;
     const listHost = host.querySelector('[data-bc5-cash-list]');
     state.rows = rows;
-    if (!rows.length) {
+    // Pending final declarations are counted directly in Centro de Control.
+    // Keep this separate panel only as an exception inbox for real discrepancies.
+    const discrepancyRows = rows.filter(function (row) {
+      return String(row.estado_aprobacion || '').toUpperCase() === 'CON_DIFERENCIA';
+    });
+    if (!discrepancyRows.length) {
       host.classList.remove('visible');
       listHost.innerHTML = '';
       return;
     }
     host.classList.add('visible');
-    listHost.innerHTML = rows.map(rowHtml).join('');
+    listHost.innerHTML = discrepancyRows.map(rowHtml).join('');
   }
   function notifyChanges(rows) {
     const current = new Map();
