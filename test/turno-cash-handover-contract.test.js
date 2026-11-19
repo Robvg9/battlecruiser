@@ -178,9 +178,9 @@ test("the owner can start a scheduled legacy day while non-worked placeholders d
 
 test("PWA release 9.5.127 loads and precaches the dashboard and cash handover UI", () => {
   assert.match(APP, /const VERSION="9.5.127"/);
-  assert.match(APP, /\["turno-cash-handover-ui\.js","1\.1"\]/);
+  assert.match(APP, /\["turno-cash-handover-ui\.js","1\.2"\]/);
   assert.match(SW, /BC_SW_VERSION = "9.5.127"/);
-  assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.1/);
+  assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.2/);
   assert.match(INDEX, /app\.js\?v=9.5.127/);
   assert.match(INDEX, /style\.css\?v=9\.5\.115/);
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
