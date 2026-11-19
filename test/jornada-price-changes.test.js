@@ -76,5 +76,5 @@ test("Price-change UI is versioned, loaded in the app and precached for PWA star
   assert.match(app,/const VERSION="9.5.128"/);
   assert.match(app,/\["jornada-price-changes.js","1.0.1"\]/);
   assert.match(sw,/BC_SW_VERSION = "9.5.128"/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.0/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.1/);
 });
