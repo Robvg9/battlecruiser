@@ -16,6 +16,7 @@
 
   function client() {
     try {
+      if (typeof client !== 'undefined' && client && typeof client.rpc === 'function') return client;
       if (window.client && typeof window.client.rpc === 'function') return window.client;
       if (typeof window.supabaseClient !== 'undefined' && window.supabaseClient && typeof window.supabaseClient.rpc === 'function') return window.supabaseClient;
     } catch (_) {}
@@ -255,8 +256,10 @@
       currentGate = null;
       return;
     }
+    const signature = session.cambios.map(function (item) { return item.id; }).join('|');
     if (currentGate && currentGate.sesion_id === session.sesion_id &&
-        document.getElementById(GATE_ID)) return;
+        currentGate._signature === signature && document.getElementById(GATE_ID)) return;
+    session._signature = signature;
     currentGate = session;
     document.getElementById(GATE_ID)?.remove();
     injectStyles();
@@ -291,13 +294,14 @@
         p_conteos: counts.map(function (item) { return { producto_id: item.producto_id, cantidad: Number(item.cantidad) }; })
       });
       if (status) { status.textContent = 'Conteo confirmado. Los precios nuevos ya están activos.'; status.className = 'bc-jpc-status success'; }
+      const completedSessionId = currentGate.sesion_id;
       document.getElementById(GATE_ID)?.remove();
       document.body.style.overflow = priorBodyOverflow;
       currentGate = null;
       window.dispatchEvent(new CustomEvent('bc:data-changed', { detail: { domains: ['stock', 'products', 'movements'] } }));
       const workspace = window.__BC7_JORNADA__;
       if (workspace && typeof workspace.openForSession === 'function') {
-        workspace.openForSession(currentGate && currentGate.sesion_id);
+        workspace.openForSession(completedSessionId);
       }
       refreshPending();
     } catch (error) {
