@@ -82,6 +82,7 @@ test("Step 7 loads eligible responsible users from the authoritative server cata
     if (name === "bc5_mis_jornadas") return { data: [], error: null };
     throw new Error("Unexpected RPC: " + name);
   });
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
   window.document.getElementById("bc7-days-count").value = "7";
   window.document.querySelector("[data-bc7-build]").click();
 
