@@ -34,7 +34,7 @@ BEGIN
     RAISE EXCEPTION 'Product price/cost history capture trigger is missing.';
   END IF;
 
-  IF NOT EXISTS (
+  IF EXISTS (
     SELECT 1 FROM public.productos p
     WHERE NOT EXISTS (
       SELECT 1 FROM public.productos_valores_historial h
