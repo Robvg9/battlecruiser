@@ -1123,7 +1123,8 @@ async function main() {
   ).catch(() => null);
   if (!registration) {
     report.evidence.phase = "online_controller_reload";
-    await reloadAndWait();
+    // This must be a normal navigation: a hard reload (ignoreCache=true) bypasses the Service Worker.
+    await reloadAndWait(false);
     registration = await waitUntil(
       "control de página por el Service Worker después de la segunda carga",
       "(()=>{const r=navigator.serviceWorker&&navigator.serviceWorker.controller;return r?{controlled:true,scriptURL:r.scriptURL}:null})()",
