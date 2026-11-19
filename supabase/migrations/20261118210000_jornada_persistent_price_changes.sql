@@ -238,7 +238,10 @@ AS $function$
     'cambios',pending.rows
   ) ORDER BY s.fecha,s.numero_dia),'[]'::jsonb)
   FROM public.turno_sesiones s
-  JOIN public.turno_tramos tr ON tr.turno_sesion_id=s.id
+  JOIN public.turno_tramos tr
+    ON tr.turno_sesion_id=s.id
+   AND tr.usuario_id=auth.uid()
+   AND tr.estado='ACTIVO'
   JOIN LATERAL (
     SELECT jsonb_agg(jsonb_build_object(
       'id',c.id,
