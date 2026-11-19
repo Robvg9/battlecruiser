@@ -466,8 +466,10 @@
     const value=String(input&&input.value||'').trim();
     if(!value)return 0;
     const raw=Number(value);
-    if(!Number.isFinite(raw)||raw<2||raw>31)return 0;
-    return Math.floor(raw);
+    if(!Number.isFinite(raw))return 0;
+    const count=Math.max(2,Math.min(31,raw));
+    if(input&&input.value!==String(count))input.value=String(count);
+    return Math.floor(count);
   }
   function readDayRows(){
     return Array.from(document.querySelectorAll('#bc7-day-rows .bc7-day-row')).map((r,i)=>{
