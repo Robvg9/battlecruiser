@@ -263,7 +263,7 @@ async function resolverDesdeModal(decision){
   }
   const accept=modal.querySelector('#admin-approval-accept'),reject=modal.querySelector('#admin-approval-reject');
   accept.disabled=true;reject.disabled=true;
-  setApprovalMessage(decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
+  setApprovalMessage(type==='declaracion_jornada'&&decision==='APROBAR'?'Guardando conteo físico…':decision==='APROBAR'?'Aplicando la aprobación…':'Registrando el rechazo…',false);
   try{
     if(type==='recepcion_inventario_jornada'){
       await rpc('bc7_resolver_entrega_jornada',{
