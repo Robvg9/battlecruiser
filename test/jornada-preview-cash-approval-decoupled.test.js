@@ -5,6 +5,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const MIGRATION=read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
+const FIX=read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
 const UI=read("public/js/bc7-jornada-ui.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const APP=read("public/app.js");
@@ -28,7 +29,8 @@ test("Final declaration and physical cash count are one Owner action in Centro d
   assert.ok(ADMIN.includes("rpc('bc7_resolver_declaracion_jornada'"),"rejection remains available to request correction");
   assert.ok(!ADMIN.includes("Aprobar declaración"));
   assert.ok(ADMIN.includes("Registra aquí el efectivo contado físicamente"));
-  assert.ok(FIX.includes("IF v_s.estado<>'COMPLETADA' THEN"),"physical count remains blocked until handover");
+  assert.ok(MIGRATION.includes("IF v_s.estado<>'COMPLETADA' THEN"),"physical count remains blocked until handover");
+  assert.ok(MIGRATION.includes("lista_para_conteo"),"the employee checklist remains required");
 });
 
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
@@ -84,8 +86,8 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
 });
 
 test("PWA caches the new Jornada and single-count modules",()=>{
-  assert.ok(APP.includes('const VERSION="9.5.128"'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.128"'));
+  assert.ok(APP.includes('const VERSION="9.5.127"'));
+  assert.ok(SW.includes('BC_SW_VERSION = "9.5.127"'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.42"]'));
   assert.ok(SW.includes("bc7-jornada-ui.js?v=7.42"));
   assert.ok(APP.includes('["aprobaciones-admin.js","20261119.1"]'));
