@@ -8,6 +8,7 @@ DECLARE
   v_prog uuid := '94000000-0000-0000-0000-000000000001';
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
   v_worker uuid := '95000000-0000-0000-0000-000000000003';
+  v_other_worker uuid := '95000000-0000-0000-0000-000000000004';
   v_almacen uuid := '10000000-0000-0000-0000-000000000004';
   v_pan uuid := '31000000-0000-0000-0000-000000000001';
   v_jugo uuid := '31000000-0000-0000-0000-000000000002';
@@ -104,6 +105,22 @@ BEGIN
     RAISE EXCEPTION 'FAIL: price changed before the physical count was confirmed';
   END IF;
 
+  -- Only the worker with the active tranche receives the blocking gate.
+  INSERT INTO auth.users(id) VALUES(v_other_worker) ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.usuarios(id,activo,role_id)
+  VALUES(v_other_worker,true,'30000000-0000-0000-0000-000000000002');
+  PERFORM set_config('request.jwt.claim.sub',v_other_worker::text,false);
+  v_result:=public.bc7_mis_cambios_precio_pendientes();
+  IF jsonb_array_length(v_result)<>0 THEN
+    RAISE EXCEPTION 'FAIL: another authenticated worker received a pending price gate';
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  v_result:=public.bc7_mis_cambios_precio_pendientes();
+  IF jsonb_array_length(v_result)<>1
+     OR v_result->0->>'sesion_id'<>v_sesion::text THEN
+    RAISE EXCEPTION 'FAIL: the active assigned worker did not receive the pending price gate';
+  END IF;
+
   -- The current assigned worker must physically count 8 units. The 2 missing units
   -- are sold at the previous price; one further unit will be sold after the change.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
@@ -173,7 +190,13 @@ BEGIN
   IF has_function_privilege('anon','public.bc7_solicitar_cambios_precio_jornada(uuid,jsonb,text)','EXECUTE') THEN
     RAISE EXCEPTION 'FAIL: anon can request a price change';
   END IF;
+  IF has_function_privilege('anon','public.bc7_mis_cambios_precio_pendientes()','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: anon can read pending price changes';
+  END IF;
+  IF has_function_privilege('authenticated','public.bc7_bloquear_cierre_con_cambios_precio_pendientes()','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: authenticated can call the trigger helper directly';
+  END IF;
 
-  RAISE NOTICE 'PASS price changes: pending request, unchanged catalogue, mandatory physical count, persistent catalogue update, old/new sale tranches, settlement and close gate';
+  RAISE NOTICE 'PASS price changes: pending request, worker-only blocking gate, unchanged catalogue, mandatory physical count, persistent catalogue update, old/new sale tranches, settlement and close gate';
 END
 $test$;
