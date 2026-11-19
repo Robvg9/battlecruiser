@@ -144,7 +144,7 @@
       return '<option value="' + esc(item.sesion_id) + '">' + esc(item.almacen_nombre) + ' · ' + esc(item.fecha) + ' · Jornada ' + esc(item.sesion_id.slice(0, 8)) + '</option>';
     }).join('');
     return '<div class="bc165-overlay" id="' + MODAL_ID + '">' +
-      '<section class="bc165-modal bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
+      '<section class="bc-jpc-dialog bc165-modal" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
         '<header class="bc165-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio y el costo solo se activarán después del conteo físico.</p></div><button type="button" class="bc165-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
         '<div class="bc-jpc-body">' +
           '<label class="bc-jpc-field">Jornada activa<select id="bc-jpc-session">' + options + '</select></label>' +
@@ -243,7 +243,7 @@
   function gateHtml(session) {
     const rows = Array.isArray(session.cambios) ? session.cambios : [];
     return '<div class="bc165-overlay bc-jpc-gate" id="' + GATE_ID + '">' +
-      '<section class="bc165-modal bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-gate-title">' +
+      '<section class="bc-jpc-dialog bc165-modal" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-gate-title">' +
         '<header class="bc165-head"><div><h3 id="bc-jpc-gate-title">Conteo obligatorio por cambio de precio</h3><p>Antes de activar los nuevos valores debes contar físicamente las existencias actuales. Las unidades que ya no estén quedarán valoradas al precio anterior.</p></div></header>' +
         '<div class="bc-jpc-body">' +
           '<div class="bc-jpc-summary">' + esc(session.fecha || '') + ' · Hay ' + rows.length + ' producto(s) pendientes. Esta ventana no se puede cerrar sin completar el conteo.</div>' +
