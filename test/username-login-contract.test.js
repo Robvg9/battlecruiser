@@ -43,12 +43,13 @@ test("a discovered session is not replaced by the auth boot fail-safe while UI m
 test("session restoration reports only a safe diagnostic code and storage-key presence", () => {
   assert.ok(auth.includes('function bcAuthStoragePresence()'));
   assert.ok(auth.includes('sb-papxnkkjtkxsitcsvcme-auth-token'));
-  assert.ok(auth.includes('bc-auth-diagnostic'));
+  assert.doesNotMatch(auth, /bc-auth-diagnostic/);
   assert.ok(auth.includes('GETSESSION_EMPTY'));
   assert.ok(auth.includes('GETSESSION_ERROR'));
   assert.ok(auth.includes('BOOT_TIMEOUT'));
   assert.ok(auth.includes('AUTH_SIGNED_OUT_EVENT'));
-  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace }'));
+  assert.ok(auth.includes('window.__BC_AUTH_DIAGNOSTIC__ = diagnostic'));
+  assert.doesNotMatch(auth, /Diagnóstico de sesión:/);
   assert.ok(auth.includes("function bcAuthErrorShape(error)"));
   assert.ok(auth.includes("function bcScheduleGetSessionRetry()"));
   assert.ok(auth.includes("_bcAuthGetSessionRetryAttempts >= 2"));
