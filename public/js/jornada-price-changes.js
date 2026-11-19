@@ -248,7 +248,7 @@
         '<div class="bc-jpc-body">' +
           '<div class="bc-jpc-summary">' + esc(session.fecha || '') + ' · Hay ' + rows.length + ' producto(s) pendientes. Esta ventana no se puede cerrar sin completar el conteo.</div>' +
           rows.map(function (item) {
-            return '<label class="bc-jpc-count-row"><span><strong>' + esc(item.nombre) + '</strong><small>Precio anterior: ' + esc(money(item.precio_anterior)) + ' CUP · Nuevo precio: ' + esc(money(item.precio_nuevo)) + ' CUP</small></span><input type="number" min="0" step="0.001" inputmode="decimal" required autocomplete="off" data-bc-jpc-count="' + esc(item.producto_id) + '" placeholder="Stock físico" aria-label="Stock físico de ' + esc(item.nombre) + '"></label>';
+            return '<label class="bc-jpc-count-row"><span><strong>' + esc(item.nombre) + '</strong><small>Precio anterior: ' + esc(money(item.precio_anterior)) + ' CUP · Nuevo precio: ' + esc(money(item.precio_nuevo)) + ' CUP' + (item.costo_nuevo!=null ? ' · Nuevo costo: ' + esc(money(item.costo_nuevo)) + ' CUP' : '') + '</small></span><input type="number" min="0" step="0.001" inputmode="decimal" required autocomplete="off" data-bc-jpc-count="' + esc(item.producto_id) + '" placeholder="Stock físico" aria-label="Stock físico de ' + esc(item.nombre) + '"></label>';
           }).join('') +
           '<p class="bc-jpc-required">Cuenta cada producto ahora. No introduzcas el stock de sistema: escribe lo que existe físicamente.</p>' +
           '<p class="bc-jpc-status" id="bc-jpc-gate-status" role="status" aria-live="polite"></p>' +
