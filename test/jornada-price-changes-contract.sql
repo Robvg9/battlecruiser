@@ -7,6 +7,7 @@ DECLARE
   v_sesion uuid := '94000000-0000-0000-0000-000000000001';
   v_prog uuid := '94000000-0000-0000-0000-000000000001';
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
+  v_worker uuid := '20000000-0000-0000-0000-000000000003';
   v_almacen uuid := '10000000-0000-0000-0000-000000000004';
   v_pan uuid := '31000000-0000-0000-0000-000000000001';
   v_jugo uuid := '31000000-0000-0000-0000-000000000002';
@@ -22,8 +23,16 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
 
+  INSERT INTO auth.users(id) VALUES(v_worker);
+  INSERT INTO public.usuarios(id,activo,role_id)
+  VALUES(v_worker,true,'30000000-0000-0000-0000-000000000002');
+
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES(v_almacen,'Almacén minorista para contrato de precio','minorista',true);
+  INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
+  SELECT producto_id,v_almacen,cantidad,minimo
+  FROM public.stock
+  WHERE almacen_id='10000000-0000-0000-0000-000000000001';
   UPDATE public.productos SET precio_normal=10 WHERE id=v_pan;
   UPDATE public.productos SET precio_normal=5 WHERE id=v_jugo;
 
@@ -41,7 +50,7 @@ BEGIN
     creado_por,actualizado_por,salario_porcentaje
   ) VALUES(
     v_prog,v_turn,v_almacen,1,(now() AT TIME ZONE 'America/Havana')::date,
-    true,v_owner,'07:00','23:00','America/Havana',NULL,'PROGRAMADA',
+    true,v_worker,'07:00','23:00','America/Havana',NULL,'PROGRAMADA',
     v_owner,v_owner,5
   );
   INSERT INTO public.turno_sesiones(
@@ -51,7 +60,9 @@ BEGIN
     (now() AT TIME ZONE 'America/Havana')::date,'PROGRAMADA',v_prog
   );
   INSERT INTO public.turno_asignaciones(turno_sesion_id,turno_id,usuario_id,asignado_por)
-  VALUES(v_sesion,v_turn,v_owner,v_owner);
+  VALUES(v_sesion,v_turn,v_worker,v_owner);
+
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
 
   v_result:=public.bc7_guardar_inventario_jornada(
     v_sesion,'INICIAL',
@@ -67,6 +78,7 @@ BEGIN
 
   PERFORM public.bc5_iniciar_jornada(v_sesion,'Apertura controlada del contrato de precio');
 
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   v_result:=public.bc7_cambios_precio_contexto();
   IF NOT EXISTS(
     SELECT 1 FROM jsonb_array_elements(v_result) x(value)
@@ -94,6 +106,7 @@ BEGIN
 
   -- The current assigned worker must physically count 8 units. The 2 missing units
   -- are sold at the previous price; one further unit will be sold after the change.
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   v_result:=public.bc7_confirmar_cambios_precio_conteo(
     v_sesion,
     jsonb_build_array(jsonb_build_object('producto_id',v_pan,'cantidad',8))
