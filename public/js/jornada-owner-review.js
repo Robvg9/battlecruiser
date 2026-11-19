@@ -338,14 +338,14 @@
     }
     if(busy){setStatus('Ya hay otra operación guardándose. Espera a que termine.','error');return;}
     busy=true;button.disabled=true;button.textContent='Guardando…';
-    setStatus('Guardando valores históricos de esta Jornada…');
+    setStatus('Guardando valores de esta Jornada y fijándolos para futuras Jornadas…');
     try{
       await rpc('bc7_ajustar_valores_producto_jornada',{
         p_turno_sesion_id:button.dataset.session,
         p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:hasPrice?Number(price):null,costo_unitario:hasCost?Number(cost):null}],
         p_comentario:reason
       });
-      setStatus('Valores guardados. Actualizando la liquidación…','success');
+      setStatus('Valores guardados y persistidos para futuras Jornadas. Actualizando la liquidación…','success');
       box.remove();await openReview(activeTurnId);
     }catch(error){
       setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');
@@ -381,7 +381,7 @@
     }).join('');
     const mapped=pending.filter(x=>verifiedHistoricCosts[normalizeProductName(x.nombre)]!=null).length;
     const box=document.createElement('div');box.className='bcjr-values-modal';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Costos históricos · carga en lote</h3><p class="bcjr-muted">Una sola lista para toda la jornada. '+mapped+' de '+pending.length+' costos vienen precargados desde el Excel verificado. Revisa los importes; puedes corregirlos aquí. Los vacíos no se guardarán. Esto solo modifica esta jornada, nunca el catálogo.</p><div class="bcjr-table-wrap" style="max-height:58dvh"><table class="bcjr-table" style="min-width:0"><thead><tr><th>Producto / vendidas</th><th>Costo CUP</th><th>Fuente</th></tr></thead><tbody>'+rows+'</tbody></table></div><label>Fuente común<textarea rows="2" maxlength="500" data-bcjr-bulk-reason>Evidencia documental de precios y costos históricos correspondiente a esta jornada.</textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-bulk-costs-save data-session="'+esc(button.dataset.session)+'">Guardar costos completados</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Costos históricos · carga en lote</h3><p class="bcjr-muted">Una sola lista para toda la jornada. '+mapped+' de '+pending.length+' costos vienen precargados desde el Excel verificado. Revisa los importes; puedes corregirlos aquí. Los vacíos no se guardarán. Los costos guardados serán la referencia global del producto para futuras Jornadas; no se modifican los lotes de compra ni las liquidaciones anteriores.</p><div class="bcjr-table-wrap" style="max-height:58dvh"><table class="bcjr-table" style="min-width:0"><thead><tr><th>Producto / vendidas</th><th>Costo CUP</th><th>Fuente</th></tr></thead><tbody>'+rows+'</tbody></table></div><label>Fuente común<textarea rows="2" maxlength="500" data-bcjr-bulk-reason>Evidencia documental de precios y costos históricos correspondiente a esta jornada.</textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-bulk-costs-save data-session="'+esc(button.dataset.session)+'">Guardar costos completados</button></div></section>';
     document.body.appendChild(box);
   }
   async function saveBulkCostsEditor(button){
@@ -403,13 +403,13 @@
     if(reason.length<5||reason.length>500){setStatus('La fuente debe tener entre 5 y 500 caracteres. No se guardó nada.','error');return;}
     if(busy){setStatus('Ya hay otra operación guardándose.','error');return;}
     const adjustments=filled.map(input=>({producto_id:input.dataset.bcjrBulkCost,precio_venta_unitario:null,costo_unitario:Number(input.value.trim())}));
-    if(!confirm('Se guardarán '+adjustments.length+' costos históricos en esta jornada. Los precios de venta y el catálogo no cambiarán. ¿Continuar?'))return;
+    if(!confirm('Se guardarán '+adjustments.length+' costos corregidos como referencia global del producto para futuras Jornadas. Los precios de venta no cambiarán ni se reescribirán lotes históricos. ¿Continuar?'))return;
     busy=true;button.disabled=true;button.textContent='Guardando '+adjustments.length+'…';setStatus('Guardando todos los costos en una sola operación auditada…');
     try{
       try{
         const result=await rpc('bc7_ajustar_valores_producto_jornada',{p_turno_sesion_id:button.dataset.session,p_ajustes:adjustments,p_comentario:reason});
-        if(!result||result.ok!==true||Number(result.productos_ajustados)!==adjustments.length||result.catalogo_modificado!==false){
-          const error=new Error('El servidor no confirmó el número exacto de costos guardados ni que el catálogo permanezca intacto. Reabre la revisión para comprobar el resultado; no repitas el guardado desde esta ventana.');
+        if(!result||result.ok!==true||Number(result.productos_ajustados)!==adjustments.length||result.catalogo_modificado!==false||result.valores_producto_persistidos!==true){
+          const error=new Error('El servidor no confirmó el número exacto de costos ni su persistencia para futuras Jornadas. Reabre la revisión para comprobar el resultado; no repitas el guardado desde esta ventana.');
           error.name='UnconfirmedBulkCostResult';
           throw error;
         }
@@ -428,7 +428,7 @@
       }
       button.disabled=true;button.textContent='Guardado';
       box.querySelectorAll('input,textarea').forEach(input=>{input.disabled=true;});
-      setStatus('Costos guardados. Actualizando la liquidación…','success');
+      setStatus('Costos guardados como referencia global del producto. Actualizando la liquidación…','success');
       try{
         const refreshed=await openReview(activeTurnId);
         if(refreshed)box.remove();
