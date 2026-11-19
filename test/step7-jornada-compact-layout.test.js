@@ -25,10 +25,10 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
  assert.match(app,/const VERSION="9.5.127"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.42"\]/);
+ assert.match(app,/\["bc7-jornada-ui\.js","7\.43"\]/);
  assert.match(sw,/BC_SW_VERSION = "9.5.127"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.42/);
- assert.ok(ui.includes("v7.42 — inventario unificado, archivo reversible y atribución de entradas tardías."));
+ assert.match(sw,/bc7-jornada-ui\.js\?v=7\.43/);
+ assert.ok(ui.includes("v7.43 — inventario unificado, archivo reversible y atribución de entradas tardías."));
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
