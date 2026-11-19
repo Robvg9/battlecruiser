@@ -237,24 +237,10 @@ function bcAuthDiagnostic(code, visible, cause, shape, fingerprint, trace) {
   var safeShape = shape || "NONE";
   var safeFingerprint = fingerprint || "NONE";
   var safeTrace = trace || "NONE";
-  window.__BC_AUTH_DIAGNOSTIC__ = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace };
-  console.warn("[BattleCruiser] auth diagnostic", { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace });
-  if (!visible || !loginForm) return;
-  var el = document.getElementById("bc-auth-diagnostic");
-  if (!el) {
-    el = document.createElement("p");
-    el.id = "bc-auth-diagnostic";
-    el.className = "footnote bc-auth-diagnostic";
-    el.setAttribute("role", "status");
-    loginForm.appendChild(el);
-  }
-  el.textContent = "Diagnóstico de sesión: " + code
-    + (safeCause !== "NONE" ? " · causa: " + safeCause : "")
-    + (safeShape !== "NONE" ? " · tipo: " + safeShape : "")
-    + (safeFingerprint !== "NONE" ? " · firma: " + safeFingerprint : "")
-    + (safeTrace !== "NONE" ? " · traza: " + safeTrace : "")
-    + " · almacenamiento local: " + storage
-    + ". Comparte solo estos valores; no compartas contraseñas ni datos de sesión.";
+  var diagnostic = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace };
+  window.__BC_AUTH_DIAGNOSTIC__ = diagnostic;
+  // Keep allowlisted diagnostics for support, but never render session internals on the login screen.
+  console.warn("[BattleCruiser] auth diagnostic", diagnostic);
 }
 // Recovery links must open the password form directly; do not make the user hunt for Ajustes.
 // Keep a query marker as fallback because Supabase may consume/remove the recovery hash during boot.

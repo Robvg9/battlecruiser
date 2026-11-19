@@ -77,7 +77,7 @@ test("PWA shell, app loader and Service Worker use one cache-isolated release ve
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/)?.[1];
   const swVersion = serviceWorker.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
   const htmlAppVersion = indexHtml.match(/app\.js\?v=([^"']+)/)?.[1];
-  assert.equal(appVersion, "9.5.127");
+  assert.equal(appVersion, "9.5.128");
   assert.equal(swVersion, appVersion);
   assert.equal(htmlAppVersion, appVersion);
   assert.match(indexHtml, new RegExp("v" + appVersion));
@@ -209,9 +209,9 @@ test("Service Worker updates wait for an explicit, stable handoff", () => {
 
 test("Saved light/dark preference is applied before first paint", () => {
   const bootstrapAt = indexHtml.indexOf('id="bc-theme-first-paint"');
-  const stylesheetAt = indexHtml.indexOf('href="style.css?v=9.5.115"');
+  const stylesheetAt = indexHtml.indexOf('href="style.css?v=9.5.116"');
   const themeScriptAt = indexHtml.indexOf('js/m27-5-theme-dark-reset.js?v=27.5a3');
-  const appScriptAt = indexHtml.indexOf('app.js?v=9.5.127');
+  const appScriptAt = indexHtml.indexOf('app.js?v=9.5.128');
   assert.ok(bootstrapAt >= 0 && bootstrapAt < stylesheetAt,
     "the saved preference bootstrap must execute before the main stylesheet");
   assert.ok(themeScriptAt >= 0 && themeScriptAt < appScriptAt,
@@ -223,9 +223,9 @@ test("Saved light/dark preference is applied before first paint", () => {
   assert.match(theme, /setAttribute\('data-bc-theme', appearance\)/,
     "runtime theme changes must keep the first-paint state synchronized");
   assert.ok(indexHtml.includes('js/core.js?v=9.5.117'));
-  assert.ok(indexHtml.includes('js/auth.js?v=9.5.117'));
+  assert.ok(indexHtml.includes('js/auth.js?v=9.5.118'));
   assert.ok(indexHtml.includes('js/m27-5-theme-dark-reset.js?v=27.5a3'));
   assert.ok(serviceWorker.includes('./js/core.js?v=9.5.117'));
-  assert.ok(serviceWorker.includes('./js/auth.js?v=9.5.117'));
+  assert.ok(serviceWorker.includes('./js/auth.js?v=9.5.118'));
   assert.ok(serviceWorker.includes('./js/m27-5-theme-dark-reset.js?v=27.5a3'));
 });

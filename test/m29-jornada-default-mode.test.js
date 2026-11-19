@@ -31,7 +31,9 @@ test("BC7 is the only creator and enforces the two-day complete-Jornada model", 
   assert.match(BC7, /Crear y organizar jornadas/);
   assert.match(BC7, /id="bc7-days-count" type="number" min="2" max="31"/);
   assert.match(BC7, /function scheduleDayCount\(\)/);
-  assert.match(BC7, /Math\.max\(2,Math\.min\(31,Number\.isFinite\(raw\)\?raw:7\)\)/);
+  assert.match(BC7, /if\(!value\)return 0/);
+  assert.match(BC7, /Math\.max\(2,Math\.min\(31,raw\)\)/);
+  assert.doesNotMatch(BC7, /id="bc7-days-count"[^>]*value="7"/);
   assert.match(BC7, /async function previewPattern/);
   assert.match(BC7, /async function createSchedule/);
   assert.match(BC7, /rpc\('bc5_previsualizar_jornada'/);

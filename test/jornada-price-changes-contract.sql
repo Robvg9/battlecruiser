@@ -14,6 +14,8 @@ DECLARE
   v_jugo uuid := '31000000-0000-0000-0000-000000000002';
   v_old_price numeric;
   v_new_price numeric;
+  v_old_cost numeric;
+  v_new_cost numeric;
   v_result jsonb;
   v_liq jsonb;
   v_line jsonb;
@@ -88,12 +90,13 @@ BEGIN
     RAISE EXCEPTION 'FAIL: owner price-change context did not expose the active Jornada';
   END IF;
 
-  SELECT precio_normal INTO v_old_price FROM public.productos WHERE id=v_pan;
+  SELECT precio_normal,costo_unitario_referencia INTO v_old_price,v_old_cost FROM public.productos WHERE id=v_pan;
   v_new_price:=v_old_price+10;
+  v_new_cost:=coalesce(v_old_cost,0)+1;
 
   v_result:=public.bc7_solicitar_cambios_precio_jornada(
     v_sesion,
-    jsonb_build_array(jsonb_build_object('producto_id',v_pan,'precio_nuevo',v_new_price)),
+    jsonb_build_array(jsonb_build_object('producto_id',v_pan,'precio_nuevo',v_new_price,'costo_nuevo',v_new_cost)),
     'Prueba de contrato: actualización del precio de Pan'
   );
 
@@ -101,8 +104,9 @@ BEGIN
      OR (v_result->>'catalogo_modificado')::boolean IS DISTINCT FROM false THEN
     RAISE EXCEPTION 'FAIL: price change request must remain pending and leave catalogue untouched';
   END IF;
-  IF (SELECT precio_normal FROM public.productos WHERE id=v_pan)<>v_old_price THEN
-    RAISE EXCEPTION 'FAIL: price changed before the physical count was confirmed';
+  IF (SELECT precio_normal FROM public.productos WHERE id=v_pan)<>v_old_price
+     OR (SELECT costo_unitario_referencia FROM public.productos WHERE id=v_pan) IS DISTINCT FROM v_old_cost THEN
+    RAISE EXCEPTION 'FAIL: price or cost changed before the physical count was confirmed';
   END IF;
 
   -- Only the worker with the active tranche receives the blocking gate.
@@ -132,8 +136,16 @@ BEGIN
   IF v_result->>'ok'<>'true' OR (v_result->>'productos_aplicados')::integer<>1 THEN
     RAISE EXCEPTION 'FAIL: physical count did not activate the pending price change';
   END IF;
-  IF (SELECT precio_normal FROM public.productos WHERE id=v_pan)<>v_new_price THEN
-    RAISE EXCEPTION 'FAIL: confirmed price was not persisted in the product catalogue';
+  IF (SELECT precio_normal FROM public.productos WHERE id=v_pan)<>v_new_price
+     OR (SELECT costo_unitario_referencia FROM public.productos WHERE id=v_pan)<>v_new_cost THEN
+    RAISE EXCEPTION 'FAIL: confirmed price and optional cost were not persisted in the product catalogue';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.productos_valores_historial h
+    WHERE h.producto_id=v_pan AND h.turno_sesion_id=v_sesion
+      AND h.origen='JORNADA_CORRECTION' AND h.costo_unitario=v_new_cost
+  ) THEN
+    RAISE EXCEPTION 'FAIL: optional cost correction was not written to effective-dated product history';
   END IF;
   IF (SELECT unidades_vendidas_precio_anterior FROM public.turno_jornada_cambios_precio
       WHERE turno_sesion_id=v_sesion AND producto_id=v_pan AND estado='APLICADO')<>2 THEN

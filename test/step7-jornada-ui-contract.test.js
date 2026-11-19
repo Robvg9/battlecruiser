@@ -106,7 +106,11 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
 
 
 test("canonical Jornada planner applies the database two-day minimum in input and save paths",()=>{
-  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31"/);
+  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej\. 5"/);
+  assert.doesNotMatch(ui,/id="bc7-days-count"[^>]*value="7"/);
+  assert.match(ui,/if\(!value\)return 0/,"an empty duration stays empty until the administrator enters a value");
+  assert.match(ui,/if\(!n\).*Indica cuántos días quieres programar/s);
+  assert.match(ui,/\$\('bc7-list-from'\)\.value=today/,"calendar starts from the current local day");
   assert.match(ui,/function scheduleDayCount\(\)/);
   assert.match(ui,/const n=scheduleDayCount\(\)/);
   assert.match(ui,/bc5_crear_jornada_unica/);
@@ -154,7 +158,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.43");
+  assert.equal(moduleVersion,"7.44");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assert.ok(app.includes('["aprobaciones-admin.js","20261119.1"]'));
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261119.1"));
@@ -167,7 +171,7 @@ test("Dependienta can open her active jornada without searching a future-only ca
   assert.match(ui,/id="bc7-current-session-card"/);
   assert.match(ui,/data-bc7-current-open/);
   assert.match(ui,/data-bc7-current-finance/);
-  assert.match(ui,/addDays\(today,-7\)/);
+  assert.match(ui,/\$\('bc7-list-from'\)\.value=today/);
   assert.match(ui,/state\.currentSession\?\.turno_sesion_id/);
 });
 

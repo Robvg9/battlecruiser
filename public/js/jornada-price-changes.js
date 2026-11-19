@@ -51,33 +51,26 @@
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = [
-      '.bc-jpc-trigger{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--gold-dim,#a78a52);border-radius:8px;padding:10px 13px;background:var(--panel,#17191d);color:var(--text,#f2eee5);font:600 13px inherit;cursor:pointer;margin:8px 0 12px}',
-      '.bc-jpc-trigger:hover{border-color:var(--gold,#c5a66a)}',
-      '.bc-jpc-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.78);overflow:auto}',
-      '.bc-jpc-dialog{width:min(780px,100%);max-height:min(92dvh,900px);display:flex;flex-direction:column;background:var(--panel,#17191d);color:var(--text,#f2eee5);border:1px solid var(--gold-dim,#8b754c);border-radius:14px;box-shadow:0 20px 70px rgba(0,0,0,.48);overflow:hidden}',
-      '.bc-jpc-head{padding:15px 17px;border-bottom:1px solid var(--line,rgba(255,255,255,.12));display:flex;align-items:flex-start;justify-content:space-between;gap:10px}',
-      '.bc-jpc-head h3{margin:0;font-size:17px}.bc-jpc-head p{margin:5px 0 0;color:var(--muted,#a9a9a9);font-size:12px;line-height:1.45}',
       '.bc-jpc-body{padding:14px 16px;overflow:auto;min-height:0}',
       '.bc-jpc-field{display:flex;flex-direction:column;gap:5px;margin:0 0 11px;font-size:12px;color:var(--muted,#c0c0c0)}',
-      '.bc-jpc-field input,.bc-jpc-field select,.bc-jpc-product input{width:100%;min-width:0;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.16));border-radius:7px;color:var(--text,#f2eee5);padding:9px;font:inherit}',
+      '.bc-jpc-field input,.bc-jpc-field select,.bc-jpc-product-fields input{width:100%;min-width:0;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.16));border-radius:7px;color:var(--text,#f2eee5);padding:9px;font:inherit}',
       '.bc-jpc-summary{padding:9px 11px;border-radius:8px;background:rgba(180,150,90,.09);font-size:12px;line-height:1.5;margin:8px 0 13px}',
       '.bc-jpc-search{margin:8px 0 10px}',
       '.bc-jpc-products{display:grid;gap:7px}',
-      '.bc-jpc-product{display:grid;grid-template-columns:24px minmax(0,1fr) 100px 120px;align-items:center;gap:9px;padding:9px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px}',
+      '.bc-jpc-product{display:grid;grid-template-columns:24px minmax(0,1fr) 118px minmax(220px,260px);align-items:center;gap:10px;padding:10px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:9px}',
       '.bc-jpc-product-name{min-width:0}.bc-jpc-product-name strong{display:block;font-size:13px}.bc-jpc-product-name small{display:block;color:var(--muted,#aaa);font-size:11px;margin-top:2px}',
-      '.bc-jpc-product-price{font-size:12px;text-align:right;white-space:nowrap}',
-      '.bc-jpc-product input[type=number]{padding:8px;font-size:13px}',
+      '.bc-jpc-product-price{font-size:12px;display:flex;flex-direction:column;gap:4px;white-space:nowrap}.bc-jpc-product-price small{color:var(--muted,#aaa);font-size:10px}',
+      '.bc-jpc-product-fields{display:grid;grid-template-columns:1fr;gap:6px}.bc-jpc-product-fields label{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--muted,#aaa)}.bc-jpc-product-fields label span{flex:0 0 76px}.bc-jpc-product-fields input{flex:1;min-width:0;width:100%;padding:8px;font-size:13px}',
       '.bc-jpc-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line,rgba(255,255,255,.12))}',
       '.bc-jpc-btn{border:1px solid var(--line,rgba(255,255,255,.18));border-radius:8px;padding:10px 13px;background:transparent;color:var(--text,#f2eee5);font-weight:600;cursor:pointer}',
       '.bc-jpc-btn.primary{background:var(--gold,#a88a50);border-color:var(--gold,#a88a50);color:#171717}.bc-jpc-btn:disabled{opacity:.5;cursor:wait}',
-      '.bc-jpc-close{font-size:22px;line-height:1;border:0;background:transparent;color:var(--muted,#aaa);cursor:pointer}',
       '.bc-jpc-status{font-size:12px;line-height:1.5;margin:8px 0;color:var(--muted,#b8b8b8)}.bc-jpc-status.error{color:#ff9d9d}.bc-jpc-status.success{color:#a4dfb6}',
       '.bc-jpc-gate .bc-jpc-dialog{width:min(620px,100%);border-color:#bd8d43}.bc-jpc-gate .bc-jpc-body{padding:16px}',
       '.bc-jpc-count-row{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;align-items:center;border:1px solid var(--line,rgba(255,255,255,.14));border-radius:9px;padding:11px;margin:8px 0}',
       '.bc-jpc-count-row strong{display:block;font-size:13px}.bc-jpc-count-row small{display:block;color:var(--muted,#aaa);font-size:11px;margin-top:3px}',
       '.bc-jpc-count-row input{width:100%;background:var(--input-bg,#101215);border:1px solid var(--line,rgba(255,255,255,.18));border-radius:7px;color:var(--text,#f2eee5);padding:10px;font-size:16px}',
       '.bc-jpc-required{font-size:11px;color:#e4bf7e;margin:8px 0 0}',
-      '@media(max-width:560px){.bc-jpc-overlay{padding:6px}.bc-jpc-dialog{max-height:96dvh;border-radius:10px}.bc-jpc-product{grid-template-columns:22px minmax(0,1fr) 90px}.bc-jpc-product-price{grid-column:2;grid-row:2;text-align:left}.bc-jpc-product input{grid-column:3;grid-row:1/3}.bc-jpc-count-row{grid-template-columns:minmax(0,1fr) 108px}.bc-jpc-head{padding:12px}.bc-jpc-body{padding:12px}}'
+      '@media(max-width:560px){.bc-jpc-product{grid-template-columns:22px minmax(0,1fr);align-items:start}.bc-jpc-product-name{grid-column:2;grid-row:1}.bc-jpc-product-price{grid-column:2;grid-row:2;white-space:normal}.bc-jpc-product-fields{grid-column:2;grid-row:3;width:100%}.bc-jpc-product-fields label{align-items:stretch}.bc-jpc-product-fields label span{flex-basis:105px}.bc-jpc-count-row{grid-template-columns:minmax(0,1fr) 108px}.bc-jpc-body{padding:12px}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -90,11 +83,15 @@
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
-      button.className = 'bc-jpc-trigger';
+      button.className = 'bc165-action';
       button.setAttribute('data-bc-jpc-owner-open', '1');
-      button.textContent = '↗ Cambios de precio';
+      button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18"/></svg><span class="bc165-sr-only">Cambios de precio</span>';
+      button.setAttribute('aria-label', 'Cambios de precio');
+      button.title = 'Cambios de precio';
       const hero = tab.querySelector('.bc-m51-hero');
-      if (hero && hero.parentNode) hero.insertAdjacentElement('afterend', button);
+      let actions = hero && hero.querySelector('.bc165-actions');
+      if (!actions && hero) { actions = document.createElement('div'); actions.className = 'bc165-actions'; hero.appendChild(actions); }
+      if (actions) actions.appendChild(button);
       else tab.prepend(button);
       button.addEventListener('click', openOwnerModal);
     }
@@ -124,17 +121,20 @@
       return '<div class="bc-jpc-product">' +
         '<input type="checkbox" id="' + esc(checkboxId) + '" data-bc-jpc-select="' + esc(item.producto_id) + '">' +
         '<label for="' + esc(checkboxId) + '" class="bc-jpc-product-name"><strong>' + esc(item.nombre) + '</strong><small>' + esc(item.unidad || 'unidad') + ' · Stock de sistema: ' + esc(money(item.stock_sistema)) + '</small></label>' +
-        '<span class="bc-jpc-product-price">Actual: <b>' + esc(money(item.precio_actual)) + '</b></span>' +
-        '<input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Nuevo precio" data-bc-jpc-price="' + esc(item.producto_id) + '" aria-label="Nuevo precio de ' + esc(item.nombre) + '">' +
+        '<span class="bc-jpc-product-price"><span>Venta actual: <b>' + esc(money(item.precio_actual)) + '</b></span><small>Costo actual: ' + esc(item.costo_actual==null?'Sin costo':money(item.costo_actual)) + '</small></span>' +
+        '<div class="bc-jpc-product-fields"><label><span>Nuevo precio</span><input type="number" min="0" step="0.01" inputmode="decimal" placeholder="Precio de venta" data-bc-jpc-price="' + esc(item.producto_id) + '" aria-label="Nuevo precio de venta de ' + esc(item.nombre) + '"></label>' +
+        '<label><span>Nuevo costo (opcional)</span><input type="number" min="0" step="0.0001" inputmode="decimal" placeholder="Sin cambio" data-bc-jpc-cost="' + esc(item.producto_id) + '" aria-label="Nuevo costo unitario de ' + esc(item.nombre) + '"></label></div>' +
       '</div>';
     }).join('') || '<p class="bc-jpc-status">No hay productos que coincidan con la búsqueda.</p>';
     host.querySelectorAll('[data-bc-jpc-select]').forEach(function (box) {
       box.addEventListener('change', function () {
         const input = host.querySelector('[data-bc-jpc-price="' + CSS.escape(box.dataset.bcJpcSelect) + '"]');
+        const cost = host.querySelector('[data-bc-jpc-cost="' + CSS.escape(box.dataset.bcJpcSelect) + '"]');
         if (input) input.disabled = !box.checked;
+        if (cost) cost.disabled = !box.checked;
       });
     });
-    host.querySelectorAll('[data-bc-jpc-price]').forEach(function (input) { input.disabled = true; });
+    host.querySelectorAll('[data-bc-jpc-price],[data-bc-jpc-cost]').forEach(function (input) { input.disabled = true; });
     const summary = document.getElementById('bc-jpc-session-summary');
     if (summary) summary.textContent = context.almacen_nombre + ' · ' + context.fecha + ' · Responsable asignada: ' + (context.responsable_id ? String(context.responsable_id).slice(0, 8) : 'sin identificar') + '. Los cambios esperarán al conteo físico de la dependienta.';
   }
@@ -143,9 +143,9 @@
     const options = contexts.map(function (item) {
       return '<option value="' + esc(item.sesion_id) + '">' + esc(item.almacen_nombre) + ' · ' + esc(item.fecha) + ' · Jornada ' + esc(item.sesion_id.slice(0, 8)) + '</option>';
     }).join('');
-    return '<div class="bc-jpc-overlay" id="' + MODAL_ID + '">' +
-      '<section class="bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
-        '<header class="bc-jpc-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio no cambia hasta que la dependienta cuente el stock físico.</p></div><button type="button" class="bc-jpc-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
+    return '<div class="bc165-overlay" id="' + MODAL_ID + '">' +
+      '<section class="bc-jpc-dialog bc165-modal" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-owner-title">' +
+        '<header class="bc165-head"><div><h3 id="bc-jpc-owner-title">Cambios de precio</h3><p>Selecciona uno o varios productos. El precio y el costo solo se activarán después del conteo físico.</p></div><button type="button" class="bc165-close" data-bc-jpc-close aria-label="Cerrar">×</button></header>' +
         '<div class="bc-jpc-body">' +
           '<label class="bc-jpc-field">Jornada activa<select id="bc-jpc-session">' + options + '</select></label>' +
           '<div class="bc-jpc-summary" id="bc-jpc-session-summary"></div>' +
@@ -195,7 +195,8 @@
     const selected = Array.from(document.querySelectorAll('#bc-jpc-products [data-bc-jpc-select]:checked'));
     const changes = selected.map(function (check) {
       const input = document.querySelector('#bc-jpc-products [data-bc-jpc-price="' + CSS.escape(check.dataset.bcJpcSelect) + '"]');
-      return { producto_id: check.dataset.bcJpcSelect, precio_nuevo: input ? input.value.trim() : '' };
+      const cost = document.querySelector('#bc-jpc-products [data-bc-jpc-cost="' + CSS.escape(check.dataset.bcJpcSelect) + '"]');
+      return { producto_id: check.dataset.bcJpcSelect, precio_nuevo: input ? input.value.trim() : '', costo_nuevo: cost && cost.value.trim()!=='' ? cost.value.trim() : null };
     });
     const reason = (document.getElementById('bc-jpc-reason')?.value || '').trim();
     if (!changes.length) {
@@ -206,6 +207,13 @@
       if (status) { status.textContent = 'Introduce un nuevo precio válido para cada producto seleccionado.'; status.className = 'bc-jpc-status error'; }
       return;
     }
+    if (changes.some(function (item) {
+      return item.costo_nuevo !== null &&
+        (!Number.isFinite(Number(item.costo_nuevo)) || Number(item.costo_nuevo) < 0 || !/^\d+(?:\.\d{1,4})?$/.test(item.costo_nuevo));
+    })) {
+      if (status) { status.textContent = 'El costo opcional debe ser un número no negativo con hasta 4 decimales.'; status.className = 'bc-jpc-status error'; }
+      return;
+    }
     if (reason.length < 5) {
       if (status) { status.textContent = 'Explica el motivo del cambio (mínimo 5 caracteres).'; status.className = 'bc-jpc-status error'; }
       return;
@@ -213,7 +221,7 @@
     ownerBusy = true;
     button.disabled = true;
     button.textContent = 'Enviando solicitud…';
-    if (status) { status.textContent = 'Registrando la solicitud. Los precios siguen sin cambiar hasta el conteo.'; status.className = 'bc-jpc-status'; }
+    if (status) { status.textContent = 'Registrando la solicitud. El catálogo no cambia hasta el conteo físico.'; status.className = 'bc-jpc-status'; }
     try {
       const result = await rpc('bc7_solicitar_cambios_precio_jornada', {
         p_turno_sesion_id: context.sesion_id,
@@ -234,13 +242,13 @@
 
   function gateHtml(session) {
     const rows = Array.isArray(session.cambios) ? session.cambios : [];
-    return '<div class="bc-jpc-overlay bc-jpc-gate" id="' + GATE_ID + '">' +
-      '<section class="bc-jpc-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-gate-title">' +
-        '<header class="bc-jpc-head"><div><h3 id="bc-jpc-gate-title">Conteo obligatorio por cambio de precio</h3><p>Antes de activar los nuevos precios debes contar físicamente las existencias actuales. Las unidades que ya no estén quedarán valoradas al precio anterior.</p></div></header>' +
+    return '<div class="bc165-overlay bc-jpc-gate" id="' + GATE_ID + '">' +
+      '<section class="bc-jpc-dialog bc165-modal" role="dialog" aria-modal="true" aria-labelledby="bc-jpc-gate-title">' +
+        '<header class="bc165-head"><div><h3 id="bc-jpc-gate-title">Conteo obligatorio por cambio de precio</h3><p>Antes de activar los nuevos valores debes contar físicamente las existencias actuales. Las unidades que ya no estén quedarán valoradas al precio anterior.</p></div></header>' +
         '<div class="bc-jpc-body">' +
           '<div class="bc-jpc-summary">' + esc(session.fecha || '') + ' · Hay ' + rows.length + ' producto(s) pendientes. Esta ventana no se puede cerrar sin completar el conteo.</div>' +
           rows.map(function (item) {
-            return '<label class="bc-jpc-count-row"><span><strong>' + esc(item.nombre) + '</strong><small>Precio anterior: ' + esc(money(item.precio_anterior)) + ' CUP · Nuevo precio: ' + esc(money(item.precio_nuevo)) + ' CUP</small></span><input type="number" min="0" step="0.001" inputmode="decimal" required autocomplete="off" data-bc-jpc-count="' + esc(item.producto_id) + '" placeholder="Stock físico" aria-label="Stock físico de ' + esc(item.nombre) + '"></label>';
+            return '<label class="bc-jpc-count-row"><span><strong>' + esc(item.nombre) + '</strong><small>Precio anterior: ' + esc(money(item.precio_anterior)) + ' CUP · Nuevo precio: ' + esc(money(item.precio_nuevo)) + ' CUP' + (item.costo_nuevo!=null ? ' · Nuevo costo: ' + esc(money(item.costo_nuevo)) + ' CUP' : '') + '</small></span><input type="number" min="0" step="0.001" inputmode="decimal" required autocomplete="off" data-bc-jpc-count="' + esc(item.producto_id) + '" placeholder="Stock físico" aria-label="Stock físico de ' + esc(item.nombre) + '"></label>';
           }).join('') +
           '<p class="bc-jpc-required">Cuenta cada producto ahora. No introduzcas el stock de sistema: escribe lo que existe físicamente.</p>' +
           '<p class="bc-jpc-status" id="bc-jpc-gate-status" role="status" aria-live="polite"></p>' +
@@ -289,13 +297,13 @@
     workerBusy = true;
     button.disabled = true;
     button.textContent = 'Guardando conteo…';
-    if (status) { status.textContent = 'Guardando el conteo físico y aplicando los nuevos precios…'; status.className = 'bc-jpc-status'; }
+    if (status) { status.textContent = 'Guardando el conteo físico y aplicando los nuevos valores…'; status.className = 'bc-jpc-status'; }
     try {
       await rpc('bc7_confirmar_cambios_precio_conteo', {
         p_turno_sesion_id: currentGate.sesion_id,
         p_conteos: counts.map(function (item) { return { producto_id: item.producto_id, cantidad: Number(item.cantidad) }; })
       });
-      if (status) { status.textContent = 'Conteo confirmado. Los precios nuevos ya están activos.'; status.className = 'bc-jpc-status success'; }
+      if (status) { status.textContent = 'Conteo confirmado. Los nuevos valores ya están activos.'; status.className = 'bc-jpc-status success'; }
       const completedSessionId = currentGate.sesion_id;
       document.getElementById(GATE_ID)?.remove();
       document.body.style.overflow = priorBodyOverflow;

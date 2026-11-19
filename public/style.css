@@ -147,11 +147,14 @@ input:focus { outline: none; border-color: var(--gold-dim); box-shadow: 0 0 0 3p
 input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .field-pass { position: relative; }
 .field-pass input { padding-right: 44px; }
-.toggle-pass {
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  background: transparent; border: none; color: var(--mist); cursor: pointer; padding: 4px;
+.pass-toggle {
+  position: absolute; right: 8px; bottom: 7px; transform: none;
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 28px;
+  background: transparent; border: none; color: var(--mist); cursor: pointer; padding: 4px; border-radius: 6px;
 }
-.toggle-pass:hover { color: var(--gold); }
+.pass-toggle svg { width: 19px; height: 19px; display: block; }
+.pass-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.pass-toggle:hover { color: var(--gold); }
 button[type="submit"] {
   width: 100%; margin-top: 6px; padding: 12px;
   background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: #211605; border: none;

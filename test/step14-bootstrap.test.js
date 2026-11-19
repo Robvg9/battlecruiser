@@ -9,8 +9,8 @@ const js = fs.readFileSync("public/js/bootstrap.js", "utf8");
 const edge = fs.readFileSync("supabase/functions/bc-bootstrap-admin/index.ts", "utf8");
 const index = fs.readFileSync("public/index.html", "utf8");
 
-test("login exposes a dedicated first-owner bootstrap entry", () => {
-  assert.ok(index.includes('href="bootstrap.html"'));
+test("bootstrap remains protected but is not exposed as a login shortcut", () => {
+  assert.doesNotMatch(index, /bootstrap-first-admin-link|href="bootstrap\.html"/);
   for (const id of [
     "bc-bootstrap-form",
     "bc-bootstrap-token",

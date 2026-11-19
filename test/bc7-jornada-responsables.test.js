@@ -82,6 +82,9 @@ test("Step 7 loads eligible responsible users from the authoritative server cata
     if (name === "bc5_mis_jornadas") return { data: [], error: null };
     throw new Error("Unexpected RPC: " + name);
   });
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  window.document.getElementById("bc7-days-count").value = "7";
+  window.document.querySelector("[data-bc7-build]").click();
 
   const ready = await waitFor(() => {
     const selects = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]"));
@@ -133,6 +136,13 @@ test("Step 7 exposes a retry after staff lookup failure and preserves a selected
     if (name === "bc5_mis_jornadas") return { data: [], error: null };
     throw new Error("Unexpected RPC: " + name);
   });
+  // This fixture deliberately does not complete the full Auth boot. Exercise the
+  // responsible-catalog RPC directly, then build the planner from that verified state.
+  const firstAttempt = await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  assert.equal(firstAttempt.length, 0, "a failed staff lookup must not expose unverified people");
+  assert.equal(staffAttempt, 1);
+  window.document.getElementById("bc7-days-count").value = "7";
+  window.document.querySelector("[data-bc7-build]").click();
 
   const failed = await waitFor(() => {
     const button = window.document.getElementById("bc7-staff-retry");
