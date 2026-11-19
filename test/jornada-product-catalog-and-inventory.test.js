@@ -100,6 +100,6 @@ test("cash difference sign matches the spreadsheet convention in settlement and 
 });
 
 test("PWA release versions stay aligned",()=>{
- assert.ok(APP.includes('VERSION="9.5.126"'));assert.ok(SW.includes('BC_SW_VERSION = "9.5.126"'));assert.ok(INDEX.includes("9.5.126"));
+ assert.ok(APP.includes('VERSION="9.5.127"'));assert.ok(SW.includes('BC_SW_VERSION = "9.5.127"'));assert.ok(INDEX.includes("9.5.127"));
  assert.ok(APP.includes('["bc7-jornada-ui.js","7.42"]'));assert.ok(SW.includes("bc7-jornada-ui.js?v=7.42"));
 });
