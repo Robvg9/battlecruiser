@@ -231,7 +231,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.127');"));
+  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.128');"));
 });
 
 
