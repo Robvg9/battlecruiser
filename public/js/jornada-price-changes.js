@@ -209,7 +209,7 @@
     }
     if (changes.some(function (item) {
       return item.costo_nuevo !== null &&
-        (!Number.isFinite(Number(item.costo_nuevo)) || Number(item.costo_nuevo) < 0 || !/^\\d+(?:\\.\\d{1,4})?$/.test(item.costo_nuevo));
+        (!Number.isFinite(Number(item.costo_nuevo)) || Number(item.costo_nuevo) < 0 || !/^\d+(?:\.\d{1,4})?$/.test(item.costo_nuevo));
     })) {
       if (status) { status.textContent = 'El costo opcional debe ser un número no negativo con hasta 4 decimales.'; status.className = 'bc-jpc-status error'; }
       return;
