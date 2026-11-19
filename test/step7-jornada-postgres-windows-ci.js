@@ -377,7 +377,7 @@ function applySql(file) {
     applySql("test/jornada-owner-checklist-contract.sql");
     applySql("test/jornada-pending-cash-visibility-contract.sql");
     log("\\r\\n=== Apply persistent Jornada price changes and verify stock-count / sale-price tranches ===");
-    applySql("supabase/migrations/20261118210000_jornada_persistent_price_changes.sql");
+    applySql("supabase/migrations/20261119000000_jornada_persistent_price_changes.sql");
     applySql("test/jornada-price-changes-contract.sql");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price changes with mandatory stock count and historical sale tranches.");
   } catch (error) {
