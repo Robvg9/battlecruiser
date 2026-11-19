@@ -7,7 +7,7 @@ DECLARE
   v_sesion uuid := '94000000-0000-0000-0000-000000000001';
   v_prog uuid := '94000000-0000-0000-0000-000000000001';
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
-  v_almacen uuid := '10000000-0000-0000-0000-000000000001';
+  v_almacen uuid := '10000000-0000-0000-0000-000000000004';
   v_pan uuid := '31000000-0000-0000-0000-000000000001';
   v_jugo uuid := '31000000-0000-0000-0000-000000000002';
   v_old_price numeric;
@@ -22,7 +22,8 @@ BEGIN
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
 
-  UPDATE public.almacenes SET tipo='minorista' WHERE id=v_almacen;
+  INSERT INTO public.almacenes(id,nombre,tipo,activo)
+  VALUES(v_almacen,'Almacén minorista para contrato de precio','minorista',true);
   UPDATE public.productos SET precio_normal=10 WHERE id=v_pan;
   UPDATE public.productos SET precio_normal=5 WHERE id=v_jugo;
 
