@@ -20,7 +20,7 @@ test("Product-wide price and cost snapshots are effective-dated, private, and ap
 });
 
 test("Historical corrections update global product values without deleting session-level evidence",()=>{
-  assert.match(migration,/CREATE OR REPLACE FUNCTION public\.bc7_ajustar_valores_producto_jornada/);
+  assert.match(migration,/DO \$patch_historical_writer\$[\s\S]*pg_get_functiondef\('public\.bc7_ajustar_valores_producto_jornada\(uuid,jsonb,text\)'::regprocedure\)/);
   assert.match(migration,/turno_jornada_valores_correcciones/);
   assert.match(migration,/SET precio_normal=coalesce\(v_price,precio_normal\)/);
   assert.match(migration,/costo_unitario_referencia=coalesce\(v_cost,costo_unitario_referencia\)/);
