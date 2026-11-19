@@ -184,8 +184,12 @@ BEGIN
         (jv.costo_unitario IS NOT NULL AND p.costo_unitario_referencia IS DISTINCT FROM jv.costo_unitario)
       );
 
-    SELECT count(*) INTO v_history_rows
+    SELECT count(DISTINCT h.producto_id) INTO v_history_rows
     FROM public.productos_valores_historial h
+    JOIN public.turno_jornada_valores_correcciones jv
+      ON jv.producto_id = h.producto_id
+     AND jv.turno_sesion_id = v_session_id
+     AND jv.vigente
     WHERE h.turno_sesion_id = v_session_id
       AND h.origen = 'JORNADA_CORRECTION';
 
