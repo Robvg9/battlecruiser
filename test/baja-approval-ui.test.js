@@ -67,7 +67,7 @@ test("PWA release and cache manifest stay aligned", () => {
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
-  assert.match(index, /style\.css\?v=9\.5\.117/);
+  assert.match(index, /style\.css\?v=9\.5\.130/);
   assert.match(sw, /inventario-detalle\.js\?v=72/);
   assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261119.1"));
   assert.ok(app.includes('["bajas-multiple.js","1.7"]'));
