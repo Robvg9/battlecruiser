@@ -88,7 +88,7 @@ test("PWA release and module cache keys stay aligned",()=>{
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"m68-ventas-pos-definitivo.js"});
-  assert.ok(ui.includes("v7.44"));
+  assert.ok(ui.includes("responsibleName: userName"), "Jornada exposes the cached responsible-name resolver used in human-readable price-change context");
 });
 
 test("PostgreSQL 17 disposable CI executes the Step 4 migration and contract",()=>{
