@@ -77,7 +77,7 @@ test("PWA shell, app loader and Service Worker use one cache-isolated release ve
   const appVersion = app.match(/const VERSION=["']([^"']+)["']/)?.[1];
   const swVersion = serviceWorker.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
   const htmlAppVersion = indexHtml.match(/app\.js\?v=([^"']+)/)?.[1];
-  assert.equal(appVersion, "9.5.129");
+  assert.equal(appVersion, "9.5.130");
   assert.equal(swVersion, appVersion);
   assert.equal(htmlAppVersion, appVersion);
   assert.match(indexHtml, new RegExp("v" + appVersion));
@@ -85,17 +85,17 @@ test("PWA shell, app loader and Service Worker use one cache-isolated release ve
 });
 
 test("Nueva compra: the three real dropdowns use explicit modal styling and a fresh shared CSS cache key", () => {
-  const htmlStyle = indexHtml.match(/<link rel="stylesheet" href="style\\.css\\?v=([^"]+)"/);
-  const swStyle = serviceWorker.match(/["']\\.\\/style\\.css\\?v=([^"']+)["']/);
+  const htmlStyle = indexHtml.match(/<link rel="stylesheet" href="style\.css\?v=([^"]+)"/);
+  const swStyle = serviceWorker.match(/["']\.\/style\.css\?v=([^"']+)["']/);
   assert.ok(htmlStyle, "index.html must expose the main stylesheet cache key");
   assert.ok(swStyle, "the Service Worker must precache the versioned main stylesheet");
   assert.equal(htmlStyle[1], swStyle[1], "HTML and Service Worker must request the same CSS bytes");
-  assert.notEqual(htmlStyle[1], "9.5.117", "the CSS cache key must change when its contents change");
+  assert.equal(htmlStyle[1], "9.5.130", "the main stylesheet must be tied to this cache-isolated release");
   for (const id of ["compra-multiple-almacen", "compra-multiple-producto", "compra-multiple-presentacion"]) {
     assert.ok(style.includes("#bc165-overlay #tab-compras") && style.includes("#" + id),
       "missing explicit Nueva compra styling for " + id);
   }
-  assert.match(style, /#bc165-overlay #tab-compras[\\s\\S]*:focus-visible/);
+  assert.match(style, /#bc165-overlay #tab-compras[\s\S]*:focus-visible/);
 });
 
 test("PWA loader: direct HTML module versions agree with the app registry", () => {
@@ -223,9 +223,9 @@ test("Service Worker updates wait for an explicit, stable handoff", () => {
 
 test("Saved light/dark preference is applied before first paint", () => {
   const bootstrapAt = indexHtml.indexOf('id="bc-theme-first-paint"');
-  const stylesheetAt = indexHtml.indexOf('href="style.css?v=20261120.1"');
+  const stylesheetAt = indexHtml.indexOf('href="style.css?v=9.5.130"');
   const themeScriptAt = indexHtml.indexOf('js/m27-5-theme-dark-reset.js?v=27.5a3');
-  const appScriptAt = indexHtml.indexOf('app.js?v=9.5.129');
+  const appScriptAt = indexHtml.indexOf('app.js?v=9.5.130');
   assert.ok(bootstrapAt >= 0 && bootstrapAt < stylesheetAt,
     "the saved preference bootstrap must execute before the main stylesheet");
   assert.ok(themeScriptAt >= 0 && themeScriptAt < appScriptAt,
