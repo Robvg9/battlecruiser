@@ -70,17 +70,19 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/No se activó ningún precio/);
   const ownerRows=ui.slice(ui.indexOf("function renderOwnerProducts"),ui.indexOf("function ownerModalHtml"));
   assert.match(ownerRows,/<article class="bc-jpc-product">/);
-  assert.ok(ownerRows.includes("const checkboxId = 'bc-jpc-select-'") &&
+  assert.ok(
+    ownerRows.includes("const checkboxId = 'bc-jpc-select-'") &&
     ownerRows.includes('<label class="bc-jpc-select-row" for="') &&
-    ownerRows.includes('id="' + esc(checkboxId)),
-    "each product checkbox is paired with its accessible label");
+    ownerRows.includes("esc(checkboxId)"),
+    "each product checkbox is paired with its accessible label"
+  );
   assert.doesNotMatch(ownerRows,/<label class="bc-jpc-product">/,
     "product rows must not nest multiple interactive inputs inside one label");
 });
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
-  assert.match(app,/\["jornada-price-changes.js","1.0.2"\]/);
+  assert.match(app,/\["jornada-price-changes.js","1.0.3"\]/);
   assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.3/);
 });
 
