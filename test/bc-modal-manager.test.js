@@ -49,18 +49,18 @@ test("shared modal traps keyboard focus, closes on Escape and restores focus and
 
     const forward = new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
     doc.getElementById("last").focus();
-    doc.dispatchEvent(forward);
+    doc.getElementById("last").dispatchEvent(forward);
     assert.equal(forward.defaultPrevented, true);
     assert.equal(doc.activeElement.id, "first");
 
     const backward = new dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
     doc.getElementById("first").focus();
-    doc.dispatchEvent(backward);
+    doc.getElementById("first").dispatchEvent(backward);
     assert.equal(backward.defaultPrevented, true);
     assert.equal(doc.activeElement.id, "close");
 
     const escape = new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    doc.dispatchEvent(escape);
+    doc.getElementById("close").dispatchEvent(escape);
     assert.equal(escape.defaultPrevented, true);
     assert.equal(controller.isOpen(), false);
     assert.equal(modal.classList.contains("hidden"), true);
@@ -107,7 +107,7 @@ test("non-dismissible modal can disable Escape and backdrop close for mandatory 
     });
 
     controller.open();
-    doc.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    doc.querySelector('#modal [role="dialog"] button').dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     modal.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
     assert.equal(controller.isOpen(), true);
     controller.close({ restoreFocus: false });
