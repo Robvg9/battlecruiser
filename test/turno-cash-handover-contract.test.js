@@ -176,13 +176,16 @@ test("the owner can start a scheduled legacy day while non-worked placeholders d
   assert.ok(TURNOS_MASTER_UI.includes("no requieren declaración de efectivo"));
 });
 
-test("PWA release 9.5.130 loads and precaches the dashboard and cash handover UI", () => {
-  assert.match(APP, /const VERSION="9.5.130"/);
+test("PWA release loads and precaches the dashboard and cash handover UI", () => {
+  const appVersion = APP.match(/const VERSION="([^"]+)"/);
+  const swVersion = SW.match(/BC_SW_VERSION = "([^"]+)"/);
+  assert.ok(appVersion, "app.js must expose its release version");
+  assert.ok(swVersion, "Service Worker must expose its release version");
+  assert.equal(swVersion[1], appVersion[1], "app and Service Worker release versions must match");
   assert.match(APP, /\["turno-cash-handover-ui\.js","1\.2"\]/);
-  assert.match(SW, /BC_SW_VERSION = "9.5.130"/);
   assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.2/);
-  assert.match(INDEX, /app\.js\?v=9.5.130/);
-  assert.match(INDEX, /style\.css\?v=9\.5\.130/);
+  assert.ok(INDEX.includes("app.js?v=" + appVersion[1]));
+  assert.ok(INDEX.includes("style.css?v=" + appVersion[1]));
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
   assert.match(PG_CI, /turno-cash-handover-contract\.sql/);
   assert.match(PG_WORKFLOW, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
