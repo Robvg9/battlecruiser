@@ -201,6 +201,7 @@ test("B2.3-B: el Centro de Atención aparece con REQUIERE_ATENCION y desaparece 
   const atencion = document.getElementById("cc-atencion");
   assert.ok(atencion.innerHTML.includes("Requiere atención") || atencion.querySelector(".cc-asunto"), "debe aparecer el asunto crítico");
   assert.ok(atencion.innerHTML.includes("Stock insuficiente."), "debe mostrar el motivo");
+  assert.equal(atencion.closest(".cc-bloque").hidden, false, "el bloque debe estar visible cuando hay una operación crítica");
 
   // Resolver: eliminar la operación (reutiliza eliminarOperacionPendiente).
   const item = atencion.querySelector(".cc-asunto");
@@ -208,7 +209,8 @@ test("B2.3-B: el Centro de Atención aparece con REQUIERE_ATENCION y desaparece 
   await window.eliminarOperacionPendiente(id);
   await window.refrescarCentroControl();
   await esperar(10);
-  assert.ok(/Nada requiere atención/.test(atencion.innerHTML), "debe desaparecer tras resolver");
+  assert.ok(/Nada requiere atención/.test(atencion.innerHTML), "debe conservar el estado vacío tras resolver");
+  assert.equal(atencion.closest(".cc-bloque").hidden, true, "el bloque debe salir del layout cuando ya no hay asuntos críticos");
 });
 
 test("B2.3-C: acción Reintentar reutiliza el flujo existente y conserva idempotency_key", async () => {
