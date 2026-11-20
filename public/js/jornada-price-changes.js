@@ -12,6 +12,7 @@
   let currentGate = null;
   let refreshing = false;
   let ownerBusy = false;
+  let ownerActionAvailable = false;
   let workerBusy = false;
   let ownerStep = 1;
   let ownerSelectedIds = Object.create(null);
@@ -108,10 +109,17 @@
       else tab.prepend(button);
       button.addEventListener('click', openOwnerModal);
     }
+    ownerActionAvailable = false;
+    button.hidden = true;
+    window.dispatchEvent(new CustomEvent('bc:price-changes-availability', { detail: { available: false } }));
     rpc('bc_actor_is_admin', {}).then(function (isAdmin) {
-      button.hidden = !isAdmin;
+      ownerActionAvailable = isAdmin === true;
+      button.hidden = !ownerActionAvailable;
+      window.dispatchEvent(new CustomEvent('bc:price-changes-availability', { detail: { available: ownerActionAvailable } }));
     }).catch(function () {
+      ownerActionAvailable = false;
       button.hidden = true;
+      window.dispatchEvent(new CustomEvent('bc:price-changes-availability', { detail: { available: false } }));
     });
   }
 
@@ -320,6 +328,10 @@
   }
 
   async function openOwnerModal() {
+    if (!ownerActionAvailable) {
+      window.alert('Este acceso está reservado al administrador.');
+      return;
+    }
     if (ownerBusy) return;
     ownerBusy = true;
     try {
@@ -560,7 +572,8 @@
 
   window.__BC_JORNADA_PRICE_CHANGES_API__ = {
     refreshPending: refreshPending,
-    openOwnerModal: openOwnerModal
+    openOwnerModal: openOwnerModal,
+    canOpenOwnerModal: function () { return ownerActionAvailable; }
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
