@@ -72,6 +72,10 @@
     }
   }
 
+  function isTopmostModal(owner) {
+    return activeModalStack.length > 0 && activeModalStack[activeModalStack.length - 1].owner === owner;
+  }
+
   document.addEventListener("keydown", function(event) {
     var active = activeModalStack.length ? activeModalStack[activeModalStack.length - 1] : null;
     if (active && typeof active.keydownHandler === "function") active.keydownHandler(event);
@@ -174,7 +178,7 @@
     }
 
     function handleClick(event) {
-      if (!opened) return;
+      if (!opened || !isTopmostModal(ownerToken)) return;
       var target = event.target;
 
       if (config.closeSelector && target && typeof target.closest === "function") {
