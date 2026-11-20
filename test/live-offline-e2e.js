@@ -46,6 +46,23 @@ const pageExceptions = [];
 const consoleErrors = [];
 const requestsById = new Map();
 
+function resolveLinkedStylesheetUrl(indexHtml, serviceWorkerBody, origin) {
+  const linkTags = String(indexHtml).match(/<link\\b[^>]*>/gi) || [];
+  const stylesheetTag = linkTags.find(tag =>
+    /\\brel\\s*=\\s*["']stylesheet["']/i.test(tag) &&
+    /\\bhref\\s*=/i.test(tag) && /style\\.css/i.test(tag)
+  );
+  const hrefMatch = stylesheetTag && stylesheetTag.match(/\\bhref\\s*=\\s*["']([^"']+)["']/i);
+  if (!hrefMatch) throw new Error("index.html no contiene el enlace a la hoja de estilos principal.");
+  const url = new URL(hrefMatch[1], origin + "/");
+  assert(url.origin === origin && url.pathname === "/style.css" && !!url.searchParams.get("v"),
+    "La hoja principal debe ser /style.css same-origin con versión de caché.");
+  const swMatch = String(serviceWorkerBody).match(/["']\\.\\/style\\.css\\?v=([^"']+)["']/);
+  assert(swMatch && swMatch[1] === url.searchParams.get("v"),
+    "index.html y Service Worker deben solicitar la misma versión de style.css.");
+  return url.toString();
+}
+
 function sha256(text) {
   const normalized = String(text).replace(/\r\n/g, "\n");
   return crypto.createHash("sha256").update(normalized, "utf8").digest("hex");
@@ -392,6 +409,11 @@ async function main() {
 
   const sourceIndex = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
   const sourceCss = fs.readFileSync(path.join(PUBLIC_DIR, "style.css"), "utf8");
+  const stylesheetUrl = resolveLinkedStylesheetUrl(sourceIndex, swSource, BASE_URL);
+  report.evidence.source = Object.assign({}, report.evidence.source, {
+    stylesheetUrl,
+    stylesheetCacheKey: new URL(stylesheetUrl).searchParams.get("v"),
+  });
   const assetPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
   const liveAssetEvidence = {};
   const isProductionBase = BASE_URL === "https://battlecruiser.robvg9.workers.dev";
@@ -414,10 +436,10 @@ async function main() {
     let lastError = null;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        const candidate = await fetchText(
-          BASE_URL + assetPath + "?bc_live_offline_e2e=" + Date.now() + "-" + attempt,
-          isProductionBase ? 20000 : 35000
-        );
+        const assetUrl = assetPath === "/style.css"
+          ? stylesheetUrl
+          : BASE_URL + assetPath + "?bc_live_offline_e2e=" + Date.now() + "-" + attempt;
+        const candidate = await fetchText(assetUrl, isProductionBase ? 20000 : 35000);
         if (candidate.status < 200 || candidate.status >= 300) {
           lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
         } else if (sha256(candidate.body) !== sha256(sourceReference)) {
