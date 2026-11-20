@@ -47,17 +47,17 @@ const consoleErrors = [];
 const requestsById = new Map();
 
 function resolveLinkedStylesheetUrl(indexHtml, serviceWorkerBody, origin) {
-  const linkTags = String(indexHtml).match(/<link\\b[^>]*>/gi) || [];
+  const linkTags = String(indexHtml).match(/<link\b[^>]*>/gi) || [];
   const stylesheetTag = linkTags.find(tag =>
-    /\\brel\\s*=\\s*["']stylesheet["']/i.test(tag) &&
-    /\\bhref\\s*=/i.test(tag) && /style\\.css/i.test(tag)
+    /\brel\s*=\s*["']stylesheet["']/i.test(tag) &&
+    /\bhref\s*=/i.test(tag) && /style\.css/i.test(tag)
   );
-  const hrefMatch = stylesheetTag && stylesheetTag.match(/\\bhref\\s*=\\s*["']([^"']+)["']/i);
+  const hrefMatch = stylesheetTag && stylesheetTag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
   if (!hrefMatch) throw new Error("index.html no contiene el enlace a la hoja de estilos principal.");
   const url = new URL(hrefMatch[1], origin + "/");
   assert(url.origin === origin && url.pathname === "/style.css" && !!url.searchParams.get("v"),
     "La hoja principal debe ser /style.css same-origin con versión de caché.");
-  const swMatch = String(serviceWorkerBody).match(/["']\\.\\/style\\.css\\?v=([^"']+)["']/);
+  const swMatch = String(serviceWorkerBody).match(/["']\.\/style\.css\?v=([^"']+)["']/);
   assert(swMatch && swMatch[1] === url.searchParams.get("v"),
     "index.html y Service Worker deben solicitar la misma versión de style.css.");
   return url.toString();
