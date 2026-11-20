@@ -148,8 +148,8 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
     "the deploy smoke must keep the byte-exact app.js proof");
   assert.ok(verifier.includes('const requiredAppMarkers = ['));
   assert.ok(verifier.includes('"jornada-price-changes.js"'));
-  assert.ok(verifier.includes('"service-worker.js": liveSw'));
-  assert.ok(verifier.includes('"style.css": liveStyle'));
+  assert.ok(verifier.includes('"service-worker.js": { body: liveSw, source: swSource }'));
+  assert.ok(verifier.includes('"style.css": { body: liveStyle, source: fs.readFileSync'));
   assert.doesNotMatch(verifier, /"app\\.js": liveApp/,
     "the later edge verifier uses the live app version/feature markers after the deploy smoke's byte-exact proof");
   assert.doesNotMatch(verifier, /"index\.html": liveIndex/,
