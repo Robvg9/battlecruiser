@@ -110,6 +110,24 @@
       '#tab-compras .compra-footer{position:sticky;bottom:-12px;z-index:4;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.6fr);gap:8px;margin:7px 0 0;padding:8px 0 0;background:var(--stone);border-top:1px solid var(--gold-dim)}',
       '#tab-compras .compra-footer button{width:100%;min-height:38px;margin:0;padding:8px 10px;font-size:12px}',
       '#tab-compras #compra-multiple-msg{margin:6px 0 0;font-size:11px;line-height:1.3}',
+      '#tab-compras .compra-step-label{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--gold-bright);margin:6px 0}',
+      '#tab-compras .compra-product-search{display:grid;gap:4px;font-size:11px;margin:6px 0}',
+      '#tab-compras .compra-product-search input{min-height:38px;padding:8px 10px;border-radius:7px}',
+      '#tab-compras .compra-product-picker{display:grid;gap:5px;max-height:min(44vh,390px);overflow:auto;overscroll-behavior:contain}',
+      '#tab-compras .compra-product-choice{display:flex;align-items:center;gap:10px;min-height:44px;padding:7px 9px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--void);cursor:pointer}',
+      '#tab-compras .compra-product-choice input{width:18px;height:18px;accent-color:var(--gold)}',
+      '#tab-compras .compra-product-choice span{display:grid;gap:2px}.compra-product-choice strong{font-size:12px}.compra-product-choice small{font-size:10px;color:var(--mist)}',
+      '#tab-compras .compra-step-actions{display:flex;justify-content:space-between;gap:8px;margin-top:9px}',
+      '#tab-compras .compra-step-actions button{min-height:38px;padding:8px 12px}',
+      '#tab-compras .compra-detail-list{display:grid;gap:8px;margin:8px 0}',
+      '#tab-compras .compra-detail-row{display:grid;gap:8px;padding:10px;border:1px solid var(--gold-dim);border-radius:8px;background:var(--void)}',
+      '#tab-compras .compra-detail-heading{display:flex;justify-content:space-between;gap:8px}.compra-detail-heading strong{font-size:13px}.compra-detail-heading small{font-size:10px;color:var(--mist)}',
+      '#tab-compras .compra-detail-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}',
+      '#tab-compras .compra-detail-fields label{display:grid;gap:4px;min-width:0;font-size:10px;color:var(--mist)}',
+      '#tab-compras .compra-detail-fields input,#tab-compras .compra-detail-fields select{width:100%;min-width:0;height:38px;padding:7px 8px;font-size:12px;box-sizing:border-box}',
+      '#tab-compras .compra-detail-help{font-size:10px;color:var(--mist)}',
+      '#tab-compras .compra-step[hidden]{display:none!important}',
+      '@media(max-width:560px){#tab-compras .compra-detail-fields{grid-template-columns:minmax(0,1fr)}#tab-compras .compra-detail-row{padding:9px}}',
       '@media(max-width:720px){#bc165-overlay .bc165-modal{width:100%;max-width:100%;padding:10px}#bc165-overlay .bc165-head{top:-10px}#tab-compras .compra-linea-editor{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:6px}#tab-compras .compra-linea-editor #compra-multiple-add{grid-column:1/-1}}',
       '@media(max-width:380px){#tab-compras .compra-cabecera{grid-template-columns:minmax(0,1fr)}#tab-compras .compra-cabecera>div:nth-child(1),#tab-compras .compra-cabecera>div:nth-child(2),#tab-compras .compra-cabecera>div:nth-child(3){grid-column:1;grid-row:auto}#tab-compras .compra-linea-editor{grid-template-columns:minmax(0,1fr)}#tab-compras .compra-linea-editor>*{grid-column:1!important}}'
     ].join('');
@@ -140,16 +158,27 @@
             '<div><label class="muted" for="compra-multiple-fecha">Fecha</label>' +
             '<input id="compra-multiple-fecha" type="datetime-local"></div>' +
           '</div>' +
-          '<h3 class="compra-subtitulo">Agregar productos</h3>' +
-          '<div class="inline-form compra-linea-editor">' +
+          '<section id="compra-step-products" class="compra-step">' +
+            '<p class="compra-step-label">PASO 1 DE 2 · Selecciona los productos</p>' +
+            '<label class="compra-product-search">Buscar producto<input id="compra-product-search" type="search" placeholder="Escribe el nombre del producto"></label>' +
+            '<div id="compra-product-picker" class="compra-product-picker"></div>' +
+            '<div class="compra-step-actions"><button type="button" id="compra-product-clear" class="cc-accion">Limpiar selección</button><button type="button" id="compra-product-next" disabled>Siguiente · 0</button></div>' +
+          '</section>' +
+          '<section id="compra-step-details" class="compra-step" hidden>' +
+            '<p class="compra-step-label">PASO 2 DE 2 · Cantidades y costos</p>' +
+            '<p class="muted">Solo aparecen los productos seleccionados. El costo corresponde a la presentación elegida.</p>' +
+            '<button type="button" id="compra-product-back" class="cc-accion">← Volver a productos</button>' +
+            '<div id="compra-multiple-lineas" class="compra-detail-list"></div>' +
+          '</section>' +
+          '<div id="compra-multiple-legacy-editor" hidden>' +
+            '<h3 class="compra-subtitulo">Editor anterior</h3><div class="inline-form compra-linea-editor">' +
             '<select id="compra-multiple-producto" aria-label="Producto"><option value="" disabled selected hidden>Producto</option></select>' +
             '<select id="compra-multiple-presentacion" aria-label="Unidad o presentación"><option value="" disabled selected hidden>Unidad base</option></select>' +
             '<input id="compra-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad">' +
             '<input id="compra-multiple-costo" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Costo" aria-label="Costo por unidad o presentación">' +
-            '<button type="button" id="compra-multiple-add">+ Añadir</button>' +
+            '<button type="button" id="compra-multiple-add">+ Añadir</button></div>' +
+            '<p id="compra-multiple-pres-ayuda" class="muted">El costo corresponde a la unidad o presentación seleccionada.</p>' +
           '</div>' +
-          '<p id="compra-multiple-pres-ayuda" class="muted">El costo corresponde a la unidad o presentación seleccionada.</p>' +
-          '<div id="compra-multiple-lineas" class="lista"></div>' +
           '<div class="compra-resumen-box" id="compra-multiple-resumen">' +
             '<div class="row"><span id="compra-multiple-n-lineas">0 líneas</span><strong>Total · <span id="compra-multiple-total">$0.00</span></strong></div>' +
           '</div>' +
@@ -177,6 +206,16 @@
     var limpiar = document.getElementById('compra-multiple-limpiar');
     var lineas = [];
     var presActual = [];
+    var selectedProducts = Object.create(null);
+    var productDrafts = Object.create(null);
+    var associationsByProduct = Object.create(null);
+    var productStep = 1;
+    var picker = document.getElementById('compra-product-picker');
+    var searchProducts = document.getElementById('compra-product-search');
+    var nextProducts = document.getElementById('compra-product-next');
+    var backProducts = document.getElementById('compra-product-back');
+    var stepProducts = document.getElementById('compra-step-products');
+    var stepDetails = document.getElementById('compra-step-details');
 
     fecha.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
@@ -222,6 +261,118 @@
         }).join('');
       presentacion.disabled = false;
       actualizarCamposPresentacion();
+    }
+
+    function renderProductPicker(){
+      if (!picker) return;
+      var query = String(searchProducts && searchProducts.value || '').trim().toLocaleLowerCase();
+      var rows = productos().filter(function(item){ return item.activo !== false && (!query || String(item.nombre || '').toLocaleLowerCase().includes(query)); });
+      picker.innerHTML = rows.map(function(item){
+        var id = String(item.id);
+        return '<label class="compra-product-choice"><input type="checkbox" data-compra-select="' + esc(id) + '"' +
+          (selectedProducts[id] ? ' checked' : '') + '><span><strong>' + esc(item.nombre) + '</strong><small>' + esc(item.unidad || 'Unidad base') + '</small></span></label>';
+      }).join('') || '<p class="lista-estado">No hay productos que coincidan con la búsqueda.</p>';
+      var count = Object.keys(selectedProducts).filter(function(id){ return selectedProducts[id]; }).length;
+      if (nextProducts) { nextProducts.disabled = count === 0; nextProducts.textContent = 'Siguiente · ' + count; }
+    }
+
+    function saveProductDrafts(){
+      lista.querySelectorAll('[data-compra-detail]').forEach(function(row){
+        var id = row.dataset.compraDetail;
+        productDrafts[id] = {
+          presentation: row.querySelector('[data-compra-presentation]')?.value || '',
+          quantity: row.querySelector('[data-compra-quantity]')?.value || '',
+          cost: row.querySelector('[data-compra-cost]')?.value || ''
+        };
+      });
+    }
+
+    async function showPurchaseStep(step){
+      if (productStep === 2 && step === 1) saveProductDrafts();
+      productStep = step === 2 ? 2 : 1;
+      if (stepProducts) stepProducts.hidden = productStep !== 1;
+      if (stepDetails) stepDetails.hidden = productStep !== 2;
+      if (stepProducts && productStep === 1) renderProductPicker();
+      if (productStep === 2) await renderPurchaseDetails();
+    }
+
+    async function renderPurchaseDetails(){
+      var chosen = productos().filter(function(item){ return !!selectedProducts[String(item.id)]; });
+      var datasets = await Promise.all(chosen.map(async function(item){
+        var id = String(item.id);
+        var associations = await presentacionesDeProducto(item.id);
+        associationsByProduct[id] = associations;
+        return { product: item, associations: associations, draft: productDrafts[id] || {} };
+      }));
+      lista.innerHTML = datasets.map(function(data){
+        var item = data.product, id = String(item.id), draft = data.draft, associations = data.associations;
+        var options = '<option value="">Unidad base</option>' + associations.map(function(item){
+          return '<option value="' + esc(item.presentacion_id) + '"' + (String(draft.presentation || '') === String(item.presentacion_id) ? ' selected' : '') + '>' +
+            esc(item.presentaciones && item.presentaciones.nombre || 'Presentación') + ' · ×' + Number(item.factor) + '</option>';
+        }).join('');
+        var selectedPresentation = associations.find(function(item){ return String(item.presentacion_id) === String(draft.presentation || ''); });
+        var unitName = selectedPresentation && selectedPresentation.presentaciones ? selectedPresentation.presentaciones.nombre : 'unidad base';
+        return '<article class="compra-detail-row" data-compra-detail="' + esc(id) + '">' +
+          '<div class="compra-detail-heading"><strong>' + esc(item.nombre) + '</strong><small>' + esc(item.unidad || 'Unidad base') + '</small></div>' +
+          '<div class="compra-detail-fields">' +
+            '<label>Presentación<select data-compra-presentation>' + options + '</select></label>' +
+            '<label>Cantidad<input type="number" min="0.0001" step="any" inputmode="decimal" data-compra-quantity value="' + esc(draft.quantity || '') + '" placeholder="Cantidad"></label>' +
+            '<label>Costo por unidad/presentación<input type="number" min="0" step="0.01" inputmode="decimal" data-compra-cost value="' + esc(draft.cost || '') + '" placeholder="Costo"></label>' +
+          '</div><small class="compra-detail-help" data-compra-detail-help>' +
+            (selectedPresentation ? esc(unitName) + ' = ' + Number(selectedPresentation.factor) + ' unidades base. El costo se registra por ' + esc(unitName) + '.' : 'Sin presentación: cantidad y costo en unidades base.') +
+          '</small></article>';
+      }).join('') || '<p class="lista-estado">Vuelve al paso anterior y selecciona al menos un producto.</p>';
+      updatePurchaseTotal();
+    }
+
+    function updatePurchaseTotal(){
+      var count = lista.querySelectorAll('[data-compra-detail]').length;
+      var amount = 0, valid = 0;
+      lista.querySelectorAll('[data-compra-detail]').forEach(function(row){
+        var quantity = Number(row.querySelector('[data-compra-quantity]')?.value);
+        var costValue = row.querySelector('[data-compra-cost]')?.value;
+        var costNumber = Number(costValue);
+        if (Number.isFinite(quantity) && quantity > 0 && costValue !== '' && Number.isFinite(costNumber) && costNumber >= 0) {
+          amount += quantity * costNumber; valid += 1;
+        }
+      });
+      if (total) total.textContent = '$' + moneyLocal(amount);
+      if (nLineas) nLineas.textContent = count + (count === 1 ? ' producto seleccionado' : ' productos seleccionados') + (valid < count ? ' · completa cantidades y costos' : '');
+    }
+
+    function collectPurchaseLines(){
+      var nextLines = [];
+      var rows = Array.from(lista.querySelectorAll('[data-compra-detail]'));
+      for (var i = 0; i < rows.length; i += 1) {
+        var row = rows[i], id = row.dataset.compraDetail;
+        var item = productos().find(function(product){ return String(product.id) === id; });
+        var quantityInput = row.querySelector('[data-compra-quantity]');
+        var costInput = row.querySelector('[data-compra-cost]');
+        var presentationSelect = row.querySelector('[data-compra-presentation]');
+        var q = Number(quantityInput && quantityInput.value), c = Number(costInput && costInput.value);
+        var association = (associationsByProduct[id] || []).find(function(value){ return String(value.presentacion_id) === String(presentationSelect && presentationSelect.value || ''); });
+        if (!item || !Number.isFinite(q) || q <= 0 || !costInput || costInput.value.trim() === '' || !Number.isFinite(c) || c < 0) {
+          msg('Completa una cantidad y un costo válido para cada producto seleccionado.', false);
+          if (quantityInput && (!Number.isFinite(q) || q <= 0)) quantityInput.focus();
+          else if (costInput) costInput.focus();
+          return null;
+        }
+        if (association && !(Number(association.factor) > 0)) { msg('Una presentación no tiene factor válido. Corrige la selección.', false); return null; }
+        var presentationName = association && association.presentaciones ? association.presentaciones.nombre : null;
+        nextLines.push({
+          key: id + '::' + (association ? association.presentacion_id : 'base'),
+          producto_id: item.id, nombre: item.nombre,
+          cantidad: association ? null : q,
+          cantidad_presentacion: association ? q : null,
+          cantidad_documento: q,
+          presentacion_id: association ? association.presentacion_id : null,
+          presentacion_nombre: presentationName,
+          factor: association ? Number(association.factor) : 1,
+          costo: c
+        });
+      }
+      if (!nextLines.length) { msg('Selecciona al menos un producto.', false); return null; }
+      return nextLines;
     }
 
     function render(){
@@ -293,8 +444,11 @@
     }
 
     async function confirmarCompra(){
-      if (!almacen.value) { msg('Seleccioná el almacén de destino.', false); return; }
-      if (!lineas.length) { msg('Agregá al menos un producto.', false); return; }
+      if (!almacen.value) { msg('Selecciona el almacén de destino.', false); return; }
+      if (productStep !== 2) { msg('Completa primero la selección de productos.', false); return; }
+      var collected = collectPurchaseLines();
+      if (!collected) return;
+      lineas = collected;
 
       var tot = lineas.reduce(function(s, l){ return s + l.cantidad_documento * l.costo; }, 0);
       if (!window.confirm('¿Confirmar compra por $' + moneyLocal(tot) + ' al almacén seleccionado? Esto suma stock real.')) return;
@@ -336,7 +490,8 @@
           var r = await ejecutarOperacion('compra_multiple', payloadMultiple);
           if (!r.ok) throw (r.error || new Error('No se pudo registrar'));
           lineas = [];
-          render();
+          selectedProducts = Object.create(null); productDrafts = Object.create(null);
+          render(); await showPurchaseStep(1);
           if (r.offline) {
             msg('✓ Compra guardada localmente — se sincronizará al recuperar conexión. Los mínimos pendientes se configuran después desde Inventario.', true);
           } else {
@@ -387,16 +542,42 @@
       var b = e.target.closest('[data-compra-remove]');
       if (b) { lineas.splice(Number(b.dataset.compraRemove), 1); render(); }
     });
+    if (picker) picker.addEventListener('change', function(event){
+      var box = event.target.closest('[data-compra-select]');
+      if (!box) return;
+      var id = String(box.dataset.compraSelect);
+      if (box.checked) selectedProducts[id] = true;
+      else { delete selectedProducts[id]; delete productDrafts[id]; }
+      renderProductPicker();
+    });
+    if (searchProducts) searchProducts.addEventListener('input', renderProductPicker);
+    if (nextProducts) nextProducts.addEventListener('click', function(){ showPurchaseStep(2); });
+    if (backProducts) backProducts.addEventListener('click', function(){ showPurchaseStep(1); });
+    lista.addEventListener('input', function(event){
+      if (event.target.matches('[data-compra-quantity],[data-compra-cost]')) updatePurchaseTotal();
+    });
+    lista.addEventListener('change', function(event){
+      if (!event.target.matches('[data-compra-presentation]')) return;
+      var row = event.target.closest('[data-compra-detail]');
+      if (!row) return;
+      var association = (associationsByProduct[row.dataset.compraDetail] || []).find(function(item){ return String(item.presentacion_id) === String(event.target.value); });
+      var hint = row.querySelector('[data-compra-detail-help]');
+      if (hint) hint.textContent = association
+        ? ((association.presentaciones && association.presentaciones.nombre || 'Presentación') + ' = ' + Number(association.factor) + ' unidades base. El costo se registra por esa presentación.')
+        : 'Sin presentación: cantidad y costo en unidades base.';
+      updatePurchaseTotal();
+    });
+    document.getElementById('compra-product-clear').addEventListener('click', function(){
+      selectedProducts = Object.create(null); productDrafts = Object.create(null);
+      renderProductPicker(); msg('', true);
+    });
     limpiar.addEventListener('click', function(){
-      lineas = [];
+      lineas = []; selectedProducts = Object.create(null); productDrafts = Object.create(null);
       proveedor.value = '';
       fecha.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      producto.value = '';
-      presentacion.innerHTML = '<option value="" disabled selected hidden>Unidad base</option>';
-      presActual = [];
-      actualizarCamposPresentacion();
-      msg('', true);
-      render();
+      producto.value = ''; presentacion.innerHTML = '<option value="" disabled selected hidden>Unidad base</option>';
+      presActual = []; actualizarCamposPresentacion(); msg('', true);
+      render(); showPurchaseStep(1);
     });
     confirmar.addEventListener('click', confirmarCompra);
 
@@ -409,6 +590,7 @@
       }
       poblar();
       render();
+      renderProductPicker();
       if (producto.value) await cargarPresentaciones();
     }
     // La única entrada visible es Movimientos → Nueva compra.
@@ -440,6 +622,8 @@
 
     poblar();
     render();
+    renderProductPicker();
+    showPurchaseStep(1);
     actualizarCamposPresentacion();
   }
 
