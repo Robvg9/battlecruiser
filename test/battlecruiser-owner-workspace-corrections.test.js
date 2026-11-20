@@ -112,6 +112,9 @@ test("Empty dashboard queues disappear, but live approval, cash and communicatio
   assert.match(centerControl, /if \(importantes\.length === 0\)[\s\S]*setDashboardBlockVisible\(el, false\)/);
   assert.match(approvals, /Promise\.allSettled\(jobs\.map\(job=>job\.promise\)\)/);
   assert.match(approvals, /setApprovalPanelVisible\(panel,false\)/);
+  assert.match(approvals, /function hideApprovalPanel\(\)/);
+  assert.match(approvals, /if\(!canAdmin\(\)\)\{hideApprovalPanel\(\);return\}/);
+  assert.match(approvals, /setApprovalPanelVisible\(panel,true\);[\s\S]*Sin conexión/);
   assert.match(approvals, /listar_entregas_caja/);
   assert.match(approvals, /function renderEntrega\(x\)/);
   assert.match(approvals, /DECLARADA.*CONTADA/);
