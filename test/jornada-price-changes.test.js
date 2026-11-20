@@ -76,8 +76,8 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
-  assert.match(app,/\["jornada-price-changes.js","1.0.1"\]/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.1/);
+  assert.match(app,/\["jornada-price-changes.js","1.0.2"\]/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.2/);
 });
 
 test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el segundo", () => {
@@ -91,4 +91,13 @@ test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el se
   assert.match(ui, /Volver a productos/);
   assert.match(ui, /humanContextLabel\(item\)/);
   assert.doesNotMatch(ui, /responsable_id\)\.slice\(0,\s*8\)/);
+});
+
+test("Price context returns the full programmed period and current cost", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261120161500_jornada_price_context_human_period.sql", "utf8");
+  assert.match(migration, /'fecha_inicio',jp\.fecha/);
+  assert.match(migration, /'fecha_fin',coalesce\(jp\.fecha_fin,jp\.fecha\)/);
+  assert.match(migration, /'costo_actual',coalesce\(pr\.costo_unitario_referencia,0\)/);
+  assert.match(migration, /bc_actor_is_admin\(\)/);
+  assert.match(migration, /SECURITY DEFINER/);
 });

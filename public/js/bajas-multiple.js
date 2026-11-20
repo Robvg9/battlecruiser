@@ -174,8 +174,10 @@
     linesHost.addEventListener('click', event => {
       const remove = event.target.closest('[data-bc-baja-remove]');
       if (!remove || submitting) return;
-      draftLines.splice(Number(remove.dataset.bcBajaRemove), 1);
+      const [removedLine] = draftLines.splice(Number(remove.dataset.bcBajaRemove), 1);
+      if (removedLine) delete selectedProductIds[String(removedLine.producto_id)];
       pendingKey = null;
+      renderBajasProductPicker();
       renderDraftLines();
     });
     linesHost.addEventListener('change', event => {

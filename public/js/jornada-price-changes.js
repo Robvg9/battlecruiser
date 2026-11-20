@@ -275,6 +275,12 @@
     if (ownerBusy) return;
     ownerBusy = true;
     try {
+      try {
+        const staff = window.__BC7_JORNADA__;
+        if (staff && typeof staff.refreshResponsibleStaff === 'function') await staff.refreshResponsibleStaff();
+      } catch (staffError) {
+        console.warn('[BattleCruiser] No se pudo actualizar el catálogo de responsables:', staffError);
+      }
       contexts = await rpc('bc7_cambios_precio_contexto', {});
       if (!Array.isArray(contexts) || !contexts.length) {
         window.alert('No existe una jornada minorista activa con una dependienta trabajando. El cambio de precio solo se puede iniciar desde una jornada activa para exigir el conteo físico.');
