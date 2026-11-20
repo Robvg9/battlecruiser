@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.44 — planificador sin duración predeterminada y calendario desde hoy.
+// v7.45 — nombres de responsables reutilizables entre módulos sin consultas duplicadas.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
