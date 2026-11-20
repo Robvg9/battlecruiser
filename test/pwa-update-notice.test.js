@@ -25,5 +25,5 @@ test("el aviso valida la versión antes de mostrarla y antes de activarla", () =
   assert.match(APP, /esVersionMasNueva\(waitingVersion, currentVersion\)/);
   assert.match(APP, /esVersionMasNueva\(latestVersion, window\.__BC_VERSION__\)/);
   assert.match(SW, /BC_GET_VERSION/);
-  assert.match(SW, /BC_SW_VERSION: BC_SW_VERSION/);
+  assert.match(SW, /type: "BC_SW_VERSION", version: BC_SW_VERSION/);
 });
