@@ -71,18 +71,39 @@ async function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function resolveLinkedStylesheetUrl(indexHtml, serviceWorkerBody, origin) {
+  const linkTags = String(indexHtml).match(/<link\\b[^>]*>/gi) || [];
+  const stylesheetTag = linkTags.find(tag =>
+    /\\brel\\s*=\\s*["']stylesheet["']/i.test(tag) &&
+    /\\bhref\\s*=/i.test(tag) && /style\\.css/i.test(tag)
+  );
+  const hrefMatch = stylesheetTag && stylesheetTag.match(/\\bhref\\s*=\\s*["']([^"']+)["']/i);
+  if (!hrefMatch) throw new Error("Production index.html has no versioned main stylesheet link.");
+  const url = new URL(hrefMatch[1], origin + "/");
+  if (url.origin !== origin || url.pathname !== "/style.css" || !url.searchParams.get("v")) {
+    throw new Error("Production main stylesheet must be a same-origin /style.css URL with a version key.");
+  }
+  const swStyleMatch = String(serviceWorkerBody).match(/["']\\.\\/style\\.css\\?v=([^"']+)["']/);
+  if (!swStyleMatch || swStyleMatch[1] !== url.searchParams.get("v")) {
+    throw new Error("index.html and Service Worker request different stylesheet cache versions.");
+  }
+  return url.toString();
+}
+
 async function verifyLiveRelease(expected) {
   const filename = releaseManifestFilename(expected.source_sha);
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
       const stamp = encodeURIComponent(String(process.env.GITHUB_RUN_ID) + "-" + attempt);
-      const [index, app, sw, style, manifest] = await Promise.all([
+      const [index, app, sw, manifest] = await Promise.all([
         fetchText(PROD_BASE + "/?bc_deploy_ready=" + stamp),
         fetchText(PROD_BASE + "/app.js?bc_deploy_ready=" + stamp + "-app"),
         fetchText(PROD_BASE + "/service-worker.js?bc_deploy_ready=" + stamp + "-sw"),
-        fetchText(PROD_BASE + "/style.css?bc_deploy_ready=" + stamp + "-style"),
         fetchText(PROD_BASE + "/" + filename + "?bc_deploy_ready=" + stamp + "-manifest"),
       ]);
+      const stylesheetUrl = resolveLinkedStylesheetUrl(index.body, sw.body, PROD_BASE);
+      const style = await fetchText(stylesheetUrl);
+      log("[deploy smoke] exact linked stylesheet URL: " + stylesheetUrl);
 
       const statusesOk = [index, app, sw, style, manifest].every(x => x.status === 200);
       const appMatch = app.body.match(VERSION_RE);
