@@ -14,13 +14,13 @@ const CSS = read("public/style.css");
 
 test("PWA shell pins one fresh 9.5.130 release and Jornada UI 7.44", () => {
   assert.ok(APP.includes('const VERSION="9.5.130";'));
-  assert.ok(INDEX.includes('style.css?v=9.5.117'));
+  assert.ok(INDEX.includes('style.css?v=9.5.130'));
   assert.ok(INDEX.includes('app.js?v=9.5.130'));
   assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
   assert.ok(INDEX.includes('app-footer-version">v9.5.130 — BattleCruiser'));
   assert.ok(SW.includes('BC_SW_VERSION = "9.5.130"'));
   assert.ok(SW.includes('./app.js?v=9.5.130'));
-  assert.ok(SW.includes('./style.css?v=9.5.117'));
+  assert.ok(SW.includes('./style.css?v=9.5.130'));
   assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
   assert.ok(APP.includes('["bc7-jornada-ui.js","7.44"]'));
   assert.ok(SW.includes('./js/bc7-jornada-ui.js?v=7.44'));
