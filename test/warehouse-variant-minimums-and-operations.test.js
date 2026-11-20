@@ -97,17 +97,25 @@ test("Inventory cards and alerts recognize a low flavor even when total product 
   assert.match(inventory, /mín\. ' \+ qtyFmt\(minimum\)/);
 });
 
-test("Operations uses live catalogs for expenses/reinvestments and opens Baja through the batch editor", () => {
-  assert.match(operations, /async function ensureOperationCatalogs\(required\)/);
-  for (const name of ["openGasto", "openReinversion"]) {
-    assert.match(operations, new RegExp("async function " + name + "\\(\\)[\\s\\S]*?await ensureOperationCatalogs\\("));
-  }
-  assert.match(operations, /window\.refrescarAlmacenes/);
-  assert.match(operations, /window\.refrescarProductos/);
-  assert.match(operations, /async function openBaja\(\)/);
-  assert.match(operations, /window\.abrirBajasMultiple/);
-  assert.ok(operations.includes("await ensureOperationCatalogs(false)"));
-  assert.ok(operations.includes("await ensureOperationCatalogs(true)"));
+test("Operations opens expense/reinvestment modals immediately and loads catalogs inside them", () => {
+  assert.match(operations, /async function ensureOperationCatalogs\\(required, silent\\)/);
+  const gasto = operations.slice(operations.indexOf("async function openGasto()"), operations.indexOf("async function openBaja()"));
+  const reinversion = operations.slice(operations.indexOf("async function openReinversion()"), operations.indexOf("function openResponsabilidad()"));
+  assert.ok(gasto.indexOf("openModal({") >= 0 && gasto.indexOf("openModal({") < gasto.indexOf("ensureOperationCatalogs(false)"),
+    "Gasto must show its modal before refreshing its optional catalog");
+  assert.ok(gasto.includes("ensureOperationCatalogs(false).then("),
+    "Gasto must refresh warehouses inside the already-open modal");
+  assert.ok(reinversion.indexOf("openModal({") >= 0 && reinversion.indexOf("openModal({") < reinversion.indexOf("ensureOperationCatalogs(true, true)"),
+    "Reinversión must show its modal before waiting for required catalogs");
+  assert.ok(reinversion.includes("ensureOperationCatalogs(true, true).then("),
+    "Reinversión must load required catalogs inside the already-open modal");
+  assert.match(reinversion, /submit\\.disabled = true/);
+  assert.match(reinversion, /submit\\.disabled = !ready/);
+  assert.match(operations, /window\\.refrescarAlmacenes/);
+  assert.match(operations, /window\\.refrescarProductos/);
+  assert.match(operations, /async function openBaja\\(\\)/);
+  assert.match(operations, /window\\.abrirBajasMultiple/);
+  assert.match(operations, /bajaOpenPromise/);
 });
 
 test("Baja entry is one authenticated multi-product list, not a duplicate finance form", () => {
@@ -140,7 +148,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.match(app, /m53-inventario-centro\.js","53\.9/);
   assert.match(app, /ui-operaciones-hub\.js","43\.3/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
-  assert.ok(app.includes('["aprobaciones-admin.js","20261120.1"]'));
+  assert.ok(app.includes('["aprobaciones-admin.js","20261120.3"]'));
   assert.match(app, /inventario-detalle\.js","72"/);
   assert.match(app, /compra-multiple\.js","27\.17"/);
   assert.ok(app.includes('["bc7-jornada-ui.js","7.45"]'));
@@ -155,7 +163,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
     "bc7-jornada-ui.js?v=7.45",
-    "ui-operaciones-hub.js?v=43.3",
+    "ui-operaciones-hub.js?v=43.4",
     "almacenes.js?v=20261111.1",
     "m53-inventario-centro.js?v=53.9",
     "movimiento-multiple.js?v=20261120.1",
