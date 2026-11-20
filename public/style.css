@@ -1639,7 +1639,6 @@ select,
 select:focus,
 select:active {
   color: var(--text);
-  background-color: var(--stone);
   border-color: var(--bc-control-border);
   color-scheme: dark;
 }
@@ -1654,7 +1653,6 @@ html[data-bc-theme="light"] select,
 html[data-bc-theme="light"] select:focus,
 html[data-bc-theme="light"] select:active {
   color: var(--text);
-  background-color: var(--stone);
   color-scheme: light;
 }
 
