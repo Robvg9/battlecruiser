@@ -142,7 +142,8 @@ async function verifyOnce(attempt) {
   // validated the same release manifest/Worker version immediately after deploy.
   // A later edge can return a normalized or stale HTML representation while
   // preserving the application shell. Keep checking the live HTML structure and
-  // release versions here, but enforce raw SHA-256/bytes for stable JS/CSS assets.
+  // release versions here. The deploy smoke remains the raw byte-exact proof; this
+  // second fetch compares complete source text after normalizing LF/CRLF only.
   const expectedIndex = release.asset_inventory["index.html"];
   if (!expectedIndex || !/^[0-9a-f]{64}$/.test(String(expectedIndex.sha256 || "")) ||
       !Number.isSafeInteger(expectedIndex.bytes) || expectedIndex.bytes < 1) {
