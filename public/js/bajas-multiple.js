@@ -580,18 +580,3 @@
   window.refrescarBajasMultiple = () => loadCatalogs(true);
   window.setTimeout(() => start(false), 1300);
 })();
-
-/* Two-step selection and detail layout for multi-product Bajas. */
-.bc-bajas-step-label{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--gold);margin:8px 0}
-.bc-bajas-search{display:grid;gap:5px;font-size:11px;margin:6px 0}
-.bc-bajas-search input{min-height:38px}
-.bc-bajas-product-picker{display:grid;gap:5px;max-height:min(42vh,360px);overflow:auto;overscroll-behavior:contain}
-.bc-bajas-product-choice{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;border:1px solid var(--gold-dim,rgba(200,160,80,.25));border-radius:8px;background:var(--void,rgba(0,0,0,.12));cursor:pointer}
-.bc-bajas-product-choice input{width:18px;height:18px;flex:0 0 18px;accent-color:var(--gold)}
-.bc-bajas-product-choice span{display:grid;gap:2px}.bc-bajas-product-choice strong{font-size:12px}.bc-bajas-product-choice small{font-size:10px;color:var(--mist,#aaa)}
-.bc-bajas-step[hidden]{display:none!important}
-.bc-bajas-step .bc-bajas-context-fields{margin:9px 0}
-.bc-baja-quantity-field{display:grid;gap:4px;font-size:11px;margin:8px 0}
-.bc-baja-quantity-field input{min-height:40px;padding:8px 10px}
-.bc-bajas-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
-@media(max-width:540px){.bc-bajas-product-picker{max-height:38vh}.bc-bajas-actions button{flex:1 1 100%}}
