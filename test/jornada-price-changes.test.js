@@ -3,6 +3,7 @@ const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
+const path=require("node:path");
 
 const migration=fs.readFileSync("supabase/migrations/20261119000000_jornada_persistent_price_changes.sql","utf8");
 const costMigration=fs.readFileSync("supabase/migrations/20261119193000_jornada_price_change_optional_cost.sql","utf8");
@@ -68,7 +69,7 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/setInterval\(refreshPending, 20000\)/);
   assert.match(ui,/No se activó ningún precio/);
   const ownerRows=ui.slice(ui.indexOf("function renderOwnerProducts"),ui.indexOf("function ownerModalHtml"));
-  assert.match(ownerRows,/<div class="bc-jpc-product">/);
+  assert.match(ownerRows,/<article class="bc-jpc-product">/);
   assert.ok(ownerRows.includes("const checkboxId = 'bc-jpc-select-'") && ownerRows.includes("<label for=\"' + esc(checkboxId)"), "each product checkbox has an explicit associated label");
   assert.doesNotMatch(ownerRows,/<label class="bc-jpc-product">/,
     "product rows must not nest multiple interactive inputs inside one label");
