@@ -12,7 +12,7 @@ const css = fs.readFileSync(path.join(root, "public/bc7-jornada-inventory-mobile
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "public/manifest.json"), "utf8"));
 
 test("Jornada mobile inventory loads its horizontal-table override after the base stylesheet", () => {
-  const baseAt = index.indexOf('href="style.css?v=9.5.117"');
+  const baseAt = index.indexOf('href="style.css?v=9.5.130"');
   const inventoryAt = index.indexOf('href="bc7-jornada-inventory-mobile.css?v=20261116.2"');
   assert.ok(baseAt >= 0, "the base stylesheet must remain loaded");
   assert.ok(inventoryAt > baseAt, "the Jornada override must load after the base stylesheet");
