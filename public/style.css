@@ -501,24 +501,30 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 }
 
 
-/* Mi Cuenta — profile view from the already-loaded authenticated context. */
-.bc-account-overlay {
+/* Shared modal primitives: structure/lifecycle is common; each feature owns its sizing and visual treatment. */
+.bc-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 12000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
+.bc-modal-overlay.hidden { display: none !important; }
+.bc-modal-dialog {
+  max-height: calc(100dvh - 28px);
+  overflow: auto;
+}
+
+/* Mi Cuenta — profile view from the already-loaded authenticated context. */
+.bc-account-overlay {
+  z-index: 12000;
   background: rgba(2, 10, 8, .76);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
-.bc-account-overlay.hidden { display: none !important; }
 .bc-account-card {
   width: min(460px, 100%);
-  max-height: calc(100dvh - 28px);
-  overflow: auto;
   padding: 20px;
   color: var(--text);
   background: var(--stone);
@@ -545,6 +551,11 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
   color: var(--text);
   font-size: 23px;
   line-height: 1.2;
+}
+.bc-account-close:focus-visible,
+.bc-account-actions button:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 2px;
 }
 .bc-account-close {
   flex: 0 0 auto;

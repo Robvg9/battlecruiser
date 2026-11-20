@@ -1,11 +1,11 @@
-// BattleCruiser — Mi Cuenta, v1.2. Read-only authenticated profile view.
+// BattleCruiser — Mi Cuenta, v1.3. Read-only profile view using the shared modal lifecycle.
 (function miCuenta() {
   'use strict';
   if (window.__BCMiCuentaLoaded) return;
   window.__BCMiCuentaLoaded = true;
 
   var modal = null;
-  var lastFocus = null;
+  var modalController = null;
 
   function firstText(obj, keys) {
     if (!obj) return '';
@@ -32,12 +32,8 @@
   }
 
   function closeModal() {
-    if (!modal || modal.classList.contains('hidden')) return;
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    var button = document.getElementById('mi-cuenta-btn');
-    if (button) button.setAttribute('aria-expanded', 'false');
-    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+    if (!modalController || !modalController.isOpen()) return;
+    modalController.close();
   }
 
   function renderProfile() {
@@ -61,18 +57,19 @@
   }
 
   function buildModal() {
-    if (modal || !document.body) return modal;
+    if (modal && modalController) return modal;
+    if (!document.body) return null;
     modal = document.getElementById('bc-mi-cuenta-modal');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'bc-mi-cuenta-modal';
-      modal.className = 'bc-account-overlay hidden';
+      modal.className = 'bc-account-overlay bc-modal-overlay hidden';
       modal.setAttribute('aria-hidden', 'true');
       modal.innerHTML = [
-        '<section class="bc-account-card" role="dialog" aria-modal="true" aria-labelledby="bc-account-title">',
+        '<section class="bc-account-card bc-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="bc-account-title" tabindex="-1">',
           '<header class="bc-account-header">',
             '<div><p class="bc-account-eyebrow">Perfil actual</p><h2 class="bc-account-title" id="bc-account-title">Mi Cuenta</h2></div>',
-            '<button type="button" class="bc-account-close" id="bc-account-close" aria-label="Cerrar Mi Cuenta">×</button>',
+            '<button type="button" class="bc-account-close" id="bc-account-close" data-bc-modal-close aria-label="Cerrar Mi Cuenta">×</button>',
           '</header>',
           '<p class="bc-account-message" id="bc-account-message" role="status" aria-live="polite"></p>',
           '<dl class="bc-account-details">',
@@ -82,7 +79,7 @@
           '</dl>',
           '<p class="bc-account-note">Por seguridad, esta pantalla no muestra contraseñas, tokens ni secretos de sesión.</p>',
           '<div class="bc-account-actions">',
-            '<button type="button" id="bc-account-back">Volver</button>',
+            '<button type="button" id="bc-account-back" data-bc-modal-close>Volver</button>',
             '<button type="button" class="bc-account-primary" id="bc-account-password">Cambiar contraseña</button>',
           '</div>',
         '</section>'
@@ -90,41 +87,54 @@
       document.body.appendChild(modal);
     }
 
-    var close = document.getElementById('bc-account-close');
-    var back = document.getElementById('bc-account-back');
+    if (!window.BCModalManager || typeof window.BCModalManager.create !== 'function') {
+      console.error('[BattleCruiser] No se cargó el controlador compartido de modales; Mi Cuenta permanece cerrada.');
+      return null;
+    }
+
     var password = document.getElementById('bc-account-password');
-    if (close) close.addEventListener('click', closeModal);
-    if (back) back.addEventListener('click', closeModal);
-    if (password) password.addEventListener('click', function () {
-      closeModal();
-      var passPanel = document.getElementById('pass-panel');
-      if (!passPanel) return;
-      passPanel.classList.remove('hidden');
-      if (typeof passPanel.scrollIntoView === 'function') {
-        passPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      var input = passPanel.querySelector('input');
-      if (input && typeof input.focus === 'function') input.focus();
-    });
-    modal.addEventListener('click', function (event) {
-      if (event.target === modal) closeModal();
-    });
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeModal();
-    });
+    if (password && password.dataset.bcPasswordActionBound !== '1') {
+      password.dataset.bcPasswordActionBound = '1';
+      password.addEventListener('click', function () {
+        closeModal();
+        var passPanel = document.getElementById('pass-panel');
+        if (!passPanel) return;
+        passPanel.classList.remove('hidden');
+        if (typeof passPanel.scrollIntoView === 'function') {
+          passPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        var input = passPanel.querySelector('input');
+        if (input && typeof input.focus === 'function') input.focus();
+      });
+    }
+
+    if (!modalController) {
+      modalController = window.BCModalManager.create(modal, {
+        dialogSelector: '.bc-account-card',
+        initialFocusSelector: '#bc-account-close',
+        returnFocusSelector: '#mi-cuenta-btn',
+        closeSelector: '[data-bc-modal-close]',
+        closeOnEscape: true,
+        closeOnBackdrop: true,
+        trapFocus: true,
+        lockScroll: true,
+        onOpen: function () {
+          var button = document.getElementById('mi-cuenta-btn');
+          if (button) button.setAttribute('aria-expanded', 'true');
+        },
+        onClose: function () {
+          var button = document.getElementById('mi-cuenta-btn');
+          if (button) button.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
     return modal;
   }
 
   function openModal() {
-    if (!buildModal()) return;
-    lastFocus = document.activeElement;
+    if (!buildModal() || !modalController) return;
     renderProfile();
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-    var button = document.getElementById('mi-cuenta-btn');
-    if (button) button.setAttribute('aria-expanded', 'true');
-    var close = document.getElementById('bc-account-close');
-    if (close && typeof close.focus === 'function') close.focus();
+    modalController.open();
   }
 
   function boot() {
