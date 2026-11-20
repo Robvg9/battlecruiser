@@ -12,7 +12,7 @@ const productos=()=>Array.isArray(window._cache?.productos)?window._cache.produc
 async function rpc(name,params){if(!window.client)throw new Error('Backend no disponible');let timer;try{const p=client.rpc(name,params||{}),t=new Promise((_,rej)=>timer=setTimeout(()=>rej(new Error('Tiempo de espera agotado')),TIMEOUT)),r=await Promise.race([p,t]);if(r.error)throw r.error;return r.data}finally{clearTimeout(timer)}}
 function ensurePanel(){if(!canAdmin())return null;let el=document.getElementById(ID);if(el)return el;const host=document.getElementById('cc-atencion');if(!host)return null;const b=document.createElement('div');b.className='cc-bloque';b.id=ID;b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';host.parentElement.insertBefore(b,host);return b}
 const listEl=()=>{const p=ensurePanel();return p&&p.querySelector('#admin-aprobaciones-lista')};
-function row(title,detail,buttons){const d=document.createElement('div');d.className='rep-fila';d.innerHTML='<span class="rep-fila-principal"><span class="cc-asunto-tipo">'+esc(title)+'</span><span class="muted">'+esc(detail)+'</span></span>';const box=document.createElement('div');box.className='btn-row';buttons.forEach(b=>{const x=document.createElement('button');x.type='button';x.className='cc-accion';x.textContent=b.text;x.disabled=!!b.disabled;if(!b.disabled)x.onclick=b.fn;box.appendChild(x)});d.appendChild(box);return d}
+function row(title,detail,buttons){const d=document.createElement('div');d.className='rep-fila';d.innerHTML='<span class="rep-fila-principal"><span class="cc-asunto-tipo">'+esc(title)+'</span><span class="muted">'+esc(detail)+'</span></span>';const box=document.createElement('div');box.className='btn-row';buttons.forEach(b=>{const x=document.createElement('button');x.type='button';x.className='cc-accion';x.textContent=b.text;x.disabled=!!b.disabled;if(!b.disabled)x.onclick=event=>b.fn(event,x);box.appendChild(x)});d.appendChild(box);return d}
 async function load(){if(!canAdmin()||!(await hasLiveSession()))return;const el=listEl();if(!el)return;if(!navigator.onLine){el.innerHTML='<p class="lista-estado">⚪ Sin conexión. Las aprobaciones requieren conexión.</p>';return}el.innerHTML='<p class="lista-estado">Cargando aprobaciones…</p>';try{const jobs=[];if(can('entregas_caja','editar_any')){jobs.push(rpc('listar_entregas_caja',{p_ciclo_id:null,p_almacen_id:null,p_estado:null}).then(e=>({k:'e',d:Array.isArray(e)?e:[]})));jobs.push(rpc('listar_cuadres',{p_limite:50,p_offset:0}).then(c=>({k:'c',d:Array.isArray(c)?c:[]})))}if(canViewOperationalQueue())jobs.push(rpc('listar_aprobaciones_admin').then(a=>({k:'o',d:Array.isArray(a)?a:[]})));const rs=await Promise.all(jobs),rows=[];for(const r of rs){if(r.k==='e')r.d.filter(x=>['DECLARADA','CONTADA'].includes(x.estado)).forEach(x=>rows.push({rank:x.estado==='DECLARADA'?0:1,node:renderEntrega(x)}));if(r.k==='c')r.d.filter(x=>['CON_DIFERENCIA','EN_REVISION'].includes(x.estado)).forEach(x=>rows.push({rank:2,node:renderCuadre(x)}));if(r.k==='o')r.d.forEach(x=>rows.push({rank:3,node:renderOperativa(x)}))}rows.sort((a,b)=>a.rank-b.rank);if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(rows.length);if(!rows.length){el.innerHTML='<p class="lista-estado">✓ No hay aprobaciones pendientes.</p>';return}el.innerHTML='';rows.forEach(r=>el.appendChild(r.node))}catch(e){el.innerHTML='<p class="lista-estado">No se pudieron cargar las aprobaciones: '+esc(e.message||e)+'</p>'}}
 function renderEntrega(x){const estado=x.estado==='DECLARADA'?'DECLARADA — falta contar':'CONTADA — falta aprobar';const dif=x.diferencia==null?'':' · Diferencia $'+money(x.diferencia);return row('💵 Entrega de caja',(x.declarado_nombre||'Usuario')+' · '+(x.almacen_nombre||'Almacén')+' · '+estado+' · Declarado $'+money(x.monto_declarado)+dif,x.estado==='DECLARADA'?[{text:'Contar dinero',fn:()=>contarEntrega(x.id)}]:[{text:'Aprobar',fn:()=>revisarEntrega(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarEntrega(x.id,'rechazar')}])}
 function renderCuadre(x){const dif=Number(x.diferencia||0),s=dif<0?'Faltante $'+money(Math.abs(dif)):dif>0?'Sobrante $'+money(dif):'Exacto';return row('🧾 Cuadre pendiente','Esperado $'+money(x.dinero_esperado)+' · Declarado $'+money(x.dinero_declarado)+' · '+s,[{text:'Aprobar',fn:()=>revisarCuadre(x.id,'aprobar')},{text:'Rechazar',fn:()=>revisarCuadre(x.id,'rechazar')}])}
@@ -26,7 +26,7 @@ function renderOperativa(x){
   if(x.tipo==='recepcion_inventario_jornada'){
     return row('📦 Recepción inventario compartido · revisión pendiente',
       (x.almacen_nombre||'Almacén')+' · '+user+' · '+(x.producto_nombre||'Jornada origen/destino')+' · '+(x.resumen||'Recepción pendiente'),
-      [{text:'Ver detalle y resolver',fn:()=>abrirRevision(x)}]);
+      [{text:'Ver detalle y resolver',fn:(event,trigger)=>abrirRevision(x,trigger)}]);
   }
   if(x.tipo==='gasto'){
     const concept=x.resumen||'gasto';
@@ -61,7 +61,7 @@ function renderOperativa(x){
     :x.tipo==='declaracion_jornada'?'💵 Declaración final de efectivo · conteo físico pendiente'
     :x.tipo==='merma'?'📉 Merma pendiente'
     :x.tipo==='baja_lista'?'📋 Lista de bajas pendiente':'📉 Baja pendiente';
-  return row(title,detail,[{text:'Ver detalles y revisar',fn:()=>abrirRevision(x)}]);
+  return row(title,detail,[{text:'Ver detalles y revisar',fn:(event,trigger)=>abrirRevision(x,trigger)}]);
 }
 async function resolverOperativaDirecta(item,decision){
   if(decision==='APROBAR'&&!confirm('¿Aprobar '+(item.tipo==='gasto'?'el gasto':'la reinversión')+' por '+money(item.monto)+' CUP?'))return;
@@ -81,7 +81,7 @@ async function resolverOperativaDirecta(item,decision){
     alert('No se pudo '+(decision==='APROBAR'?'aprobar':'rechazar')+': '+(error.message||error));
   }
 }
-let approvalFocusReturn=null;
+let approvalModalController=null;
 function ensureApprovalModal(){
   let modal=document.getElementById('admin-aprobacion-modal');
   if(modal)return modal;
@@ -101,25 +101,36 @@ function ensureApprovalModal(){
       '</footer>'+
     '</section>';
   document.body.appendChild(modal);
-  modal.addEventListener('click',event=>{
-    if(event.target.closest('[data-bc-admin-close]'))closeApprovalModal();
+  if(!window.BCModalManager||typeof window.BCModalManager.create!=='function'){
+    throw new Error('BCModalManager debe cargarse antes de Aprobaciones administrativas.');
+  }
+  approvalModalController=window.BCModalManager.create(modal,{
+    dialogSelector:'.bc-admin-approval-dialog',
+    initialFocusSelector:'.bc-admin-approval-close',
+    closeSelector:'[data-bc-admin-close]',
+    backdropSelector:'.bc-admin-approval-backdrop',
+    hiddenClass:null,
+    hiddenAttribute:true,
+    closeOnEscape:true,
+    closeOnBackdrop:true,
+    trapFocus:true,
+    lockScroll:true,
+    onOpen:function(){document.body.classList.add('bc-admin-approval-open');},
+    onClose:function(){document.body.classList.remove('bc-admin-approval-open');}
   });
   modal.querySelector('#admin-approval-reject').addEventListener('click',()=>resolverDesdeModal('RECHAZAR'));
   modal.querySelector('#admin-approval-accept').addEventListener('click',()=>resolverDesdeModal('APROBAR'));
-  document.addEventListener('keydown',event=>{
-    if(event.key==='Escape'&&!modal.hidden)closeApprovalModal();
-  });
   return modal;
 }
 function closeApprovalModal(){
   const modal=document.getElementById('admin-aprobacion-modal');
   if(!modal)return;
+  if(approvalModalController&&approvalModalController.isOpen()){
+    approvalModalController.close();
+    return;
+  }
   modal.hidden=true;
   document.body.classList.remove('bc-admin-approval-open');
-  if(approvalFocusReturn&&approvalFocusReturn.isConnected){
-    try{approvalFocusReturn.focus({preventScroll:true})}catch(_){}
-  }
-  approvalFocusReturn=null;
 }
 function setApprovalMessage(value,isError){
   const el=document.getElementById('admin-approval-message');
@@ -217,21 +228,18 @@ function renderApprovalDetails(x,detail){
   rejectButton.hidden=false;
   acceptButton.textContent=isList?'Aceptar lista completa':isFinalCash?'Confirmar conteo físico':isReceipt?'Aprobar recepción':'Aceptar y aprobar';
   acceptButton.disabled=false;
-  modal.hidden=false;
   footer.hidden=false;
-  document.body.classList.add('bc-admin-approval-open');
-  modal.querySelector('.bc-admin-approval-dialog').focus({preventScroll:true});
 }
-async function abrirRevision(x){
+async function abrirRevision(x,opener){
   const modal=ensureApprovalModal();
-  approvalFocusReturn=document.activeElement;
-  modal.hidden=false;
+  if(opener&&opener.isConnected&&typeof opener.focus==='function'){
+    try{opener.focus({preventScroll:true})}catch(_){try{opener.focus()}catch(__){}}
+  }
   modal.querySelector('#admin-approval-title').textContent='Cargando detalle…';
   modal.querySelector('#admin-approval-subtitle').textContent='';
   modal.querySelector('#admin-approval-body').innerHTML='<p class="lista-estado">Recuperando los productos y motivos de la solicitud…</p>';
   modal.querySelector('#admin-approval-footer').hidden=true;
-  document.body.classList.add('bc-admin-approval-open');
-  modal.querySelector('.bc-admin-approval-dialog').focus({preventScroll:true});
+  approvalModalController.open();
   try{
     let detail=x;
     if(x.tipo==='baja_lista'){

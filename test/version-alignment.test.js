@@ -118,7 +118,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["m53-inventario-centro.js","53.9"]'), 'M53 must resolve warehouse IDs for mixed variants');
   assert.ok(app.includes('["ui-operaciones-hub.js","43.3"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'), 'the finance operations form must refresh');
-  assert.ok(app.includes('["aprobaciones-admin.js","20261119.1"]'), 'the approval form must refresh');
+  assert.ok(app.includes('["aprobaciones-admin.js","20261120.1"]'), 'the approval form must refresh');
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'), 'the retroactive Jornada opening form must load');
   assert.ok(sw.includes('./js/bc7-periodo-apertura-ui.js?v=1.8'), 'the retroactive Jornada opening form must be precached');
   assert.ok(app.includes('["bajas-multiple.js","1.7"]'), 'Bajas list payload must be refreshed');
@@ -202,10 +202,10 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.131 — New Purchase picker UX and shared modal lifecycle integration/);
-  assert.match(index, /<script src="app\.js\?v=9\.5\.131"><\/script>/);
+  assert.match(app, /v9\.5\.132 — Administrative approval modal shared lifecycle integration/);
+  assert.match(index, /<script src="app\.js\?v=9\.5\.132"><\/script>/);
   for (const asset of [
-    'style.css?v=9.5.131',
+    'style.css?v=9.5.132',
     'js/centro-control.js?v=9.5.70',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.64',
@@ -294,10 +294,10 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.131'));
-  assert.ok(index.includes('app.js?v=9.5.131'));
-  assert.ok(sw.includes('./style.css?v=9.5.131'));
-  assert.ok(sw.includes('./app.js?v=9.5.131'));
+  assert.ok(index.includes('style.css?v=9.5.132'));
+  assert.ok(index.includes('app.js?v=9.5.132'));
+  assert.ok(sw.includes('./style.css?v=9.5.132'));
+  assert.ok(sw.includes('./app.js?v=9.5.132'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });

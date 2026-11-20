@@ -67,9 +67,9 @@ test("PWA release and cache manifest stay aligned", () => {
   const index = read("public/index.html");
   const sw = read("public/service-worker.js");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
-  assert.match(index, /style\.css\?v=9\.5\.130/);
+  assert.match(index, /style\.css\?v=9\.5\.132/);
   assert.match(sw, /inventario-detalle\.js\?v=72/);
-  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261119.1"));
+  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261120.1"));
   assert.ok(app.includes('["bajas-multiple.js","1.7"]'));
   assert.ok(sw.includes('./js/bajas-multiple.js?v=1.7'));
   assert.match(sw, /productos\.js\?v=20261118\.1/);
@@ -98,6 +98,12 @@ test("Baja review opens a floating modal and resolves the whole grouped request"
   assert.match(ui,/obtener_detalle_solicitud_baja_admin/);
   assert.match(ui,/resolver_solicitud_bajas_admin/);
   assert.match(ui,/p_solicitud_id:id/);
+  assert.match(ui,/window\.BCModalManager\.create\(modal,/);
+  assert.match(ui,/dialogSelector:'.bc-admin-approval-dialog'/);
+  assert.match(ui,/initialFocusSelector:'.bc-admin-approval-close'/);
+  assert.match(ui,/approvalModalController\.open\(\)/);
+  assert.match(ui,/approvalModalController\.close\(\)/);
+  assert.doesNotMatch(ui,/document\.addEventListener\('keydown',event=>\{\s*if\(event\.key==='Escape'/);
   assert.match(ui,/Aceptar lista completa/);
   assert.match(ui,/Rechazar lista completa/);
   assert.match(ui,/filter\(input=>!input\.disabled\)/);
