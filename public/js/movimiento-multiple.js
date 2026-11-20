@@ -19,6 +19,7 @@
   }
   function fmt(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   let lineas = [], enviando = false, selectors = null, catalogosRefreshPromise = null, stockRefreshPromise = null;
+  let selectedProductIds = Object.create(null), transferDrafts = Object.create(null), transferStep = 1;
   if (!Array.isArray(window.__BC_TRANSFER_STOCK_SNAPSHOT__)) window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
   if (typeof window.__BC_TRANSFER_STOCK_CONFIRMED__ !== 'boolean') window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
   if (typeof window.__BC_TRANSFER_STOCK_USER_ID__ !== 'string') window.__BC_TRANSFER_STOCK_USER_ID__ = null;
@@ -168,9 +169,19 @@
   function actualizarStockHint() {
     const hint = document.getElementById('mov-multiple-stock');
     if (!hint || !selectors) return;
-    if (!selectors.origin.value || !selectors.product.value) {
-      hint.textContent = 'El stock se valida en el almacén de origen.'; hint.className = 'muted mov-transfer-stock'; return;
+    if (!selectors.origin.value) {
+      hint.textContent = 'Selecciona primero el almacén de origen para consultar existencias.';
+      hint.className = 'muted mov-transfer-stock'; return;
     }
+    if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
+      hint.textContent = 'El inventario del almacén de origen todavía no está confirmado.';
+      hint.className = 'muted mov-transfer-stock is-low'; return;
+    }
+    const selectedCount = Object.keys(selectedProductIds).filter(id => selectedProductIds[id]).length;
+    hint.textContent = selectedCount
+      ? 'Existencias confirmadas para ' + selectedCount + ' producto(s) seleccionados.'
+      : 'Elige los productos que quieres trasladar; el stock se comprobará de nuevo antes de registrar.';
+    hint.className = 'muted mov-transfer-stock'; return;
     if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
       hint.textContent = window.__BC_TRANSFER_STOCK_ERROR__ ? 'Existencias sin confirmar: ' + window.__BC_TRANSFER_STOCK_ERROR__ : 'Actualiza existencias para consultar el stock real.';
       hint.className = 'muted mov-transfer-stock is-low'; return;
@@ -183,13 +194,85 @@
   function render() {
     const host = document.getElementById('mov-multiple-lineas'), count = document.getElementById('mov-multiple-count');
     if (!host) return;
-    host.innerHTML = lineas.length ? lineas.map((l, i) =>
-      '<div class="mov-transfer-line"><span class="mov-transfer-line-name"><strong>' + esc(l.nombre) + '</strong></span>' +
-      '<span class="mov-transfer-line-qty">' + fmt(l.cantidad) + ' u</span>' +
-      '<button type="button" data-mov-remove="' + i + '" aria-label="Quitar ' + esc(l.nombre) + '">×</button></div>'
-    ).join('') : '<p class="mov-transfer-empty">Añade los productos que viajarán en esta transferencia.</p>';
+    host.innerHTML = lineas.length ? lineas.map((l, i) => {
+      const info = stockDisponible(l.producto_id, selectors && selectors.origin.value);
+      const available = info ? fmt(info.cantidad) + ' disponibles' : 'Stock pendiente de validar';
+      return '<article class="mov-transfer-detail-row" data-mov-detail="' + esc(l.producto_id) + '">' +
+        '<div><strong>' + esc(l.nombre) + '</strong><small>' + esc(available) + '</small></div>' +
+        '<label>Cantidad a transferir<input type="number" min="0.0001" step="any" inputmode="decimal" data-mov-quantity="' + esc(l.producto_id) + '" value="' + (transferDrafts[String(l.producto_id)] || '') + '" placeholder="Cantidad"></label>' +
+      '</article>';
+    }).join('') : '<p class="mov-transfer-empty">Vuelve al paso anterior y selecciona los productos.</p>';
     if (count) count.textContent = fmt(lineas.length);
-    host.querySelectorAll('[data-mov-remove]').forEach(b => b.addEventListener('click', () => { lineas.splice(Number(b.dataset.movRemove), 1); render(); }));
+  }
+
+  function renderTransferProductPicker() {
+    const host = document.getElementById('mov-transfer-product-picker');
+    const search = document.getElementById('mov-transfer-product-search');
+    const next = document.getElementById('mov-transfer-next');
+    if (!host) return;
+    const query = String(search && search.value || '').trim().toLocaleLowerCase();
+    const rows = productos().filter(p => p.activo !== false && p.estado !== false &&
+      (!query || String(p.nombre || '').toLocaleLowerCase().includes(query)));
+    host.innerHTML = rows.map(p => {
+      const id = String(p.id);
+      return '<label class="mov-transfer-choice"><input type="checkbox" data-mov-select="' + esc(id) + '"' +
+        (selectedProductIds[id] ? ' checked' : '') + '><span><strong>' + esc(p.nombre) + '</strong><small>Unidad base</small></span></label>';
+    }).join('') || '<p class="mov-transfer-empty">No hay productos que coincidan con la búsqueda.</p>';
+    const count = Object.keys(selectedProductIds).filter(id => selectedProductIds[id]).length;
+    if (next) { next.disabled = count === 0; next.textContent = 'Siguiente · ' + count; }
+  }
+
+  function saveTransferDrafts() {
+    document.querySelectorAll('#mov-multiple-lineas [data-mov-quantity]').forEach(input => {
+      transferDrafts[String(input.dataset.movQuantity)] = input.value;
+    });
+  }
+
+  async function showTransferStep(step) {
+    if (step === 2) {
+      if (!selectors.origin.value || !selectors.destination.value) return feedback('Selecciona el almacén de origen y el de destino.', false);
+      if (String(selectors.origin.value) === String(selectors.destination.value)) return feedback('El origen y el destino deben ser distintos.', false);
+      if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
+        feedback('Confirmando existencias actuales antes de continuar…', true);
+        if (!(await actualizarInventarioConfirmado())) return feedback('No se pudo confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), false);
+      }
+      transferStep = 2;
+      lineas = productos().filter(p => selectedProductIds[String(p.id)]).map(p => ({
+        producto_id: p.id, nombre: p.nombre, cantidad: Number(transferDrafts[String(p.id)] || 0)
+      }));
+      document.getElementById('mov-transfer-step-products').hidden = true;
+      document.getElementById('mov-transfer-step-details').hidden = false;
+      render();
+      feedback('Indica la cantidad de cada producto. Se comprobará contra el stock confirmado.', true);
+      return;
+    }
+    if (transferStep === 2) saveTransferDrafts();
+    transferStep = 1;
+    document.getElementById('mov-transfer-step-products').hidden = false;
+    document.getElementById('mov-transfer-step-details').hidden = true;
+    renderTransferProductPicker();
+    feedback('', true);
+  }
+
+  function collectTransferQuantities() {
+    const rows = Array.from(document.querySelectorAll('#mov-multiple-lineas [data-mov-detail]'));
+    const amounts = [];
+    for (const row of rows) {
+      const id = String(row.dataset.movDetail);
+      const input = row.querySelector('[data-mov-quantity]');
+      const amount = Number(input && input.value);
+      const line = lineas.find(item => String(item.producto_id) === id);
+      if (!line || !Number.isFinite(amount) || amount <= 0) {
+        feedback('Escribe una cantidad válida para cada producto seleccionado.', false);
+        if (input) input.focus();
+        return false;
+      }
+      line.cantidad = amount;
+      transferDrafts[id] = input.value;
+      amounts.push(line);
+    }
+    lineas = amounts;
+    return !!lineas.length;
   }
   async function agregarLinea() {
     if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
@@ -215,7 +298,8 @@
     const source = selectors.origin.value, dest = selectors.destination.value;
     if (!source || !dest) return feedback('Selecciona el origen y el destino.', false);
     if (String(source) === String(dest)) return feedback('El origen y el destino deben ser distintos.', false);
-    if (!lineas.length) return feedback('Agrega al menos un producto antes de registrar.', false);
+    if (transferStep !== 2) return feedback('Completa primero la selección de productos.', false);
+    if (!collectTransferQuantities()) return false;
     feedback('Confirmando las existencias actuales desde Supabase…', true);
     if (!(await actualizarInventarioConfirmado())) {
       return feedback('No se puede registrar la transferencia sin confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Reintenta la lectura.'), false);
@@ -255,7 +339,11 @@
         if (typeof window.refrescarTransferencias === 'function') await window.refrescarTransferencias();
         await actualizarInventarioConfirmado();
       }
-      lineas = []; render(); actualizarStockHint();
+      lineas = []; selectedProductIds = Object.create(null); transferDrafts = Object.create(null);
+      transferStep = 1;
+      document.getElementById('mov-transfer-step-products').hidden = false;
+      document.getElementById('mov-transfer-step-details').hidden = true;
+      renderTransferProductPicker(); render(); actualizarStockHint();
     } catch (error) {
       const detail = typeof window.explicarError === 'function' ? window.explicarError(error, 'transferencia') : (error && error.message || 'error desconocido');
       feedback('No se pudo registrar la transferencia: ' + detail, false);
@@ -278,14 +366,26 @@
       '#movimiento-multiple-panel .mov-transfer-stock.is-low{color:#e0a06f}' +
       '#movimiento-multiple-panel #mov-multiple-refresh-stock{min-height:34px;padding:6px 10px;font-size:.72rem;justify-self:start}' +
       '#movimiento-multiple-panel .mov-transfer-lines-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 0;font-size:.72rem;letter-spacing:.04em}' +
-      '#movimiento-multiple-panel .mov-transfer-lines{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow:auto}' +
+      '#movimiento-multiple-panel .mov-transfer-step-label{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--gold-bright);margin:5px 0}',
+      '#movimiento-multiple-panel .mov-transfer-search{display:grid;gap:5px;font-size:11px}',
+      '#movimiento-multiple-panel .mov-transfer-product-picker{display:grid;gap:5px;max-height:min(42vh,360px);overflow:auto;overscroll-behavior:contain}',
+      '#movimiento-multiple-panel .mov-transfer-choice{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px;border:1px solid rgba(212,176,92,.2);border-radius:7px;background:var(--void);cursor:pointer}',
+      '#movimiento-multiple-panel .mov-transfer-choice input{width:18px;height:18px;flex:0 0 18px;accent-color:var(--gold)}',
+      '#movimiento-multiple-panel .mov-transfer-choice span{display:grid;gap:2px}.mov-transfer-choice strong{font-size:12px}.mov-transfer-choice small{font-size:10px;color:var(--mist)}',
+      '#movimiento-multiple-panel .mov-transfer-step-actions{display:flex;justify-content:space-between;gap:8px;margin-top:9px}',
+      '#movimiento-multiple-panel .mov-transfer-detail-row{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:8px;align-items:center;padding:9px;border:1px solid rgba(212,176,92,.2);border-radius:7px;background:var(--void)}',
+      '#movimiento-multiple-panel .mov-transfer-detail-row strong{display:block;font-size:12px}.mov-transfer-detail-row small{font-size:10px;color:var(--mist)}',
+      '#movimiento-multiple-panel .mov-transfer-detail-row label{display:grid;gap:4px;font-size:10px;color:var(--mist)}',
+      '#movimiento-multiple-panel .mov-transfer-detail-row input{height:38px;font-size:13px}',
+      '#movimiento-multiple-panel .mov-transfer-step[hidden]{display:none!important}',
+      '#movimiento-multiple-panel .mov-transfer-lines{display:flex;flex-direction:column;gap:6px;max-height:min(44vh,360px);overflow:auto}')
       '#movimiento-multiple-panel .mov-transfer-line{display:grid;grid-template-columns:minmax(0,1fr) auto 32px;gap:8px;align-items:center;padding:7px 8px;background:var(--void,#0c1c18);border:1px solid rgba(212,176,92,.16);border-radius:7px;font-size:.78rem}' +
       '#movimiento-multiple-panel .mov-transfer-line-name{min-width:0;overflow-wrap:anywhere}#movimiento-multiple-panel .mov-transfer-line-qty{white-space:nowrap;color:var(--mist)}' +
       '#movimiento-multiple-panel .mov-transfer-line button{min-height:30px;width:30px;padding:0;font-size:19px}' +
       '#movimiento-multiple-panel .mov-transfer-empty{margin:0;padding:9px 10px;border:1px dashed rgba(212,176,92,.22);border-radius:7px;color:var(--mist);font-size:.75rem}' +
       '#movimiento-multiple-panel .mov-transfer-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}' +
       '#movimiento-multiple-panel .mov-transfer-feedback{margin:0;min-height:1em;font-size:.76rem}' +
-      '@media(max-width:420px){#movimiento-multiple-panel .mov-transfer-line-editor{grid-template-columns:minmax(0,1fr) 96px}#movimiento-multiple-panel #mov-multiple-add{grid-column:1/-1}}';
+      '@media(max-width:420px){#movimiento-multiple-panel .mov-transfer-detail-row{grid-template-columns:minmax(0,1fr)}#movimiento-multiple-panel .mov-transfer-detail-row input{height:40px}}';
     document.head.appendChild(style);
   }
   function init() {
@@ -299,25 +399,52 @@
       '<p class="mov-transfer-intro">Agrupa varios productos del mismo origen al mismo destino. Se registra una sola transferencia.</p>' +
       '<div class="mov-transfer-warehouses"><label><span>Origen</span><select id="mov-multiple-origen" aria-label="Almacén de origen"><option value="" disabled selected hidden>Seleccionar origen</option></select></label>' +
       '<label><span>Destino</span><select id="mov-multiple-destino" aria-label="Almacén de destino"><option value="" disabled selected hidden>Seleccionar destino</option></select></label></div>' +
-      '<div class="mov-transfer-line-editor"><label><span>Producto</span><select id="mov-multiple-producto" aria-label="Producto"><option value="" disabled selected hidden>Seleccionar producto</option></select></label>' +
-      '<input id="mov-multiple-cantidad" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="Cantidad" aria-label="Cantidad a transferir">' +
-      '<button type="button" id="mov-multiple-add">+ Agregar</button></div>' +
+      '<section id="mov-transfer-step-products" class="mov-transfer-step">' +
+        '<p class="mov-transfer-step-label">PASO 1 DE 2 · Selecciona los productos</p>' +
+        '<label class="mov-transfer-search">Buscar producto<input id="mov-transfer-product-search" type="search" placeholder="Escribe el nombre del producto"></label>' +
+        '<div id="mov-transfer-product-picker" class="mov-transfer-product-picker"></div>' +
+        '<div class="mov-transfer-step-actions"><button type="button" id="mov-transfer-clear">Limpiar selección</button><button type="button" id="mov-transfer-next" disabled>Siguiente · 0</button></div>' +
+      '</section>' +
+      '<section id="mov-transfer-step-details" class="mov-transfer-step" hidden>' +
+        '<p class="mov-transfer-step-label">PASO 2 DE 2 · Cantidades</p>' +
+        '<p class="muted">Solo aparecen los productos elegidos. La cantidad se valida contra el stock del almacén de origen.</p>' +
+        '<button type="button" id="mov-transfer-back">← Volver a productos</button>' +
+        '<div class="mov-transfer-lines-head"><strong>PRODUCTOS SELECCIONADOS</strong><span><b id="mov-multiple-count">0</b></span></div>' +
+        '<div id="mov-multiple-lineas" class="mov-transfer-lines"></div>' +
+        '<div class="mov-transfer-actions"><button type="button" id="mov-multiple-confirmar">Registrar transferencia</button><button type="button" id="mov-multiple-limpiar">Limpiar</button></div>' +
+      '</section>' +
       '<p id="mov-multiple-stock" class="muted mov-transfer-stock">El stock se valida en el almacén de origen.</p>' +
       '<button type="button" id="mov-multiple-refresh-stock">Actualizar existencias</button>' +
-      '<div class="mov-transfer-lines-head"><strong>PRODUCTOS DE LA TRANSFERENCIA</strong><span><b id="mov-multiple-count">0</b> líneas</span></div>' +
-      '<div id="mov-multiple-lineas" class="mov-transfer-lines"></div>' +
-      '<div class="mov-transfer-actions"><button type="button" id="mov-multiple-confirmar">Registrar transferencia</button><button type="button" id="mov-multiple-limpiar">Limpiar</button></div>' +
+      '<div class="mov-transfer-line-editor" hidden><select id="mov-multiple-producto"></select><input id="mov-multiple-cantidad" type="number"><button type="button" id="mov-multiple-add">Agregar</button></div>' +
       '<p id="mov-multiple-msg" class="msg mov-transfer-feedback" role="status" aria-live="polite"></p>';
     legacyForm.parentNode.insertBefore(panel, legacyForm); legacyForm.style.display = 'none'; legacyForm.setAttribute('aria-hidden', 'true');
     selectors = {
       origin: panel.querySelector('#mov-multiple-origen'), destination: panel.querySelector('#mov-multiple-destino'),
       product: panel.querySelector('#mov-multiple-producto'), quantity: panel.querySelector('#mov-multiple-cantidad')
     };
-    selectors.origin.addEventListener('change', actualizarStockHint);
+    selectors.origin.addEventListener('change', function(){ actualizarStockHint(); });
     selectors.product.addEventListener('change', actualizarStockHint);
     selectors.destination.addEventListener('change', function () {
       if (selectors.origin.value && selectors.origin.value === selectors.destination.value) feedback('El origen y el destino deben ser distintos.', false);
       else feedback('', true);
+    });
+    panel.querySelector('#mov-transfer-product-picker').addEventListener('change', function(event){
+      const box = event.target.closest('[data-mov-select]');
+      if (!box) return;
+      const id = String(box.dataset.movSelect);
+      if (box.checked) selectedProductIds[id] = true;
+      else { delete selectedProductIds[id]; delete transferDrafts[id]; }
+      renderTransferProductPicker(); actualizarStockHint();
+    });
+    panel.querySelector('#mov-transfer-product-search').addEventListener('input', renderTransferProductPicker);
+    panel.querySelector('#mov-transfer-next').addEventListener('click', function(){ showTransferStep(2); });
+    panel.querySelector('#mov-transfer-back').addEventListener('click', function(){ showTransferStep(1); });
+    panel.querySelector('#mov-transfer-clear').addEventListener('click', function(){
+      selectedProductIds = Object.create(null); transferDrafts = Object.create(null);
+      renderTransferProductPicker(); actualizarStockHint(); feedback('Selección limpiada.', true);
+    });
+    panel.querySelector('#mov-multiple-lineas').addEventListener('input', function(event){
+      if (event.target.matches('[data-mov-quantity]')) transferDrafts[String(event.target.dataset.movQuantity)] = event.target.value;
     });
     selectors.quantity.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); agregarLinea(); } });
     panel.querySelector('#mov-multiple-add').addEventListener('click', agregarLinea);
@@ -332,7 +459,11 @@
     });
     panel.querySelector('#mov-multiple-confirmar').addEventListener('click', confirmarTransferencia);
     panel.querySelector('#mov-multiple-limpiar').addEventListener('click', function () {
-      lineas = []; selectors.quantity.value = ''; feedback('Lista limpiada.', true); render(); actualizarStockHint();
+      lineas = []; selectedProductIds = Object.create(null); transferDrafts = Object.create(null);
+      selectors.quantity.value = ''; transferStep = 1;
+      panel.querySelector('#mov-transfer-step-products').hidden = false;
+      panel.querySelector('#mov-transfer-step-details').hidden = true;
+      renderTransferProductPicker(); feedback('Lista limpiada.', true); render(); actualizarStockHint();
     });
     window.__BC_MOVIMIENTO_MULTIPLE_REFRESH__ = asegurarCatalogos;
     window.__BC_MOVIMIENTO_MULTIPLE_STATE__ = () => ({ lineas: lineas.map(x => Object.assign({}, x)), enviando });
@@ -398,7 +529,7 @@
         actualizarStockHint();
       }, 180);
     });
-    asegurarCatalogos(); render();
+    asegurarCatalogos(); render(); renderTransferProductPicker();
   }
   window.__BC_MOVIMIENTO_MULTIPLE_BOOT__ = init;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
