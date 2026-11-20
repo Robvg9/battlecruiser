@@ -135,7 +135,9 @@ function renderRequiereAtencion(asuntos) {
   if (!el) return;
   const criticos = asuntos.filter((a) => a.prioridad === "critico");
   if (criticos.length === 0) {
-    el.textContent = "";
+    // Conserva el estado semántico para lectores de pantalla y pruebas de flujo,
+    // pero retira todo el bloque del layout mientras no haya nada accionable.
+    el.innerHTML = '<p class="lista-estado">Nada requiere atención ahora mismo.</p>';
     setDashboardBlockVisible(el, false);
     return;
   }
