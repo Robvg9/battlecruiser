@@ -22,6 +22,7 @@
   ].join(",");
 
   var scrollLockOwners = new Set();
+  var activeModalStack = [];
   var originalBodyOverflow = "";
   var originalRootOverflow = "";
 
@@ -51,6 +52,21 @@
     if (document.documentElement) document.documentElement.style.overflow = originalRootOverflow;
     originalBodyOverflow = "";
     originalRootOverflow = "";
+  }
+
+  function activateModal(owner) {
+    var existing = activeModalStack.indexOf(owner);
+    if (existing >= 0) activeModalStack.splice(existing, 1);
+    activeModalStack.push(owner);
+  }
+
+  function deactivateModal(owner) {
+    var existing = activeModalStack.indexOf(owner);
+    if (existing >= 0) activeModalStack.splice(existing, 1);
+  }
+
+  function isTopmostModal(owner) {
+    return activeModalStack.length > 0 && activeModalStack[activeModalStack.length - 1] === owner;
   }
 
   function isUsable(element) {
@@ -116,11 +132,12 @@
     }
 
     function handleKeydown(event) {
-      if (!opened) return;
+      if (!opened || !isTopmostModal(ownerToken)) return;
 
       if (event.key === "Escape" && config.closeOnEscape) {
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         api.close();
         return;
       }
@@ -177,6 +194,7 @@
       open: function() {
         if (destroyed || opened) return false;
         opened = true;
+        activateModal(ownerToken);
         var configuredReturnFocus = config.returnFocusSelector
           ? document.querySelector(config.returnFocusSelector)
           : null;
@@ -199,6 +217,7 @@
         if (!opened) return false;
         var restore = !closeOptions || closeOptions.restoreFocus !== false;
         opened = false;
+        deactivateModal(ownerToken);
 
         document.removeEventListener("keydown", handleKeydown, true);
         element.removeEventListener("click", handleClick);
