@@ -48,8 +48,8 @@ test("shared modal traps keyboard focus, closes on Escape and restores focus and
     assert.equal(doc.activeElement.id, "first");
 
     const forward = new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
-    doc.getElementById("last").focus();
-    doc.getElementById("last").dispatchEvent(forward);
+    doc.getElementById("close").focus();
+    doc.getElementById("close").dispatchEvent(forward);
     assert.equal(forward.defaultPrevented, true);
     assert.equal(doc.activeElement.id, "first");
 
