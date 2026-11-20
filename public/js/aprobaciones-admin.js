@@ -11,15 +11,26 @@ async function hasLiveSession(){const api=window.client||(typeof client!=='undef
 const productos=()=>Array.isArray(window._cache?.productos)?window._cache.productos:[],almacenes=()=>Array.isArray(window._cache?.almacenes)?window._cache.almacenes.filter(a=>a.activo!==false):[];
 async function rpc(name,params){if(!window.client)throw new Error('Backend no disponible');let timer;try{const p=client.rpc(name,params||{}),t=new Promise((_,rej)=>timer=setTimeout(()=>rej(new Error('Tiempo de espera agotado')),TIMEOUT)),r=await Promise.race([p,t]);if(r.error)throw r.error;return r.data}finally{clearTimeout(timer)}}
 function setApprovalPanelVisible(panel,visible){if(!panel)return;panel.hidden=!visible;panel.classList.toggle('hidden',!visible);if(visible)panel.style.removeProperty('display');else panel.style.setProperty('display','none','important')}
+function hideApprovalPanel(){
+  const panel=document.getElementById(ID);
+  if(panel){
+    const list=panel.querySelector('#admin-aprobaciones-lista');
+    if(list)list.textContent='';
+    setApprovalPanelVisible(panel,false);
+  }
+  if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(0);
+}
 function ensurePanel(){if(!canAdmin())return null;let el=document.getElementById(ID);if(el)return el;const host=document.getElementById('cc-atencion');if(!host)return null;const b=document.createElement('div');b.className='cc-bloque';b.id=ID;b.hidden=true;b.style.setProperty('display','none','important');b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';host.parentElement.insertBefore(b,host);return b}
 const listEl=()=>{const p=ensurePanel();return p&&p.querySelector('#admin-aprobaciones-lista')};
 function row(title,detail,buttons){const d=document.createElement('div');d.className='rep-fila';d.innerHTML='<span class="rep-fila-principal"><span class="cc-asunto-tipo">'+esc(title)+'</span><span class="muted">'+esc(detail)+'</span></span>';const box=document.createElement('div');box.className='btn-row';buttons.forEach(b=>{const x=document.createElement('button');x.type='button';x.className='cc-accion';x.textContent=b.text;x.disabled=!!b.disabled;if(!b.disabled)x.onclick=event=>b.fn.call(x,event,x);box.appendChild(x)});d.appendChild(box);return d}
 async function load(){
-  if(!canAdmin()||!(await hasLiveSession()))return;
+  if(!canAdmin()){hideApprovalPanel();return}
+  if(!(await hasLiveSession())){hideApprovalPanel();return}
   const panel=ensurePanel(),el=panel&&panel.querySelector('#admin-aprobaciones-lista');
   if(!panel||!el)return;
   if(!navigator.onLine){
-    if(!panel.hidden)el.innerHTML='<p class="lista-estado">⚪ Sin conexión. Las colas administrativas no se pueden comprobar ahora.</p>';
+    setApprovalPanelVisible(panel,true);
+    el.innerHTML='<p class="lista-estado">⚪ Sin conexión. No se pueden verificar las entregas de caja ni las aprobaciones administrativas.</p>';
     return;
   }
   const jobs=[];
