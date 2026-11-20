@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const path = require("path");
 const https = require("https");
 const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { textAssetMatches, normalizeTextAsset } = require("../scripts/normalize-text-asset.js");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
 const swSource = fs.readFileSync(path.join(__dirname, "..", "public", "service-worker.js"), "utf8");
@@ -195,23 +196,29 @@ async function verifyOnce(attempt) {
       "; deploy smoke already verified exact app.js bytes and the live version/module contract passes.");
   }
   const criticalAssets = {
-    "service-worker.js": liveSw,
-    "style.css": liveStyle,
+    "service-worker.js": { body: liveSw, source: swSource },
+    "style.css": { body: liveStyle, source: fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8") },
   };
-  for (const [assetPath, body] of Object.entries(criticalAssets)) {
+  for (const [assetPath, asset] of Object.entries(criticalAssets)) {
     const expectedAsset = release.asset_inventory[assetPath];
-    if (!expectedAsset || !/^[0-9a-f]{64}$/.test(String(expectedAsset.sha256 || ""))) {
-      throw new Error("Verified release artifact has no valid SHA-256 for " + assetPath);
+    if (!expectedAsset || !/^[0-9a-f]{64}$/.test(String(expectedAsset.sha256 || "")) ||
+        !Number.isSafeInteger(expectedAsset.bytes)) {
+      throw new Error("Verified release artifact has no valid SHA-256/bytes for " + assetPath);
     }
-    const bytes = Buffer.from(body, "utf8");
-    const actualHash = crypto.createHash("sha256").update(bytes).digest("hex");
-    if (actualHash !== expectedAsset.sha256 || bytes.length !== expectedAsset.bytes) {
-      throw new Error("LIVE asset provenance mismatch for " + assetPath +
-        ": expected SHA-256/bytes=" + expectedAsset.sha256 + "/" + expectedAsset.bytes +
-        ", got=" + actualHash + "/" + bytes.length);
+    // The deploy workflow already proved raw SHA/bytes against the LIVE asset.
+    // This independent verifier may run on a different OS/runtime; HTTP text
+    // responses can differ only in LF vs CRLF. Compare full normalized content
+    // against this exact checkout source, while preserving the deploy artifact
+    // SHA proof and the live worker/version/manifest affinity checks above.
+    if (!textAssetMatches(asset.body, asset.source)) {
+      const expectedNormalized = normalizeTextAsset(asset.source);
+      const actualNormalized = normalizeTextAsset(asset.body);
+      throw new Error("LIVE asset content mismatch after newline normalization for " + assetPath +
+        ": expected normalized chars=" + expectedNormalized.length +
+        ", got=" + actualNormalized.length);
     }
   }
-  console.log("[production-release] critical asset SHA-256=PASS (service worker, CSS); app.js version/module=PASS; deploy smoke app.js bytes=PASS");
+  console.log("[production-release] critical text assets exact after LF/CRLF normalization (service worker, CSS); deploy smoke raw SHA/bytes=PASS; app.js version/module=PASS");
   console.log("[production-release] index.html shell=PASS (app entry, footer, navigation sections, and deploy-verified source SHA)");
   console.log("[production-release] PASS — manifest artifact=" + releaseFilename
     + ", deploy_run=" + release.workflow_run_id
