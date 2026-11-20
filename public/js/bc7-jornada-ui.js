@@ -2711,6 +2711,7 @@
   });
   window.__BC7_JORNADA__ = {
     openWorkspace: openWorkspace,
+    responsibleName: userName,
     refreshResponsibleStaff: async function(){try{return await ensureResponsibleCatalog(true);}catch(_){return []; }},
     openForSession: async function(sessionId) {
       if (!sessionId) return false;

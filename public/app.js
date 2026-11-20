@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
 // v9.5.132 — Administrative approval modal shared lifecycle integration.
 (function hotfixV9475(){
-  const VERSION="9.5.132";
+  const VERSION="9.5.133";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -15,64 +15,128 @@
 (function instalarAvisoActualizacionPWA(){
   if (!("serviceWorker" in navigator)) return;
   var aviso = null;
+  var comprobando = false;
 
-  function mostrarAviso(registration) {
-    if (!registration || !registration.waiting || !navigator.serviceWorker.controller || aviso) return;
-    aviso = document.createElement("aside");
-    aviso.className = "bc-pwa-update-notice";
-    aviso.id = "bc-pwa-update-notice";
-    aviso.setAttribute("role", "status");
+  function esVersionMasNueva(candidate, current) {
+    function parse(value) {
+      if (typeof value !== "string") return null;
+      var parts = value.trim().split(".");
+      if (parts.length < 2 || parts.length > 4) return null;
+      var numbers = parts.map(function(part) {
+        if (!part) return NaN;
+        for (var i = 0; i < part.length; i += 1) {
+          if (part.charCodeAt(i) < 48 || part.charCodeAt(i) > 57) return NaN;
+        }
+        return Number(part);
+      });
+      return numbers.some(function(number) { return !Number.isFinite(number); }) ? null : numbers;
+    }
+    var next = parse(candidate), live = parse(current);
+    if (!next || !live) return false;
+    var length = Math.max(next.length, live.length);
+    for (var i = 0; i < length; i += 1) {
+      var a = next[i] || 0, b = live[i] || 0;
+      if (a !== b) return a > b;
+    }
+    return false;
+  }
 
-    var message = document.createElement("span");
-    message.textContent = "Hay una versión nueva de BattleCruiser lista. La aplicación actual seguirá estable hasta que la actualices.";
-    var button = document.createElement("button");
-    button.type = "button";
-    button.textContent = "Actualizar ahora";
-    button.addEventListener("click", async function() {
-      var waiting = registration.waiting;
-      if (!waiting) {
-        window.location.reload();
-        return;
+  function leerVersionEsperando(worker) {
+    return new Promise(function(resolve) {
+      if (!worker || typeof MessageChannel === "undefined") { resolve(null); return; }
+      var channel = new MessageChannel();
+      var settled = false;
+      var timer = setTimeout(function() { finish(null); }, 1800);
+      function finish(value) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { channel.port1.close(); } catch (_) {}
+        resolve(value);
       }
-      button.disabled = true;
-      button.textContent = "Preparando actualización…";
-      try {
-        await new Promise(function(resolve, reject) {
-          var timer = setTimeout(function() {
-            waiting.removeEventListener("statechange", onStateChange);
-            reject(new Error("La nueva versión no terminó de activarse."));
-          }, 15000);
-          function onStateChange() {
-            if (waiting.state === "activated") {
-              clearTimeout(timer);
-              waiting.removeEventListener("statechange", onStateChange);
-              resolve();
-            } else if (waiting.state === "redundant") {
-              clearTimeout(timer);
-              waiting.removeEventListener("statechange", onStateChange);
-              reject(new Error("La actualización fue reemplazada."));
-            }
-          }
-          waiting.addEventListener("statechange", onStateChange);
-          if (waiting.state === "activated") {
-            clearTimeout(timer);
-            waiting.removeEventListener("statechange", onStateChange);
-            resolve();
+      channel.port1.onmessage = function(event) {
+        var data = event && event.data;
+        finish(data && data.type === "BC_SW_VERSION" ? String(data.version || "") : null);
+      };
+      try { worker.postMessage({ type: "BC_GET_VERSION" }, [channel.port2]); }
+      catch (_) { finish(null); }
+    });
+  }
+
+  async function mostrarAviso(registration) {
+    if (!registration || !registration.waiting || !navigator.serviceWorker.controller || aviso || comprobando) return;
+    comprobando = true;
+    try {
+      var waiting = registration.waiting;
+      var waitingVersion = await leerVersionEsperando(waiting);
+      var currentVersion = window.__BC_VERSION__;
+      // A same/older/unknown worker must never block the page already in use.
+      if (!esVersionMasNueva(waitingVersion, currentVersion) || registration.waiting !== waiting || aviso) return;
+
+      aviso = document.createElement("aside");
+      aviso.className = "bc-pwa-update-notice";
+      aviso.id = "bc-pwa-update-notice";
+      aviso.setAttribute("role", "status");
+      var message = document.createElement("span");
+      message.textContent = "Hay una versión más reciente de BattleCruiser lista. Puedes aplicarla cuando termines lo que estás haciendo.";
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Actualizar ahora";
+      button.addEventListener("click", async function() {
+        var latestWorker = registration.waiting;
+        if (!latestWorker) {
+          aviso && aviso.remove();
+          aviso = null;
+          return;
+        }
+        button.disabled = true;
+        button.textContent = "Comprobando versión…";
+        try {
+          var latestVersion = await leerVersionEsperando(latestWorker);
+          if (!esVersionMasNueva(latestVersion, window.__BC_VERSION__) || registration.waiting !== latestWorker) {
+            aviso && aviso.remove();
+            aviso = null;
             return;
           }
-          waiting.postMessage({ type: "SKIP_WAITING" });
-        });
-        window.location.reload();
-      } catch (error) {
-        console.warn("[BattleCruiser] No se pudo activar la actualización:", error);
-        button.disabled = false;
-        button.textContent = "Reintentar actualización";
-      }
-    });
-
-    aviso.appendChild(message);
-    aviso.appendChild(button);
-    document.body.appendChild(aviso);
+          button.textContent = "Preparando actualización…";
+          await new Promise(function(resolve, reject) {
+            var timer = setTimeout(function() {
+              latestWorker.removeEventListener("statechange", onStateChange);
+              reject(new Error("La nueva versión no terminó de activarse."));
+            }, 15000);
+            function onStateChange() {
+              if (latestWorker.state === "activated") {
+                clearTimeout(timer);
+                latestWorker.removeEventListener("statechange", onStateChange);
+                resolve();
+              } else if (latestWorker.state === "redundant") {
+                clearTimeout(timer);
+                latestWorker.removeEventListener("statechange", onStateChange);
+                reject(new Error("La actualización fue reemplazada."));
+              }
+            }
+            latestWorker.addEventListener("statechange", onStateChange);
+            if (latestWorker.state === "activated") {
+              clearTimeout(timer);
+              latestWorker.removeEventListener("statechange", onStateChange);
+              resolve();
+              return;
+            }
+            latestWorker.postMessage({ type: "SKIP_WAITING" });
+          });
+          window.location.reload();
+        } catch (error) {
+          console.warn("[BattleCruiser] No se pudo activar la actualización:", error);
+          button.disabled = false;
+          button.textContent = "Reintentar actualización";
+        }
+      });
+      aviso.appendChild(message);
+      aviso.appendChild(button);
+      document.body.appendChild(aviso);
+    } finally {
+      comprobando = false;
+    }
   }
 
   window.addEventListener("bc:pwa-update-ready", function(event) {
@@ -103,12 +167,12 @@
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
     ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261109.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
     ["m53-inventario-centro.js","53.9"],["m55-productos-import.js","55.5"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.8"],["m57-turnos-sesion-ux-fix.js","57.6"],
-    ["m68-ventas-pos-definitivo.js","9.5.132"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
+    ["m68-ventas-pos-definitivo.js","9.5.133"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.2"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.4"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.7"],["hotfix-17-final-loader-20260903.js","20261030.2"],
     ["hotfix-pulido-20260903.js","20261105.4"],["hotfix-pulido-20260903b.js","20261105.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20261103.1"],
-    ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["bc-modal-manager.js","1.0"],["mi-cuenta.js","1.3"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.12"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.3"],["bajas-multiple.js","1.7"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.0"],["jornada-price-changes.js","1.0.1"]
+    ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["bc-modal-manager.js","1.0"],["mi-cuenta.js","1.3"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.12"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.3"],["bajas-multiple.js","1.7"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.0"],["jornada-price-changes.js","1.0.2"]
   ];
   let resolveUIReady;
   window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});
