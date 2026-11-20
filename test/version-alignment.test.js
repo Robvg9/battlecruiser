@@ -172,7 +172,9 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(index.includes('<script src="js/navegacion.js?v=9.5.65"></script>'), "canonical Jornada navigation needs a cache-busted script");
   assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.64"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
   assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.64/, "the fixed Turnos module must be available in the offline shell");
-  assert.match(app, /\["mi-cuenta\.js","1\.2"\]/);
+  assert.match(app, /\["bc-modal-manager\.js","1\.0"\]/);
+  assert.match(app, /\["mi-cuenta\.js","1\.3"\]/);
+  assert.ok(app.indexOf('["bc-modal-manager.js","1.0"]') < app.indexOf('["mi-cuenta.js","1.3"]'));
   assert.match(app, /\["bc7-jornada-ui\.js","7.44"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
@@ -194,7 +196,9 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.118"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
-  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.2"><\/script>/);
+  assert.match(index, /<script src="js\/bc-modal-manager\.js\?v=1\.0"><\/script>/);
+  assert.match(index, /<script src="js\/mi-cuenta\.js\?v=1\.3"><\/script>/);
+  assert.ok(index.indexOf("js/bc-modal-manager.js?v=1.0") < index.indexOf("js/mi-cuenta.js?v=1.3"));
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
@@ -216,7 +220,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
     './js/comunicacion.js?v=9.5.64',
   ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
-  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.2/);
+  assert.match(sw, /\.\/js\/bc-modal-manager\.js\?v=1\.0/);
+  assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.3/);
   assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.44/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
