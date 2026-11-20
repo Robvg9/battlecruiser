@@ -176,6 +176,16 @@ test("post-deploy verifier uses the exact no-store URL and cache-header contract
     "the post-deploy verifier must not use a different cache key or extra cache directives");
 });
 
+test("all LIVE verifiers fetch the stylesheet through the exact cache-busted URL referenced by HTML and Service Worker", () => {
+  assert.ok(deployScript.includes("resolveLinkedStylesheetUrl(index.body, sw.body, PROD_BASE)"));
+  assert.ok(verifier.includes("resolveLinkedStylesheetUrl(liveIndex, liveSw, baseUrl)"));
+  assert.ok(liveOfflineE2e.includes("resolveLinkedStylesheetUrl(sourceIndex, swSource, BASE_URL)"));
+  assert.ok(deployScript.includes("fetchText(stylesheetUrl)"));
+  assert.ok(verifier.includes("request(stylesheetUrl)"));
+  assert.ok(liveOfflineE2e.includes('assetPath === "/style.css"'));
+  assert.ok(liveOfflineE2e.includes("const stylesheetUrl = resolveLinkedStylesheetUrl(sourceIndex, swSource, BASE_URL)"));
+});
+
 test("deploy smoke and post-deploy LIVE verifier pin related requests to the same Cloudflare Worker version", () => {
   assert.ok(deployScript.includes('"Cloudflare-Workers-Version-Key": versionKey'));
   assert.ok(verifier.includes('"Cloudflare-Workers-Version-Key": versionAffinityKey'));

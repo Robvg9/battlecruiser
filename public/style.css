@@ -1683,3 +1683,38 @@ html[data-bc-theme="light"] select optgroup {
   outline-offset: 1px;
 }
 
+
+
+/* Purchase modal: cache-busted contrast for the three real Nueva compra controls. */
+#bc165-overlay #tab-compras .compra-cabecera #compra-multiple-almacen,
+#bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-producto,
+#bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-presentacion {
+  background: var(--void) !important;
+  background-color: var(--void) !important;
+  background-image: none !important;
+  color: var(--text) !important;
+  border: 1px solid var(--bc-control-border) !important;
+  border-radius: var(--bc-radius-control) !important;
+  color-scheme: dark;
+}
+
+#bc165-overlay #tab-compras .compra-cabecera #compra-multiple-almacen option,
+#bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-producto option,
+#bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-presentacion option {
+  background-color: var(--stone) !important;
+  color: var(--text) !important;
+}
+
+#bc165-overlay #tab-compras .compra-cabecera #compra-multiple-almacen:focus-visible,
+#bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-producto:focus-visible,
+#bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-presentacion:focus-visible {
+  outline: 2px solid var(--bc-control-focus) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px var(--void) !important;
+}
+
+html[data-bc-theme="light"] #bc165-overlay #tab-compras .compra-cabecera #compra-multiple-almacen,
+html[data-bc-theme="light"] #bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-producto,
+html[data-bc-theme="light"] #bc165-overlay #tab-compras .compra-linea-editor #compra-multiple-presentacion {
+  color-scheme: light;
+}
