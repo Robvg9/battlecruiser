@@ -149,7 +149,7 @@ test("approval queue visibility matches backend permissions and does not query o
   assert.match(UI, /if\(canViewOperationalQueue\(\)\)jobs\.push\(rpc\('listar_aprobaciones_admin'/);
 });
 
-test("the loaded multi-Baja module guard matches the 1.6 cache version", () => {
-  assert.match(BAJAS, /__BC_BAJAS_MULTIPLE__ === '1\.6'/);
-  assert.match(BAJAS, /__BC_BAJAS_MULTIPLE__ = '1\.6'/);
+test("the loaded multi-Baja module guard matches the 1.7 cache version", () => {
+  assert.match(BAJAS, /__BC_BAJAS_MULTIPLE__ === '1\.7'/);
+  assert.match(BAJAS, /__BC_BAJAS_MULTIPLE__ = '1\.7'/);
 });

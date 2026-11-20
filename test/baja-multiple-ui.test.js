@@ -3,11 +3,17 @@ const test=require("node:test"),assert=require("node:assert/strict"),fs=require(
 const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,file),"utf8");
 test("Bajas use one multi-item form and require authenticated session",()=>{
  const module=read("public/js/bajas-multiple.js"),admin=read("public/js/aprobaciones-admin.js"),finance=read("public/js/operaciones-financieras.js");
- assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add"/);assert.match(module,/crear_bajas_multiple/);
+ assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add-line"/);assert.match(module,/id="bc-baja-product"/);assert.match(module,/id="bc-baja-quantity"/);assert.match(module,/crear_bajas_multiple/);
  assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: requestIdempotencyKey/);
  assert.match(module,/motivo_general: String\(line\.motivo_general \|\| ''\)/);assert.match(module,/motivo_general: generalReason/);
- assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
- assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
+ assert.match(module,/bc-bajas-default-reason/);
+ assert.match(module,/draftLines\.push/);
+ assert.match(module,/function renderDraftLines/);
+ assert.match(module,/data-bc-baja-reason/);
+ assert.match(module,/line\.motivo \|\| defaultReason/);
+ assert.match(module,/line\.otro/);
+ assert.doesNotMatch(module,/function addRow\(/);
+ assert.match(module,/line\.motivo \|\| defaultReason/);
  assert.doesNotMatch(module,/auth\.getSession\(\)/);
  assert.doesNotMatch(module,/!await hasSession\(\)/);
  assert.match(module,/function ensureModal\(\)/);
@@ -19,7 +25,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.match(module,/api\.auth\.refreshSession\(\)/);
  assert.match(module,/tokenRejected/);
  assert.match(module,/const requestIdempotencyKey = pendingKey/);
- assert.match(module,/persistentRequestKey\(warehouse, lines\)/);
+ assert.match(module,/persistentRequestKey\(warehouse, requestLines\)/);
  assert.match(module,/PENDING_REQUEST_PREFIX/);
  assert.doesNotMatch(admin,/id='adm-baja-form'/);assert.doesNotMatch(finance,/form-salida-producto/);
  assert.doesNotMatch(finance,/setInterval\(\(\)=>\{start\(\)\},10000\)/);
@@ -42,8 +48,8 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(css,/\.bc-bajas-modal-dialog/);
  assert.match(module,/catalogLoadPromise/);
  assert.match(module,/refreshPicker\(host\)/);
- assert.match(css,/bc-baja-line-product\{grid-column:1\/-1/);
- assert.match(css,/bc-baja-line-qty\{grid-column:1\/3/);
+ assert.match(css,/bc-baja-line-editor/);assert.match(css,/bc-baja-line-summary/);
+ assert.match(css,/bc-baja-line-reason-details/);assert.match(css,/bc-bajas-list-empty/);
  assert.match(css,/bc-bajas-context-fields/);
  assert.match(css,/bc-bajas-list-heading/);
  assert.match(css,/max-height:none;overflow:visible/);

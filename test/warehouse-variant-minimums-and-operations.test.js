@@ -113,7 +113,7 @@ test("Operations uses live catalogs for expenses/reinvestments and opens Baja th
 test("Baja entry is one authenticated multi-product list, not a duplicate finance form", () => {
   const bajas = read("public/js/bajas-multiple.js");
   assert.match(bajas, /id="bc-bajas-multiple-form"/);
-  assert.match(bajas, /id="bc-baja-add"/);
+  assert.match(bajas, /id="bc-baja-add-line"/);
   assert.match(bajas, /crear_bajas_multiple/);
   assert.doesNotMatch(bajas, /hasSession/);
    assert.doesNotMatch(bajas, /auth\.getSession\(\)/);
@@ -130,7 +130,7 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
 });
 
 test("Release cache keys and Service Worker precache match the modified inventory and Operations modules", () => {
-  assert.match(app, /const VERSION="9\.5\.128"/);
+  assert.match(app, /const VERSION="9\.5\.129"/);
   assert.match(app, /m53-inventario-centro\.js","53\.9/);
   assert.match(app, /ui-operaciones-hub\.js","43\.3/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
@@ -140,11 +140,11 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.ok(app.includes('["bc7-jornada-ui.js","7.44"]'));
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
   assert.match(index, /productos\.js\?v=20261118\.1/);
-  assert.match(index, /style\.css\?v=9\.5\.116/);
+  assert.match(index, /style\.css\?v=9\.5\.117/);
   assert.match(index, /almacenes\.js\?v=20261111\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.128/);
-  assert.match(index, /v9\.5\.128 — BattleCruiser/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.128"/);
+  assert.match(index, /app\.js\?v=9\.5\.129/);
+  assert.match(index, /v9\.5\.129 — BattleCruiser/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.129"/);
   for (const asset of [
     "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
@@ -157,7 +157,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "productos.js?v=20261118.1",
     "compra-multiple.js?v=27.16",
     "aprobaciones-admin.js?v=20261119.1",
-    "bajas-multiple.js?v=1.6"
+    "bajas-multiple.js?v=1.7"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
 
@@ -169,7 +169,9 @@ test("Baja card opens the shared batch form with predefined reasons and required
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(bajas.includes("'" + reason + "'"), "missing Baja reason " + reason);
   }
-  assert.match(bajas, /other\.required = reason\.value === 'Otro'/);
+  assert.match(bajas, /input\.required=defaultReason\.value==='Otro'/);
+  assert.match(bajas, /otherInput\.required = line\.motivo === 'Otro'/);
+  assert.match(bajas, /reason === 'Otro' && !other/);
   assert.match(bajas, /api\.rpc\('crear_bajas_multiple'/);
   assert.doesNotMatch(operations, /rpc\('crear_baja'/);
   assert.doesNotMatch(approvals, /rpc\('crear_baja'/);
