@@ -44,6 +44,6 @@ test("Price change action uses movement toolbar and supports optional cost",()=>
   assert.match(price,/data-bc-jpc-cost/);
   assert.match(price,/costo_nuevo:/);
   assert.match(price,/item\.costo_nuevo!=null/);
-  assert.match(app,/\["jornada-price-changes\.js","1\.0\.3"\]/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.3/);
+  assert.match(app,/\["jornada-price-changes\.js","1\.0\.4"\]/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.4/);
 });
