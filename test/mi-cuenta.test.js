@@ -114,3 +114,24 @@ test("Mi Cuenta loads its shared modal dependency before the profile module and 
   assert.ok(sw.includes("./js/bc-modal-manager.js?v=1.0"), "the shared dependency must be in the offline shell");
   assert.ok(sw.includes("./js/mi-cuenta.js?v=1.3"), "the updated account module must be in the offline shell");
 });
+
+test("Los controles de cuenta y salida son solo iconos SVG, con nombre accesible", () => {
+  const dom = new JSDOM(read("public/index.html"), { url: "https://battlecruiser.test/" });
+  try {
+    const doc = dom.window.document;
+    const account = doc.getElementById("mi-cuenta-btn");
+    const logout = doc.getElementById("logout-btn");
+    for (const button of [account, logout]) {
+      assert.ok(button, "header control must exist");
+      assert.equal(button.children.length, 1, "the visible control must contain only its SVG icon");
+      assert.equal(button.querySelectorAll("svg").length, 1);
+      assert.equal(button.textContent.trim(), "", "no visible button label should remain");
+      assert.ok(button.getAttribute("aria-label"), "screen readers must retain an accessible name");
+      assert.ok(button.title, "hover tooltip must remain available");
+    }
+    assert.equal(account.getAttribute("aria-label"), "Mi cuenta");
+    assert.equal(logout.getAttribute("aria-label"), "Cerrar sesión");
+  } finally {
+    dom.window.close();
+  }
+});
