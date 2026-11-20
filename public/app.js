@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.129 — Bajas con editor lineal y lista de productos.
+// v9.5.130 — Contraste y caché de Nueva compra corregidos.
 (function hotfixV9475(){
-  const VERSION="9.5.129";
+  const VERSION="9.5.130";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
