@@ -118,7 +118,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["m53-inventario-centro.js","53.9"]'), 'M53 must resolve warehouse IDs for mixed variants');
   assert.ok(app.includes('["ui-operaciones-hub.js","43.4"]'), 'the Operations hub must refresh');
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'), 'the finance operations form must refresh');
-  assert.ok(app.includes('["aprobaciones-admin.js","20261120.2"]'), 'the approval form must refresh');
+  assert.ok(app.includes('["aprobaciones-admin.js","20261120.3"]'), 'the approval form must refresh');
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'), 'the retroactive Jornada opening form must load');
   assert.ok(sw.includes('./js/bc7-periodo-apertura-ui.js?v=1.8'), 'the retroactive Jornada opening form must be precached');
   assert.ok(app.includes('["bajas-multiple.js","1.8"]'), 'Bajas list payload must be refreshed');
