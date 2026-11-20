@@ -84,6 +84,7 @@ test("nested modal controllers keep page scroll locked until the last modal clos
     const one = dom.window.BCModalManager.create(doc.getElementById("one"));
     const two = dom.window.BCModalManager.create(doc.getElementById("two"));
 
+    doc.getElementById("opener").focus();
     one.open();
     two.open();
     assert.equal(doc.body.style.overflow, "hidden");
