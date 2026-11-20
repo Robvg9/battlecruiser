@@ -154,3 +154,53 @@ test("manager is idempotent and close controls are delegated by the overlay", ()
     dom.window.close();
   }
 });
+
+test("only the topmost nested modal handles Escape and traps keyboard focus", () => {
+  const dom = createWindow(`<!doctype html><html><body style="overflow:auto">
+    <button id="opener">Open</button>
+    <div id="one" class="hidden" aria-hidden="true">
+      <section role="dialog" tabindex="-1">
+        <button id="one-first">One first</button>
+        <button id="one-last">One last</button>
+      </section>
+    </div>
+    <div id="two" class="hidden" aria-hidden="true">
+      <section role="dialog" tabindex="-1">
+        <button id="two-first">Two first</button>
+        <button id="two-last">Two last</button>
+      </section>
+    </div>
+  </body></html>`);
+  try {
+    const doc = dom.window.document;
+    const one = dom.window.BCModalManager.create(doc.getElementById("one"));
+    const two = dom.window.BCModalManager.create(doc.getElementById("two"));
+
+    one.open();
+    assert.equal(doc.activeElement.id, "one-first");
+    two.open();
+    assert.equal(doc.activeElement.id, "two-first");
+    assert.equal(doc.body.style.overflow, "hidden");
+
+    const tab = new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    doc.getElementById("two-last").focus();
+    doc.getElementById("two-last").dispatchEvent(tab);
+    assert.equal(tab.defaultPrevented, true);
+    assert.equal(doc.activeElement.id, "two-first");
+
+    const escapeTop = new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    doc.getElementById("two-first").dispatchEvent(escapeTop);
+    assert.equal(two.isOpen(), false);
+    assert.equal(one.isOpen(), true);
+    assert.equal(doc.activeElement.id, "one-first");
+    assert.equal(doc.body.style.overflow, "hidden");
+
+    const escapeParent = new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    doc.getElementById("one-first").dispatchEvent(escapeParent);
+    assert.equal(one.isOpen(), false);
+    assert.equal(doc.body.style.overflow, "auto");
+    assert.equal(doc.activeElement.id, "opener");
+  } finally {
+    dom.window.close();
+  }
+});
