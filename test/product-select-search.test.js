@@ -1,11 +1,11 @@
 "use strict";
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
-const root=path.join(__dirname,".."),source=fs.readFileSync(path.join(root,"public/js/product-select-search.js"),"utf8");
+const root=path.join(__dirname,".."),source=fs.readFileSync(path.join(root,"public/js/product-select-search.js"),"utf8"),manager=fs.readFileSync(path.join(root,"public/js/bc-modal-manager.js"),"utf8");
 test("product selects use one modal search and keep the native select contract",async()=>{
  const {JSDOM}=require("jsdom");
- const dom=new JSDOM(`<!doctype html><body><label><span>Producto</span><select id="trf-producto"><option value="" disabled selected>Producto</option><option value="juice">Jugo La Estancia</option><option value="water">Agua</option></select></label><label><span>Producto</span><select id="bc-baja-producto-1"><option value="">Producto</option><option value="coffee">Café</option></select></label><label><span>Categoría</span><select id="prod-categoria"><option value="">Categoría</option><option value="bebidas">Bebidas</option></select></label><label><span>Almacén de origen</span><select id="mov-multiple-origen"><option value="">Origen</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><label><span>Almacén de destino</span><select id="mov-multiple-destino"><option value="">Destino</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><input id="venta-producto-buscar"><select id="venta-producto"><option value="">Producto</option></select></body>`,{runScripts:"outside-only"});
+ const dom=new JSDOM(`<!doctype html><body><label><span>Producto</span><select id="trf-producto"><option value="" disabled selected>Producto</option><option value="juice">Jugo La Estancia</option><option value="water">Agua</option></select></label><label><span>Producto</span><select id="bc-baja-producto-1"><option value="">Producto</option><option value="coffee">Café</option></select></label><label><span>Categoría</span><select id="prod-categoria"><option value="">Categoría</option><option value="bebidas">Bebidas</option></select></label><label><span>Almacén de origen</span><select id="mov-multiple-origen"><option value="">Origen</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><label><span>Almacén de destino</span><select id="mov-multiple-destino"><option value="">Destino</option><option value="a">Almacén Central</option><option value="b">La Cueva</option></select></label><input id="venta-producto-buscar"><select id="venta-producto"><option value="">Producto</option></select><section id="tab-compras"><div class="compra-cabecera"><div><label>Almacén destino</label><select id="compra-multiple-almacen"><option value="">Seleccionar</option><option value="w1">Almacén Central</option></select></div></div><div class="compra-linea-editor"><select id="compra-multiple-producto" aria-label="Producto"><option value="">Producto</option><option value="p1">Arroz</option></select><select id="compra-multiple-presentacion" aria-label="Unidad o presentación"><option value="">Unidad base</option><option value="u1">Saco · ×25</option></select></div></section></body>`,{runScripts:"outside-only"});
  try{
-  dom.window.eval(source);const select=dom.window.document.getElementById("trf-producto"),field=select.parentElement;
+  dom.window.eval(manager);dom.window.eval(source);const select=dom.window.document.getElementById("trf-producto"),field=select.parentElement;
   assert.ok(field.querySelector(".bc-product-picker-trigger"));assert.equal(field.querySelectorAll("input").length,0);
   assert.ok(select.classList.contains("bc-product-picker-native-select"));
   assert.equal(dom.window.document.querySelectorAll("#bc-product-picker-modal").length,0,"the shared modal is created on demand");
@@ -32,9 +32,33 @@ test("product selects use one modal search and keep the native select contract",
   assert.equal(modal.querySelectorAll(".bc-product-picker-result").length,1);
   modal.querySelector(".bc-product-picker-result").click();assert.equal(category.value,"bebidas");
   assert.equal(dom.window.document.querySelector("#venta-producto").closest(".bc-product-picker-field"),null);
+  const purchaseProduct=dom.window.document.getElementById("compra-multiple-producto"),purchaseProductField=purchaseProduct.parentElement;
+  assert.ok(purchaseProductField.classList.contains("bc-product-picker-field--purchase"));
+  assert.equal(purchaseProductField.querySelector(".bc-product-picker-field-label").textContent,"Producto");
+  const purchaseTrigger=purchaseProductField.querySelector(".bc-product-picker-trigger");
+  purchaseTrigger.click();
+  assert.equal(modal.querySelector("#bc-product-picker-title").textContent,"Elegir producto");
+  assert.equal(dom.window.document.activeElement.id,"bc-product-picker-search");
+  assert.equal(purchaseTrigger.getAttribute("aria-expanded"),"true");
+  const escape=new dom.window.KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true});
+  search.dispatchEvent(escape);
+  assert.equal(modal.hidden,true,"Escape is handled by the shared modal manager");
+  assert.equal(dom.window.document.activeElement,purchaseTrigger,"focus returns to the exact purchase control");
+  assert.equal(purchaseTrigger.getAttribute("aria-expanded"),"false");
+  const purchaseUnit=dom.window.document.getElementById("compra-multiple-presentacion"),unitField=purchaseUnit.parentElement;
+  assert.ok(unitField.classList.contains("bc-product-picker-field--purchase"));
+  assert.equal(unitField.querySelector(".bc-product-picker-field-label").textContent,"Unidad base");
+  unitField.querySelector(".bc-product-picker-trigger").click();
+  assert.equal(modal.querySelector("#bc-product-picker-title").textContent,"Elegir unidad base");
+  assert.match(modal.querySelector(".bc-product-picker-status").textContent,/1 unidad$/);
+  modal.querySelector(".bc-product-picker-result").click();
+  assert.equal(purchaseUnit.value,"u1");
+  assert.equal(modal.hidden,true);
+  assert.match(dom.window.document.getElementById("bc-purchase-picker-ux-style").textContent,/grid-column:1\/-1/);
+
  }finally{dom.window.close();}
 });
 test("module and cache manifest are versioned together",()=>{
  const app=fs.readFileSync(path.join(root,"public/app.js"),"utf8"),sw=fs.readFileSync(path.join(root,"public/service-worker.js"),"utf8");
- assert.match(app,/\["product-select-search\.js","2\.2"\]/);assert.match(sw,/product-select-search\.js\?v=2\.2/);assert.match(sw,/bajas-multiple\.js\?v=1\.7/);
+ assert.match(app,/\["product-select-search\.js","2\.3"\]/);assert.match(sw,/product-select-search\.js\?v=2\.3/);assert.match(sw,/bajas-multiple\.js\?v=1\.7/);
 });

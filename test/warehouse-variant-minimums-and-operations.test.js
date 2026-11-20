@@ -130,7 +130,13 @@ test("The legacy vale type keeps its stored value but is presented as Baja", () 
 });
 
 test("Release cache keys and Service Worker precache match the modified inventory and Operations modules", () => {
-  assert.match(app, /const VERSION="9\.5\.130"/);
+  const appVersion = app.match(/const VERSION="([^"]+)"/);
+  const swVersion = serviceWorker.match(/BC_SW_VERSION = "([^"]+)"/);
+  const approvalVersion = app.match(/\["aprobaciones-admin\.js","([^"]+)"\]/);
+  assert.ok(appVersion, "app.js must expose its release version");
+  assert.ok(swVersion, "Service Worker must expose its release version");
+  assert.ok(approvalVersion, "admin approvals module must expose its cache version");
+  assert.equal(swVersion[1], appVersion[1], "app and Service Worker release versions must match");
   assert.match(app, /m53-inventario-centro\.js","53\.9/);
   assert.match(app, /ui-operaciones-hub\.js","43\.3/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
@@ -140,15 +146,14 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.ok(app.includes('["bc7-jornada-ui.js","7.44"]'));
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
   assert.match(index, /productos\.js\?v=20261118\.1/);
-  assert.match(index, /style\.css\?v=9\.5\.130/);
+  assert.ok(index.includes("style.css?v=" + appVersion[1]));
   assert.match(index, /almacenes\.js\?v=20261111\.1/);
-  assert.match(index, /app\.js\?v=9\.5\.130/);
-  assert.match(index, /v9\.5\.130 — BattleCruiser/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.130"/);
+  assert.ok(index.includes("app.js?v=" + appVersion[1]));
+  assert.ok(index.includes("v" + appVersion[1] + " — BattleCruiser"));
+  assert.ok(serviceWorker.includes('BC_SW_VERSION = "' + appVersion[1] + '"'));
   for (const asset of [
     "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
-    "aprobaciones-admin.js?v=20261119.1",
     "bc7-jornada-ui.js?v=7.44",
     "ui-operaciones-hub.js?v=43.3",
     "almacenes.js?v=20261111.1",
@@ -159,6 +164,8 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "aprobaciones-admin.js?v=20261119.1",
     "bajas-multiple.js?v=1.7"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
+  assert.ok(serviceWorker.includes("./js/aprobaciones-admin.js?v=" + approvalVersion[1]),
+    "admin approvals module must be precached with its current cache version");
 });
 
 test("Baja card opens the shared batch form with predefined reasons and required Otro detail", () => {

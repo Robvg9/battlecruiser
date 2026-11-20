@@ -12,7 +12,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && 'battlecruiser-pr-preview-shared' || format('battlecruiser-quality-{0}', github.ref) }}
+  group: ${{ github.event_name == 'pull_request' && format('battlecruiser-pr-quality-{0}', github.event.pull_request.number) || format('battlecruiser-quality-{0}', github.ref) }}
   cancel-in-progress: false
 
 permissions:
