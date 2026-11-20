@@ -340,6 +340,18 @@
       if (nLineas) nLineas.textContent = count + (count === 1 ? ' producto seleccionado' : ' productos seleccionados') + (valid < count ? ' · completa cantidades y costos' : '');
     }
 
+    function resetPurchaseSelection(){
+      lineas = [];
+      selectedProducts = Object.create(null);
+      productDrafts = Object.create(null);
+      productStep = 1;
+      if (stepProducts) stepProducts.hidden = false;
+      if (stepDetails) stepDetails.hidden = true;
+      if (searchProducts) searchProducts.value = '';
+      renderProductPicker();
+      render();
+    }
+
     function collectPurchaseLines(){
       var nextLines = [];
       var rows = Array.from(lista.querySelectorAll('[data-compra-detail]'));
@@ -489,9 +501,7 @@
         if (typeof ejecutarOperacion === 'function' && typeof RPC_POR_TIPO !== 'undefined' && RPC_POR_TIPO.compra_multiple) {
           var r = await ejecutarOperacion('compra_multiple', payloadMultiple);
           if (!r.ok) throw (r.error || new Error('No se pudo registrar'));
-          lineas = [];
-          selectedProducts = Object.create(null); productDrafts = Object.create(null);
-          render(); await showPurchaseStep(1);
+          resetPurchaseSelection();
           if (r.offline) {
             msg('✓ Compra guardada localmente — se sincronizará al recuperar conexión. Los mínimos pendientes se configuran después desde Inventario.', true);
           } else {
@@ -515,8 +525,7 @@
             }
             throw res.error;
           }
-          lineas = [];
-          render();
+          resetPurchaseSelection();
           if (typeof window.bcNotificarCambioDatos === 'function') window.bcNotificarCambioDatos('compra', false);
           await actualizarYMostrarResultado();
           return;
@@ -572,12 +581,11 @@
       renderProductPicker(); msg('', true);
     });
     limpiar.addEventListener('click', function(){
-      lineas = []; selectedProducts = Object.create(null); productDrafts = Object.create(null);
+      resetPurchaseSelection();
       proveedor.value = '';
       fecha.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       producto.value = ''; presentacion.innerHTML = '<option value="" disabled selected hidden>Unidad base</option>';
       presActual = []; actualizarCamposPresentacion(); msg('', true);
-      render(); showPurchaseStep(1);
     });
     confirmar.addEventListener('click', confirmarCompra);
 
