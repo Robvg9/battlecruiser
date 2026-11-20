@@ -112,6 +112,7 @@
       modalController = window.BCModalManager.create(modal, {
         dialogSelector: '.bc-account-card',
         initialFocusSelector: '#bc-account-close',
+        returnFocusSelector: '#mi-cuenta-btn',
         closeSelector: '[data-bc-modal-close]',
         closeOnEscape: true,
         closeOnBackdrop: true,
