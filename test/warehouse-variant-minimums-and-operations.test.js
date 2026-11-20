@@ -140,7 +140,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.ok(app.includes('["bc7-jornada-ui.js","7.44"]'));
   assert.ok(app.includes('["movimiento-multiple.js","20261109.1"]'));
   assert.match(index, /productos\.js\?v=20261118\.1/);
-  assert.match(index, /style\.css\?v=9\.5\.117/);
+  assert.match(index, /style\.css\?v=9\.5\.130/);
   assert.match(index, /almacenes\.js\?v=20261111\.1/);
   assert.match(index, /app\.js\?v=9\.5\.130/);
   assert.match(index, /v9\.5\.130 — BattleCruiser/);
