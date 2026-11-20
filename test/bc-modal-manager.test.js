@@ -183,6 +183,10 @@ test("only the topmost nested modal handles Escape and traps keyboard focus", ()
     assert.equal(doc.activeElement.id, "two-first");
     assert.equal(doc.body.style.overflow, "hidden");
 
+    doc.getElementById("one").dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    assert.equal(one.isOpen(), true, "clicking the background modal must not dismiss it while the top modal is open");
+    assert.equal(two.isOpen(), true);
+
     const tab = new dom.window.KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
     doc.getElementById("two-last").focus();
     doc.getElementById("two-last").dispatchEvent(tab);
