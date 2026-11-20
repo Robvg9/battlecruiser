@@ -1683,3 +1683,57 @@ html[data-bc-theme="light"] select optgroup {
   outline-offset: 1px;
 }
 
+/* Nueva compra: the searchable-picker module hides the native SELECT and
+   inserts a visible BUTTON. Override .inline-form button for those real
+   controls; styling the hidden native select alone does not affect the UI. */
+#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger,
+#tab-compras .compra-linea-editor .bc-product-picker-field > .bc-product-picker-trigger {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  height: auto;
+  padding: 9px 12px;
+  background: var(--void, #0a1613);
+  color: var(--text, #f5efe3);
+  border: 1px solid var(--bc-control-border, rgba(212,176,92,.38));
+  border-radius: var(--bc-radius-control, 9px);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  box-shadow: none;
+}
+
+#tab-compras .compra-linea-editor .bc-product-picker-field > .bc-product-picker-trigger {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger.is-placeholder,
+#tab-compras .compra-linea-editor .bc-product-picker-field > .bc-product-picker-trigger.is-placeholder {
+  color: var(--mist, #c9c0a8);
+}
+
+#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger:hover:not(:disabled),
+#tab-compras .compra-linea-editor .bc-product-picker-field > .bc-product-picker-trigger:hover:not(:disabled) {
+  background: var(--stone-2, #1a3830);
+  border-color: var(--gold);
+}
+
+#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger:focus-visible,
+#tab-compras .compra-linea-editor .bc-product-picker-field > .bc-product-picker-trigger:focus-visible {
+  outline: 2px solid var(--bc-control-focus, rgba(212,176,92,.72));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--void, #0a1613);
+}
+
+#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger:disabled,
+#tab-compras .compra-linea-editor .bc-product-picker-field > .bc-product-picker-trigger:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+}
