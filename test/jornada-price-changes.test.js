@@ -57,6 +57,8 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/item\.costo_nuevo!=null/);
   assert.match(ui,/bc-jpc-dialog bc165-modal/,"price change modal reuses the shared operation modal shell");
   assert.match(ui,/bc7_cambios_precio_contexto/);
+  assert.match(ui,/canOpenOwnerModal: function \(\) \{ return ownerActionAvailable; \}/);
+  assert.match(ui,/bc:price-changes-availability/);
   assert.match(ui,/bc7_solicitar_cambios_precio_jornada/);
   assert.match(ui,/bc7_mis_cambios_precio_pendientes/);
   assert.match(ui,/bc7_confirmar_cambios_precio_conteo/);
