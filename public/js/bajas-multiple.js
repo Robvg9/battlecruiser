@@ -1,13 +1,21 @@
 // BattleCruiser — one atomic multi-product Baja request.
 (function () {
   'use strict';
-  if (window.__BC_BAJAS_MULTIPLE__ === '1.6') return;
-  window.__BC_BAJAS_MULTIPLE__ = '1.6';
+  if (window.__BC_BAJAS_MULTIPLE__ === '1.7') return;
+  window.__BC_BAJAS_MULTIPLE__ = '1.7';
   const REASONS = ['Rotura','Hechado a perder','El Jefe lo cogió','Vencimiento','Daño o deterioro','Pérdida','Consumo interno','Otro'];
-  let products = [], warehouses = [], sequence = 0, loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
+  let products = [], warehouses = [], draftLines = [], loading = false, submitting = false, pendingKey = null, catalogLoadPromise = null;
   function apiClient() { try { return window.client || (typeof client !== 'undefined' ? client : null); } catch (_) { return null; } }
   function canCreate() { return typeof window.tienePermiso === 'function' && window.tienePermiso('bajas','crear'); }
   function refreshPicker(root) { if (typeof window.__BC_PRODUCT_PICKER_REFRESH__ === 'function') window.__BC_PRODUCT_PICKER_REFRESH__(root || document.body); }
+  function escapeMarkup(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[character]);
+  }
+  function quantityLabel(value) {
+    return Number(value).toLocaleString('es-ES', { maximumFractionDigits: 4 });
+  }
   function message(value, kind) {
     const el = document.getElementById('bc-bajas-message');
     if (!el) return;
@@ -127,21 +135,63 @@
     host.id = 'bc-bajas-multiple-host';
     host.className = 'bc-bajas-multiple';
     host.innerHTML =
-      '<p class="bc-bajas-intro">Selecciona un almacén y añade los productos que correspondan. Cada línea lleva su cantidad y motivo; toda la lista se envía en una única operación. Las solicitudes de usuarios sin permiso global de aprobación quedan pendientes y no modifican el stock/FIFO hasta ser aprobadas.</p>' +
+      '<p class="bc-bajas-intro">Selecciona el almacén, elige un motivo general y agrega cada producto a una lista. La lista completa se envía en una sola operación. Las solicitudes pendientes no modifican stock/FIFO hasta ser aprobadas.</p>' +
       '<form id="bc-bajas-multiple-form">' +
         '<div class="bc-bajas-context-fields">' +
           '<label><span>Almacén</span><select id="bc-bajas-warehouse" required><option value="" disabled selected hidden>Seleccionar almacén…</option></select></label>' +
-          '<label><span>Motivo general de la lista</span><select id="bc-bajas-default-reason" required><option value="" disabled selected hidden>Seleccionar motivo…</option></select></label>' +
+          '<label><span>Motivo general</span><select id="bc-bajas-default-reason" required><option value="" disabled selected hidden>Seleccionar motivo…</option></select></label>' +
           '<label id="bc-bajas-default-other-wrap" hidden><span>Explica el motivo general</span><input id="bc-bajas-default-other" maxlength="180" placeholder="Describe el motivo"></label>' +
         '</div>' +
+        '<div class="bc-baja-line-editor">' +
+          '<label><span>Producto</span><select id="bc-baja-product" aria-label="Producto"><option value="" disabled selected hidden>Seleccionar producto…</option></select></label>' +
+          '<label><span>Cantidad</span><input id="bc-baja-quantity" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="0" aria-label="Cantidad a dar de baja"></label>' +
+          '<button type="button" id="bc-baja-add-line">+ Agregar a la lista</button>' +
+        '</div>' +
         '<div class="bc-bajas-list-heading"><strong>PRODUCTOS A DAR DE BAJA</strong><span id="bc-bajas-line-count">0 productos</span></div>' +
-        '<div class="bc-bajas-lines" id="bc-bajas-lines"></div>' +
-        '<div class="bc-bajas-actions"><button type="button" id="bc-baja-add">+ Añadir producto</button><button type="submit" id="bc-baja-submit">Enviar lista a revisión</button></div>' +
+        '<div class="bc-bajas-lines" id="bc-bajas-lines"><p class="bc-bajas-list-empty">Todavía no hay productos en esta lista.</p></div>' +
+        '<div class="bc-bajas-actions"><button type="submit" id="bc-baja-submit">Enviar lista a revisión</button></div>' +
         '<p class="bc-bajas-message" id="bc-bajas-message" role="status" aria-live="polite"></p>' +
       '</form>';
     modal.querySelector('.bc-bajas-modal-content').appendChild(host);
     const form = host.querySelector('#bc-bajas-multiple-form');
-    host.querySelector('#bc-baja-add').addEventListener('click', addRow);
+    const addButton = host.querySelector('#bc-baja-add-line');
+    const productSelect = host.querySelector('#bc-baja-product');
+    const quantityInput = host.querySelector('#bc-baja-quantity');
+    const linesHost = host.querySelector('#bc-bajas-lines');
+    addButton.addEventListener('click', addLineToList);
+    quantityInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); addLineToList(); }
+    });
+    linesHost.addEventListener('click', event => {
+      const remove = event.target.closest('[data-bc-baja-remove]');
+      if (!remove || submitting) return;
+      draftLines.splice(Number(remove.dataset.bcBajaRemove), 1);
+      pendingKey = null;
+      renderDraftLines();
+    });
+    linesHost.addEventListener('change', event => {
+      const select = event.target.closest('[data-bc-baja-reason]');
+      if (!select) return;
+      const index = Number(select.dataset.bcBajaReason);
+      const line = draftLines[index];
+      if (!line) return;
+      line.motivo = select.value || '';
+      const card = select.closest('.bc-baja-line');
+      const otherWrap = card && card.querySelector('[data-bc-baja-other-wrap]');
+      const otherInput = card && card.querySelector('[data-bc-baja-other]');
+      if (otherWrap) otherWrap.hidden = line.motivo !== 'Otro';
+      if (otherInput) otherInput.required = line.motivo === 'Otro';
+      const label = card && card.querySelector('.bc-baja-line-reason-status');
+      if (label) label.textContent = line.motivo ? (line.motivo === 'Otro' ? 'Otro motivo' : line.motivo) : 'Motivo general';
+      pendingKey = null;
+    });
+    linesHost.addEventListener('input', event => {
+      const input = event.target.closest('[data-bc-baja-other]');
+      if (!input) return;
+      const line = draftLines[Number(input.dataset.bcBajaOther)];
+      if (line) line.otro = input.value;
+      pendingKey = null;
+    });
     const defaultReason = host.querySelector('#bc-bajas-default-reason');
     REASONS.forEach(value => { const option=document.createElement('option'); option.value=value; option.textContent=value; defaultReason.appendChild(option); });
     defaultReason.addEventListener('change', () => {
@@ -152,7 +202,7 @@
     form.addEventListener('submit', submit);
     form.addEventListener('input', () => { if (!submitting) pendingKey = null; });
     form.addEventListener('change', () => { if (!submitting) pendingKey = null; });
-    addRow();
+    renderDraftLines();
     return host;
   }
   function fillWarehouseSelect() {
@@ -168,53 +218,70 @@
     if (!select) return;
     const old = select.value;
     select.innerHTML = '<option value="" disabled selected hidden>Seleccionar producto…</option>';
-    products.forEach(item => { const option = document.createElement('option'); option.value=item.id; option.textContent=item.nombre; select.appendChild(option); });
+    products.forEach(item => {
+      const option = document.createElement('option');
+      option.value=item.id;
+      option.textContent=item.nombre;
+      select.appendChild(option);
+    });
     if (products.some(item => String(item.id) === String(old))) select.value = old;
     refreshPicker(select);
   }
-  function addRow() {
-    const host = document.getElementById('bc-bajas-lines');
-    if (!host || submitting) return;
-    const rowId = ++sequence;
-    const row = document.createElement('div');
-    row.className = 'bc-baja-line';
-    row.dataset.reasonOverride='false';
-    row.innerHTML =
-      '<label class="bc-baja-line-product"><span>Producto</span><select class="bc-baja-product" id="bc-baja-producto-' + rowId + '" required><option value="" disabled selected hidden>Seleccionar producto…</option></select></label>' +
-      '<label class="bc-baja-line-qty"><span>Cantidad</span><input class="bc-baja-quantity" type="number" min="0.0001" step="any" inputmode="decimal" placeholder="0" required></label>' +
-      '<button type="button" class="bc-baja-line-remove" aria-label="Quitar producto">×</button>' +
-      '<button type="button" class="bc-baja-line-reason-toggle">Motivo distinto</button>' +
-      '<label class="bc-baja-line-reason" hidden><span>Motivo solo para este producto</span><select class="bc-baja-reason"><option value="" selected>Usar motivo general</option></select></label>' +
-      '<label class="bc-baja-line-other" hidden><span>Explica este motivo</span><input class="bc-baja-other" maxlength="180" placeholder="Describe el motivo"></label>';
-    host.appendChild(row);
-    fillProductSelect(row.querySelector('.bc-baja-product'));
-    refreshPicker(row);
-    const reason = row.querySelector('.bc-baja-reason');
-    REASONS.forEach(value => { const o = document.createElement('option'); o.value=value; o.textContent=value; reason.appendChild(o); });
-    const otherWrap = row.querySelector('.bc-baja-line-other'), other = row.querySelector('.bc-baja-other');
-    const reasonWrap = row.querySelector('.bc-baja-line-reason');
-    row.querySelector('.bc-baja-line-reason-toggle').addEventListener('click', event => {
-      const enabled = row.dataset.reasonOverride !== 'true';
-      row.dataset.reasonOverride = enabled ? 'true' : 'false';
-      reasonWrap.hidden = !enabled;
-      event.currentTarget.textContent = enabled ? 'Usar motivo general' : 'Motivo distinto';
-      if (!enabled) { reason.value=''; other.value=''; otherWrap.hidden=true; other.required=false; }
-      pendingKey=null;
-      updateLineCount();
+  function addLineToList() {
+    if (submitting || loading) return;
+    const productSelect = document.getElementById('bc-baja-product');
+    const quantityInput = document.getElementById('bc-baja-quantity');
+    const productId = productSelect && productSelect.value;
+    const quantity = Number(quantityInput && quantityInput.value);
+    const product = products.find(item => String(item.id) === String(productId));
+    if (!product || !Number.isFinite(quantity) || quantity <= 0) {
+      message('Selecciona un producto y escribe una cantidad válida.', 'error');
+      return;
+    }
+    draftLines.push({
+      producto_id: product.id,
+      nombre: product.nombre,
+      cantidad: quantity,
+      motivo: '',
+      otro: ''
     });
-    reason.addEventListener('change', () => { otherWrap.hidden = reason.value !== 'Otro'; other.required = reason.value === 'Otro'; });
-    row.querySelector('.bc-baja-line-remove').addEventListener('click', () => {
-      if (host.children.length > 1) row.remove();
-      else { row.querySelector('.bc-baja-product').value=''; row.querySelector('.bc-baja-quantity').value=''; reason.value=''; other.value=''; otherWrap.hidden=true; other.required=false; }
-      pendingKey = null;
-      updateLineCount();
-    });
+    if (productSelect) productSelect.value = '';
+    if (quantityInput) quantityInput.value = '';
     pendingKey = null;
+    renderDraftLines();
+    message('Producto agregado. Puedes continuar con el siguiente.', 'success');
+  }
+  function renderDraftLines() {
+    const host = document.getElementById('bc-bajas-lines');
+    if (!host) return;
+    host.innerHTML = draftLines.length ? draftLines.map((line, index) => {
+      const reasonLabel = line.motivo
+        ? (line.motivo === 'Otro' ? 'Otro motivo' : line.motivo)
+        : 'Motivo general';
+      const options = ['<option value=""' + (!line.motivo ? ' selected' : '') + '>Usar motivo general</option>']
+        .concat(REASONS.map(reason => '<option value="' + escapeMarkup(reason) + '"' + (line.motivo === reason ? ' selected' : '') + '>' + escapeMarkup(reason) + '</option>'))
+        .join('');
+      const otherOpen = line.motivo === 'Otro';
+      return '<article class="bc-baja-line">' +
+        '<div class="bc-baja-line-summary">' +
+          '<div class="bc-baja-line-main"><strong>' + escapeMarkup(line.nombre) + '</strong><small>' + escapeMarkup(quantityLabel(line.cantidad)) + ' · <span class="bc-baja-line-reason-status">' + escapeMarkup(reasonLabel) + '</span></small></div>' +
+          '<button type="button" class="bc-baja-line-remove" data-bc-baja-remove="' + index + '" aria-label="Quitar ' + escapeMarkup(line.nombre) + '">×</button>' +
+        '</div>' +
+        '<details class="bc-baja-line-reason-details"' + (line.motivo ? ' open' : '') + '>' +
+          '<summary>Motivo distinto (opcional)</summary>' +
+          '<label><span>Motivo para este producto</span><select data-bc-baja-reason="' + index + '">' + options + '</select></label>' +
+          '<label data-bc-baja-other-wrap' + (otherOpen ? '' : ' hidden') + '><span>Explica este motivo</span><input data-bc-baja-other="' + index + '" maxlength="180" placeholder="Describe el motivo" value="' + escapeMarkup(line.otro || '') + '"' + (otherOpen ? ' required' : '') + '></label>' +
+        '</details>' +
+      '</article>';
+    }).join('') : '<p class="bc-bajas-list-empty">Todavía no hay productos en esta lista.</p>';
     updateLineCount();
   }
   function updateLineCount() {
-    const host=document.getElementById('bc-bajas-lines'), count=document.getElementById('bc-bajas-line-count');
-    if (count) { const n=host ? host.children.length : 0; count.textContent=n+' '+(n===1?'producto':'productos'); }
+    const count=document.getElementById('bc-bajas-line-count');
+    if (count) {
+      const n=draftLines.length;
+      count.textContent=n+' '+(n===1?'producto':'productos');
+    }
   }
   async function loadCatalogs(force) {
     if (!canCreate()) return false;
@@ -223,7 +290,7 @@
     if (!host) return false;
     if (!force && products.length && warehouses.length) return true;
     loading = true;
-    const add = host.querySelector('#bc-baja-add');
+    const add = host.querySelector('#bc-baja-add-line');
     if (add) add.disabled = true;
     message('Actualizando productos y almacenes autorizados…', '');
     const request = (async function () {
@@ -248,11 +315,10 @@
         products = operational.filter(product => product && product.id && product.nombre && product.activo !== false);
         warehouses = (Array.isArray(results[1].data) ? results[1].data : []).filter(item => item && item.id && item.activo !== false);
         fillWarehouseSelect();
-        host.querySelectorAll('.bc-baja-product').forEach(fillProductSelect);
-        if (!host.querySelector('.bc-baja-line')) addRow();
+        fillProductSelect(host.querySelector('#bc-baja-product'));
         refreshPicker(host);
         if (products.length && warehouses.length) {
-          message(products.length + ' productos y ' + warehouses.length + ' almacenes disponibles. Añade los productos de esta lista.', 'success');
+          message(products.length + ' productos y ' + warehouses.length + ' almacenes disponibles. Selecciona un producto y agrégalo a la lista.', 'success');
           return true;
         }
         message('No hay productos o almacenes activos disponibles para registrar la Baja.', 'error');
@@ -273,28 +339,29 @@
     if (!canCreate()) return message('Tu usuario no tiene permiso para registrar Bajas.', 'error');
     const form = document.getElementById('bc-bajas-multiple-form');
     const warehouse = document.getElementById('bc-bajas-warehouse') && document.getElementById('bc-bajas-warehouse').value;
-    const rows = Array.from(form ? form.querySelectorAll('.bc-baja-line') : []);
-    if (!warehouse || !rows.length) return message('Selecciona un almacén y añade al menos un producto.', 'error');
+    const productEditor = document.getElementById('bc-baja-product');
+    const quantityEditor = document.getElementById('bc-baja-quantity');
+    if (!warehouse || !draftLines.length) return message('Selecciona un almacén y agrega al menos un producto a la lista.', 'error');
+    if ((productEditor && productEditor.value) || (quantityEditor && quantityEditor.value.trim())) {
+      return message('Tienes un producto sin agregar. Pulsa «Agregar a la lista» o limpia ese editor antes de enviar.', 'error');
+    }
     const defaultReason = document.getElementById('bc-bajas-default-reason')?.value || '';
     const defaultOther = document.getElementById('bc-bajas-default-other')?.value.trim() || '';
     if (!defaultReason || (defaultReason === 'Otro' && !defaultOther)) {
       return message('Selecciona el motivo general de la lista (y descríbelo si es Otro).', 'error');
     }
     const generalReason = defaultReason === 'Otro' ? 'Otro: ' + defaultOther : defaultReason;
-    const lines = [];
-    for (const row of rows) {
-      const product = row.querySelector('.bc-baja-product').value;
-      const quantity = Number(row.querySelector('.bc-baja-quantity').value);
-      const customReason = row.dataset.reasonOverride === 'true';
-      const reason = customReason ? row.querySelector('.bc-baja-reason').value : defaultReason;
-      const other = customReason ? row.querySelector('.bc-baja-other').value.trim() : defaultOther;
-      if (!product || !Number.isFinite(quantity) || quantity <= 0 || !reason || (reason === 'Otro' && !other)) {
-        return message('Completa producto y cantidad; revisa el motivo general o el motivo particular marcado.', 'error');
+    const requestLines = [];
+    for (const line of draftLines) {
+      const reason = line.motivo || defaultReason;
+      const other = line.motivo === 'Otro' ? String(line.otro || '').trim() : defaultOther;
+      if (!line.producto_id || !Number.isFinite(Number(line.cantidad)) || Number(line.cantidad) <= 0 || !reason || (reason === 'Otro' && !other)) {
+        return message('Revisa los productos agregados y el motivo general o particular.', 'error');
       }
-      lines.push({
+      requestLines.push({
         almacen_id: warehouse,
-        producto_id: product,
-        cantidad: quantity,
+        producto_id: line.producto_id,
+        cantidad: Number(line.cantidad),
         motivo: reason === 'Otro' ? 'Otro: ' + other : reason,
         motivo_general: generalReason
       });
@@ -317,7 +384,7 @@
 
     let requestKey;
     try {
-      requestKey = await persistentRequestKey(warehouse, lines);
+      requestKey = await persistentRequestKey(warehouse, requestLines);
       pendingKey = requestKey.key;
     } catch (error) {
       submitting = false;
@@ -333,7 +400,7 @@
 
     const requestIdempotencyKey = pendingKey;
     const callRpc = () => api.rpc('crear_bajas_multiple', {
-      p_lineas: lines,
+      p_lineas: requestLines,
       p_idempotency_key: requestIdempotencyKey
     });
     const sendWithTimeout = () => typeof window.withNetworkTimeout === 'function'
@@ -358,7 +425,7 @@
       }
       if (result && result.error) throw result.error;
       const created = result && result.data && Array.isArray(result.data.bajas) ? result.data.bajas : [];
-      if (created.length !== lines.length || created.some(item => !item || !item.id)) {
+      if (created.length !== requestLines.length || created.some(item => !item || !item.id)) {
         throw new Error('La respuesta no confirmó todas las líneas de la lista. La clave se conserva; reintenta esta misma lista sin cambiarla.');
       }
       try { requestKey.storage.removeItem(requestKey.storageKey); } catch (_) {}
@@ -370,7 +437,12 @@
       if (defaultOtherWrap) defaultOtherWrap.hidden = true;
       const defaultOtherEl = document.getElementById('bc-bajas-default-other');
       if (defaultOtherEl) { defaultOtherEl.value = ''; defaultOtherEl.required = false; }
-      document.getElementById('bc-bajas-lines').innerHTML = '';
+      draftLines = [];
+      const productEditor = document.getElementById('bc-baja-product');
+      const quantityEditor = document.getElementById('bc-baja-quantity');
+      if (productEditor) productEditor.value = '';
+      if (quantityEditor) quantityEditor.value = '';
+      renderDraftLines();
       const approved = created.every(item => item.estado === 'APROBADA');
       message(approved ? '✓ Lista registrada como una sola solicitud y aprobada. Stock y FIFO actualizados.'
         : '✓ Lista enviada como una sola solicitud a revisión administrativa. El stock no cambia hasta aprobar.', 'success');
@@ -399,7 +471,7 @@
         if (state.control && state.control.isConnected) state.control.disabled = state.disabled;
       });
       submitButton.textContent = originalSubmitText;
-      if (succeeded) addRow();
+      if (succeeded) renderDraftLines();
     }
   }
   function start(force) {
