@@ -98,7 +98,7 @@ test("Inventory cards and alerts recognize a low flavor even when total product 
 });
 
 test("Operations opens expense/reinvestment modals immediately and loads catalogs inside them", () => {
-  assert.match(operations, /async function ensureOperationCatalogs\\(required, silent\\)/);
+  assert.match(operations, /async function ensureOperationCatalogs\(required, silent\)/);
   const gasto = operations.slice(operations.indexOf("async function openGasto()"), operations.indexOf("async function openBaja()"));
   const reinversion = operations.slice(operations.indexOf("async function openReinversion()"), operations.indexOf("function openResponsabilidad()"));
   assert.ok(gasto.indexOf("openModal({") >= 0 && gasto.indexOf("openModal({") < gasto.indexOf("ensureOperationCatalogs(false)"),
@@ -109,12 +109,12 @@ test("Operations opens expense/reinvestment modals immediately and loads catalog
     "Reinversión must show its modal before waiting for required catalogs");
   assert.ok(reinversion.includes("ensureOperationCatalogs(true, true).then("),
     "Reinversión must load required catalogs inside the already-open modal");
-  assert.match(reinversion, /submit\\.disabled = true/);
-  assert.match(reinversion, /submit\\.disabled = !ready/);
-  assert.match(operations, /window\\.refrescarAlmacenes/);
-  assert.match(operations, /window\\.refrescarProductos/);
-  assert.match(operations, /async function openBaja\\(\\)/);
-  assert.match(operations, /window\\.abrirBajasMultiple/);
+  assert.match(reinversion, /submit\.disabled = true/);
+  assert.match(reinversion, /submit\.disabled = !ready/);
+  assert.match(operations, /window\.refrescarAlmacenes/);
+  assert.match(operations, /window\.refrescarProductos/);
+  assert.match(operations, /async function openBaja\(\)/);
+  assert.match(operations, /window\.abrirBajasMultiple/);
   assert.match(operations, /bajaOpenPromise/);
 });
 
@@ -146,7 +146,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.ok(approvalVersion, "admin approvals module must expose its cache version");
   assert.equal(swVersion[1], appVersion[1], "app and Service Worker release versions must match");
   assert.match(app, /m53-inventario-centro\.js","53\.9/);
-  assert.match(app, /ui-operaciones-hub\.js","43\.3/);
+  assert.match(app, /ui-operaciones-hub\.js","43\.4/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
   assert.ok(app.includes('["aprobaciones-admin.js","20261120.3"]'));
   assert.match(app, /inventario-detalle\.js","72"/);
