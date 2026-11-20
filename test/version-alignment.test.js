@@ -206,18 +206,18 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="app\.js\?v=9\.5\.133"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.134',
-    'js/centro-control.js?v=9.5.70',
+    'js/centro-control.js?v=9.5.71',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.64',
-    'js/operacion-humana.js?v=9.5.64',
-    'js/comunicacion.js?v=9.5.64',
+    'js/operacion-humana.js?v=9.5.65',
+    'js/comunicacion.js?v=9.5.65',
   ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
   for (const asset of [
-    './js/centro-control.js?v=9.5.70',
+    './js/centro-control.js?v=9.5.71',
     './js/navegacion.js?v=9.5.65',
     './js/mando.js?v=9.5.64',
-    './js/operacion-humana.js?v=9.5.64',
-    './js/comunicacion.js?v=9.5.64',
+    './js/operacion-humana.js?v=9.5.65',
+    './js/comunicacion.js?v=9.5.65',
   ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/bc-modal-manager\.js\?v=1\.0/);
