@@ -27,18 +27,18 @@ const releasePath = path.join(process.cwd(), "test-results", "release", releaseF
 const baseUrl = "https://battlecruiser.robvg9.workers.dev";
 
 function resolveLinkedStylesheetUrl(indexHtml, serviceWorkerBody, origin) {
-  const linkTags = String(indexHtml).match(/<link\\b[^>]*>/gi) || [];
+  const linkTags = String(indexHtml).match(/<link\b[^>]*>/gi) || [];
   const stylesheetTag = linkTags.find(tag =>
-    /\\brel\\s*=\\s*["']stylesheet["']/i.test(tag) &&
-    /\\bhref\\s*=/i.test(tag) && /style\\.css/i.test(tag)
+    /\brel\s*=\s*["']stylesheet["']/i.test(tag) &&
+    /\bhref\s*=/i.test(tag) && /style\.css/i.test(tag)
   );
-  const hrefMatch = stylesheetTag && stylesheetTag.match(/\\bhref\\s*=\\s*["']([^"']+)["']/i);
+  const hrefMatch = stylesheetTag && stylesheetTag.match(/\bhref\s*=\s*["']([^"']+)["']/i);
   if (!hrefMatch) throw new Error("LIVE index.html has no versioned main stylesheet link.");
   const url = new URL(hrefMatch[1], origin + "/");
   if (url.origin !== origin || url.pathname !== "/style.css" || !url.searchParams.get("v")) {
     throw new Error("LIVE main stylesheet must be a same-origin /style.css URL with a version key.");
   }
-  const swStyleMatch = String(serviceWorkerBody).match(/["']\\.\\/style\\.css\\?v=([^"']+)["']/);
+  const swStyleMatch = String(serviceWorkerBody).match(/["']\.\/style\.css\?v=([^"']+)["']/);
   if (!swStyleMatch || swStyleMatch[1] !== url.searchParams.get("v")) {
     throw new Error("LIVE index.html and Service Worker request different stylesheet cache versions.");
   }
