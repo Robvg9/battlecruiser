@@ -99,6 +99,8 @@ test("Baja review opens a floating modal and resolves the whole grouped request"
   assert.match(ui,/resolver_solicitud_bajas_admin/);
   assert.match(ui,/p_solicitud_id:id/);
   assert.match(ui,/window\.BCModalManager\.create\(modal,/);
+  assert.match(ui,/x\.onclick=event=>b\.fn\.call\(x,event,x\)/);
+
   assert.match(ui,/dialogSelector:'.bc-admin-approval-dialog'/);
   assert.match(ui,/initialFocusSelector:'.bc-admin-approval-close'/);
   assert.match(ui,/approvalModalController\.open\(\)/);
