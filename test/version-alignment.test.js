@@ -202,7 +202,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.130 — Shared modal lifecycle pilot for Mi Cuenta/);
+  assert.match(app, /v9\.5\.131 — New Purchase picker UX and shared modal lifecycle integration/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.131"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.131',
@@ -294,8 +294,8 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.130'));
-  assert.ok(index.includes('app.js?v=9.5.130'));
+  assert.ok(index.includes('style.css?v=9.5.131'));
+  assert.ok(index.includes('app.js?v=9.5.131'));
   assert.ok(sw.includes('./style.css?v=9.5.131'));
   assert.ok(sw.includes('./app.js?v=9.5.131'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
