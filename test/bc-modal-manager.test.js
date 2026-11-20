@@ -177,6 +177,7 @@ test("only the topmost nested modal handles Escape and traps keyboard focus", ()
     const one = dom.window.BCModalManager.create(doc.getElementById("one"));
     const two = dom.window.BCModalManager.create(doc.getElementById("two"));
 
+    doc.getElementById("opener").focus();
     one.open();
     assert.equal(doc.activeElement.id, "one-first");
     two.open();
