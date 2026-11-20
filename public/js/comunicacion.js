@@ -5,6 +5,8 @@
 let _comConvActual = null;
 let _comConvActualTipo = null;
 let _comNoLeidosTotal = 0;
+let _comNoLeidosError = null;
+let _comNoLeidosFlight = null;
 
 async function refrescarComunicacion() {
   if (!appShell || !appShell.classList.contains("visible")) return;
@@ -25,28 +27,82 @@ async function refrescarComunicacion() {
 }
 
 async function actualizarBadgeNoLeidos() {
-  const badge = document.getElementById("com-tab-badge");
-  if (!badge) return;
-  if (!navigator.onLine || !tienePermiso("comunicacion", "ver")) {
-    badge.classList.add("hidden");
-    badge.textContent = "";
+  if (_comNoLeidosFlight) return _comNoLeidosFlight;
+  _comNoLeidosFlight = (async function () {
+    const badge = document.getElementById("com-tab-badge");
+    const autorizado = typeof tienePermiso === "function" && tienePermiso("comunicacion", "ver");
+    if (!navigator.onLine || !autorizado) {
+      _comNoLeidosTotal = 0;
+      _comNoLeidosError = null;
+      if (badge) {
+        badge.classList.add("hidden");
+        badge.textContent = "";
+      }
+      return;
+    }
+    try {
+      const { data, error } = await client.rpc("contar_no_leidos_global", {});
+      if (error) throw error;
+      _comNoLeidosError = null;
+      _comNoLeidosTotal = Math.max(0, Number(data) || 0);
+      if (!badge) return;
+      if (_comNoLeidosTotal > 0) {
+        badge.classList.remove("hidden");
+        badge.textContent = String(_comNoLeidosTotal);
+        badge.classList.add("atencion");
+      } else {
+        badge.classList.add("hidden");
+        badge.textContent = "";
+      }
+    } catch (e) {
+      _comNoLeidosTotal = 0;
+      _comNoLeidosError = String(e && (e.message || e.details) || e || "Error desconocido");
+      if (badge) {
+        badge.classList.add("hidden");
+        badge.textContent = "";
+      }
+    }
+  })();
+  try {
+    await _comNoLeidosFlight;
+  } finally {
+    _comNoLeidosFlight = null;
+  }
+}
+
+async function refrescarAlertasB8() {
+  const autorizado = typeof tienePermiso === "function" && tienePermiso("comunicacion", "ver");
+  if (!navigator.onLine || !autorizado) {
+    _comNoLeidosTotal = 0;
+    _comNoLeidosError = null;
     return;
   }
-  try {
-    const { data, error } = await client.rpc("contar_no_leidos_global", {});
-    if (error) { badge.classList.add("hidden"); return; }
-    _comNoLeidosTotal = Number(data) || 0;
-    if (_comNoLeidosTotal > 0) {
-      badge.classList.remove("hidden");
-      badge.textContent = String(_comNoLeidosTotal);
-      badge.classList.add("atencion");
-    } else {
-      badge.classList.add("hidden");
-      badge.textContent = "";
-    }
-  } catch (e) {
-    badge.classList.add("hidden");
+  await actualizarBadgeNoLeidos();
+}
+
+function construirAlertasB8() {
+  const avisos = [];
+  if (_comNoLeidosError) {
+    avisos.push({
+      nivel: "atencion",
+      tipo: "No se pudo comprobar Comunicación",
+      texto: "No se pudo consultar el contador de mensajes sin leer: " + _comNoLeidosError,
+      op: null,
+      tab: "comunicacion"
+    });
   }
+  if (_comNoLeidosTotal > 0) {
+    avisos.push({
+      nivel: "atencion",
+      tipo: "Mensajes sin leer",
+      texto: _comNoLeidosTotal === 1
+        ? "Tienes 1 mensaje pendiente de leer."
+        : "Tienes " + _comNoLeidosTotal + " mensajes pendientes de leer.",
+      op: null,
+      tab: "comunicacion"
+    });
+  }
+  return avisos;
 }
 
 async function refrescarListaConversaciones() {
