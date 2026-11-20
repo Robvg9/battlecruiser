@@ -77,7 +77,7 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
   assert.match(app,/\["jornada-price-changes.js","1.0.2"\]/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.2/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.3/);
 });
 
 test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el segundo", () => {
@@ -100,4 +100,13 @@ test("Price context returns the full programmed period and current cost", () => 
   assert.match(migration, /'costo_actual',coalesce\(pr\.costo_unitario_referencia,0\)/);
   assert.match(migration, /bc_actor_is_admin\(\)/);
   assert.match(migration, /SECURITY DEFINER/);
+});
+
+test("Price-change preview uses the existing read-only Jornada schedule RPC when context migration is not present", () => {
+  const ui = fs.readFileSync(path.join(__dirname, "..", "public", "js", "jornada-price-changes.js"), "utf8");
+  assert.match(ui, /loadHumanSchedulePeriods/);
+  assert.match(ui, /rpc\('bc5_mis_jornadas'/);
+  assert.match(ui, /p_fecha_inicio: shiftDate\(day, -30\)/);
+  assert.match(ui, /p_fecha_fin: shiftDate\(day, 30\)/);
+  assert.match(ui, /item\.estado !== 'CANCELADA'/);
 });

@@ -8,6 +8,7 @@
   const MODAL_ID = 'bc-jpc-owner-modal';
   const GATE_ID = 'bc-jpc-attendant-gate';
   let contexts = [];
+  let scheduledRows = [];
   let currentGate = null;
   let refreshing = false;
   let ownerBusy = false;
@@ -148,8 +149,9 @@
   }
 
   function sessionPeriod(context) {
-    const related = contexts.filter(function(item) {
-      return context && context.turno_id && String(item.turno_id) === String(context.turno_id);
+    const related = scheduledRows.filter(function(item) {
+      return context && context.turno_id && String(item.turno_id) === String(context.turno_id) &&
+        String(item.almacen_id || '') === String(context.almacen_id || '') && item.estado !== 'CANCELADA';
     });
     const dates = related.map(function(item) { return String(item.fecha || '').slice(0, 10); }).filter(Boolean).sort();
     const start = String(context && context.fecha_inicio || dates[0] || context && context.fecha || '').slice(0, 10);
@@ -162,6 +164,43 @@
       return 'Turno del ' + Number(a[2]) + ' al ' + Number(b[2]) + ' de ' + endLabel.split(' ').slice(-1).join(' ');
     }
     return 'Turno del ' + startLabel + ' al ' + endLabel;
+  }
+
+  function shiftDate(value, days) {
+    const parts = String(value || '').slice(0, 10).split('-').map(Number);
+    if (parts.length !== 3 || parts.some(function(part) { return !Number.isFinite(part); })) return '';
+    const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + Number(days || 0), 12));
+    return date.toISOString().slice(0, 10);
+  }
+
+  async function loadHumanSchedulePeriods(items) {
+    const seen = Object.create(null);
+    const active = (Array.isArray(items) ? items : []).filter(function(item) {
+      return item && item.turno_id && item.fecha && (!item.fecha_inicio || !item.fecha_fin);
+    });
+    const anchors = active.filter(function(item) {
+      const key = String(item.turno_id) + '|' + String(item.almacen_id || '') + '|' + String(item.fecha);
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+    const ranges = anchors.map(function(item) {
+      const day = String(item.fecha).slice(0, 10);
+      return [
+        { p_fecha_inicio: shiftDate(day, -30), p_fecha_fin: day },
+        { p_fecha_inicio: day, p_fecha_fin: shiftDate(day, 30) }
+      ];
+    }).flat();
+    const responses = await Promise.all(ranges.map(function(range) {
+      return rpc('bc5_mis_jornadas', range);
+    }));
+    const merged = new Map();
+    responses.forEach(function(rows) {
+      (Array.isArray(rows) ? rows : []).forEach(function(row) {
+        if (row && row.id) merged.set(String(row.id), row);
+      });
+    });
+    scheduledRows = Array.from(merged.values());
   }
 
   function humanContextLabel(context) {
@@ -291,6 +330,16 @@
         console.warn('[BattleCruiser] No se pudo actualizar el catálogo de responsables:', staffError);
       }
       contexts = await rpc('bc7_cambios_precio_contexto', {});
+      if (Array.isArray(contexts) && contexts.some(function(item) { return !item.fecha_inicio || !item.fecha_fin; })) {
+        try {
+          await loadHumanSchedulePeriods(contexts);
+        } catch (scheduleError) {
+          scheduledRows = [];
+          console.warn('[BattleCruiser] No se pudo completar el período programado de la Jornada:', scheduleError);
+        }
+      } else {
+        scheduledRows = [];
+      }
       if (!Array.isArray(contexts) || !contexts.length) {
         window.alert('No existe una jornada minorista activa con una dependienta trabajando. El cambio de precio solo se puede iniciar desde una jornada activa para exigir el conteo físico.');
         return;
