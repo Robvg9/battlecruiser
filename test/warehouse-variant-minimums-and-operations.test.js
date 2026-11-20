@@ -169,7 +169,9 @@ test("Baja card opens the shared batch form with predefined reasons and required
   for (const reason of ["Rotura", "Hechado a perder", "El Jefe lo cogió", "Vencimiento", "Daño o deterioro", "Pérdida", "Consumo interno", "Otro"]) {
     assert.ok(bajas.includes("'" + reason + "'"), "missing Baja reason " + reason);
   }
-  assert.match(bajas, /other\.required = reason\.value === 'Otro'/);
+  assert.match(bajas, /input\.required=defaultReason\.value==='Otro'/);
+  assert.match(bajas, /otherInput\.required = line\.motivo === 'Otro'/);
+  assert.match(bajas, /reason === 'Otro' && !other/);
   assert.match(bajas, /api\.rpc\('crear_bajas_multiple'/);
   assert.doesNotMatch(operations, /rpc\('crear_baja'/);
   assert.doesNotMatch(approvals, /rpc\('crear_baja'/);
