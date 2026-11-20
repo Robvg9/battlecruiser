@@ -57,22 +57,44 @@ function createPurchaseWindow(t) {
 
 const tick = (w) => new Promise((resolve) => w.setTimeout(resolve, 0));
 
+async function chooseProductAndFill(w, d, productId, quantity, cost) {
+  const checkbox = d.querySelector('[data-compra-select="' + productId + '"]');
+  assert.ok(checkbox, "product picker contains " + productId);
+  checkbox.checked = true;
+  checkbox.dispatchEvent(new w.Event("change", { bubbles: true }));
+  assert.equal(d.getElementById("compra-product-next").disabled, false);
+  d.getElementById("compra-product-next").click();
+
+  let row = null;
+  for (let attempt = 0; attempt < 12 && !row; attempt++) {
+    await tick(w);
+    row = d.querySelector('[data-compra-detail="' + productId + '"]');
+  }
+  assert.ok(row, "step 2 contains the selected product");
+  row.querySelector("[data-compra-quantity]").value = String(quantity);
+  row.querySelector("[data-compra-cost]").value = String(cost);
+  row.querySelector("[data-compra-quantity]").dispatchEvent(new w.Event("input", { bubbles: true }));
+  row.querySelector("[data-compra-cost]").dispatchEvent(new w.Event("input", { bubbles: true }));
+}
+
+
 test("modal de Nueva Compra queda enfocado en registrar y no muestra historial", async (t) => {
   const { w } = createPurchaseWindow(t);
   await w.__BC_COMPRAS_ACTIVAR();
 
   const panel = w.document.getElementById("tab-compras");
   assert.ok(panel);
-  assert.match(panel.textContent, /Agregar productos/);
+  assert.match(panel.textContent, /PASO 1 DE 2/);
   assert.doesNotMatch(panel.textContent, /Últimas compras|Historial|Compra de proveedor|Proveedor → BattleCruiser/);
   assert.equal(w.document.getElementById("compra-multiple-historial"), null);
   assert.ok(w.document.getElementById("compra-multiple-almacen"));
   assert.ok(w.document.getElementById("compra-multiple-proveedor"));
   assert.ok(w.document.getElementById("compra-multiple-fecha"));
-  assert.ok(w.document.getElementById("compra-multiple-producto"));
-  assert.ok(w.document.getElementById("compra-multiple-presentacion"));
-  assert.ok(w.document.getElementById("compra-multiple-cantidad"));
-  assert.ok(w.document.getElementById("compra-multiple-costo"));
+  assert.ok(w.document.getElementById("compra-product-picker"));
+  assert.ok(w.document.getElementById("compra-product-search"));
+  assert.ok(w.document.getElementById("compra-product-next"));
+  assert.equal(w.document.getElementById("compra-step-details").hidden, true);
+  assert.equal(w.document.getElementById("compra-multiple-legacy-editor").hidden, true);
   assert.ok(w.document.getElementById("compra-multiple-confirmar"));
 
   const style = w.document.getElementById("bc-compras-flow-style").textContent;
@@ -88,15 +110,10 @@ test("confirmar compra conserva el RPC de alta y no consulta compras anteriores"
 
   const d = w.document;
   d.getElementById("compra-multiple-almacen").value = "warehouse-1";
-  const product = d.getElementById("compra-multiple-producto");
-  product.value = "product-1";
-  product.dispatchEvent(new w.Event("change"));
-  await tick(w);
-
-  d.getElementById("compra-multiple-cantidad").value = "12";
-  d.getElementById("compra-multiple-costo").value = "3.5";
-  d.getElementById("compra-multiple-add").click();
-  assert.match(d.getElementById("compra-multiple-n-lineas").textContent, /1 línea/);
+  await chooseProductAndFill(w, d, "product-1", 12, 3.5);
+  assert.equal(d.getElementById("compra-step-products").hidden, true);
+  assert.equal(d.getElementById("compra-step-details").hidden, false);
+  assert.match(d.getElementById("compra-multiple-n-lineas").textContent, /1 producto seleccionado/);
 
   d.getElementById("compra-multiple-confirmar").click();
   await tick(w);
@@ -120,13 +137,7 @@ test("una compra con varias líneas nunca se fragmenta si falla el RPC de lista"
   await w.__BC_COMPRAS_ACTIVAR();
   const d = w.document;
   d.getElementById("compra-multiple-almacen").value = "warehouse-1";
-  const product = d.getElementById("compra-multiple-producto");
-  product.value = "product-1";
-  product.dispatchEvent(new w.Event("change"));
-  await tick(w);
-  d.getElementById("compra-multiple-cantidad").value = "12";
-  d.getElementById("compra-multiple-costo").value = "3.5";
-  d.getElementById("compra-multiple-add").click();
+  await chooseProductAndFill(w, d, "product-1", 12, 3.5);
   w.client.rpc = async (name, payload) => {
     rpcCalls.push({ name, payload });
     return { data: null, error: { code: "42883", message: "registrar_compra_multiple does not exist" } };
@@ -150,20 +161,15 @@ test("Nueva Compra styles the visible searchable-picker buttons, not only hidden
   w.eval(PICKER);
   await tick(w);
 
-  const controls = [
-    { id: "compra-multiple-almacen", scope: ".compra-cabecera" },
-    { id: "compra-multiple-producto", scope: ".compra-linea-editor" },
-    { id: "compra-multiple-presentacion", scope: ".compra-linea-editor" }
-  ];
-
-  for (const item of controls) {
-    const select = w.document.getElementById(item.id);
-    assert.ok(select, item.id + " native select must exist");
-    assert.ok(select.classList.contains("bc-product-picker-native-select"), item.id + " must be transformed");
-    const trigger = select.parentElement.querySelector(":scope > .bc-product-picker-trigger");
-    assert.ok(trigger, item.id + " must have a visible picker button");
-    assert.ok(trigger.closest("#tab-compras " + item.scope), item.id + " trigger must remain in its purchase layout");
-  }
+  const select = w.document.getElementById("compra-multiple-almacen");
+  assert.ok(select, "warehouse selector remains a native accessible select");
+  assert.ok(select.classList.contains("bc-product-picker-native-select"), "warehouse selector uses the shared picker");
+  const trigger = select.parentElement.querySelector(":scope > .bc-product-picker-trigger");
+  assert.ok(trigger, "warehouse destination has a visible searchable picker button");
+  assert.ok(trigger.closest("#tab-compras .compra-cabecera"), "warehouse picker remains in the purchase header");
+  assert.ok(w.document.getElementById("compra-product-search"), "products use the visible two-step picker");
+  assert.ok(w.document.querySelector("#compra-product-picker [data-compra-select]"), "each product is a selectable row");
+  assert.equal(w.document.getElementById("compra-multiple-legacy-editor").hidden, true);
 
   const overrideStart = STYLE.indexOf(
     "#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger,"
