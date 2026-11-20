@@ -7,6 +7,8 @@ const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
 const PURCHASE = fs.readFileSync(path.join(__dirname, "..", "public/js/compra-multiple.js"), "utf8");
+const PICKER = fs.readFileSync(path.join(__dirname, "..", "public/js/product-select-search.js"), "utf8");
+const STYLE = fs.readFileSync(path.join(__dirname, "..", "public/style.css"), "utf8");
 
 function createPurchaseWindow(t) {
   const dom = new JSDOM(
@@ -135,4 +137,48 @@ test("una compra con varias líneas nunca se fragmenta si falla el RPC de lista"
   assert.equal(rpcCalls[0].name, "registrar_compra_multiple");
   assert.match(d.getElementById("compra-multiple-msg").textContent, /No está disponible el registro de compras por lista/);
   assert.doesNotMatch(PURCHASE, /confirmarLineaALinea|ejecutarOperacion\('compra',/);
+});
+
+
+test("Nueva Compra styles the visible searchable-picker buttons, not only hidden native selects", async (t) => {
+  const { w } = createPurchaseWindow(t);
+  await w.__BC_COMPRAS_ACTIVAR();
+
+  const style = w.document.createElement("style");
+  style.textContent = STYLE;
+  w.document.head.appendChild(style);
+  w.eval(PICKER);
+  await tick(w);
+
+  const controls = [
+    { id: "compra-multiple-almacen", scope: ".compra-cabecera" },
+    { id: "compra-multiple-producto", scope: ".compra-linea-editor" },
+    { id: "compra-multiple-presentacion", scope: ".compra-linea-editor" }
+  ];
+
+  for (const item of controls) {
+    const select = w.document.getElementById(item.id);
+    assert.ok(select, item.id + " native select must exist");
+    assert.ok(select.classList.contains("bc-product-picker-native-select"), item.id + " must be transformed");
+    const trigger = select.parentElement.querySelector(":scope > .bc-product-picker-trigger");
+    assert.ok(trigger, item.id + " must have a visible picker button");
+    assert.ok(trigger.closest("#tab-compras " + item.scope), item.id + " trigger must remain in its purchase layout");
+  }
+
+  const overrideStart = STYLE.indexOf(
+    "#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger,"
+  );
+  const overrideEnd = STYLE.indexOf("\n}", overrideStart);
+  assert.ok(overrideStart >= 0 && overrideEnd > overrideStart,
+    "purchase-specific styles must target the visible custom picker buttons");
+  const override = STYLE.slice(overrideStart, overrideEnd);
+  assert.ok(override.includes("background: var(--void"));
+  assert.ok(override.includes("color: var(--text"));
+  assert.ok(override.includes("border: 1px solid"));
+  assert.ok(overrideStart > STYLE.indexOf(".inline-form button"),
+    "the custom-button override must come after the generic gold inline-form button rule");
+
+  assert.ok(STYLE.includes(
+    "#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger:focus-visible"
+  ));
 });
