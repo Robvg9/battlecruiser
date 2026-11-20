@@ -67,7 +67,7 @@ test("Mi Cuenta muestra identidad no sensible y utiliza el ciclo compartido de m
     button.focus();
     button.click();
     const escape = new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    doc.dispatchEvent(escape);
+    doc.getElementById("bc-account-close").dispatchEvent(escape);
     assert.equal(escape.defaultPrevented, true);
     assert.ok(modal.classList.contains("hidden"));
     assert.equal(button.getAttribute("aria-expanded"), "false");
