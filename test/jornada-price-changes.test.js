@@ -84,8 +84,8 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
-  assert.match(app,/\["jornada-price-changes.js","1.0.3"\]/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.3/);
+  assert.match(app,/\["jornada-price-changes.js","1.0.4"\]/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.4/);
 });
 
 test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el segundo", () => {
