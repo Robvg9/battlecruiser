@@ -1,5 +1,5 @@
 "use strict";
-const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -61,6 +61,5 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
   assert.match(app, /bc7-jornada-ui\.js","7\.44"/);
   assert.match(sw, /bc7-jornada-ui\.js\?v=7\.44/);
-  assert.match(app, /aprobaciones-admin\.js","20261119\.1"/);
-  assert.match(sw, /aprobaciones-admin\.js\?v=20261119\.1/);
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
 });

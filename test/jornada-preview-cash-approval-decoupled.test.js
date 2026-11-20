@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -10,6 +11,7 @@ const UI=read("public/js/bc7-jornada-ui.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const APP=read("public/app.js");
 const SW=read("public/service-worker.js");
+const INDEX=read("public/index.html");
 
 test("Jornada closure checklist is five steps and includes the saved final cash declaration",()=>{
   assert.match(MIGRATION,/v_cash_declared boolean/);
@@ -86,12 +88,8 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
 });
 
 test("PWA caches the new Jornada and single-count modules",()=>{
-  assert.ok(APP.includes('const VERSION="9.5.130"'));
-  assert.ok(SW.includes('BC_SW_VERSION = "9.5.130"'));
-  assert.ok(APP.includes('["bc7-jornada-ui.js","7.44"]'));
-  assert.ok(SW.includes("bc7-jornada-ui.js?v=7.44"));
-  assert.ok(APP.includes('["aprobaciones-admin.js","20261119.1"]'));
-  assert.ok(SW.includes("aprobaciones-admin.js?v=20261119.1"));
-  assert.ok(APP.includes('["turno-cash-handover-ui.js","1.2"]'));
-  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
+  assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"bc7-jornada-ui.js"});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"aprobaciones-admin.js"});
+  assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"turno-cash-handover-ui.js"});
 });

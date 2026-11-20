@@ -8,6 +8,7 @@ const { JSDOM } = require("jsdom");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const MODAL_MANAGER = read("public/js/bc-modal-manager.js");
 const UI = read("public/js/aprobaciones-admin.js");
 const BAJAS = read("public/js/bajas-multiple.js");
 
@@ -63,6 +64,7 @@ function setupApprovalWindow(t) {
     }
   };
 
+  w.eval(MODAL_MANAGER);
   w.eval(UI);
   t.after(() => w.close());
   return { w, calls };

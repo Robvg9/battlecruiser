@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -7,6 +8,7 @@ const migration=fs.readFileSync("supabase/migrations/20261118000001_jornada_inve
 const ui=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
+const index=fs.readFileSync("public/index.html","utf8");
 
 test("initial inventory correction is an audited overlay and leaves source rows immutable",()=>{
   assert.ok(migration.includes("CHECK (tipo IN ('FINAL','INICIAL'))"));
@@ -46,8 +48,6 @@ test("stale shared handovers are refreshed and forced to recount before a receip
 });
 
 test("PWA loads the changed Jornada module from a refreshed release cache",()=>{
-  assert.ok(app.includes('const VERSION="9.5.130"'));
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.44"]'));
-  assert.ok(sw.includes('var BC_SW_VERSION = "9.5.130"'));
-  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.44"));
+  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
 });

@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -8,6 +9,7 @@ const costMigration=fs.readFileSync("supabase/migrations/20261119193000_jornada_
 const ui=fs.readFileSync("public/js/jornada-price-changes.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
+const index=fs.readFileSync("public/index.html","utf8");
 
 test("Jornada price changes are server-owned, audited, and wait for a physical count",()=>{
   assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_cambios_precio/);
@@ -73,8 +75,7 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
 });
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
-  assert.match(app,/const VERSION="9.5.130"/);
+  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
   assert.match(app,/\["jornada-price-changes.js","1.0.1"\]/);
-  assert.match(sw,/BC_SW_VERSION = "9.5.130"/);
   assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.1/);
 });

@@ -1,7 +1,8 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs");
 const ui=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
-const app=fs.readFileSync("public/app.js","utf8"),sw=fs.readFileSync("public/service-worker.js","utf8");
+const app=fs.readFileSync("public/app.js","utf8"),sw=fs.readFileSync("public/service-worker.js","utf8"),index=fs.readFileSync("public/index.html","utf8");
 test("Step 7 folds help/admin and keeps first view to the calendar",()=>{
  assert.match(ui,/<details id="bc7-help-details" class="bc7-help">/);
  assert.match(ui,/<details id="bc7-admin-details" class="bc7-admin-details" hidden>/);
@@ -24,10 +25,8 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
- assert.match(app,/const VERSION="9.5.130"/);
- assert.match(app,/\["bc7-jornada-ui\.js","7\.44"\]/);
- assert.match(sw,/BC_SW_VERSION = "9.5.130"/);
- assert.match(sw,/bc7-jornada-ui\.js\?v=7\.44/);
+ assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
+ assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
  assert.ok(ui.includes("v7.44 — planificador sin duración predeterminada y calendario desde hoy."));
 });
 
