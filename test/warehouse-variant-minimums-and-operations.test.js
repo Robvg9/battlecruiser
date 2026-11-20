@@ -113,7 +113,7 @@ test("Operations uses live catalogs for expenses/reinvestments and opens Baja th
 test("Baja entry is one authenticated multi-product list, not a duplicate finance form", () => {
   const bajas = read("public/js/bajas-multiple.js");
   assert.match(bajas, /id="bc-bajas-multiple-form"/);
-  assert.match(bajas, /id="bc-baja-add"/);
+  assert.match(bajas, /id="bc-baja-add-line"/);
   assert.match(bajas, /crear_bajas_multiple/);
   assert.doesNotMatch(bajas, /hasSession/);
    assert.doesNotMatch(bajas, /auth\.getSession\(\)/);
@@ -157,7 +157,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "productos.js?v=20261118.1",
     "compra-multiple.js?v=27.16",
     "aprobaciones-admin.js?v=20261119.1",
-    "bajas-multiple.js?v=1.6"
+    "bajas-multiple.js?v=1.7"
   ]) assert.ok(serviceWorker.includes(asset), "missing SW precache asset " + asset);
 });
 
