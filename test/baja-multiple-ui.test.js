@@ -3,10 +3,16 @@ const test=require("node:test"),assert=require("node:assert/strict"),fs=require(
 const root=path.join(__dirname,".."),read=file=>fs.readFileSync(path.join(root,file),"utf8");
 test("Bajas use one multi-item form and require authenticated session",()=>{
  const module=read("public/js/bajas-multiple.js"),admin=read("public/js/aprobaciones-admin.js"),finance=read("public/js/operaciones-financieras.js");
- assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add"/);assert.match(module,/crear_bajas_multiple/);
+ assert.match(module,/id="bc-bajas-multiple-form"/);assert.match(module,/id="bc-baja-add-line"/);assert.match(module,/id="bc-baja-product"/);assert.match(module,/id="bc-baja-quantity"/);assert.match(module,/crear_bajas_multiple/);
  assert.doesNotMatch(module,/async function hasSession/);assert.match(module,/p_idempotency_key: requestIdempotencyKey/);
  assert.match(module,/motivo_general: String\(line\.motivo_general \|\| ''\)/);assert.match(module,/motivo_general: generalReason/);
- assert.match(module,/bc-bajas-default-reason/);assert.match(module,/bc-baja-line-reason-toggle/);
+ assert.match(module,/bc-bajas-default-reason/);
+ assert.match(module,/draftLines\.push/);
+ assert.match(module,/function renderDraftLines/);
+ assert.match(module,/data-bc-baja-reason/);
+ assert.match(module,/line\.motivo \|\| defaultReason/);
+ assert.match(module,/line\.otro/);
+ assert.doesNotMatch(module,/function addRow\(/);
  assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
  assert.doesNotMatch(module,/auth\.getSession\(\)/);
  assert.doesNotMatch(module,/!await hasSession\(\)/);
