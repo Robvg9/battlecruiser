@@ -175,7 +175,7 @@ test("Nueva Compra styles the visible searchable-picker buttons, not only hidden
   assert.ok(override.includes("background: var(--void"));
   assert.ok(override.includes("color: var(--text"));
   assert.ok(override.includes("border: 1px solid"));
-  assert.ok(STYLE.indexOf(overrideStart) > STYLE.indexOf(".inline-form button"),
+  assert.ok(overrideStart > STYLE.indexOf(".inline-form button"),
     "the custom-button override must come after the generic gold inline-form button rule");
 
   assert.ok(STYLE.includes(
