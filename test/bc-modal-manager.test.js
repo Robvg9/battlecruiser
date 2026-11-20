@@ -117,6 +117,25 @@ test("non-dismissible modal can disable Escape and backdrop close for mandatory 
   }
 });
 
+test("shared modal restores a configured trigger even when touch input did not focus it", () => {
+  const dom = createWindow();
+  try {
+    const doc = dom.window.document;
+    const opener = doc.getElementById("opener");
+    const modal = doc.getElementById("modal");
+    assert.notEqual(doc.activeElement, opener);
+
+    const controller = dom.window.BCModalManager.create(modal, {
+      returnFocusSelector: "#opener"
+    });
+    controller.open();
+    controller.close();
+    assert.equal(doc.activeElement, opener);
+  } finally {
+    dom.window.close();
+  }
+});
+
 test("manager is idempotent and close controls are delegated by the overlay", () => {
   const dom = createWindow();
   try {
