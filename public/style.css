@@ -1617,3 +1617,69 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
  .bc-bajas-multiple #bc-baja-add-line{grid-column:1/-1;width:100%}
  .bc-bajas-multiple .bc-baja-line{padding:8px}
 }
+
+/* ============================================================
+   BC VISUAL FOUNDATION — native controls / readable options
+   Shared baseline for purchase, transfer and movement dialogs.
+   Keep touch targets accessible; compactness comes from layout,
+   not from shrinking interactive hit areas.
+   ============================================================ */
+:root {
+  --bc-radius-control: 9px;
+  --bc-radius-card: 14px;
+  --bc-space-control: 10px;
+  --bc-space-compact: 8px;
+  --bc-control-bg: var(--stone);
+  --bc-control-bg-hover: var(--stone-2);
+  --bc-control-border: rgba(212,176,92,.38);
+  --bc-control-focus: rgba(212,176,92,.72);
+}
+
+select,
+select:focus,
+select:active {
+  color: var(--text);
+  border-color: var(--bc-control-border);
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  color: var(--text);
+  background-color: var(--stone);
+}
+
+html[data-bc-theme="light"] select,
+html[data-bc-theme="light"] select:focus,
+html[data-bc-theme="light"] select:active {
+  color: var(--text);
+  color-scheme: light;
+}
+
+html[data-bc-theme="light"] select option,
+html[data-bc-theme="light"] select optgroup {
+  color: var(--text);
+  background-color: var(--stone);
+}
+
+/* Purchase form: explicit contrast for closed controls and menu items. */
+#tab-compras .compra-cabecera select,
+#tab-compras .compra-linea-editor select {
+  color: var(--text) !important;
+  background-color: var(--stone) !important;
+  border: 1px solid var(--bc-control-border);
+  border-radius: var(--bc-radius-control);
+}
+
+#tab-compras .compra-cabecera select option,
+#tab-compras .compra-linea-editor select option {
+  color: var(--text) !important;
+  background-color: var(--stone) !important;
+}
+
+#tab-compras .compra-cabecera select:focus-visible,
+#tab-compras .compra-linea-editor select:focus-visible {
+  outline: 2px solid var(--bc-control-focus);
+  outline-offset: 1px;
+}
+
