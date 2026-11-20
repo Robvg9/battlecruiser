@@ -165,15 +165,20 @@ test("Nueva Compra styles the visible searchable-picker buttons, not only hidden
     assert.ok(trigger.closest("#tab-compras " + item.scope), item.id + " trigger must remain in its purchase layout");
   }
 
-  const override = STYLE.match(
-    /#tab-compras\\s+\\.compra-cabecera\\s+\\.bc-product-picker-field\\s*>\\s*\\.bc-product-picker-trigger,\\s*#tab-compras\\s+\\.compra-linea-editor\\s+\\.bc-product-picker-field\\s*>\\s*\\.bc-product-picker-trigger\\s*\\{([^}]+)\\}/
+  const overrideStart = STYLE.indexOf(
+    "#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger,"
   );
-  assert.ok(override, "purchase-specific styles must target the visible custom picker buttons");
-  assert.match(override[1], /background:\\s*var\\(--void/);
-  assert.match(override[1], /color:\\s*var\\(--text/);
-  assert.match(override[1], /border:\\s*1px solid/);
-  assert.ok(STYLE.indexOf(override[0]) > STYLE.indexOf(".inline-form button"),
+  const overrideEnd = STYLE.indexOf("\n}", overrideStart);
+  assert.ok(overrideStart >= 0 && overrideEnd > overrideStart,
+    "purchase-specific styles must target the visible custom picker buttons");
+  const override = STYLE.slice(overrideStart, overrideEnd);
+  assert.ok(override.includes("background: var(--void"));
+  assert.ok(override.includes("color: var(--text"));
+  assert.ok(override.includes("border: 1px solid"));
+  assert.ok(STYLE.indexOf(overrideStart) > STYLE.indexOf(".inline-form button"),
     "the custom-button override must come after the generic gold inline-form button rule");
 
-  assert.match(STYLE, /#tab-compras\\s+\\.compra-cabecera\\s+\\.bc-product-picker-field\\s*>\\s*\\.bc-product-picker-trigger:focus-visible/);
+  assert.ok(STYLE.includes(
+    "#tab-compras .compra-cabecera .bc-product-picker-field > .bc-product-picker-trigger:focus-visible"
+  ));
 });
