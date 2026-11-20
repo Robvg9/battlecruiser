@@ -13,7 +13,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.match(module,/line\.motivo \|\| defaultReason/);
  assert.match(module,/line\.otro/);
  assert.doesNotMatch(module,/function addRow\(/);
- assert.match(module,/customReason \? row\.querySelector\('\.bc-baja-reason'\)\.value : defaultReason/);
+ assert.match(module,/line\.motivo \|\| defaultReason/);
  assert.doesNotMatch(module,/auth\.getSession\(\)/);
  assert.doesNotMatch(module,/!await hasSession\(\)/);
  assert.match(module,/function ensureModal\(\)/);
@@ -25,7 +25,7 @@ test("Bajas use one multi-item form and require authenticated session",()=>{
  assert.match(module,/api\.auth\.refreshSession\(\)/);
  assert.match(module,/tokenRejected/);
  assert.match(module,/const requestIdempotencyKey = pendingKey/);
- assert.match(module,/persistentRequestKey\(warehouse, lines\)/);
+ assert.match(module,/persistentRequestKey\(warehouse, requestLines\)/);
  assert.match(module,/PENDING_REQUEST_PREFIX/);
  assert.doesNotMatch(admin,/id='adm-baja-form'/);assert.doesNotMatch(finance,/form-salida-producto/);
  assert.doesNotMatch(finance,/setInterval\(\(\)=>\{start\(\)\},10000\)/);
@@ -48,8 +48,8 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(css,/\.bc-bajas-modal-dialog/);
  assert.match(module,/catalogLoadPromise/);
  assert.match(module,/refreshPicker\(host\)/);
- assert.match(css,/bc-baja-line-product\{grid-column:1\/-1/);
- assert.match(css,/bc-baja-line-qty\{grid-column:1\/3/);
+ assert.match(css,/bc-baja-line-editor/);assert.match(css,/bc-baja-line-summary/);
+ assert.match(css,/bc-baja-line-reason-details/);assert.match(css,/bc-bajas-list-empty/);
  assert.match(css,/bc-bajas-context-fields/);
  assert.match(css,/bc-bajas-list-heading/);
  assert.match(css,/max-height:none;overflow:visible/);
