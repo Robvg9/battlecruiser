@@ -54,20 +54,28 @@
     originalRootOverflow = "";
   }
 
-  function activateModal(owner) {
-    var existing = activeModalStack.indexOf(owner);
+  function activateModal(owner, keydownHandler) {
+    var existing = -1;
+    for (var i = 0; i < activeModalStack.length; i += 1) {
+      if (activeModalStack[i].owner === owner) { existing = i; break; }
+    }
     if (existing >= 0) activeModalStack.splice(existing, 1);
-    activeModalStack.push(owner);
+    activeModalStack.push({ owner: owner, keydownHandler: keydownHandler });
   }
 
   function deactivateModal(owner) {
-    var existing = activeModalStack.indexOf(owner);
-    if (existing >= 0) activeModalStack.splice(existing, 1);
+    for (var i = activeModalStack.length - 1; i >= 0; i -= 1) {
+      if (activeModalStack[i].owner === owner) {
+        activeModalStack.splice(i, 1);
+        break;
+      }
+    }
   }
 
-  function isTopmostModal(owner) {
-    return activeModalStack.length > 0 && activeModalStack[activeModalStack.length - 1] === owner;
-  }
+  document.addEventListener("keydown", function(event) {
+    var active = activeModalStack.length ? activeModalStack[activeModalStack.length - 1] : null;
+    if (active && typeof active.keydownHandler === "function") active.keydownHandler(event);
+  }, true);
 
   function isUsable(element) {
     if (!element || element.disabled) return false;
@@ -132,7 +140,7 @@
     }
 
     function handleKeydown(event) {
-      if (!opened || !isTopmostModal(ownerToken)) return;
+      if (!opened) return;
 
       if (event.key === "Escape" && config.closeOnEscape) {
         event.preventDefault();
@@ -194,7 +202,7 @@
       open: function() {
         if (destroyed || opened) return false;
         opened = true;
-        activateModal(ownerToken);
+        activateModal(ownerToken, handleKeydown);
         var configuredReturnFocus = config.returnFocusSelector
           ? document.querySelector(config.returnFocusSelector)
           : null;
@@ -205,7 +213,6 @@
         element.setAttribute("aria-hidden", "false");
 
         if (config.lockScroll) acquireScrollLock(ownerToken);
-        document.addEventListener("keydown", handleKeydown, true);
         element.addEventListener("click", handleClick);
 
         callHook(config.onOpen, api);
@@ -219,7 +226,6 @@
         opened = false;
         deactivateModal(ownerToken);
 
-        document.removeEventListener("keydown", handleKeydown, true);
         element.removeEventListener("click", handleClick);
         if (config.hiddenClass) element.classList.add(config.hiddenClass);
         if (config.hiddenAttribute) element.hidden = true;
