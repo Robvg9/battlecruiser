@@ -85,6 +85,7 @@
     var config = Object.assign({
       dialogSelector: '[role="dialog"]',
       initialFocusSelector: null,
+      returnFocusSelector: null,
       closeSelector: null,
       backdropSelector: null,
       hiddenClass: "hidden",
@@ -176,7 +177,10 @@
       open: function() {
         if (destroyed || opened) return false;
         opened = true;
-        returnFocus = document.activeElement || null;
+        var configuredReturnFocus = config.returnFocusSelector
+          ? document.querySelector(config.returnFocusSelector)
+          : null;
+        returnFocus = configuredReturnFocus || document.activeElement || null;
 
         if (config.hiddenClass) element.classList.remove(config.hiddenClass);
         if (config.hiddenAttribute) element.hidden = false;
