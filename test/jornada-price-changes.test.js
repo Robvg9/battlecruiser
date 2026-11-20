@@ -79,3 +79,16 @@ test("Price-change UI is versioned, loaded in the app and precached for PWA star
   assert.match(app,/\["jornada-price-changes.js","1.0.1"\]/);
   assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.1/);
 });
+
+test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el segundo", () => {
+  const ui = fs.readFileSync(path.join(__dirname, "..", "public", "js", "jornada-price-changes.js"), "utf8");
+  assert.match(ui, /PASO 1 DE 2/);
+  assert.match(ui, /PASO 2 DE 2/);
+  assert.match(ui, /ownerSelectedIds/);
+  assert.match(ui, /bc-jpc-select-row/);
+  assert.match(ui, /Nuevo precio de venta/);
+  assert.match(ui, /Nuevo costo \(opcional\)/);
+  assert.match(ui, /Volver a productos/);
+  assert.match(ui, /humanContextLabel\(item\)/);
+  assert.doesNotMatch(ui, /responsable_id\)\.slice\(0,\s*8\)/);
+});
