@@ -10,7 +10,11 @@
     { key: 'transfer', label: 'Nueva transferencia', icon: '⇄', allowed: () => can('transferencias', 'crear') },
     { key: 'low-stock', label: 'Stock bajo', icon: '⚠️', allowed: () => can('reportes', 'ver') },
     { key: 'jornada', label: 'Jornada actual', icon: '🗓️', allowed: () => can('turnos', 'ver') },
-    { key: 'pending', label: 'Pendientes', icon: '📥', allowed: () => can('auditoria', 'ver') }
+    { key: 'pending', label: 'Pendientes', icon: '📥', allowed: () => can('auditoria', 'ver') },
+    { key: 'price-changes', label: 'Cambios de precio', icon: '💲', allowed: () => {
+      const api = window.__BC_JORNADA_PRICE_CHANGES_API__;
+      return !!(api && typeof api.canOpenOwnerModal === 'function' && api.canOpenOwnerModal());
+    } }
   ];
 
   function can(section, action) {
@@ -26,7 +30,8 @@
       '.bc-owner-quick-action{display:flex;align-items:center;justify-content:flex-start;gap:8px;min-width:0;min-height:42px;padding:7px 10px;border:1px solid var(--gold-dim);border-radius:9px;background:rgba(255,255,255,.025);color:var(--text);font-size:11.5px;font-weight:700;text-align:left;cursor:pointer}' +
       '.bc-owner-quick-action:hover,.bc-owner-quick-action:focus-visible{border-color:var(--gold);background:rgba(201,162,77,.08);outline:none}' +
       '.bc-owner-quick-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 25px;width:25px;height:25px;border-radius:7px;background:rgba(201,162,77,.12);font-size:15px}' +
-      '@media(min-width:760px){.bc-owner-quick-actions{grid-template-columns:repeat(5,minmax(0,1fr))}}' +
+      '@media(min-width:760px){.bc-owner-quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}' +
+      '@media(min-width:1120px){.bc-owner-quick-actions{grid-template-columns:repeat(6,minmax(0,1fr))}}' +
       '#tab-resumen .cc-estado{margin-bottom:9px!important;padding:10px 12px!important}' +
       '#tab-resumen .cc-dashboard-kpis{margin-bottom:10px!important;gap:7px!important}' +
       '#tab-resumen .cc-bloque{padding:10px 11px!important;margin-bottom:0!important}' +
@@ -86,6 +91,12 @@
     }
     if (key === 'pending' && can('auditoria', 'ver') && typeof window.irATab === 'function') {
       window.irATab('pendientes');
+      return;
+    }
+    if (key === 'price-changes') {
+      const api = window.__BC_JORNADA_PRICE_CHANGES_API__;
+      if (api && typeof api.canOpenOwnerModal === 'function' && api.canOpenOwnerModal() &&
+          typeof api.openOwnerModal === 'function') api.openOwnerModal();
     }
   }
 
@@ -105,6 +116,7 @@
       observer.observe(shell, { attributes: true, attributeFilter: ['data-bc-permisos-cargados'] });
     }
     window.addEventListener('bc:permissions-changed', ensure);
+    window.addEventListener('bc:price-changes-availability', ensure);
     window.__BC_OWNER_QUICK_ACTIONS_VERIFY__ = function () {
       const root = document.getElementById(ROOT_ID);
       return {
