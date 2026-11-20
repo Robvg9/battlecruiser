@@ -202,7 +202,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.match(app, /v9\.5\.133 — Administrative approval modal shared lifecycle integration/);
+  assert.match(app, /v9\.5\.133 — Version-aware PWA update notice and unified two-step operation flows/);
   assert.match(index, /<script src="app\.js\?v=9\.5\.133"><\/script>/);
   for (const asset of [
     'style.css?v=9.5.133',
@@ -222,7 +222,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/bc-modal-manager\.js\?v=1\.0/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.3/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.44/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.45/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');

@@ -21,8 +21,8 @@ BEGIN
       'almacen_id',s.almacen_id,
       'almacen_nombre',a.nombre,
       'fecha',s.fecha,
-      'fecha_inicio',jp.fecha,
-      'fecha_fin',coalesce(jp.fecha_fin,jp.fecha),
+      'fecha_inicio',coalesce((SELECT min(p2.fecha) FROM public.turno_jornada_programacion p2 WHERE p2.turno_id=s.turno_id AND p2.almacen_id=s.almacen_id AND p2.estado IN ('PROGRAMADA','DESCANSO')),s.fecha),
+      'fecha_fin',coalesce((SELECT max(p2.fecha) FROM public.turno_jornada_programacion p2 WHERE p2.turno_id=s.turno_id AND p2.almacen_id=s.almacen_id AND p2.estado IN ('PROGRAMADA','DESCANSO')),s.fecha),
       'responsable_id',jp.responsable_id,
       'productos',coalesce((
         SELECT jsonb_agg(jsonb_build_object(
