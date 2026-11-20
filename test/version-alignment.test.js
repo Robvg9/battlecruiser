@@ -170,8 +170,8 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["hotfix-configuracion-20260902\.js","20261020\.4"\]/);
   assert.match(app, /\["configuracion\.js","20261104\.1"\]/, "connectivity panel must bypass stale cached layout");
   assert.ok(index.includes('<script src="js/navegacion.js?v=9.5.65"></script>'), "canonical Jornada navigation needs a cache-busted script");
-  assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.64"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
-  assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.64/, "the fixed Turnos module must be available in the offline shell");
+  assert.match(index, /<script src="js\/operacion-humana\.js\?v=9\.5\.65"><\/script>/, "Turnos history must load the fixed warehouse-filter script");
+  assert.match(sw, /\.\/js\/operacion-humana\.js\?v=9\.5\.65/, "the fixed Turnos module must be available in the offline shell");
   assert.match(app, /\["bc-modal-manager\.js","1\.0"\]/);
   assert.match(app, /\["mi-cuenta\.js","1\.3"\]/);
   assert.ok(app.indexOf('["bc-modal-manager.js","1.0"]') < app.indexOf('["mi-cuenta.js","1.3"]'));
