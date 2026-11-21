@@ -164,6 +164,71 @@ test('successful same-origin shell requests are cached for subsequent offline us
   assert.ok(worker.entries.has(request.url), 'network response must be cached under its requested URL');
 });
 
+test('versioned JavaScript and CSS are served cache-first without a network revalidation', async () => {
+  let networkCalls = 0;
+  const worker = createWorker({
+    fetch: async function() {
+      networkCalls++;
+      return new Response('unexpected network response', { status: 200 });
+    }
+  });
+  const assets = [
+    new Request(ORIGIN + '/js/ventas.js?v=20261120.2'),
+    new Request(ORIGIN + '/style.css?v=9.5.135')
+  ];
+  for (const request of assets) {
+    await worker.cache.put(request, new Response('cached:' + new URL(request.url).pathname, { status: 200 }));
+  }
+
+  for (const request of assets) {
+    const response = await dispatchFetch(worker, request);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'cached:' + new URL(request.url).pathname);
+  }
+  assert.equal(networkCalls, 0, 'versioned assets should not revalidate a known release URL');
+});
+
+test('a missing versioned asset falls back to the network once and is cached under its exact URL', async () => {
+  let networkCalls = 0;
+  const worker = createWorker({
+    fetch: async function(request) {
+      networkCalls++;
+      return new Response('network:' + new URL(request.url).pathname, { status: 200 });
+    }
+  });
+  const request = new Request(ORIGIN + '/js/new-module.js?v=1.0.0');
+  const response = await dispatchFetch(worker, request);
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), 'network:/js/new-module.js');
+  assert.equal(networkCalls, 1);
+  assert.ok(worker.entries.has(request.url));
+});
+
+test('HTML documents and unversioned shell assets remain network-first', async () => {
+  let networkCalls = 0;
+  const worker = createWorker({
+    fetch: async function(request) {
+      networkCalls++;
+      const url = new URL(request.url);
+      return new Response('fresh:' + url.pathname, { status: 200 });
+    }
+  });
+  const requests = [
+    new Request(ORIGIN + '/index.html'),
+    new Request(ORIGIN + '/js/legacy-module.js')
+  ];
+  for (const request of requests) {
+    await worker.cache.put(request, new Response('stale:' + new URL(request.url).pathname, { status: 200 }));
+  }
+
+  for (const request of requests) {
+    const response = await dispatchFetch(worker, request);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'fresh:' + new URL(request.url).pathname);
+  }
+  assert.equal(networkCalls, 2, 'documents and unversioned resources must continue to revalidate');
+});
+
 test('offline fallback serves the exact cached app.js release URL', async () => {
   const worker = createWorker();
   await dispatchInstall(worker);

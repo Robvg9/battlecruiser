@@ -74,6 +74,12 @@ function isAppShellRequest(url) {
     path.endsWith("/");
 }
 
+function isVersionedStaticAsset(url) {
+  var path = url.pathname || "";
+  return (path.endsWith(".js") || path.endsWith(".css")) &&
+    url.searchParams.has("v");
+}
+
 function cacheSuccessfulResponse(request, response) {
   if (!response || !response.ok) return Promise.resolve(response);
   return caches.open(BC_STATIC).then(function(cache) {
@@ -152,6 +158,26 @@ self.addEventListener("fetch", function(event) {
   }
 
   if (isAppShellRequest(url)) {
+    if (isVersionedStaticAsset(url)) {
+      // A versioned JS/CSS URL is immutable for this release cache. The new
+      // release gets a fresh BC_STATIC bucket and precaches these exact URLs,
+      // so warm navigations should not revalidate 100+ modules over the network.
+      event.respondWith(caches.open(BC_STATIC).then(function(cache) {
+        return cache.match(request);
+      }).then(function(cached) {
+        if (cached) return cached;
+        return fetch(new Request(request, { cache: "no-store" })).then(function(response) {
+          return cacheSuccessfulResponse(request, response);
+        }).catch(function() {
+          return cachedFallback(request);
+        });
+      }).catch(function() {
+        // If Cache Storage is unavailable, preserve online loading.
+        return fetch(new Request(request, { cache: "no-store" }));
+      }));
+      return;
+    }
+
     var freshRequest;
     if (request.mode === "navigate") {
       // A navigation Request has mode "navigate" and cannot be cloned with a new
