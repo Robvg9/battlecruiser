@@ -5,7 +5,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const ROOT=path.join(__dirname,"..");
 const read=file=>fs.readFileSync(path.join(ROOT,file),"utf8");
-const migration=read("supabase/migrations/20261121180000_jornada_operational_close_and_transfer_attribution.sql");
+const migration=read("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
 const ui=read("public/js/bc7-jornada-ui.js");
 const owner=read("public/js/jornada-owner-review.js");
 
