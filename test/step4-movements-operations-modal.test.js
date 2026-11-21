@@ -48,10 +48,29 @@ function setup(t) {
       getSession: async () => ({ data: { session: { user: { id: "owner-fixture" }, access_token: "test-access-token" } }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
     },
-    rpc: async (name) => ({ data: [
-      { id: "s1", producto_id: "p1", almacen_id: "a", cantidad: 40, minimo: 0 },
-      { id: "s2", producto_id: "p2", almacen_id: "a", cantidad: 25, minimo: 0 }
-    ], error: null })
+    rpc: async (name) => {
+      if (name === "listar_receptores_transferencia") {
+        return { data: [{ id: "receiver-1", nombre: "Sheila Dependienta" }], error: null };
+      }
+      if (name === "obtener_transferencia_compartir") {
+        return {
+          data: {
+            fecha: "2026-11-21T10:00:00.000Z",
+            almacen: "Tu mejor opción",
+            recibe: "Sheila Dependienta",
+            lineas: [
+              { nombre: "Producto 1", cantidad: 2 },
+              { nombre: "Producto 2", cantidad: 3 }
+            ]
+          },
+          error: null
+        };
+      }
+      return { data: [
+        { id: "s1", producto_id: "p1", almacen_id: "a", cantidad: 40, minimo: 0 },
+        { id: "s2", producto_id: "p2", almacen_id: "a", cantidad: 25, minimo: 0 }
+      ], error: null };
+    }
   };
   window.__BC_TRANSFER_STOCK_CONFIRMED__ = true;
   window.__BC_TRANSFER_STOCK_USER_ID__ = "owner-fixture";
@@ -175,6 +194,12 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   const panel = modal.querySelector("#movimiento-multiple-panel");
   panel.querySelector("#mov-multiple-origen").value = "a";
   panel.querySelector("#mov-multiple-destino").value = "b";
+  const receiver = panel.querySelector("#mov-multiple-recibido-por");
+  for (let attempt = 0; attempt < 30 && receiver.options.length < 2; attempt++) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.ok(receiver.options.length >= 2, "el catálogo debe cargar responsables activos");
+  receiver.value = "receiver-1";
 
   for (const id of ["p1", "p2"]) {
     const checkbox = panel.querySelector('[data-mov-select="' + id + '"]');
@@ -201,7 +226,10 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   );
   assert.equal(window.__transferCalls[0].payload.p_origen_id, "a");
   assert.equal(window.__transferCalls[0].payload.p_destino_id, "b");
+  assert.equal(window.__transferCalls[0].payload.p_recibido_por, "receiver-1");
   assert.match(panel.querySelector("#mov-multiple-msg").textContent, /una sola operación/);
+  assert.ok(panel.querySelector("#mov-transfer-share-btn"), "el comprobante solo aparece tras registrar la transferencia");
+  assert.match(panel.querySelector("#mov-transfer-share").textContent, /Compartir por WhatsApp/);
 });
 
 test("Transferencias: permisos y disponibilidad de stock se validan antes de enviar", (t) => {
