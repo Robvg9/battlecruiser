@@ -202,20 +202,20 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.ok(app.includes("// v9.5.138 — Restore accessible header icon controls after legacy modules initialize."));
+  assert.ok(app.includes("// v9.5.138 — Storage inventory audit and transfer sharing after legacy modules initialize."));
   assert.ok(index.includes('<script src="app.js?v=9.5.138"></script>'));
   for (const asset of [
     'style.css?v=9.5.138',
     'js/centro-control.js?v=9.5.71',
     'js/navegacion.js?v=9.5.65',
-    'js/mando.js?v=9.5.64',
+    'js/mando.js?v=9.5.138',
     'js/operacion-humana.js?v=9.5.65',
     'js/comunicacion.js?v=9.5.65',
   ]) assert.ok(index.includes(asset), 'index must load versioned preview asset ' + asset);
   for (const asset of [
     './js/centro-control.js?v=9.5.71',
     './js/navegacion.js?v=9.5.65',
-    './js/mando.js?v=9.5.64',
+    './js/mando.js?v=9.5.138',
     './js/operacion-humana.js?v=9.5.65',
     './js/comunicacion.js?v=9.5.65',
   ]) assert.ok(sw.includes(asset), 'Service Worker must precache versioned preview asset ' + asset);
