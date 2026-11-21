@@ -186,7 +186,7 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   assert.notEqual(multiple, -1, "app.js debe cargar el módulo de transferencias múltiples");
   assert.ok(multiple < modal, "el panel múltiple debe existir antes de inicializar el modal");
   assert.ok(modal < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
-  assert.match(sw, /movimiento-multiple\.js\?v=20261121\.1/);
+  assert.match(sw, /movimiento-multiple\.js\?v=20261121\.2/);
 });test("Transferencias: seleccionar primero y definir cantidades después registra una sola operación", async (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="transferencias"]').click();

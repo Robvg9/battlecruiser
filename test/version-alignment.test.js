@@ -193,7 +193,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/productos\.js\?v=20261118.1"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261118.1/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.118"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.120"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/bc-modal-manager\.js\?v=1\.0"><\/script>/);
@@ -202,7 +202,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.ok(app.includes("// v9.5.142 — Color-coded jornada statuses and single modern transfer picker."));
+  assert.ok(app.includes("// v9.5.142 — Protected preview proxy and offline-first read-only test mode."));
   assert.ok(index.includes('<script src="app.js?v=9.5.142"></script>'));
   for (const asset of [
     'style.css?v=9.5.142',
