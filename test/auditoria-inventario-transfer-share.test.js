@@ -133,6 +133,10 @@ test("Physical count creation and database write guard exclude retail stores", (
   assert.match(migration, /interval '4 hours'/);
   assert.match(migration, /bc_registrar_baja_auditoria_inventario/);
   assert.match(moduleSource, /El stock no fue modificado/);
+  assert.match(moduleSource, /let draftCounts = Object\.create\(null\)/);
+  assert.match(moduleSource, /Object\.entries\(draftCounts\)/);
+  assert.match(moduleSource, /for \(const line of currentDetail\.lineas\)/);
+  assert.match(moduleSource, /Usa la búsqueda para localizar los que faltan/);
 });
 
 test("Physical audit module is mounted separately from Jornada and excludes minorista inventory in its selector", () => {
