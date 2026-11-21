@@ -81,7 +81,7 @@ test("Operations preserves primary action nodes across permission refreshes and 
     "unchanged permissions must not replace primary action nodes");
 
   gasto.click();
-  const modal = doc.getElementById("bc-op-modal-backdrop");
+  const modal = doc.getElementById("bc-op-modal");
   assert.ok(modal, "one primary click must synchronously open the Gasto modal");
   assert.match(modal.textContent, /Registrar gasto/);
 });
