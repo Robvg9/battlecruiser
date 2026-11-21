@@ -146,7 +146,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
   assert.ok(approvalVersion, "admin approvals module must expose its cache version");
   assert.equal(swVersion[1], appVersion[1], "app and Service Worker release versions must match");
   assert.match(app, /m53-inventario-centro\.js","53\.9/);
-  assert.match(app, /ui-operaciones-hub\.js","43\.4/);
+  assert.match(app, /ui-operaciones-hub\.js","43\.5/);
   assert.ok(app.includes('["operaciones-financieras.js","20261108.5"]'));
   assert.ok(app.includes('["aprobaciones-admin.js","20261120.3"]'));
   assert.match(app, /inventario-detalle\.js","72"/);
@@ -163,7 +163,7 @@ test("Release cache keys and Service Worker precache match the modified inventor
     "inventario-detalle.js?v=72",
     "operaciones-financieras.js?v=20261108.5",
     "bc7-jornada-ui.js?v=7.45",
-    "ui-operaciones-hub.js?v=43.4",
+    "ui-operaciones-hub.js?v=43.5",
     "almacenes.js?v=20261111.1",
     "m53-inventario-centro.js?v=53.9",
     "movimiento-multiple.js?v=20261120.1",
