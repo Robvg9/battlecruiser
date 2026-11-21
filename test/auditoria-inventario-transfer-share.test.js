@@ -142,3 +142,14 @@ test("Physical audit module is mounted separately from Jornada and excludes mino
   assert.match(worker, /auditoria-inventario\.js\?v=1\.0/);
   assert.match(worker, /BC_SW_VERSION = "9\.5\.138"/);
 });
+
+
+test("Multi-product retail transfers also require and persist the receiving person", () => {
+  const multi = read("public/js/movimiento-multiple.js");
+  assert.match(multi, /mov-transfer-receiver-wrap/);
+  assert.match(multi, /bc_listar_responsables_transferencia/);
+  assert.match(multi, /selectors\.receiver\.value/);
+  assert.match(multi, /transferPayload\.p_responsable_receptor_id = receiverId/);
+  assert.match(multi, /'transferencia_receptor'/);
+  assert.match(multi, /movimiento-multiple\.js/);
+});
