@@ -10,7 +10,7 @@ function fixture(){
  const html=[
   "<!doctype html><html><head></head><body><div id='app-shell' class='visible'>",
   "<header class='app-header'><div class='header-left'><button id='sidebar-toggle-btn'>☰</button><h1>Battlecruiser</h1></div>",
-  "<div class='header-right'><div id='conn-status-app'><span id='conn-text-app'>Conectado</span></div><span id='cola-pendientes-badge'></span><span id='user-email'>Roberto · Dueño</span><button id='mi-cuenta-btn'>Mi Cuenta</button><button id='logout-btn'>Cerrar sesión</button></div></header>",
+  "<div class='header-right'><div id='conn-status-app'><span id='conn-text-app'>Conectado</span></div><span id='cola-pendientes-badge'></span><span id='user-email'>Roberto · Dueño</span><button id='mi-cuenta-btn' type='button' aria-label='Mi cuenta' title='Mi cuenta'><svg viewBox='0 0 24 24'><circle cx='12' cy='8' r='3.4'></circle><path d='M5 20c.6-3.4 3.2-5.4 7-5.4s6.4 2 7 5.4'></path></svg></button><button id='logout-btn' type='button' aria-label='Cerrar sesión' title='Cerrar sesión'><svg viewBox='0 0 24 24'><path d='M13 4h6v16h-6'></path><path d='M3 12h11'></path><path d='m10 8 4 4-4 4'></path></svg></button></div></header>",
   "<section id='tab-productos' class='tab-panel'><div id='bc-productos-barra'><div class='bc-productos-search'><input id='productos-buscar'></div>",
   "<div id='bc-productos-controles'><div id='bc-productos-orden'><button>A–Z</button><button>Z–A</button></div><div id='bc-productos-vista'><button>Filas</button><button>Cuadros</button></div>",
   "<button type='button' id='bc-productos-agregar'>Registrar nuevo producto</button><button type='button'>Agregar producto</button></div></div>",
@@ -32,9 +32,21 @@ test("header is compact and retains account, logout, connection and user context
  const c=fixture();t.after(()=>c.dom.window.close());
  const css=c.document.getElementById("bc-m75-products-compact-style").textContent;
  assert.match(css,/grid-template-areas:"brand account logout" "status queue user"/);
- assert.equal(c.document.getElementById("logout-btn").textContent,"Salir");
- assert.equal(c.document.getElementById("logout-btn").getAttribute("aria-label"),"Cerrar sesión");
- assert.equal(c.document.getElementById("mi-cuenta-btn").textContent,"Mi cuenta");
+ const logout = c.document.getElementById("logout-btn");
+ const account = c.document.getElementById("mi-cuenta-btn");
+ const logoutSvg = logout.querySelector("svg");
+ const accountSvg = account.querySelector("svg");
+ assert.ok(logoutSvg, "logout starts with its SVG icon");
+ assert.ok(accountSvg, "account starts with its SVG icon");
+ assert.equal(logout.textContent.trim(),"");
+ assert.equal(account.textContent.trim(),"");
+ assert.equal(logout.getAttribute("aria-label"),"Cerrar sesión");
+ assert.equal(account.getAttribute("aria-label"),"Mi cuenta");
+ c.window.__BCM75_apply();
+ assert.strictEqual(logout.querySelector("svg"),logoutSvg,"M75 retries must preserve the logout SVG node");
+ assert.strictEqual(account.querySelector("svg"),accountSvg,"M75 retries must preserve the account SVG node");
+ assert.equal(logout.childElementCount,1);
+ assert.equal(account.childElementCount,1);
  assert.ok(c.document.getElementById("conn-status-app"));
  assert.equal(c.document.getElementById("user-email").textContent,"Roberto · Dueño");
 });
@@ -74,7 +86,7 @@ function nativeModalFixture(){
  const html=[
   "<!doctype html><html><head></head><body><div id='app-shell' class='visible'>",
   "<header class='app-header'><div class='header-left'><button id='sidebar-toggle-btn'>☰</button><h1>Battlecruiser</h1></div>",
-  "<div class='header-right'><div id='conn-status-app'><span id='conn-text-app'>Conectado</span></div><span id='cola-pendientes-badge'></span><span id='user-email'>Roberto · Dueño</span><button id='mi-cuenta-btn'>Mi Cuenta</button><button id='logout-btn'>Cerrar sesión</button></div></header>",
+  "<div class='header-right'><div id='conn-status-app'><span id='conn-text-app'>Conectado</span></div><span id='cola-pendientes-badge'></span><span id='user-email'>Roberto · Dueño</span><button id='mi-cuenta-btn' type='button' aria-label='Mi cuenta' title='Mi cuenta'><svg viewBox='0 0 24 24'><circle cx='12' cy='8' r='3.4'></circle><path d='M5 20c.6-3.4 3.2-5.4 7-5.4s6.4 2 7 5.4'></path></svg></button><button id='logout-btn' type='button' aria-label='Cerrar sesión' title='Cerrar sesión'><svg viewBox='0 0 24 24'><path d='M13 4h6v16h-6'></path><path d='M3 12h11'></path><path d='m10 8 4 4-4 4'></path></svg></button></div></header>",
   "<section id='tab-productos' class='tab-panel'>",
   "<div id='msg-productos'></div><div id='msg-prod-imagen'></div><input id='productos-buscar'>",
   "<div id='lista-productos'></div>",
