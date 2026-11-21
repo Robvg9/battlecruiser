@@ -166,7 +166,7 @@ async function listarResponsablesTransferencia() {
     const { data, error } = await client.rpc("bc_listar_responsables_transferencia");
     if (error) throw error;
     _responsablesTransferencia = (Array.isArray(data) ? data : [])
-      .filter((usuario) => usuario && usuario.id && usuario.activo === true && usuario.archivado !== true)
+      .filter((usuario) => usuario && usuario.id && usuario.nombre)
       .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
     return _responsablesTransferencia;
   })();
