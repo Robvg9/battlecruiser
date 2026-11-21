@@ -109,6 +109,8 @@ test("Retail destinations require a receiver-aware RPC and preserve it in the of
   assert.match(offline, /transferencia_receptor:\s*"registrar_transferencia_con_receptor"/);
   assert.match(offline, /case "transferencia_receptor"/);
   assert.match(migration, /responsable_receptor_id uuid REFERENCES public\.usuarios\(id\)/);
+  assert.match(migration, /responsable_receptor_nombre text/);
+  assert.match(migration, /responsable_receptor_nombre = coalesce\(responsable_receptor_nombre,v_nombre_receptor\)/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.registrar_transferencia_con_receptor/);
   assert.match(migration, /p_responsable_receptor_id/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc_mensaje_transferencia/);
