@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.141 — Offline-first shell, local profile recovery and pending operation safeguards.
+// v9.5.142 — Protected preview proxy and offline-first read-only test mode.
 (function hotfixV9475(){
-  const VERSION="9.5.141";
+  const VERSION="9.5.142";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");

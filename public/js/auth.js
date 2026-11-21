@@ -654,13 +654,15 @@ client.auth.onAuthStateChange(function (event, session) {
 function bcUsernameLoginEndpoint() {
   // The shared PR preview is a different origin from production. Route only
   // that exact host through its isolated Worker proxy; LIVE keeps direct Supabase.
-  return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
+  return ["https://bc-pr-224-battlecruiser.robvg9.workers.dev",
+    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"].includes(window.location.origin)
     ? "/__bc_preview/functions/v1/bc-username-login"
     : SUPABASE_URL + "/functions/v1/bc-username-login";
 }
 
 function bcPasswordRecoveryEndpoint() {
-  return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
+  return ["https://bc-pr-224-battlecruiser.robvg9.workers.dev",
+    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"].includes(window.location.origin)
     ? "/__bc_preview/functions/v1/bc-password-recovery-admin"
     : SUPABASE_URL + "/functions/v1/bc-password-recovery-admin";
 }

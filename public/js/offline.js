@@ -1164,6 +1164,10 @@ async function ejecutarOperacion(tipo, payload) {
     return { ok: true, offline: true, operacion };
   }
 
+  if (window.__BC_PREVIEW_READ_ONLY__ === true) {
+    // Preview writes stay in IndexedDB and are never sent to the production project.
+    return encolar();
+  }
   if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true) {
     marcarConectividadReal("offline");
     return encolar();
@@ -1365,7 +1369,8 @@ function sincronizandoGlobal(activo) {
 }
 
 async function procesarColaSincronizacion() {
-  if (window.__BC_OFFLINE_AUTH__ === true) return;
+  // Preview operations are never replayed against LIVE.
+  if (window.__BC_PREVIEW_READ_ONLY__ === true || window.__BC_OFFLINE_AUTH__ === true) return;
   if (_sincronizando) return;
   // Bind one drain pass to the user who started it. An IndexedDB await can
   // outlive logout/login, so filtering only the initial queue snapshot is not
@@ -1385,7 +1390,7 @@ async function procesarColaSincronizacion() {
     if (usuarioIdParaCola() !== usuarioIdSincronizacion) return;
 
     for (const op of operaciones) {
-      if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true) break;
+      if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true || window.__BC_PREVIEW_READ_ONLY__ === true) break;
       if (usuarioIdParaCola() !== usuarioIdSincronizacion) break;
       // Fail closed if the stored owner does not match the identity bound to
       // this pass, even if a future query/index regression returns a foreign op.
