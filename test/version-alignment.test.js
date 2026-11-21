@@ -185,10 +185,10 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(app.includes('["m27-6-ventas-presentaciones.js","27.6g"]'));
   assert.ok(sw.includes("./js/m27-5-ventas-precio-politica.js?v=27.5b7"));
   assert.ok(sw.includes("./js/m27-6-ventas-presentaciones.js?v=27.6g"));
-  assert.match(app, /\["m75-productos-ui-compacto\.js","75\\.13"\]/, "M75 must load with its refreshed module cache key");
+  assert.ok(app.includes('["m75-productos-ui-compacto.js","75.13"]'));
   assert.ok(app.includes('["m76-movimientos-operaciones.js","76.3"]'), "M76 must group the movement history by operation");
   assert.ok(sw.includes("./js/m76-movimientos-operaciones.js?v=76.3"), "M76 must be precached for offline use");
-  assert.match(sw, /\.\/js\/m75-productos-ui-compacto\.js\?v=75\\.13/, "the offline shell must precache the same M75 module version");
+  assert.ok(sw.includes("./js/m75-productos-ui-compacto.js?v=75.13"));
   assert.match(m26, /function fijarNomenclaturaSoloProductos\(\) \{ return false; \}/, "M26 must leave the single presentations panel in Administration");
   assert.match(index, /<script src="js\/productos\.js\?v=20261118.1"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261118.1/, "the offline shell must precache the updated product module version");
@@ -306,9 +306,9 @@ test('Conectividad compacta: estilos y recursos críticos comparten caché renov
 test('Administration UI modules refresh their cache keys', () => {
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["roles-en-usuarios\.js","33\.7"\]/);
-  assert.match(app, /\["m75-productos-ui-compacto\.js","75\\.13"\]/);
+  assert.ok(app.includes('["m75-productos-ui-compacto.js","75.13"]'));
   assert.match(sw, /m26-ui-integridad\.js\?v=26\.41/);
-  assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\\.13/);
+  assert.ok(sw.includes("./js/m75-productos-ui-compacto.js?v=75.13"));
   assert.match(sw, /catalogos\.js\?v=20261106\.1/);
 });
 
@@ -333,6 +333,6 @@ test("M75 keeps the account/logout SVG buttons intact while applying accessible 
   assert.ok(!m75.includes("account.textContent = 'Mi cuenta'"));
   assert.match(m75, /logout\.setAttribute\('aria-label', 'Cerrar sesión'\)/);
   assert.match(m75, /account\.setAttribute\('aria-label', 'Mi cuenta'\)/);
-  assert.match(app, /\["m75-productos-ui-compacto\.js","75\.13"\]/);
-  assert.match(sw, /m75-productos-ui-compacto\.js\?v=75\.13/);
+  assert.ok(app.includes('["m75-productos-ui-compacto.js","75.13"]'));
+  assert.ok(sw.includes("./js/m75-productos-ui-compacto.js?v=75.13"));
 });
