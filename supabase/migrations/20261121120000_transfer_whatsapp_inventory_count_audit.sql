@@ -395,6 +395,7 @@ begin
   if auth.uid() is null or not (
     public.bc_actor_is_admin()
     or public.tiene_permiso('auditoria','crear')
+    or public.tiene_permiso('auditoria','editar_any')
   ) then
     raise exception 'Sin permiso para registrar conteos físicos' using errcode = '42501';
   end if;
