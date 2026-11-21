@@ -60,7 +60,7 @@ test("PWA loader: app.js has one authoritative version per module", () => {
     "bc-modal-manager.js": "1.0",
     "mi-cuenta.js": "1.3",
     "compra-multiple.js": "27.17",
-    "movimiento-multiple.js": "20261121.1",
+    "movimiento-multiple.js": "20261121.2",
     "inventario-detalle.js": "72",
   };
   for (const [name, version] of Object.entries(expected)) {
