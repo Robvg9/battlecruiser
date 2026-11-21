@@ -645,6 +645,9 @@
     const finalSaved=!!declaration&&(!tramoId||String(declaration.turno_tramo_id)===String(tramoId));
     const today=dateHavana();
     let html='<div class="bc7-list">';
+    if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&!declaration){
+      html+='<div class="bc7-note"><b>Transcribir declaración de efectivo de la responsable</b><p>Registra el importe que la responsable comunicó o dejó documentado. Esto no es el conteo físico del Dueño. El conteo real se registra en un paso separado.</p><form data-bc7-admin-cash-declaration="'+esc(sessionId)+'"><label class="bc7-field">Importe declarado por la responsable (CUP)<input data-bc7-admin-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></label><label class="bc7-field">Fuente / observación obligatoria<input data-bc7-admin-cash-note maxlength="1000" required placeholder="Ej.: importe comunicado por la responsable al entregar el efectivo"></label><div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar declaración transcrita</button></div><p class="bc7-msg" data-bc7-admin-cash-msg></p></form></div>';
+    }
     for(let index=0;index<totalDays;index++){
       const date=addDays(firstDate,index),isFinal=date===lastDate;
       const row=rows.find(item=>String(item.fecha||'').slice(0,10)===date);
@@ -803,6 +806,35 @@
     }finally{
       busy(saveButton,false);
     }
+  }
+  async function saveAdminCashDeclaration(form){
+    const sessionId=String(form?.dataset?.bc7AdminCashDeclaration||'');
+    const amountInput=form?.querySelector('[data-bc7-admin-cash-amount]');
+    const noteInput=form?.querySelector('[data-bc7-admin-cash-note]');
+    const amount=amountInput&&amountInput.value.trim()!==''?Number(amountInput.value):NaN;
+    const note=String(noteInput?.value||'').trim();
+    const message=form?.querySelector('[data-bc7-admin-cash-msg]');
+    const button=form?.querySelector('button[type="submit"]');
+    if(!state.admin||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='CERRADA_OPERATIVAMENTE'){
+      msg(message,'Solo ADMIN puede transcribir una declaración de efectivo después del sello operativo.','error');return false;
+    }
+    if(!Number.isFinite(amount)||amount<0||note.length<5){
+      msg(message,'Introduce un importe válido y una fuente/observación de al menos 5 caracteres.','error');return false;
+    }
+    if(!confirm('Se registrará el importe declarado por la responsable según la fuente indicada. No se guardará todavía ningún conteo físico. ¿Confirmas?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_admin_transcribir_declaracion_dinero',{
+        p_turno_sesion_id:sessionId,p_monto:amount,p_observacion:note
+      });
+      const loaded=await openWorkspace(sessionId);
+      if(!loaded)throw new Error('La declaración fue enviada pero no se pudo recargar la Jornada.');
+      setStatus('Declaración transcrita y auditada. El conteo físico del Dueño sigue separado.','ok');
+      return true;
+    }catch(error){
+      msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');
+      return false;
+    }finally{busy(button,false);}
   }
   async function countFinalCash(form){
     const declarationId=String(form?.dataset?.bc7FinalCashCount||'');
@@ -2150,9 +2182,6 @@
        state.detail.sesion?.es_minorista!==true){
       msg(message,'La Jornada cambió o ya no está operativamente abierta. Actualiza antes de continuar.','error');return false;
     }
-    if(!state.admin&&!state.isAssigned&&String(state.detail.sesion?.responsable_id||'')!==String(state.userId||'')){
-      msg(message,'Solo el responsable asignado o ADMIN puede sellar la operación.','error');return false;
-    }
     if(!confirm('Se cerrará únicamente la operación de esta Jornada. No se registrará inventario final, declaración de efectivo ni aprobación. La Jornada quedará pendiente de conciliación del Dueño. ¿Continuar?'))return false;
     if(!busy(button,true))return false;
     try{
@@ -2866,6 +2895,7 @@
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
+    else if(f.matches('[data-bc7-admin-cash-declaration]')){e.preventDefault();await saveAdminCashDeclaration(f);}
     else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
   });
   document.addEventListener('change',function(e){
