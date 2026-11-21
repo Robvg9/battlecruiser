@@ -454,11 +454,8 @@ declare
   v_sin_motivo integer;
   v_estado text;
 begin
-  if auth.uid() is null or not (
-    public.bc_actor_is_admin()
-    or public.tiene_permiso('auditoria','editar_any')
-  ) then
-    raise exception 'Solo un responsable autorizado puede finalizar el conteo.' using errcode = '42501';
+  if auth.uid() is null then
+    raise exception 'Sesión no autenticada' using errcode = '42501';
   end if;
 
   select * into v_auditoria
@@ -468,6 +465,14 @@ begin
 
   if not found or v_auditoria.estado <> 'ABIERTA' then
     raise exception 'La auditoría no está abierta.';
+  end if;
+
+  -- The creator can always close the count they started. Admins and users
+  -- with the cross-audit edit permission can close any open count.
+  if v_auditoria.creado_por <> auth.uid()
+    and not public.bc_actor_is_admin()
+    and not public.tiene_permiso('auditoria','editar_any') then
+    raise exception 'Solo quien inició el conteo o un responsable autorizado puede finalizarlo.' using errcode = '42501';
   end if;
 
   select
@@ -530,6 +535,8 @@ begin
   if auth.uid() is null or not (
     public.bc_actor_is_admin()
     or public.tiene_permiso('auditoria','ver')
+    or public.tiene_permiso('auditoria','crear')
+    or public.tiene_permiso('auditoria','editar_any')
   ) then
     raise exception 'Sin permiso para consultar auditorías de inventario' using errcode = '42501';
   end if;
@@ -570,6 +577,8 @@ begin
   if auth.uid() is null or not (
     public.bc_actor_is_admin()
     or public.tiene_permiso('auditoria','ver')
+    or public.tiene_permiso('auditoria','crear')
+    or public.tiene_permiso('auditoria','editar_any')
   ) then
     raise exception 'Sin permiso para consultar detalle de auditoría' using errcode = '42501';
   end if;

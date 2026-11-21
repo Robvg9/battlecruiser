@@ -18,6 +18,8 @@ test("physical audit is limited server-side to storage warehouses", () => {
   assert.match(migration, /before insert or update or delete on public\.stock/i);
   assert.match(migration, /for share/i);
   assert.match(inventoryUi, /w\.tipo === 'almacenamiento'/);
+  assert.match(migration, /v_auditoria\.creado_por <> auth\.uid\(\)/);
+  assert.match(migration, /public\.tiene_permiso\('auditoria','crear'\)/);
 });
 
 test("physical audit snapshots zero stock and distinguishes not-counted from zero", () => {
