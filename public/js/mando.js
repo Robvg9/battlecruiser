@@ -87,10 +87,20 @@ function etiquetaEstadoAuditoria(estado) {
 function textoDescripcionAuditoria(fila) {
   const original = String(fila.descripcion || "").trim();
   const sinUuid = original.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi, "").replace(/\s*[·:#-]\s*$/, "").trim();
+  const tipo = String(fila.tipo || "");
+  if (tipo === "transferencia" && /^transferencia registrada/i.test(sinUuid)) {
+    return "Transferencia registrada entre almacenes";
+  }
+  if (tipo === "compra" && /^compra registrada/i.test(sinUuid)) {
+    return "Compra de mercancía registrada";
+  }
+  if (tipo === "venta" && /^venta registrada/i.test(sinUuid)) {
+    return "Venta registrada";
+  }
   if (sinUuid && !/^(operación|movimiento)\s+(compra|venta|transferencia|vale)\s+(ejecutada|registrada)/i.test(sinUuid)) {
     return sinUuid;
   }
-  return etiquetaTipoAuditoria(fila.tipo);
+  return etiquetaTipoAuditoria(tipo);
 }
 
 function renderAuditoria(filas) {
