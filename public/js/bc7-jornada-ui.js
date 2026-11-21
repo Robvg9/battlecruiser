@@ -740,7 +740,7 @@
       if(board)renderMonthCalendar(month,data);
       renderCalendarDetail(state.calendarSelectedDate,data);
       if(list){
-        list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este mes.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
+        list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango mensual.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
       }
     }catch(e){
       state.rows=[];
