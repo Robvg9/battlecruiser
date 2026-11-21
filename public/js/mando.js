@@ -70,6 +70,8 @@ function etiquetaTipoAuditoria(tipo) {
     sincronizacion: "Sincronización"
   };
   if (labels[tipo]) return labels[tipo];
+  if (/^producto/.test(String(tipo || ""))) return "Producto";
+  if (/^usuario_/.test(String(tipo || ""))) return "Usuarios";
   const readable = String(tipo || "Actividad").replace(/[_-]+/g, " ").trim();
   return readable ? readable.charAt(0).toUpperCase() + readable.slice(1) : "Actividad";
 }
@@ -204,15 +206,41 @@ function renderPaginacionAuditoria(cargadas) {
 }
 
 function poblarFiltrosAuditoria() {
-  const tipos = ["compra", "venta", "transferencia", "vale", "producto", "usuario_rol", "usuario_estado", "sincronizacion"];
-  const estados = ["exito", "pendiente", "requiere_atencion", "error"];
+  const tipos = [
+    ["compra", "Compras"],
+    ["venta", "Ventas"],
+    ["transferencia", "Transferencias"],
+    ["vale", "Vales de salida"],
+    ["producto", "Productos"],
+    ["producto_actualizar", "Actualizaciones de producto"],
+    ["producto_crear", "Productos creados"],
+    ["usuario_rol", "Roles de usuario"],
+    ["usuario_estado", "Estado de usuario"],
+    ["sincronizacion", "Sincronización"]
+  ];
+  const estados = [
+    ["exito", "Correcto"],
+    ["pendiente", "Pendiente"],
+    ["requiere_atencion", "Requiere revisión"],
+    ["error", "Error"]
+  ];
   const selTipo = document.getElementById("filtro-aud-tipo");
   const selEstado = document.getElementById("filtro-aud-estado");
   if (selTipo && selTipo.options.length <= 1) {
-    tipos.forEach((t) => { const o = document.createElement("option"); o.value = t; o.textContent = t; selTipo.appendChild(o); });
+    tipos.forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      selTipo.appendChild(option);
+    });
   }
   if (selEstado && selEstado.options.length <= 1) {
-    estados.forEach((e) => { const o = document.createElement("option"); o.value = e; o.textContent = e; selEstado.appendChild(o); });
+    estados.forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      selEstado.appendChild(option);
+    });
   }
 }
 
