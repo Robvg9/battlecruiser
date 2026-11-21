@@ -492,6 +492,7 @@ const ETIQUETA_TIPO_OP = {
   venta: "Venta",
   venta_jornada: "Venta de Jornada",
   transferencia: "Transferencia",
+  transferencia_receptor: "Transferencia a almacén minorista",
   vale: "Vale de salida",
   producto: "Creación de producto",
   producto_actualizar: "Edición de producto",
