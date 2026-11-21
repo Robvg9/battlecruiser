@@ -12,6 +12,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 test("Transfer WhatsApp report uses the exact stored delivery data and requested field order", () => {
   const source = read("public/js/transferencias.js");
   const sandbox = {
+    safeInit: () => {},
     window: {
       numberFmt: (value) => String(value),
       addEventListener: () => {},
@@ -66,6 +67,7 @@ test("Transfer WhatsApp report uses the exact stored delivery data and requested
 test("Share formatter rejects a report without a receiving person or product lines", () => {
   const source = read("public/js/transferencias.js");
   const sandbox = {
+    safeInit: () => {},
     window: { numberFmt: (value) => String(value), addEventListener: () => {} },
     document: {},
     navigator: {},
