@@ -388,6 +388,15 @@
       <form id="form-transferencia" class="inline-form">
         <select id="trf-origen" required></select>
         <select id="trf-destino" required></select>
+        <div id="trf-responsable-receptor-wrap" class="trf-responsable-receptor-wrap hidden">
+          <label for="trf-responsable-receptor">
+            <span>Responsable que recibe la mercancía</span>
+            <select id="trf-responsable-receptor">
+              <option value="">Selecciona quién recibe…</option>
+            </select>
+          </label>
+          <p class="muted">Obligatorio cuando el destino es un almacén minorista.</p>
+        </div>
         <select id="trf-producto" required></select>
         <input id="trf-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Transferir</button>
@@ -618,6 +627,39 @@
         <div id="mando-auditoria" class="lista" aria-live="polite"></div>
         <div class="mando-paginacion" id="mando-paginacion"></div>
       </div>
+
+      <section class="cc-bloque bc-auditoria-inv-shell" aria-labelledby="bc-auditoria-inv-title">
+        <div class="bc-auditoria-inv-header">
+          <div>
+            <h3 id="bc-auditoria-inv-title">Conteo físico de inventario</h3>
+            <p class="muted">Auditorías independientes de Jornada, disponibles solo en almacenes de almacenamiento.</p>
+          </div>
+        </div>
+        <div id="mando-auditoria-inventario">
+          <div class="bc-auditoria-inv-create">
+            <label for="bc-auditoria-inv-warehouse">
+              <span>Almacén de almacenamiento</span>
+              <select id="bc-auditoria-inv-warehouse" required>
+                <option value="">Cargando almacenes…</option>
+              </select>
+            </label>
+            <label for="bc-auditoria-inv-note">
+              <span>Observación (opcional)</span>
+              <input id="bc-auditoria-inv-note" type="text" maxlength="500" placeholder="Motivo o referencia de este conteo">
+            </label>
+            <button type="button" class="cc-accion primary" data-audit-create>Iniciar conteo físico</button>
+          </div>
+          <p id="bc-auditoria-inv-message" class="msg bc-auditoria-inv-message" aria-live="polite"></p>
+          <div id="bc-auditoria-inv-detail" class="bc-auditoria-inv-detail hidden"></div>
+          <div class="bc-auditoria-inv-history-heading">
+            <h4>Historial de auditorías</h4>
+            <button type="button" class="cc-accion" data-audit-refresh>Actualizar</button>
+          </div>
+          <div id="bc-auditoria-inv-list" class="bc-auditoria-inv-list" aria-live="polite">
+            <p class="lista-estado">Cargando auditorías…</p>
+          </div>
+        </div>
+      </section>
     </section>
 
     <section id="tab-usuarios" class="tab-panel">
