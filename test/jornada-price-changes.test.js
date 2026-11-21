@@ -102,7 +102,7 @@ test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el se
 });
 
 test("Price context returns the full programmed period and current cost", () => {
-  const migration = fs.readFileSync("supabase/migrations/20261120161500_jornada_price_context_human_period.sql", "utf8");
+  const migration = fs.readFileSync("supabase/migrations/20261121031512_jornada_price_context_human_period.sql", "utf8");
   assert.match(migration, /'fecha_inicio',coalesce\(\(SELECT min\(p2\.fecha\)/);
   assert.match(migration, /'fecha_fin',coalesce\(\(SELECT max\(p2\.fecha\)/);
   assert.match(migration, /'costo_actual',coalesce\(pr\.costo_unitario_referencia,0\)/);

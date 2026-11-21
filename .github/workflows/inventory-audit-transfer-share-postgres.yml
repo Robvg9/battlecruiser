@@ -1,0 +1,58 @@
+name: BattleCruiser Physical Inventory Audit PostgreSQL 17
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20261121124129_transfer_whatsapp_inventory_count_audit.sql'
+      - 'test/inventory-audit-transfer-share-fixture.sql'
+      - 'test/inventory-audit-transfer-share-contract.sql'
+      - 'test/inventory-audit-transfer-share.test.js'
+      - 'public/js/inventario-auditoria.js'
+      - 'public/js/movimiento-multiple.js'
+      - '.github/workflows/inventory-audit-transfer-share-postgres.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory-audit-postgres:
+    name: Physical count, stock lock, permissions and transfer receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: battlecruiser_inventory_audit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d battlecruiser_inventory_audit_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: battlecruiser_inventory_audit_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Build isolated transfer and inventory schema fixture
+        run: psql -v ON_ERROR_STOP=1 -f test/inventory-audit-transfer-share-fixture.sql
+      - name: Apply physical inventory audit and transfer receipt migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261121124129_transfer_whatsapp_inventory_count_audit.sql
+      - name: Verify real PostgreSQL behavior, permission boundaries, and ACLs
+        run: psql -v ON_ERROR_STOP=1 -f test/inventory-audit-transfer-share-contract.sql
+      - name: Verify WhatsApp multiline formatter and client contract
+        run: node --test test/inventory-audit-transfer-share.test.js
