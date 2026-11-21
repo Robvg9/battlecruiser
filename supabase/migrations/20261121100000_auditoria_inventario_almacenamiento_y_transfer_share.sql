@@ -134,6 +134,26 @@ BEFORE INSERT OR UPDATE OR DELETE ON public.stock
 FOR EACH ROW
 EXECUTE FUNCTION public.bc_guard_stock_during_inventory_audit();
 
+CREATE OR REPLACE FUNCTION public.bc_listar_almacenes_auditoria_inventario()
+RETURNS TABLE (id uuid, nombre text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo el Dueño/Admin puede consultar los almacenes auditables.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+  SELECT a.id, a.nombre
+  FROM public.almacenes a
+  WHERE a.activo IS DISTINCT FROM false
+    AND a.tipo = 'almacenamiento'
+  ORDER BY a.nombre;
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.bc_listar_auditorias_inventario()
 RETURNS TABLE (
   id uuid,
@@ -771,6 +791,7 @@ BEGIN
 END;
 $function$;
 
+REVOKE ALL ON FUNCTION public.bc_listar_almacenes_auditoria_inventario() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_listar_auditorias_inventario() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_crear_auditoria_inventario(uuid,text,uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_detalle_auditoria_inventario(uuid) FROM PUBLIC, anon;
@@ -782,6 +803,7 @@ REVOKE ALL ON FUNCTION public.bc_registrar_baja_auditoria_inventario(uuid,uuid,t
 REVOKE ALL ON FUNCTION public.registrar_transferencia_con_receptor(uuid,uuid,jsonb,uuid,uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_mensaje_transferencia(uuid) FROM PUBLIC, anon;
 
+GRANT EXECUTE ON FUNCTION public.bc_listar_almacenes_auditoria_inventario() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc_listar_auditorias_inventario() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc_crear_auditoria_inventario(uuid,text,uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc_detalle_auditoria_inventario(uuid) TO authenticated;
