@@ -169,6 +169,23 @@ function renderAuditoria(filas) {
   renderPaginacionAuditoria(filas.length);
 }
 
+function iconoAuditoria(tipo) {
+  switch (tipo) {
+    case "venta": return "🛒";
+    case "compra": return "📦";
+    case "transferencia": return "↔";
+    case "vale": return "📋";
+    case "producto":
+    case "producto_actualizar":
+    case "producto_estado": return "🏷️";
+    case "usuario_rol":
+    case "usuario_estado": return "👤";
+    case "sincronizacion": return "🔄";
+    case "auditoria_inventario": return "📋";
+    default: return "•";
+  }
+}
+
 function renderPaginacionAuditoria(cargadas) {
   const el = document.getElementById("mando-paginacion");
   if (!el) return;
