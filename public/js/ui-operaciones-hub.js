@@ -1,4 +1,4 @@
-// BattleCruiser — Operaciones Hub (v9.2.37)
+// BattleCruiser — Operaciones Hub (v9.2.38)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
 // M12-FE.8: resp→responsabilidades.crear; inc→incidencias.crear (no turnos.crear).
@@ -6,7 +6,7 @@
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '44';
+  var HUB_VER = '46';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
@@ -22,7 +22,7 @@
       : rows.filter(function (p) { return p && p.activo !== false && (!p.inventario_mixto || !!p.producto_padre_id); });
   }
   function stores() { return Array.isArray(window._cache && window._cache.almacenes) ? window._cache.almacenes.filter(function (a) { return a.activo !== false; }) : []; }
-  async function ensureOperationCatalogs(required) {
+  async function ensureOperationCatalogs(required, silent) {
     var catalogError = null;
     var api = window.client || null;
     try { if (!api && typeof client !== 'undefined') api = client; } catch (_) {}
@@ -58,7 +58,7 @@
       var reason = catalogError && (catalogError.message || catalogError.details)
         ? ' Detalle: ' + String(catalogError.message || catalogError.details)
         : (!available.products.length ? ' No hay productos activos disponibles.' : ' No hay almacenes activos disponibles.');
-      alert('No se pudieron cargar los productos y almacenes activos desde Supabase. Comprueba la conexión e inténtalo de nuevo.' + reason);
+      if (!silent) alert('No se pudieron cargar los productos y almacenes activos desde Supabase. Comprueba la conexión e inténtalo de nuevo.' + reason);
       return false;
     }
     return true;
@@ -84,8 +84,10 @@
       '.op-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}',
       '@media(min-width:560px){.op-grid{grid-template-columns:1fr 1fr}}',
       '@media(min-width:900px){.op-grid{grid-template-columns:1fr 1fr 1fr}}',
-      '.op-card{display:flex;flex-direction:column;gap:10px;padding:18px 16px;border-radius:14px;border:1px solid rgba(201,162,77,.16);background:rgba(12,28,24,.55);cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease;text-align:left;min-height:150px}',
-      '.op-card:hover{transform:translateY(-2px);border-color:rgba(201,162,77,.35);box-shadow:0 10px 28px rgba(0,0,0,.25)}',
+      '.op-card{display:flex;flex-direction:column;gap:10px;padding:18px 16px;border-radius:14px;border:1px solid rgba(201,162,77,.16);background:rgba(12,28,24,.55);cursor:pointer;transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease;text-align:left;min-height:150px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}',
+      '@media(hover:hover) and (pointer:fine){.op-card:hover{border-color:rgba(201,162,77,.35);background:rgba(20,42,36,.72);box-shadow:0 6px 18px rgba(0,0,0,.2)}}',
+      '.op-card:active{transform:none}',
+      '.op-card:focus-visible{outline:2px solid var(--gold-bright);outline-offset:2px}',
       '.op-card-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(201,162,77,.1)}',
       '.op-card h3{margin:0;font-family:Cormorant Garamond,serif;font-size:1.2rem;font-weight:600;color:var(--text)}',
       '.op-card p{margin:0;flex:1;font-size:12.5px;line-height:1.4;color:var(--mist)}',
@@ -193,7 +195,6 @@
 
   async function openGasto() {
     if (!requireCrear('gastos')) return;
-    if (!(await ensureOperationCatalogs(false))) return;
     openModal({
       icon: '💸', title: 'Registrar gasto', submitText: 'Enviar a aprobación',
       bodyHtml:
@@ -202,6 +203,19 @@
         '<div class="field"><span>Descripción (opcional)</span><input id="op-g-desc" placeholder="Detalle breve"></div>' +
         '<div class="field"><span>Almacén (opcional)</span><select id="op-g-alm">' + storeOpts(true) + '</select></div>' +
         '<p class="muted" style="margin:0;font-size:12px">No descuenta caja hasta ser aprobado.</p>',
+      // El formulario aparece antes de consultar catálogos. El almacén es opcional.
+      afterOpen: function (back) {
+        ensureOperationCatalogs(false).then(function () {
+          if (!back.isConnected) return;
+          var select = back.querySelector('#op-g-alm');
+          if (!select) return;
+          var previous = select.value;
+          select.innerHTML = storeOpts(true);
+          if (previous) select.value = previous;
+        }).catch(function (error) {
+          console.warn('[BattleCruiser] No se pudieron actualizar los almacenes opcionales del gasto:', error);
+        });
+      },
       onSubmit: async function (setMsg) {
         if (!requireCrear('gastos')) { setMsg('Sin permiso para registrar gastos.', false); throw new Error('permiso'); }
         var concepto = document.getElementById('op-g-concepto').value.trim();
@@ -216,19 +230,23 @@
     });
   }
 
+  var bajaOpenPromise = null;
   async function openBaja() {
     if (!requireCrear('bajas')) return;
     if (typeof window.abrirBajasMultiple !== 'function') {
       alert('El listado de Bajas todavía se está cargando. Vuelve a abrir Operaciones en unos segundos.');
       return;
     }
-    const opened = await window.abrirBajasMultiple();
-    if (!opened) alert('No se pudo abrir la lista de Bajas. Comprueba tu sesión y vuelve a intentar.');
+    if (bajaOpenPromise) return bajaOpenPromise;
+    bajaOpenPromise = Promise.resolve(window.abrirBajasMultiple()).then(function (opened) {
+      if (!opened) alert('No se pudo abrir la lista de Bajas. Comprueba tu sesión y vuelve a intentar.');
+      return opened;
+    }).finally(function () { bajaOpenPromise = null; });
+    return bajaOpenPromise;
   }
 
   async function openReinversion() {
     if (!requireCrear('reinversiones')) return;
-    if (!(await ensureOperationCatalogs(true))) return;
     openModal({
       icon: '🔄', title: 'Registrar reinversión', submitText: 'Registrar reinversión',
       submitBg: 'rgba(50,140,90,.95)', submitColor: '#fff',
@@ -241,6 +259,35 @@
         '</div>' +
         '<div class="field"><span>Proveedor (opcional)</span><input id="op-r-prov" placeholder="Nombre del proveedor"></div>' +
         '<p class="muted" style="margin:0;font-size:12px">Inventario ↑ · costo unitario · caja ↓</p>',
+      // Abrimos el modal inmediatamente y cargamos los datos dentro de él.
+      afterOpen: function (back) {
+        var storeSelect = back.querySelector('#op-r-alm');
+        var productSelect = back.querySelector('#op-r-prod');
+        var submit = back.querySelector('.op-submit');
+        var status = back.querySelector('.op-msg');
+        if (storeSelect) { storeSelect.disabled = true; storeSelect.innerHTML = '<option value="" selected>Cargando almacenes…</option>'; }
+        if (productSelect) { productSelect.disabled = true; productSelect.innerHTML = '<option value="" selected>Cargando productos…</option>'; }
+        if (submit) submit.disabled = true;
+        if (status) { status.textContent = 'Cargando productos y almacenes…'; status.className = 'op-msg'; }
+        ensureOperationCatalogs(true, true).then(function (ok) {
+          if (!back.isConnected) return;
+          if (!ok) {
+            if (status) { status.textContent = 'No se pudieron cargar los catálogos. Comprueba la conexión y vuelve a abrir la operación.'; status.className = 'op-msg err'; }
+            return;
+          }
+          if (storeSelect) { storeSelect.innerHTML = storeOpts(false); storeSelect.disabled = false; }
+          if (productSelect) { productSelect.innerHTML = productOpts(); productSelect.disabled = false; }
+          var ready = stores().length > 0 && products().length > 0;
+          if (submit) submit.disabled = !ready;
+          if (status) {
+            status.textContent = ready ? '' : 'No hay productos o almacenes activos disponibles.';
+            status.className = ready ? 'op-msg' : 'op-msg err';
+          }
+        }).catch(function (error) {
+          if (!back.isConnected) return;
+          if (status) { status.textContent = 'No se pudieron cargar los catálogos: ' + String(error && (error.message || error) || error); status.className = 'op-msg err'; }
+        });
+      },
       onSubmit: async function (setMsg) {
         if (!requireCrear('reinversiones')) { setMsg('Sin permiso para registrar reinversiones.', false); throw new Error('permiso'); }
         var alm = document.getElementById('op-r-alm').value;
@@ -258,19 +305,6 @@
         setTimeout(closeModal, 900);
       }
     });
-  }
-
-  function snapshotList(id) {
-    var el = document.getElementById(id);
-    if (!el) return '<p class="op-list-empty">Sin datos todavía.</p>';
-    var html = el.innerHTML.trim();
-    if (!html || /Sin responsabilidad|Sin incidencia|lista-estado|Cargando/i.test(html) && el.children.length <= 1) {
-      var text = el.textContent || '';
-      if (/Sin |Cargando|Todavía/i.test(text) || !el.querySelector('.lista-item,.rep-fila,div')) {
-        return '<p class="op-list-empty">' + esc(text.trim() || 'Sin registros.') + '</p>';
-      }
-    }
-    return html;
   }
 
   function openResponsabilidad() {
@@ -417,16 +451,16 @@
   function buildCardsList() {
     var cards = [];
     if (can('gastos', 'ver') && can('gastos', 'crear')) {
-      cards.push({ tone: 'gold', icon: '💸', title: 'Agregar gasto', fn: openGasto });
+      cards.push({ key: 'gasto', tone: 'gold', icon: '💸', title: 'Agregar gasto', fn: openGasto });
     }
     if (can('bajas', 'ver') && can('bajas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Agregar baja', fn: openBaja });
+      cards.push({ key: 'baja', tone: 'red', icon: '📦', title: 'Agregar baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
-      cards.push({ tone: 'green', icon: '🔄', title: 'Agregar reinversión', fn: openReinversion });
+      cards.push({ key: 'reinversion', tone: 'green', icon: '🔄', title: 'Agregar reinversión', fn: openReinversion });
     }
     if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
-      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', fn: openIncidencia });
+      cards.push({ key: 'incidencia', tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', fn: openIncidencia });
     }
     return cards;
   }
@@ -434,25 +468,53 @@
   function buildSecondaryActions() {
     var actions = [];
     if (can('responsabilidades', 'ver') && can('responsabilidades', 'crear')) {
-      actions.push({ label: 'Responsabilidades', fn: openResponsabilidad });
+      actions.push({ key: 'responsabilidades', label: 'Responsabilidades', fn: openResponsabilidad });
     }
     if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
-      actions.push({ label: 'Aprobaciones', fn: goAprobaciones });
+      actions.push({ key: 'aprobaciones', label: 'Aprobaciones', fn: goAprobaciones });
     }
     return actions;
   }
 
   function fillCardsGrid(grid) {
     if (!grid) return;
-    grid.innerHTML = '';
-    buildCardsList().forEach(function (card) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'op-card op-action-button tone-' + card.tone;
-      btn.setAttribute('aria-label', card.title);
-      btn.innerHTML = '<span class="op-card-icon" aria-hidden="true">' + card.icon + '</span><span class="op-action-label">' + esc(card.title) + '</span>';
-      btn.onclick = card.fn;
-      grid.appendChild(btn);
+    var cards = buildCardsList();
+    var existing = new Map();
+    Array.from(grid.children).forEach(function (button) {
+      var key = button.getAttribute('data-op-action');
+      if (key) existing.set(key, button);
+    });
+    var desired = new Set();
+
+    cards.forEach(function (card, index) {
+      var key = card.key || card.title;
+      var button = existing.get(key);
+      var className = 'op-card op-action-button tone-' + card.tone;
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('data-op-action', key);
+        button.className = className;
+        button.setAttribute('aria-label', card.title);
+        button.innerHTML = '<span class="op-card-icon" aria-hidden="true">' + card.icon + '</span><span class="op-action-label">' + esc(card.title) + '</span>';
+        button.onclick = card.fn;
+      } else {
+        if (button.className !== className) button.className = className;
+        if (button.getAttribute('aria-label') !== card.title) button.setAttribute('aria-label', card.title);
+        var icon = button.querySelector('.op-card-icon');
+        var label = button.querySelector('.op-action-label');
+        if (icon && icon.textContent !== card.icon) icon.textContent = card.icon;
+        if (label && label.textContent !== card.title) label.textContent = card.title;
+      }
+
+      desired.add(key);
+      // No mover un nodo que ya está en la posición correcta: conserva foco y objetivo del clic.
+      var atPosition = grid.children[index];
+      if (atPosition !== button) grid.insertBefore(button, atPosition || null);
+    });
+
+    existing.forEach(function (button, key) {
+      if (!desired.has(key)) button.remove();
     });
   }
 
@@ -462,14 +524,35 @@
     container.hidden = !actions.length;
     var grid = container.querySelector('#op-secondary-grid');
     if (!grid) return;
-    grid.innerHTML = '';
-    actions.forEach(function (action) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'op-secondary-action';
-      btn.textContent = action.label;
-      btn.onclick = action.fn;
-      grid.appendChild(btn);
+
+    var existing = new Map();
+    Array.from(grid.children).forEach(function (button) {
+      var key = button.getAttribute('data-op-secondary-action');
+      if (key) existing.set(key, button);
+    });
+    var desired = new Set();
+
+    actions.forEach(function (action, index) {
+      var key = action.key || action.label;
+      var button = existing.get(key);
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'op-secondary-action';
+        button.setAttribute('data-op-secondary-action', key);
+        button.textContent = action.label;
+        button.onclick = action.fn;
+      } else if (button.textContent !== action.label) {
+        button.textContent = action.label;
+      }
+
+      desired.add(key);
+      var atPosition = grid.children[index];
+      if (atPosition !== button) grid.insertBefore(button, atPosition || null);
+    });
+
+    existing.forEach(function (button, key) {
+      if (!desired.has(key)) button.remove();
     });
   }
 

@@ -1,4 +1,5 @@
 "use strict";
+const { assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -158,10 +159,9 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.44");
+  assert.equal(moduleVersion,"7.45");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
-  assert.ok(app.includes('["aprobaciones-admin.js","20261119.1"]'));
-  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261119.1"));
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
   assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261116.2"));
 });
 

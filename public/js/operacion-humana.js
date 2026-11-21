@@ -511,35 +511,47 @@ async function refrescarOperacion() {
 // Deriva alertas reales de turnos/cuadres/responsabilidades/incidencias.
 // No inventa: si los RPC no existen o no hay conexión, no agrega alertas.
 let _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
+let _b7AlertasError = null;
 
 async function refrescarAlertasB7() {
   if (!navigator.onLine) return;
-  // Reset before loading to avoid showing a previous user's cached alerts after a role change.
   _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
+  _b7AlertasError = null;
   if (!tienePermiso("turnos", "ver")) return;
-  try {
-    // Turnos abiertos.
-    const { data: turnos } = await client.rpc("listar_turnos", { p_estado: "ABIERTO", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.turnosAbiertos = (turnos || []).length;
-    // Cuadres pendientes / con diferencia.
-    const { data: cuadresP } = await client.rpc("listar_cuadres", { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.cuadresPendientes = (cuadresP || []).length;
-    const { data: cuadresD } = await client.rpc("listar_cuadres", { p_estado: "CON_DIFERENCIA", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.cuadresDiferencia = (cuadresD || []).length;
-    // Responsabilidades pendientes.
-    const { data: resp } = await client.rpc("listar_responsabilidades", { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.respPendientes = (resp || []).length;
-    // Incidencias abiertas.
-    const { data: inc } = await client.rpc("listar_incidencias", { p_estado: "ABIERTA", p_limite: 100, p_offset: 0 });
-    _b7CacheAlertas.incAbiertas = (inc || []).length;
-  } catch (e) {
-    // Si los RPC no existen o fallan, no agregar alertas (no inventar).
-    _b7CacheAlertas = { turnosAbiertos: 0, cuadresPendientes: 0, cuadresDiferencia: 0, respPendientes: 0, incAbiertas: 0 };
-  }
+
+  const sources = [
+    { key: "turnosAbiertos", label: "turnos abiertos", rpc: "listar_turnos", params: { p_estado: "ABIERTO", p_limite: 100, p_offset: 0 } },
+    { key: "cuadresPendientes", label: "cuadres pendientes", rpc: "listar_cuadres", params: { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 } },
+    { key: "cuadresDiferencia", label: "cuadres con diferencia", rpc: "listar_cuadres", params: { p_estado: "CON_DIFERENCIA", p_limite: 100, p_offset: 0 } },
+    { key: "respPendientes", label: "responsabilidades", rpc: "listar_responsabilidades", params: { p_estado: "PENDIENTE", p_limite: 100, p_offset: 0 } },
+    { key: "incAbiertas", label: "incidencias abiertas", rpc: "listar_incidencias", params: { p_estado: "ABIERTA", p_limite: 100, p_offset: 0 } }
+  ];
+  const results = await Promise.allSettled(sources.map((source) => client.rpc(source.rpc, source.params)));
+  const failures = [];
+  results.forEach((result, index) => {
+    const source = sources[index];
+    if (result.status === "rejected" || (result.value && result.value.error)) {
+      const error = result.status === "rejected" ? result.reason : result.value.error;
+      failures.push(source.label + ": " + String(error && (error.message || error) || "error de consulta"));
+      return;
+    }
+    const data = result.value && result.value.data;
+    _b7CacheAlertas[source.key] = Array.isArray(data) ? data.length : 0;
+  });
+  _b7AlertasError = failures.length ? failures.join("; ") : null;
 }
 
 function construirAlertasB7() {
   const a = [];
+  if (_b7AlertasError) {
+    a.push({
+      nivel: "atencion",
+      tipo: "No se pudieron comprobar todos los avisos de Jornada",
+      texto: _b7AlertasError,
+      op: null,
+      tab: "turnos"
+    });
+  }
   if (_b7CacheAlertas.cuadresDiferencia > 0) {
     a.push({ nivel: "critico", tipo: "Cuadre con diferencia", texto: _b7CacheAlertas.cuadresDiferencia + " cuadre(s) con diferencia requieren revisión.", op: null, tab: "ciclos" });
   }
@@ -557,7 +569,6 @@ function construirAlertasB7() {
   }
   return a;
 }
-
 // Inicialización de las pestañas Turnos y Operación.
 safeInit("b7-turnos", () => {
   const btnAbrir = document.getElementById("btn-abrir-turno");

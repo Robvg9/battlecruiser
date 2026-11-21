@@ -1,13 +1,16 @@
 "use strict";
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
+const path=require("node:path");
 
 const migration=fs.readFileSync("supabase/migrations/20261119000000_jornada_persistent_price_changes.sql","utf8");
 const costMigration=fs.readFileSync("supabase/migrations/20261119193000_jornada_price_change_optional_cost.sql","utf8");
 const ui=fs.readFileSync("public/js/jornada-price-changes.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
+const index=fs.readFileSync("public/index.html","utf8");
 
 test("Jornada price changes are server-owned, audited, and wait for a physical count",()=>{
   assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_cambios_precio/);
@@ -54,6 +57,8 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/item\.costo_nuevo!=null/);
   assert.match(ui,/bc-jpc-dialog bc165-modal/,"price change modal reuses the shared operation modal shell");
   assert.match(ui,/bc7_cambios_precio_contexto/);
+  assert.match(ui,/canOpenOwnerModal: function \(\) \{ return ownerActionAvailable; \}/);
+  assert.match(ui,/bc:price-changes-availability/);
   assert.match(ui,/bc7_solicitar_cambios_precio_jornada/);
   assert.match(ui,/bc7_mis_cambios_precio_pendientes/);
   assert.match(ui,/bc7_confirmar_cambios_precio_conteo/);
@@ -66,15 +71,50 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
   assert.match(ui,/setInterval\(refreshPending, 20000\)/);
   assert.match(ui,/No se activó ningún precio/);
   const ownerRows=ui.slice(ui.indexOf("function renderOwnerProducts"),ui.indexOf("function ownerModalHtml"));
-  assert.match(ownerRows,/<div class="bc-jpc-product">/);
-  assert.ok(ownerRows.includes("const checkboxId = 'bc-jpc-select-'") && ownerRows.includes("<label for=\"' + esc(checkboxId)"), "each product checkbox has an explicit associated label");
+  assert.match(ownerRows,/<article class="bc-jpc-product">/);
+  assert.ok(
+    ownerRows.includes("const checkboxId = 'bc-jpc-select-'") &&
+    ownerRows.includes('<label class="bc-jpc-select-row" for="') &&
+    ownerRows.includes("esc(checkboxId)"),
+    "each product checkbox is paired with its accessible label"
+  );
   assert.doesNotMatch(ownerRows,/<label class="bc-jpc-product">/,
     "product rows must not nest multiple interactive inputs inside one label");
 });
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
-  assert.match(app,/const VERSION="9.5.130"/);
-  assert.match(app,/\["jornada-price-changes.js","1.0.1"\]/);
-  assert.match(sw,/BC_SW_VERSION = "9.5.130"/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.1/);
+  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
+  assert.match(app,/\["jornada-price-changes.js","1.0.4"\]/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.4/);
+});
+
+test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el segundo", () => {
+  const ui = fs.readFileSync(path.join(__dirname, "..", "public", "js", "jornada-price-changes.js"), "utf8");
+  assert.match(ui, /PASO 1 DE 2/);
+  assert.match(ui, /PASO 2 DE 2/);
+  assert.match(ui, /ownerSelectedIds/);
+  assert.match(ui, /bc-jpc-select-row/);
+  assert.match(ui, /Nuevo precio de venta/);
+  assert.match(ui, /Nuevo costo \(opcional\)/);
+  assert.match(ui, /Volver a productos/);
+  assert.match(ui, /humanContextLabel\(item\)/);
+  assert.doesNotMatch(ui, /responsable_id\)\.slice\(0,\s*8\)/);
+});
+
+test("Price context returns the full programmed period and current cost", () => {
+  const migration = fs.readFileSync("supabase/migrations/20261120161500_jornada_price_context_human_period.sql", "utf8");
+  assert.match(migration, /'fecha_inicio',coalesce\(\(SELECT min\(p2\.fecha\)/);
+  assert.match(migration, /'fecha_fin',coalesce\(\(SELECT max\(p2\.fecha\)/);
+  assert.match(migration, /'costo_actual',coalesce\(pr\.costo_unitario_referencia,0\)/);
+  assert.match(migration, /bc_actor_is_admin\(\)/);
+  assert.match(migration, /SECURITY DEFINER/);
+});
+
+test("Price-change preview uses the existing read-only Jornada schedule RPC when context migration is not present", () => {
+  const ui = fs.readFileSync(path.join(__dirname, "..", "public", "js", "jornada-price-changes.js"), "utf8");
+  assert.match(ui, /loadHumanSchedulePeriods/);
+  assert.match(ui, /rpc\('bc5_mis_jornadas'/);
+  assert.match(ui, /p_fecha_inicio: shiftDate\(day, -30\)/);
+  assert.match(ui, /p_fecha_fin: shiftDate\(day, 30\)/);
+  assert.match(ui, /item\.estado !== 'CANCELADA'/);
 });

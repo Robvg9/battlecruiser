@@ -644,6 +644,11 @@ async function main() {
     "(()=>{",
     "if(window.__BC_E2E_BOOT_DIAG_INSTALLED__)return;",
     "window.__BC_E2E_BOOT_DIAG_INSTALLED__=true;",
+    "window.__BC_HEADER_ACTION_WRITES__=[];",
+    "const isHeaderAction=node=>!!(node&&node.nodeType===1&&(node.id==='mi-cuenta-btn'||node.id==='logout-btn'));",
+    "const recordHeaderWrite=(kind,node,value)=>{if(!isHeaderAction(node))return;const item={kind,id:node.id,value:String(value==null?'':value).slice(0,120),stack:(new Error('header action write')).stack};window.__BC_HEADER_ACTION_WRITES__.push(item);console.warn('__BC_E2E_HEADER_ACTION_WRITE__',JSON.stringify(item));};",
+    "const textDesc=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');if(textDesc&&textDesc.set&&textDesc.configurable)Object.defineProperty(Node.prototype,'textContent',{configurable:true,enumerable:textDesc.enumerable,get:textDesc.get,set:function(value){recordHeaderWrite('textContent',this,value);return textDesc.set.call(this,value);}});",
+    "const htmlDesc=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');if(htmlDesc&&htmlDesc.set&&htmlDesc.set.configurable)Object.defineProperty(Element.prototype,'innerHTML',{configurable:true,enumerable:htmlDesc.enumerable,get:htmlDesc.get,set:function(value){recordHeaderWrite('innerHTML',this,value);return htmlDesc.set.call(this,value);}});",
     "const nativeObserver=window.MutationObserver;let nextObserverId=0;",
     "window.MutationObserver=function(callback){",
     "const id=++nextObserverId;let calls=0;let totalRecords=0;let repeatLogged=false;const createdAt=performance.now();",
@@ -941,13 +946,26 @@ async function main() {
     deviceScaleFactor: 2,
     mobile: true,
   });
-  const mobileHeader = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,display:s.display,gridArea:s.gridArea};};const shell=document.querySelector('#app-shell');const login=document.querySelector('#login-form');const header=document.querySelector('.app-header');if(login)login.classList.add('hidden');if(shell)shell.classList.add('visible');const finish=()=>{const brand=header&&header.querySelector('.header-left');const actions=header&&header.querySelector('.header-right');const account=header&&header.querySelector('#mi-cuenta-btn');const logout=header&&header.querySelector('#logout-btn');resolve({ready:document.readyState!=='loading',readyState:document.readyState,href:location.href,uiReady:window.__BC_UI_READY_RESOLVED__===true,fontStatus:document.fonts?document.fonts.status:null,viewportWidth:innerWidth,viewportHeight:innerHeight,documentWidth:document.documentElement.scrollWidth,header:box(header),headerDisplay:header?getComputedStyle(header).display:null,brand:box(brand),title:box(header&&header.querySelector('h1')),actions:box(actions),account:box(account),logout:box(logout),rightOverflow:!!(header&&logout&&logout.getBoundingClientRect().right>header.getBoundingClientRect().right+1),brandLogoutOverlap:!!(brand&&account&&account.getBoundingClientRect().left<brand.getBoundingClientRect().right-1),accountLogoutOrder:!!(account&&logout&&account.getBoundingClientRect().right<=logout.getBoundingClientRect().left+1),accountLogoutAligned:!!(account&&logout&&Math.abs(account.getBoundingClientRect().top-logout.getBoundingClientRect().top)<=8)});};requestAnimationFrame(finish);}))))()");
+  const mobileHeader = await evaluate("(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();const s=getComputedStyle(e);return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,display:s.display,gridArea:s.gridArea};};const shell=document.querySelector('#app-shell');const login=document.querySelector('#login-form');const header=document.querySelector('.app-header');if(login)login.classList.add('hidden');if(shell)shell.classList.add('visible');const finish=()=>{const brand=header&&header.querySelector('.header-left');const actions=header&&header.querySelector('.header-right');const account=header&&header.querySelector('#mi-cuenta-btn');const logout=header&&header.querySelector('#logout-btn');const iconState=e=>{const svg=e&&e.querySelector('svg');const shape=svg&&(svg.querySelector('path')||svg.querySelector('circle'));const ss=svg?getComputedStyle(svg):null;const ps=shape?getComputedStyle(shape):null;const bs=e?getComputedStyle(e):null;return {exists:!!svg,childCount:e?e.children.length:0,text:e?(e.textContent||'').trim():null,bounds:box(svg),display:ss?ss.display:null,visibility:ss?ss.visibility:null,opacity:ss?ss.opacity:null,svgColor:ss?ss.color:null,shapeStroke:ps?ps.stroke:null,buttonColor:bs?bs.color:null,buttonBackground:bs?bs.backgroundColor:null};};resolve({ready:document.readyState!=='loading',readyState:document.readyState,href:location.href,uiReady:window.__BC_UI_READY_RESOLVED__===true,fontStatus:document.fonts?document.fonts.status:null,viewportWidth:innerWidth,viewportHeight:innerHeight,documentWidth:document.documentElement.scrollWidth,header:box(header),headerDisplay:header?getComputedStyle(header).display:null,brand:box(brand),title:box(header&&header.querySelector('h1')),actions:box(actions),account:box(account),logout:box(logout),accountIcon:iconState(account),logoutIcon:iconState(logout),headerActionWrites:(window.__BC_HEADER_ACTION_WRITES__||[]).slice(-20),headerActionsNormalized:window.__BC_HEADER_ACTIONS_NORMALIZED__||null,rightOverflow:!!(header&&logout&&logout.getBoundingClientRect().right>header.getBoundingClientRect().right+1),brandLogoutOverlap:!!(brand&&account&&account.getBoundingClientRect().left<brand.getBoundingClientRect().right-1),accountLogoutOrder:!!(account&&logout&&account.getBoundingClientRect().right<=logout.getBoundingClientRect().left+1),accountLogoutAligned:!!(account&&logout&&Math.abs(account.getBoundingClientRect().top-logout.getBoundingClientRect().top)<=8)});};requestAnimationFrame(finish);}))))()");
   report.evidence.androidMobileHeader = mobileHeader;
+  report.evidence.headerActionWrites = mobileHeader.headerActionWrites || [];
+  report.evidence.headerActionsNormalized = mobileHeader.headerActionsNormalized || null;
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const androidHeaderScreenshot = await cdpCommand("Page.captureScreenshot", { format: "png", fromSurface: true, captureBeyondViewport: false });
   fs.writeFileSync(ANDROID_HEADER_SCREENSHOT_PATH, Buffer.from(androidHeaderScreenshot.data, "base64"));
   report.evidence.androidMobileHeader.screenshot = ANDROID_HEADER_SCREENSHOT_PATH;
   report.evidence.androidMobileHeader.environment = "Chromium CDP mobile emulation 360x800 @ deviceScaleFactor 2; no es una prueba en Android físico.";
+  const headerIcons = [mobileHeader.accountIcon, mobileHeader.logoutIcon];
+  report.evidence.androidHeaderIconRendering = headerIcons;
+  assert(mobileHeader.headerActionsNormalized && mobileHeader.headerActionsNormalized.account?.svg && mobileHeader.headerActionsNormalized.logout?.svg,
+    "El cargador final debe normalizar ambos controles del encabezado: " + JSON.stringify(mobileHeader.headerActionsNormalized));
+  assert(headerIcons.every(icon => icon && icon.exists && icon.childCount === 1 &&
+      icon.text === "" && icon.bounds && icon.bounds.width >= 16 && icon.bounds.height >= 16 &&
+      icon.display !== "none" && icon.visibility !== "hidden" && Number(icon.opacity) > 0 &&
+      icon.shapeStroke && !["none", "transparent", "rgba(0, 0, 0, 0)"].includes(icon.shapeStroke) &&
+      icon.shapeStroke !== icon.buttonBackground),
+    "Los controles de Mi Cuenta y Salir deben dibujar sus SVG visibles, no dejar cuadros vacíos: " +
+      JSON.stringify(headerIcons));
   assert(mobileHeader.ready,
     "DOM_NO_PREPARADO: document.readyState sigue en loading al medir el encabezado móvil: " +
       JSON.stringify({readyState: mobileHeader.readyState, href: mobileHeader.href, uiReady: mobileHeader.uiReady, fontStatus: mobileHeader.fontStatus}));
@@ -980,7 +998,7 @@ async function main() {
   // The browser profile is deliberately unauthenticated. For this UI-only layout probe,
   // install a synthetic in-memory permission context and let the real permission engine
   // expose Administration. This does not create an auth session or write business data.
-  const mobileScrollPermissionFixture = await evaluate("(()=>{const shell=document.querySelector('#app-shell');const button=document.querySelector('#tabs .tab-btn[data-tab=config]');const panel=document.querySelector('#tab-config');if(!shell||!button||!panel||window.__BC_PERMISOS_CANONICO__!==true||typeof window.aplicarPermisosAInterfaz!=='function')return {ready:false,reason:'canonical permission engine unavailable'};_usuarioActual={id:'bc-e2e-layout-fixture',nombre:'E2E layout fixture',rol:'E2E'};_permisosEfectivos={categorias:{ver:true,crear:true},unidades:{ver:true,crear:true}};_permisosCargaExitosa=true;window.__BC_E2E_SYNTHETIC_PERMISSION_FIXTURE__=true;window.aplicarPermisosAInterfaz();return {ready:true,userId:_usuarioActual.id,permissionSections:Object.keys(_permisosEfectivos),shellReady:shell.getAttribute('data-bc-permisos-cargados'),buttonPermission:button.getAttribute('data-bc-permiso'),panelPermission:panel.getAttribute('data-bc-permiso'),buttonHidden:button.classList.contains('hidden'),panelHidden:panel.classList.contains('hidden'),panelVisible:panel.classList.contains('visible')};})()");
+  const mobileScrollPermissionFixture = await evaluate("(()=>{const shell=document.querySelector('#app-shell');const button=document.querySelector('#tabs .tab-btn[data-tab=config]');const panel=document.querySelector('#tab-config');if(!shell||!button||!panel||window.__BC_PERMISOS_CANONICO__!==true||typeof window.aplicarPermisosAInterfaz!=='function')return {ready:false,reason:'canonical permission engine unavailable'};_usuarioActual={id:'bc-e2e-layout-fixture',nombre:'E2E layout fixture',rol:'E2E'};_permisosEfectivos={categorias:{ver:true,crear:true},unidades:{ver:true,crear:true},gastos:{ver:true,crear:true},bajas:{ver:true,crear:true},reinversiones:{ver:true,crear:true},incidencias:{ver:true,crear:true}};_permisosCargaExitosa=true;window.__BC_E2E_SYNTHETIC_PERMISSION_FIXTURE__=true;window.aplicarPermisosAInterfaz();return {ready:true,userId:_usuarioActual.id,permissionSections:Object.keys(_permisosEfectivos),shellReady:shell.getAttribute('data-bc-permisos-cargados'),buttonPermission:button.getAttribute('data-bc-permiso'),panelPermission:panel.getAttribute('data-bc-permiso'),buttonHidden:button.classList.contains('hidden'),panelHidden:panel.classList.contains('hidden'),panelVisible:panel.classList.contains('visible')};})()");
   report.evidence.mobileScrollPermissionFixture = mobileScrollPermissionFixture;
   assert(mobileScrollPermissionFixture.ready && mobileScrollPermissionFixture.shellReady === "1" &&
          mobileScrollPermissionFixture.buttonPermission === "1" && mobileScrollPermissionFixture.panelPermission === "1" &&
@@ -1021,6 +1039,38 @@ async function main() {
   report.evidence.settingsStructure = settingsStructure;
   assert(settingsStructure.legacyMenuAbsent && settingsStructure.connectivityTab && settingsStructure.preferencesTab && settingsStructure.accountButton && settingsStructure.logoutButton,
     "La estructura nueva debe quitar el menú Ajustes duplicado y conservar Mi Cuenta/Cerrar sesión: " + JSON.stringify(settingsStructure));
+
+  // Verify Mi Cuenta's first click in the real browser without changing account data.
+  const accountModalFirstClick = await evaluate("(()=>{const b=document.querySelector('#mi-cuenta-btn');if(!b)return null;b.click();const m=document.querySelector('#bc-mi-cuenta-modal');return {button:!!b,modal:!!m,visible:!!(m&&!m.classList.contains('hidden')),ariaHidden:m?m.getAttribute('aria-hidden'):null,closeButton:!!(m&&m.querySelector('#bc-account-close'))}})()");
+  report.evidence.accountModalFirstClick = accountModalFirstClick;
+  assert(accountModalFirstClick && accountModalFirstClick.visible && accountModalFirstClick.ariaHidden === "false" && accountModalFirstClick.closeButton,
+    "Mi Cuenta debe abrir su modal con el primer clic en Chromium: " + JSON.stringify(accountModalFirstClick));
+  await evaluate("(()=>{const b=document.querySelector('#bc-mi-cuenta-modal #bc-account-close');if(b)b.click();return true})()");
+  await waitUntil("cierre del modal Mi Cuenta", "(()=>{const m=document.querySelector('#bc-mi-cuenta-modal');return !!(m&&m.classList.contains('hidden'))})()", 3000);
+
+  const operationTabAccess = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=operacion]');return {exists:!!b,permission:b?b.getAttribute('data-bc-permiso'):null}})()");
+  report.evidence.operationsTabAccess = operationTabAccess;
+  assert(operationTabAccess.exists && operationTabAccess.permission === "1",
+    "La fixture sintética debe habilitar Operaciones sin iniciar sesión ni escribir datos: " + JSON.stringify(operationTabAccess));
+  const operationsTabClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=operacion]');if(!b)return false;b.click();return true})()");
+  assert(operationsTabClicked, "No se pudo abrir Operaciones con el permiso sintético.");
+  await waitUntil("Operaciones y acción primaria Agregar gasto visibles", "(()=>{const t=document.querySelector('#tab-operacion');const b=t&&t.querySelector('[data-op-action=gasto]');return !!(t&&t.classList.contains('visible')&&b&&b.isConnected&&getComputedStyle(b).display!=='none')})()", 10000);
+  const gastoPoint = await evaluate("(()=>{const b=document.querySelector('#tab-operacion [data-op-action=gasto]');if(!b)return null;b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height,connected:b.isConnected}})()");
+  report.evidence.operationsPrimaryTarget = gastoPoint;
+  assert(gastoPoint && gastoPoint.connected && gastoPoint.width > 0 && gastoPoint.height > 0,
+    "La acción primaria Agregar gasto no tiene un objetivo de clic visible: " + JSON.stringify(gastoPoint));
+  await cdpCommand("Input.dispatchMouseEvent", { type: "mouseMoved", x: gastoPoint.x, y: gastoPoint.y });
+  await cdpCommand("Input.dispatchMouseEvent", { type: "mousePressed", x: gastoPoint.x, y: gastoPoint.y, button: "left", clickCount: 1 });
+  await cdpCommand("Input.dispatchMouseEvent", { type: "mouseReleased", x: gastoPoint.x, y: gastoPoint.y, button: "left", clickCount: 1 });
+  const gastoFirstClick = await waitUntil(
+    "modal Agregar gasto después del primer clic real",
+    "(()=>{const m=document.querySelector('#bc-op-modal');return !!(m&&/Registrar gasto/.test(m.textContent||'')&&getComputedStyle(m).display!=='none')})()",
+    5000
+  );
+  report.evidence.operationsPrimaryFirstClick = gastoFirstClick;
+  assert(gastoFirstClick, "Agregar gasto debe abrir su modal con un único clic real en Chromium.");
+  await evaluate("(()=>{const b=document.querySelector('#bc-op-modal .op-modal-x');if(b)b.click();return true})()");
+  await waitUntil("cierre del modal Agregar gasto", "(()=>!document.querySelector('#bc-op-modal-backdrop'))()", 3000);
 
   const connectivityClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=conectividad]');if(!b)return false;b.click();return true;})()");
   assert(connectivityClicked, "No se encontró la sección Conectividad.");

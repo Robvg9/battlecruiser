@@ -1,4 +1,4 @@
-// BattleCruiser M75 v75.12 — interfaz compacta de Productos y Administración.
+// BattleCruiser M75 v75.13 — interfaz compacta sin alterar los iconos del encabezado.
 (function () {
   'use strict';
   if (window.__BCM75_PRODUCTS_UI) return;
@@ -261,10 +261,20 @@
     var a = ensureToolbar();
     var b = moveNomenclatureToAdmin();
     var c = ensureModalImporter();
+    // The shared shell owns the SVG content. M75 may set accessible names,
+    // but must never replace the button children with plain text.
     var logout = document.getElementById('logout-btn');
-    if (logout) { logout.textContent = 'Salir'; logout.setAttribute('aria-label', 'Cerrar sesión'); logout.title = 'Cerrar sesión'; }
+    if (logout) {
+      logout.classList.add('bc-header-icon-button');
+      logout.setAttribute('aria-label', 'Cerrar sesión');
+      logout.title = 'Cerrar sesión';
+    }
     var account = document.getElementById('mi-cuenta-btn');
-    if (account) account.textContent = 'Mi cuenta';
+    if (account) {
+      account.classList.add('bc-header-icon-button');
+      account.setAttribute('aria-label', 'Mi cuenta');
+      account.title = 'Mi cuenta';
+    }
     var user = document.getElementById('user-email');
     if (user && user.textContent) user.title = user.textContent.trim();
     return { toolbar: a, nomenclature: b, importer: c };

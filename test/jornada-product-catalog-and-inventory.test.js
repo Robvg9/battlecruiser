@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -100,6 +101,6 @@ test("cash difference sign matches the spreadsheet convention in settlement and 
 });
 
 test("PWA release versions stay aligned",()=>{
- assert.ok(APP.includes('VERSION="9.5.130"'));assert.ok(SW.includes('BC_SW_VERSION = "9.5.130"'));assert.ok(INDEX.includes("9.5.130"));
- assert.ok(APP.includes('["bc7-jornada-ui.js","7.44"]'));assert.ok(SW.includes("bc7-jornada-ui.js?v=7.44"));
+ assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
+ assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"bc7-jornada-ui.js"});
 });

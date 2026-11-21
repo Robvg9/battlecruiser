@@ -8,6 +8,7 @@ const { JSDOM } = require("jsdom");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const MODAL_MANAGER = read("public/js/bc-modal-manager.js");
 const UI = read("public/js/aprobaciones-admin.js");
 const BAJAS = read("public/js/bajas-multiple.js");
 
@@ -63,6 +64,7 @@ function setupApprovalWindow(t) {
     }
   };
 
+  w.eval(MODAL_MANAGER);
   w.eval(UI);
   t.after(() => w.close());
   return { w, calls };
@@ -146,7 +148,7 @@ test("approval modal is fixed to the viewport and only its body scrolls on Andro
 
 test("approval queue visibility matches backend permissions and does not query operational approvals for cash-only users", () => {
   assert.match(UI, /const canViewOperationalQueue=\(\)=>can\('gastos','editar_any'\)\|\|can\('mermas','editar_any'\)\|\|can\('bajas','editar_any'\)\|\|can\('reinversiones','editar_any'\)\|\|can\('entregas_caja','editar_any'\)\|\|can\('auditoria','editar_any'\)/);
-  assert.match(UI, /if\(canViewOperationalQueue\(\)\)jobs\.push\(rpc\('listar_aprobaciones_admin'/);
+  assert.match(UI, /if\(canViewOperationalQueue\(\)\)jobs\.push\(\{k:'o',label:'Aprobaciones operativas',promise:rpc\('listar_aprobaciones_admin'\)\}\)/);
 });
 
 test("the loaded multi-Baja module guard matches the 1.7 cache version", () => {

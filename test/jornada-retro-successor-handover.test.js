@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -7,6 +8,7 @@ const inventoryTruth=fs.readFileSync("supabase/migrations/20261116180000_jornada
 const jornada=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
+const index=fs.readFileSync("public/index.html","utf8");
 
 const actualCloseMigration=fs.readFileSync("supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql","utf8");
 
@@ -57,10 +59,7 @@ test("incoming count is blank by default",()=>{
   assert.ok(jornada.includes('placeholder="Contar físicamente"'));
 });
 test("PWA release and service worker cache keys are aligned",()=>{
-  assert.ok(app.includes('const VERSION="9.5.130"'));
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.44"]'));
-  assert.ok(app.includes('["m68-ventas-pos-definitivo.js","9.5.130"]'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.130"'));
-  assert.ok(sw.includes('bc7-jornada-ui.js?v=7.44'));
-  assert.ok(sw.includes('m68-ventas-pos-definitivo.js?v=9.5.130'));
+  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"m68-ventas-pos-definitivo.js"});
 });

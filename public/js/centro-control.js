@@ -107,6 +107,16 @@ function proyeccionStock(producto_id, almacen_id, stockReal) {
   };
 }
 
+// Oculta los bloques sin trabajo accionable para evitar scroll vacío.
+function setDashboardBlockVisible(content, visible) {
+  const block = content && content.closest ? content.closest(".cc-bloque") : null;
+  if (!block) return;
+  block.hidden = !visible;
+  block.classList.toggle("hidden", !visible);
+  if (visible) block.style.removeProperty("display");
+  else block.style.setProperty("display", "none", "important");
+}
+
 // ---- Render del Centro de Control ----
 
 function renderEstadoNegocio(estado) {
@@ -125,9 +135,13 @@ function renderRequiereAtencion(asuntos) {
   if (!el) return;
   const criticos = asuntos.filter((a) => a.prioridad === "critico");
   if (criticos.length === 0) {
+    // Conserva el estado semántico para lectores de pantalla y pruebas de flujo,
+    // pero retira todo el bloque del layout mientras no haya nada accionable.
     el.innerHTML = '<p class="lista-estado">Nada requiere atención ahora mismo.</p>';
+    setDashboardBlockVisible(el, false);
     return;
   }
+  setDashboardBlockVisible(el, true);
   el.innerHTML = "";
   criticos.forEach((a) => {
     const op = a.op;
@@ -166,9 +180,11 @@ function renderPendientesCompacto(asuntos) {
   const pendientes = asuntos.filter((a) => a.prioridad === "atencion");
   const total = pendientes.length;
   if (total === 0) {
-    el.innerHTML = '<p class="lista-estado">Sin operaciones pendientes.</p>';
+    el.textContent = "";
+    setDashboardBlockVisible(el, false);
     return;
   }
+  setDashboardBlockVisible(el, true);
   el.innerHTML = "";
   const resumen = document.createElement("div");
   resumen.className = "cc-pendientes-resumen";
@@ -257,9 +273,11 @@ function renderAvisosOperativosControl(ops) {
   if (conectado && typeof construirAlertasB8 === "function") avisos.push(...construirAlertasB8());
   const importantes = avisos.filter((a) => a.nivel === "critico" || a.nivel === "atencion");
   if (importantes.length === 0) {
-    el.innerHTML = '<p class="lista-estado">Sin asuntos adicionales que requieran atención.</p>';
+    el.textContent = "";
+    setDashboardBlockVisible(el, false);
     return;
   }
+  setDashboardBlockVisible(el, true);
   importantes.forEach((aviso) => {
     const row = document.createElement("div");
     row.className = "cc-aviso cc-aviso-" + (aviso.nivel === "critico" ? "critico" : "atencion");

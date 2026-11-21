@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned } = require("./helpers/pwa-release-contract");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -8,6 +9,9 @@ const migration = fs.readFileSync(
   path.join(__dirname, "../supabase/migrations/20261110160751_la_cueva_period_retroactive_opening.sql"),
   "utf8"
 );
+const app = fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
+const serviceWorker = fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
+const index = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf8");
 const configBootstrap = fs.readFileSync(
   path.join(__dirname, "../supabase/migrations/20261111150000_step7_jornada_config_bootstrap.sql"),
   "utf8"
@@ -109,8 +113,7 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /stock general no se modificará/i);
   assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'));
   assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.8"));
-  assert.ok(app.includes('VERSION="9.5.130"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.130"'));
+  assertPwaReleaseAligned(assert,{app,serviceWorker,index});
 });
 
 

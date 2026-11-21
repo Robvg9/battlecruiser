@@ -1,4 +1,5 @@
 "use strict";
+const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers/pwa-release-contract");
 const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -9,6 +10,7 @@ const indexes=read("supabase/migrations/20261102144901_step4_shared_inventory_fk
 const ui=read("public/js/bc7-jornada-ui.js");
 const app=read("public/app.js");
 const sw=read("public/service-worker.js");
+const index=read("public/index.html");
 const pg=read("test/step4-jornada-shared-inventory-contract.sql");
 const runner=read("test/step7-jornada-postgres-windows-ci.js");
 const workflow=read(".github/workflows/step7-jornada-postgres.yml");
@@ -82,18 +84,11 @@ test("Shared inventory foreign-key index migration covers all six new references
   ]) assert.ok(indexes.includes(column),"missing covering index: "+column);
 });
 
-test("PWA and service worker cache are aligned at 9.5.130 / Jornada module 7.44",()=>{
-  const version=app.match(/const VERSION="([^"]+)"/);
-  const swVersion=sw.match(/BC_SW_VERSION = "([^"]+)"/);
-  assert.ok(version&&swVersion,"app/service worker version declaration missing");
-  assert.equal(version[1],"9.5.130");
-  assert.equal(swVersion[1],version[1]);
-  for(const marker of ['["bc7-jornada-ui.js","7.44"]','["m68-ventas-pos-definitivo.js","9.5.130"]']){
-    assert.ok(app.includes(marker),"dynamic module cache missing "+marker);
-  }
-  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.44"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.130"));
-  assert.ok(ui.includes("v7.44"));
+test("PWA release and module cache keys stay aligned",()=>{
+  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
+  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"m68-ventas-pos-definitivo.js"});
+  assert.ok(ui.includes("responsibleName: userName"), "Jornada exposes the cached responsible-name resolver used in human-readable price-change context");
 });
 
 test("PostgreSQL 17 disposable CI executes the Step 4 migration and contract",()=>{

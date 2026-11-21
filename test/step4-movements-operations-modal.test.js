@@ -167,26 +167,33 @@ test("Transferencias: el cargador incluye el módulo múltiple antes del modal y
   assert.notEqual(multiple, -1, "app.js debe cargar el módulo de transferencias múltiples");
   assert.ok(multiple < modal, "el panel múltiple debe existir antes de inicializar el modal");
   assert.ok(modal < purchaseRepair, "el módulo del modal debe cargarse antes de su reparador");
-  assert.match(sw, /movimiento-multiple\.js\?v=20261109\.1/);
-});test("Transferencias: añadir varios productos registra una sola operación con todas las líneas", async (t) => {
+  assert.match(sw, /movimiento-multiple\.js\?v=20261120\.1/);
+});test("Transferencias: seleccionar primero y definir cantidades después registra una sola operación", async (t) => {
   const { window } = setup(t);
   window.document.querySelector('[data-bc165="transferencias"]').click();
   const modal = window.document.getElementById("bc165-overlay");
   const panel = modal.querySelector("#movimiento-multiple-panel");
   panel.querySelector("#mov-multiple-origen").value = "a";
   panel.querySelector("#mov-multiple-destino").value = "b";
-  panel.querySelector("#mov-multiple-producto").value = "p1";
-  panel.querySelector("#mov-multiple-cantidad").value = "2";
-  panel.querySelector("#mov-multiple-add").click();
-  panel.querySelector("#mov-multiple-producto").value = "p2";
-  panel.querySelector("#mov-multiple-cantidad").value = "3";
-  panel.querySelector("#mov-multiple-add").click();
+
+  for (const id of ["p1", "p2"]) {
+    const checkbox = panel.querySelector('[data-mov-select="' + id + '"]');
+    assert.ok(checkbox, "el selector debe mostrar " + id);
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new window.Event("change", { bubbles: true }));
+  }
+  assert.equal(panel.querySelectorAll('[data-mov-select]:checked').length, 2);
+  panel.querySelector("#mov-transfer-next").click();
+  assert.equal(panel.querySelector("#mov-transfer-step-details").hidden, false);
+  panel.querySelector('[data-mov-quantity="p1"]').value = "2";
+  panel.querySelector('[data-mov-quantity="p2"]').value = "3";
   assert.equal(window.__BC_MOVIMIENTO_MULTIPLE_STATE__().lineas.length, 2);
+
   panel.querySelector("#mov-multiple-confirmar").click();
-  for (let attempt = 0; attempt < 10 && window.__transferCalls.length === 0; attempt++) {
+  for (let attempt = 0; attempt < 30 && window.__transferCalls.length === 0; attempt++) {
     await new Promise(resolve => setImmediate(resolve));
   }
-  assert.equal(window.__transferCalls.length, 1, "la lista completa debe usar un solo RPC");
+  assert.equal(window.__transferCalls.length, 1, "la lista completa debe usar una sola operación");
   assert.equal(window.__transferCalls[0].type, "transferencia");
   assert.deepEqual(
     JSON.parse(JSON.stringify(window.__transferCalls[0].payload.p_lineas.map((x) => [x.producto_id, x.cantidad]))),
