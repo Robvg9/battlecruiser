@@ -896,7 +896,6 @@ BEGIN
   JOIN public.almacenes destino ON destino.id = t.almacen_destino_id
   WHERE t.id = p_transferencia_id
     AND t.estado = 'completada'
-    AND t.responsable_receptor_id IS NOT NULL
     AND nullif(btrim(t.responsable_receptor_nombre),'') IS NOT NULL;
 
   IF v_resultado IS NULL THEN
