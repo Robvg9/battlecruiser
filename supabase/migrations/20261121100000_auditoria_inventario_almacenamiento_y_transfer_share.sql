@@ -790,10 +790,7 @@ BEGIN
 END;
 $function$;
 
--- Reject the legacy transfer RPC for retail warehouses. The wrapper below is
--- the only path that can set the transaction-local gate after validating and
--- snapshotting the receiving person.
-CREATE OR REPLACE FUNCTION public.registrar_transferencia(
+CREATE OR REPLACE FUNCTION private.bc_registrar_transferencia_interna(
   p_origen_id uuid,
   p_destino_id uuid,
   p_lineas jsonb,
@@ -817,8 +814,6 @@ DECLARE
   v_tomar numeric;
   v_stock_origen numeric;
   v_idempotente uuid;
-  v_receiver_gate boolean := coalesce(current_setting('app.bc_transfer_receiver_write', true),'off') = 'on';
-  v_destino_minorista boolean;
 BEGIN
   IF NOT public.tiene_permiso('transferencias','crear') THEN
     RAISE EXCEPTION 'Sin permiso para registrar transferencias';
@@ -827,14 +822,6 @@ BEGIN
     RAISE EXCEPTION 'El almacén origen y destino no pueden ser el mismo';
   END IF;
 
-  SELECT (a.tipo = 'minorista') INTO v_destino_minorista
-  FROM public.almacenes a
-  WHERE a.id = p_destino_id AND a.activo IS DISTINCT FROM false;
-
-  IF coalesce(v_destino_minorista,false) AND NOT v_receiver_gate THEN
-    RAISE EXCEPTION 'Las transferencias hacia almacenes minoristas requieren identificar a la persona que recibe la mercancía.'
-      USING ERRCODE = '22023';
-  END IF;
 
   IF p_idempotency_key IS NULL THEN
     RAISE EXCEPTION 'Se requiere idempotency_key';
@@ -921,6 +908,44 @@ BEGIN
 END;
 $function$;
 
+REVOKE ALL ON FUNCTION private.bc_registrar_transferencia_interna(uuid,uuid,jsonb,uuid) FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.registrar_transferencia(
+  p_origen_id uuid,
+  p_destino_id uuid,
+  p_lineas jsonb,
+  p_idempotency_key uuid DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_tipo_destino text;
+BEGIN
+  IF NOT public.tiene_permiso('transferencias','crear') THEN
+    RAISE EXCEPTION 'Sin permiso para registrar transferencias';
+  END IF;
+  IF p_origen_id = p_destino_id THEN
+    RAISE EXCEPTION 'El almacén origen y destino no pueden ser el mismo';
+  END IF;
+
+  SELECT a.tipo INTO v_tipo_destino
+  FROM public.almacenes a
+  WHERE a.id = p_destino_id AND a.activo IS DISTINCT FROM false;
+
+  IF v_tipo_destino = 'minorista' THEN
+    RAISE EXCEPTION 'Las transferencias hacia almacenes minoristas requieren identificar a la persona que recibe la mercancía.'
+      USING ERRCODE = '22023';
+  END IF;
+
+  RETURN private.bc_registrar_transferencia_interna(
+    p_origen_id, p_destino_id, p_lineas, p_idempotency_key
+  );
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.registrar_transferencia_con_receptor(
   p_origen_id uuid,
   p_destino_id uuid,
@@ -965,11 +990,9 @@ BEGIN
   -- Reuse the established atomic transfer/FIFO/idempotency implementation.
   -- The metadata update is in the same outer transaction: no transfer can
   -- commit without its receiving person when using this RPC.
-  PERFORM set_config('app.bc_transfer_receiver_write','on',true);
-  v_transferencia_id := public.registrar_transferencia(
+  v_transferencia_id := private.bc_registrar_transferencia_interna(
     p_origen_id, p_destino_id, p_lineas, p_idempotency_key
   );
-  PERFORM set_config('app.bc_transfer_receiver_write','off',true);
 
   SELECT t.responsable_receptor_id, t.responsable_receptor_nombre
   INTO v_existente, v_nombre_receptor_actual
