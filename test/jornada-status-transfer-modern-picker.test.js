@@ -47,7 +47,7 @@ test("PWA release and offline module cache are aligned for the transfer UI updat
   assertPwaReleaseAligned(assert, { app, serviceWorker, index });
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "movimiento-multiple.js" });
 
-  const modernModule = app.indexOf('["movimiento-multiple.js","20261121.1"]');
+  const modernModule = app.indexOf('["movimiento-multiple.js","20261121.2"]');
   const transferModal = app.indexOf('["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"]');
   assert.ok(modernModule >= 0 && transferModal > modernModule,
     "the multi-product picker must initialize before the transfer modal moves it");
