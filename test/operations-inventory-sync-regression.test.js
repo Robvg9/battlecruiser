@@ -40,7 +40,7 @@ test("Flavor editor saves a positive minimum independently for each variant and 
 });
 
 test("Operations hub reloads both catalogs from Supabase instead of trusting non-empty stale cache", () => {
-  assert.match(operationsHub, /async function ensureOperationCatalogs\(required\)/);
+  assert.match(operationsHub, /async function ensureOperationCatalogs\(required, silent\)/);
   assert.match(operationsHub, /api\.from\('productos'\)/);
   assert.match(operationsHub, /categorias\(nombre\),presentaciones\(nombre\)/);
   assert.match(operationsHub, /api\.from\('almacenes'\)/);

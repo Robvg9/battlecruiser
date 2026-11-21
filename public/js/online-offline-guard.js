@@ -69,7 +69,15 @@
     }
   }
 
+  function appShellAuthenticated() {
+    var shell = document.getElementById("app-shell");
+    return !!(shell && shell.classList.contains("visible"));
+  }
+
   async function recuperarYComprobar() {
+    // The login screen has no app session. Avoid polling Auth's /user endpoint
+    // anonymously while the user is still entering credentials.
+    if (!appShellAuthenticated()) return;
     if (!navigator.onLine) {
       if (typeof marcarConectividadReal === "function") marcarConectividadReal("offline");
       return;

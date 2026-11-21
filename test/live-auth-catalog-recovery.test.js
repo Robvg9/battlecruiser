@@ -10,7 +10,8 @@ const transfers = read("public/js/movimiento-multiple.js");
 
 test("Baja catalog and approval requests wait for the authenticated Supabase session", () => {
   assert.match(approvals, /async function hasLiveSession\(\)/);
-  assert.match(approvals, /if\(!canAdmin\(\)\|\|!\(await hasLiveSession\(\)\)\)return/);
+  assert.match(approvals, /if\(!canAdmin\(\)\)\{hideApprovalPanel\(\);return\}/);
+  assert.match(approvals, /if\(!\(await hasLiveSession\(\)\)\)\{hideApprovalPanel\(\);return\}/);
   assert.match(approvals, /SIGNED_IN.*INITIAL_SESSION.*TOKEN_REFRESHED/);
 });
 
