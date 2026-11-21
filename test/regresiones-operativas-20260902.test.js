@@ -23,8 +23,12 @@ test('syntax: todos los módulos JS nuevos pasan node --check', () => {
   for (const file of NEW_JS) execFileSync(process.execPath, ['--check', path.join(root,'public','js',file)], {stdio:'pipe'});
 });
 
-test('logout: usa LogOut y frontera de sesión', () => {
-  assert.ok(hotfix.includes("btn.textContent = 'LogOut'"));
+test('logout: conserva el SVG accesible y la frontera de sesión', () => {
+  assert.ok(!hotfix.includes("btn.textContent = 'LogOut'"),
+    "el logout no debe reemplazar el SVG visible por texto");
+  assert.ok(hotfix.includes("btn.classList.add('bc-reg-logout','bc-header-icon-button')"));
+  assert.ok(hotfix.includes("btn.setAttribute('aria-label','Cerrar sesión')"));
+  assert.ok(hotfix.includes("btn.setAttribute('title','Cerrar sesión')"));
   assert.ok(hotfix.includes('window.__bcLogoutEnCurso = true'));
   assert.ok(hotfix.includes('window.location.replace'));
   assert.ok(hotfix.includes("'.ajustes-wrap{display:none!important}'"));
