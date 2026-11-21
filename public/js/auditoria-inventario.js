@@ -303,6 +303,10 @@
     if (!currentAudit || busy) return;
     const detail = currentDetail;
     const inputs = byId("bc-auditoria-inv-detail").querySelectorAll("[data-audit-line]");
+    if (inputs.length !== detail.lineas.length) {
+      setMessage("Quita la búsqueda para mostrar todos los productos y completar el conteo antes de cerrar.", false);
+      return;
+    }
     const incomplete = [...inputs].some((input) => input.value.trim() === "");
     if (incomplete) {
       setMessage("Completa la cantidad física de todos los productos antes de cerrar.", false);
