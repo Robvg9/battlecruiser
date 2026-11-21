@@ -5,7 +5,7 @@ const fs=require("node:fs");
 const read=file=>fs.readFileSync(file,"utf8");
 const offline=read("public/js/offline.js");
 const jornada=read("public/js/bc7-jornada-ui.js");
-const migration=read("supabase/migrations/20261121180000_jornada_operational_close_and_transfer_attribution.sql");
+const migration=read("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
 
 test("Jornada late-operation RPCs reuse the single IndexedDB operation queue",()=>{
   for(const [type,rpc] of [
