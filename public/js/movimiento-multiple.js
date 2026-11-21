@@ -47,7 +47,7 @@
       const result = await api.rpc('bc_listar_responsables_transferencia');
       if (result.error) throw result.error;
       receiverOptions = (Array.isArray(result.data) ? result.data : [])
-        .filter(user => user && user.id && user.activo === true && user.archivado !== true)
+        .filter(user => user && user.id && user.nombre)
         .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
       return receiverOptions;
     })();
