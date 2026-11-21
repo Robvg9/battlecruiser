@@ -18,13 +18,13 @@ test("Jornada calendar uses the requested status colors and labels", () => {
   assert.ok(start >= 0 && end > start, "calendar row renderer must exist");
   const row = ui.slice(start, end);
 
-  assert.match(row, /isClosed=\\['COMPLETADA','CERRADA','CERRADO'\\]\\.includes\\(status\\)/);
-  assert.match(row, /isScheduled=\\['PROGRAMADA','PROGRAMADO','PENDIENTE'\\]\\.includes\\(status\\)/);
+  assert.ok(row.includes("const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);"));
+  assert.ok(row.includes("const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);"));
   assert.match(row, /class="bc7-pill closed">Cerrada/);
   assert.match(row, /class="bc7-pill ok">En curso/);
   assert.match(row, /class="bc7-pill warn">Programada/);
   assert.match(row, /const isTerminal=isClosed/);
-  assert.match(ui, /\\.bc7-pill\\.closed\\{color:#efaaa2;border-color:#a45353;background:rgba\\(164,83,83,\\.10\\)\\}/);
+  assert.ok(ui.includes(".bc7-pill.closed{color:#efaaa2;border-color:#a45353;background:rgba(164,83,83,.10)}"));
 });
 
 test("Transferencia keeps only the modern multi-product picker visible", () => {
@@ -34,7 +34,7 @@ test("Transferencia keeps only the modern multi-product picker visible", () => {
   assert.match(transfer, /PASO 1 DE 2 · Selecciona los productos/);
   assert.match(transfer, /PASO 2 DE 2 · Cantidades/);
   assert.match(transfer, /mov-transfer-line-editor/);
-  assert.match(transfer, /mov-transfer-line-editor\\{display:none!important\\}/,
+  assert.ok(transfer.includes(".mov-transfer-line-editor{display:none!important}"),
     "the legacy single-product add editor must stay hidden despite the hidden attribute/CSS cascade");
   assert.match(transfer, /legacyForm\.style\.display = 'none'/,
     "the old one-product transfer form must also remain hidden");
