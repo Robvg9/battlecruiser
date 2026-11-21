@@ -679,6 +679,26 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.bc_listar_responsables_transferencia()
+RETURNS TABLE (id uuid, nombre text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.tiene_permiso('transferencias','crear') THEN
+    RAISE EXCEPTION 'No tienes permiso para consultar responsables de recepción.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+  SELECT u.id, u.nombre
+  FROM public.usuarios u
+  WHERE u.activo IS TRUE
+    AND coalesce(u.archivado,false) IS FALSE
+  ORDER BY u.nombre;
+END;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.registrar_transferencia_con_receptor(
   p_origen_id uuid,
   p_destino_id uuid,
@@ -800,6 +820,7 @@ REVOKE ALL ON FUNCTION public.bc_cerrar_auditoria_inventario(uuid) FROM PUBLIC, 
 REVOKE ALL ON FUNCTION public.bc_cancelar_auditoria_inventario(uuid,text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_resolver_linea_auditoria_inventario(uuid,uuid,text,text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_registrar_baja_auditoria_inventario(uuid,uuid,text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.bc_listar_responsables_transferencia() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.registrar_transferencia_con_receptor(uuid,uuid,jsonb,uuid,uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.bc_mensaje_transferencia(uuid) FROM PUBLIC, anon;
 
@@ -812,6 +833,7 @@ GRANT EXECUTE ON FUNCTION public.bc_cerrar_auditoria_inventario(uuid) TO authent
 GRANT EXECUTE ON FUNCTION public.bc_cancelar_auditoria_inventario(uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc_resolver_linea_auditoria_inventario(uuid,uuid,text,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc_registrar_baja_auditoria_inventario(uuid,uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.bc_listar_responsables_transferencia() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.registrar_transferencia_con_receptor(uuid,uuid,jsonb,uuid,uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.bc_mensaje_transferencia(uuid) TO authenticated;
 
