@@ -14,7 +14,7 @@ const mando = fs.readFileSync("public/js/mando.js", "utf8");
 
 test("physical audit is limited server-side to storage warehouses", () => {
   assert.match(migration, /v_almacen\.tipo\s*<>\s*'almacenamiento'/i);
-  assert.match(migration, /inventario_auditoria_activa_id/);
+  assert.match(migration, /auditoria_inventario_activa_id/);
   assert.match(migration, /before insert or update or delete on public\.stock/i);
   assert.match(migration, /for share/i);
   assert.match(inventoryUi, /w\.tipo === 'almacenamiento'/);
@@ -46,7 +46,7 @@ test("transfer receiver is persisted through a backward-compatible atomic RPC ex
   assert.match(migration, /add column if not exists recibido_por uuid references public\.usuarios/i);
   assert.match(migration, /registrar_transferencia\(\s*p_origen_id uuid,\s*p_destino_id uuid,\s*p_lineas jsonb,\s*p_idempotency_key uuid,\s*p_recibido_por uuid/s);
   assert.match(migration, /public\.registrar_transferencia\(\s*p_origen_id,\s*p_destino_id,\s*v_lineas,\s*p_idempotency_key\s*\)/s);
-  assert.match(transferUi, /p_recibido_por:\s*receiver/);
+  assert.match(transferUi, /if \(receiver\) payload\.p_recibido_por = receiver/);
   assert.match(transferUi, /listar_receptores_transferencia/);
 });
 
