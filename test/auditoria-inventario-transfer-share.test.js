@@ -114,7 +114,7 @@ test("Retail destinations require a receiver-aware RPC and preserve it in the of
   assert.match(migration, /responsable_receptor_nombre = coalesce\(responsable_receptor_nombre,v_nombre_receptor\)/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.registrar_transferencia_con_receptor/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.registrar_transferencia\(/);
-  assert.match(migration, /coalesce\\(v_destino_minorista,false\\) AND NOT v_receiver_gate/);
+  assert.match(migration, /coalesce\(v_destino_minorista,false\) AND NOT v_receiver_gate/);
   assert.match(migration, /set_config\('app\.bc_transfer_receiver_write','on',true\)/);
   assert.match(migration, /p_responsable_receptor_id/);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.bc_mensaje_transferencia/);
