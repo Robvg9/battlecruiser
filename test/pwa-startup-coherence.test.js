@@ -214,6 +214,7 @@ test("Service Worker updates wait for an explicit, stable handoff", () => {
 });
 
 test("Saved light/dark preference is applied before first paint", () => {
+  const appVersion = app.match(/const VERSION="([^"]+)"/)?.[1];
   const bootstrapAt = indexHtml.indexOf('id="bc-theme-first-paint"');
   const stylesheetAt = indexHtml.indexOf('href="style.css?v=' + appVersion + '"');
   const themeScriptAt = indexHtml.indexOf('js/m27-5-theme-dark-reset.js?v=27.5a3');

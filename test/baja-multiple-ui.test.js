@@ -55,8 +55,8 @@ test("Baja list opens in a single responsive modal, not as a hidden Operations b
  assert.match(css,/max-height:none;overflow:visible/);
  assert.match(css,/overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch/);
  assert.match(css,/bc-pwa-update-notice/);
- assert.match(hub,/if \\(bajaOpenPromise\\) return bajaOpenPromise/);
- assert.match(hub,/bajaOpenPromise = Promise\\.resolve\\(window\\.abrirBajasMultiple\\(\\)\\)/);
+ assert.ok(hub.includes("if (bajaOpenPromise) return bajaOpenPromise"));
+ assert.ok(hub.includes("bajaOpenPromise = Promise.resolve(window.abrirBajasMultiple())"));
 });
 
 test("batch RPC returns one parent request with all Baja child lines",()=>{
