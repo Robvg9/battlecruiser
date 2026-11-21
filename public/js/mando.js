@@ -136,7 +136,7 @@ function renderAuditoria(filas) {
     return;
   }
   if (filas.length === 0) {
-    el.innerHTML = '<p class="lista-estado">Todavía no hay movimientos para mostrar.</p>';
+    el.innerHTML = '<p class="lista-estado">Sin registros de auditoría para los filtros seleccionados.</p>';
     renderPaginacionAuditoria(0);
     return;
   }
