@@ -163,7 +163,7 @@ async function listarResponsablesTransferencia() {
   if (_responsablesTransferencia) return _responsablesTransferencia;
   if (_cargandoResponsablesTransferencia) return _cargandoResponsablesTransferencia;
   _cargandoResponsablesTransferencia = (async function () {
-    const { data, error } = await client.rpc("listar_usuarios_admin", { p_incluir_archivados: false });
+    const { data, error } = await client.rpc("bc_listar_responsables_transferencia");
     if (error) throw error;
     _responsablesTransferencia = (Array.isArray(data) ? data : [])
       .filter((usuario) => usuario && usuario.id && usuario.activo === true && usuario.archivado !== true)
