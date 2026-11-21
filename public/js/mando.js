@@ -194,7 +194,7 @@ function poblarFiltrosAuditoria() {
     tipos.forEach((t) => { const o = document.createElement("option"); o.value = t; o.textContent = etiquetaTipoAuditoria(t); selTipo.appendChild(o); });
   }
   if (selEstado && selEstado.options.length <= 1) {
-    estados.forEach((e) => { const o = document.createElement("option"); o.value = e; o.textContent = e; selEstado.appendChild(o); });
+    estados.forEach((e) => { const o = document.createElement("option"); o.value = e; o.textContent = etiquetaEstadoAuditoria(e); selEstado.appendChild(o); });
   }
 }
 
