@@ -63,6 +63,7 @@ test("WhatsApp share uses the compact recipient template only after successful o
   assert.match(transferUi, /Fecha: \*/);
   assert.match(transferUi, /Recibe: \*@/);
   assert.match(transferUi, /data\.lineas\.map/);
+  assert.match(transferUi, /lastShareText = lines\.join\('\\n'\)/);
   assert.match(transferUi, /function formatQtyForShare\(value\)/);
   assert.match(transferUi, /formatQtyForShare\(item\.cantidad\)/);
   assert.match(transferUi, /navigator\.share/);
