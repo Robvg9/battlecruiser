@@ -1,8 +1,10 @@
 {
   "name": "battlecruiser",
-  "compatibility_date": "2026-08-10",
+  "main": "./preview-worker.mjs",
+  "compatibility_date": "2026-09-24",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/__bc_preview/*"]
   }
 }
- 

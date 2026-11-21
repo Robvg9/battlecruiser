@@ -416,7 +416,7 @@
       if (result.offline) feedback(
         receiver
           ? '✓ Transferencia guardada localmente. Stock y permisos se validarán en Supabase al sincronizar.'
-          : '✓ Transferencia guardada localmente; falta identificar quién recibe. Stock y permisos se validarán en Supabase al sincronizar.',
+          : '✓ Transferencia guardada localmente; falta identificar quién recibe. Esta operación no tendrá comprobante de WhatsApp. Stock y permisos se validarán en Supabase al sincronizar.',
         true
       );
       else {
