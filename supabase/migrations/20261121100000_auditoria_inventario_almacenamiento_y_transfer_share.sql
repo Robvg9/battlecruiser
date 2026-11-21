@@ -5,7 +5,8 @@ BEGIN;
 
 ALTER TABLE public.transferencias
   ADD COLUMN IF NOT EXISTS responsable_receptor_id uuid
-  REFERENCES public.usuarios(id) ON DELETE SET NULL;
+  REFERENCES public.usuarios(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS responsable_receptor_nombre text;
 
 CREATE INDEX IF NOT EXISTS idx_transferencias_responsable_receptor
   ON public.transferencias(responsable_receptor_id)
@@ -804,6 +805,8 @@ AS $function$
 DECLARE
   v_transferencia_id uuid;
   v_existente uuid;
+  v_nombre_receptor_actual text;
+  v_nombre_receptor text;
   v_destino_tipo text;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.tiene_permiso('transferencias','crear') THEN
@@ -819,12 +822,12 @@ BEGIN
   IF NOT FOUND OR v_destino_tipo <> 'minorista' THEN
     RAISE EXCEPTION 'El responsable de recepción solo se exige para transferencias hacia almacenes minoristas.';
   END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM public.usuarios u
-    WHERE u.id = p_responsable_receptor_id
-      AND u.activo IS TRUE
-      AND coalesce(u.archivado,false) IS FALSE
-  ) THEN
+  SELECT u.nombre INTO v_nombre_receptor
+  FROM public.usuarios u
+  WHERE u.id = p_responsable_receptor_id
+    AND u.activo IS TRUE
+    AND coalesce(u.archivado,false) IS FALSE;
+  IF NOT FOUND OR nullif(btrim(v_nombre_receptor),'') IS NULL THEN
     RAISE EXCEPTION 'La persona responsable seleccionada no está activa.';
   END IF;
 
@@ -835,7 +838,8 @@ BEGIN
     p_origen_id, p_destino_id, p_lineas, p_idempotency_key
   );
 
-  SELECT t.responsable_receptor_id INTO v_existente
+  SELECT t.responsable_receptor_id, t.responsable_receptor_nombre
+  INTO v_existente, v_nombre_receptor_actual
   FROM public.transferencias t
   WHERE t.id = v_transferencia_id
   FOR UPDATE;
@@ -845,7 +849,8 @@ BEGIN
   END IF;
 
   UPDATE public.transferencias
-  SET responsable_receptor_id = p_responsable_receptor_id
+  SET responsable_receptor_id = coalesce(responsable_receptor_id,p_responsable_receptor_id),
+      responsable_receptor_nombre = coalesce(responsable_receptor_nombre,v_nombre_receptor)
   WHERE id = v_transferencia_id;
 
   RETURN v_transferencia_id;
@@ -874,7 +879,7 @@ BEGIN
     'transferencia_id', t.id,
     'fecha', t.fecha,
     'almacen', destino.nombre,
-    'responsable', receptor.nombre,
+    'responsable', t.responsable_receptor_nombre,
     'productos', coalesce((
       SELECT jsonb_agg(jsonb_build_object(
         'nombre', p.nombre,
@@ -889,10 +894,10 @@ BEGIN
   INTO v_resultado
   FROM public.transferencias t
   JOIN public.almacenes destino ON destino.id = t.almacen_destino_id
-  LEFT JOIN public.usuarios receptor ON receptor.id = t.responsable_receptor_id
   WHERE t.id = p_transferencia_id
     AND t.estado = 'completada'
-    AND t.responsable_receptor_id IS NOT NULL;
+    AND t.responsable_receptor_id IS NOT NULL
+    AND nullif(btrim(t.responsable_receptor_nombre),'') IS NOT NULL;
 
   IF v_resultado IS NULL THEN
     RAISE EXCEPTION 'La transferencia no existe, no está completada o no tiene responsable receptor.';
