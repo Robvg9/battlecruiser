@@ -492,6 +492,7 @@ const ETIQUETA_TIPO_OP = {
   venta: "Venta",
   venta_jornada: "Venta de Jornada",
   transferencia: "Transferencia",
+  transferencia_receptor: "Transferencia a almacén minorista",
   vale: "Vale de salida",
   producto: "Creación de producto",
   producto_actualizar: "Edición de producto",
@@ -528,7 +529,8 @@ function resumenOperacionPendiente(op) {
       const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
       return lineas.length + " línea(s) · " + totalUnidades + " unidades";
     }
-    case "transferencia": {
+    case "transferencia":
+    case "transferencia_receptor": {
       const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
       const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
       return lineas.length + " línea(s) · " + totalUnidades + " unidades";
@@ -739,7 +741,8 @@ function detalleOperacionPendiente(op) {
       });
       break;
     }
-    case "transferencia": {
+    case "transferencia":
+    case "transferencia_receptor": {
       const lineas = Array.isArray(p.p_lineas) ? p.p_lineas : [];
       cuerpo += fila("Origen", resolverNombreAlmacen(p.p_origen_id));
       cuerpo += fila("Destino", resolverNombreAlmacen(p.p_destino_id));
@@ -1020,7 +1023,7 @@ function ajustePendiente(producto_id, almacen_id) {
       (p.p_lineas || []).forEach((l) => {
         if (l.producto_id === producto_id) ajuste -= Number(l.cantidad) || 0;
       });
-    } else if (op.tipo === "transferencia") {
+    } else if (op.tipo === "transferencia" || op.tipo === "transferencia_receptor") {
       (p.p_lineas || []).forEach((l) => {
         if (l.producto_id !== producto_id) return;
         if (p.p_origen_id === almacen_id) ajuste -= Number(l.cantidad) || 0;
@@ -1037,6 +1040,7 @@ const RPC_POR_TIPO = {
   venta: "registrar_venta",
   venta_jornada: "bc7_registrar_venta_jornada",
   transferencia: "registrar_transferencia",
+  transferencia_receptor: "registrar_transferencia_con_receptor",
   vale: "registrar_vale_salida",
   // que compra/venta/transferencia/vale, en vez de un INSERT directo aparte.
   producto: "crear_producto",
@@ -1071,6 +1075,7 @@ function tipoAuditableFrontend(tipo) {
     case "venta":
     case "venta_jornada":
     case "transferencia":
+    case "transferencia_receptor":
     case "vale":
       // Ya auditados por el trigger auditar_mutacion_operativa().
       return false;
@@ -1090,6 +1095,7 @@ const BC_DATA_DOMAINS_BY_OPERATION = {
   venta: ['stock', 'inventory', 'movements', 'sales'],
   venta_jornada: ['stock', 'inventory', 'movements', 'sales'],
   transferencia: ['stock', 'inventory', 'movements', 'transfers'],
+  transferencia_receptor: ['stock', 'inventory', 'movements', 'transfers'],
   vale: ['stock', 'inventory', 'movements', 'vales'],
   almacen: ['warehouses', 'stock', 'inventory'],
   almacen_actualizar: ['warehouses', 'stock', 'inventory'],
@@ -1246,6 +1252,7 @@ function reconciliarTrasOperacion(tipo, resultado) {
       marcarRefrescoPendiente("ventas");
       break;
     case "transferencia":
+    case "transferencia_receptor":
       marcarRefrescoPendiente("stock");
       marcarRefrescoPendiente("transferencias");
       break;

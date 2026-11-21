@@ -1809,3 +1809,156 @@ html[data-bc-theme="light"] select optgroup {
 .bc-baja-quantity-field input{min-height:40px;padding:8px 10px}
 .bc-bajas-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 @media(max-width:540px){.bc-bajas-product-picker{max-height:38vh}.bc-bajas-actions button{flex:1 1 100%}}
+
+
+/* BattleCruiser 9.5.138 — readable audit history and storage-only stock counts. */
+#tab-mando .bc-auditoria-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) minmax(130px, auto);
+  align-items: start;
+  gap: 11px;
+  padding: 13px 12px;
+  margin: 0;
+  border-bottom: 1px solid var(--border, rgba(128,128,128,.18));
+  background: transparent;
+}
+#tab-mando .bc-auditoria-card:last-child { border-bottom: 0; }
+#tab-mando .bc-auditoria-card .cc-actividad-icono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--stone, rgba(128,128,128,.10));
+  font-size: 17px;
+}
+#tab-mando .bc-auditoria-card-content { min-width: 0; display: grid; gap: 5px; }
+#tab-mando .bc-auditoria-card-title {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+#tab-mando .bc-auditoria-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#tab-mando .bc-auditoria-type,
+#tab-mando .bc-auditoria-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--stone, rgba(128,128,128,.10));
+  color: var(--mist, #777);
+  font-size: 10px;
+  font-weight: 650;
+}
+#tab-mando .bc-auditoria-status.done { color: var(--green, #397c58); }
+#tab-mando .bc-auditoria-status.pending { color: var(--gold, #a97822); }
+#tab-mando .bc-auditoria-status.review { color: var(--wine, #a43f3f); }
+#tab-mando .bc-auditoria-card-actor { color: var(--mist, #777); font-size: 11px; }
+#tab-mando .bc-auditoria-card-date { min-width: 0; max-width: 155px; padding-top: 2px; text-align: right; font-size: 10.5px; line-height: 1.35; white-space: normal; }
+#tab-mando .bc-auditoria-empty { display: grid; place-items: center; gap: 7px; text-align: center; padding: 28px 14px; }
+#tab-mando .bc-auditoria-empty-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--stone, rgba(128,128,128,.10)); font-size: 20px; }
+#tab-mando .bc-auditoria-empty strong { font-size: 13px; }
+
+.bc-auditoria-inv-shell { margin-top: 16px; display: grid; gap: 12px; }
+.bc-auditoria-inv-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.bc-auditoria-inv-header h3,
+.bc-auditoria-inv-history-heading h4 { margin: 0; }
+.bc-auditoria-inv-header p { margin: 4px 0 0; max-width: 620px; }
+.bc-auditoria-inv-create { display: grid; grid-template-columns: minmax(180px,1fr) minmax(200px,1fr) auto; align-items: end; gap: 9px; }
+.bc-auditoria-inv-create label,
+.bc-auditoria-inv-search,
+.bc-auditoria-inv-line-values label,
+.bc-auditoria-inv-review label,
+.trf-responsable-receptor-wrap label { display: grid; gap: 5px; min-width: 0; }
+.bc-auditoria-inv-create label > span,
+.bc-auditoria-inv-search > span,
+.bc-auditoria-inv-line-values label > span,
+.bc-auditoria-inv-review label > span,
+.trf-responsable-receptor-wrap label > span { color: var(--mist, #777); font-size: 11px; font-weight: 650; }
+.bc-auditoria-inv-create input,
+.bc-auditoria-inv-create select,
+.bc-auditoria-inv-search input,
+.bc-auditoria-inv-line-values input,
+.bc-auditoria-inv-review input,
+.bc-auditoria-inv-review select,
+.trf-responsable-receptor-wrap select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+}
+.bc-auditoria-inv-message { margin: 0; }
+.bc-auditoria-inv-detail { display: grid; gap: 12px; min-width: 0; margin-top: 5px; }
+.bc-auditoria-inv-detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.bc-auditoria-inv-detail-head h4 { margin: 0; font-size: 16px; }
+.bc-auditoria-inv-detail-head p { margin: 4px 0 0; }
+.bc-auditoria-inv-state { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; background: var(--stone, rgba(128,128,128,.10)); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.bc-auditoria-inv-state.open { color: var(--gold, #a97822); }
+.bc-auditoria-inv-state.review { color: var(--wine, #a43f3f); }
+.bc-auditoria-inv-state.closed { color: var(--green, #397c58); }
+.bc-auditoria-inv-warning { padding: 11px 12px; border-radius: 10px; border-left: 3px solid var(--gold, #a97822); background: var(--stone, rgba(128,128,128,.08)); color: var(--text); font-size: 12px; line-height: 1.45; }
+.bc-auditoria-inv-warning strong { display: block; margin-bottom: 2px; }
+.bc-auditoria-inv-note { padding: 9px 11px; border-radius: 9px; background: var(--stone, rgba(128,128,128,.08)); font-size: 12px; }
+.bc-auditoria-inv-kpis { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
+.bc-auditoria-inv-kpis > div { display: grid; gap: 3px; min-width: 0; padding: 10px; border-radius: 10px; background: var(--stone, rgba(128,128,128,.08)); }
+.bc-auditoria-inv-kpis strong { font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.bc-auditoria-inv-kpis span { color: var(--mist, #777); font-size: 10px; }
+.bc-auditoria-inv-search { max-width: 420px; }
+.bc-auditoria-inv-lines { display: grid; gap: 7px; }
+.bc-auditoria-inv-line { display: grid; gap: 9px; min-width: 0; padding: 11px; border: 1px solid var(--border, rgba(128,128,128,.18)); border-radius: 11px; background: var(--surface, transparent); }
+.bc-auditoria-inv-line-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.bc-auditoria-inv-line-title > strong { min-width: 0; font-size: 12.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.bc-auditoria-inv-difference { border-radius: 999px; padding: 4px 8px; background: var(--stone, rgba(128,128,128,.08)); font-size: 11px; font-weight: 750; white-space: nowrap; }
+.bc-auditoria-inv-difference.negative { color: var(--wine, #a43f3f); }
+.bc-auditoria-inv-difference.positive { color: var(--green, #397c58); }
+.bc-auditoria-inv-difference.zero { color: var(--mist, #777); }
+.bc-auditoria-inv-line-values { display: grid; grid-template-columns: minmax(0,1fr) minmax(150px,.8fr); align-items: end; gap: 10px; }
+.bc-auditoria-inv-line-values > span { display: grid; gap: 3px; color: var(--mist, #777); font-size: 10px; }
+.bc-auditoria-inv-line-values > span strong { color: var(--text); font-size: 13px; }
+.bc-auditoria-inv-review { display: grid; grid-template-columns: minmax(170px,.8fr) minmax(200px,1fr); gap: 8px; padding-top: 8px; border-top: 1px solid var(--border, rgba(128,128,128,.18)); }
+.bc-auditoria-inv-review .bc-auditoria-inv-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.bc-auditoria-inv-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.bc-auditoria-inv-footnote { margin: -4px 0 0; font-size: 10.5px; }
+.bc-auditoria-inv-review-result { margin: 0; color: var(--mist, #777); font-size: 11px; }
+.bc-auditoria-inv-review-result strong { display: block; color: var(--green, #397c58); }
+.bc-auditoria-inv-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid var(--border, rgba(128,128,128,.18)); }
+.bc-auditoria-inv-list { display: grid; gap: 7px; }
+.bc-auditoria-inv-history { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; width: 100%; padding: 11px 12px; text-align: left; border: 1px solid var(--border, rgba(128,128,128,.18)); border-radius: 10px; background: var(--surface, transparent); color: var(--text); cursor: pointer; }
+.bc-auditoria-inv-history-main { display: grid; gap: 3px; min-width: 0; }
+.bc-auditoria-inv-history-main strong { font-size: 12.5px; }
+.bc-auditoria-inv-history-main .muted { font-size: 10px; }
+.bc-auditoria-inv-history-state { align-self: center; border-radius: 999px; padding: 4px 8px; background: var(--stone, rgba(128,128,128,.10)); font-size: 10px; font-weight: 700; }
+.bc-auditoria-inv-history-state.open { color: var(--gold, #a97822); }
+.bc-auditoria-inv-history-state.review { color: var(--wine, #a43f3f); }
+.bc-auditoria-inv-history-state.closed { color: var(--green, #397c58); }
+.bc-auditoria-inv-history-meta { grid-column: 1 / -1; color: var(--mist, #777); font-size: 10px; }
+.trf-responsable-receptor-wrap { display: grid; gap: 4px; grid-column: 1 / -1; width: 100%; padding: 9px 10px; border: 1px solid var(--border, rgba(128,128,128,.18)); border-radius: 10px; background: var(--stone, rgba(128,128,128,.06)); }
+.trf-responsable-receptor-wrap p { margin: 0; font-size: 10.5px; }
+.bc-transfer-share { display: grid; gap: 9px; margin-top: 13px; padding: 12px; border: 1px solid var(--border, rgba(128,128,128,.18)); border-radius: 11px; background: var(--stone, rgba(128,128,128,.06)); }
+.bc-transfer-share-heading { display: grid; gap: 3px; }
+.bc-transfer-share-heading strong { font-size: 13px; }
+.bc-transfer-share-heading span,
+.bc-transfer-share > p { font-size: 10.5px; }
+.bc-transfer-share-text { width: 100%; min-height: 180px; resize: vertical; padding: 10px; font-family: inherit; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.bc-transfer-share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.bc-transfer-share > p { margin: 0; color: var(--mist, #777); }
+
+@media (max-width: 680px) {
+  #tab-mando .bc-auditoria-card { grid-template-columns: 34px minmax(0,1fr); gap: 8px; padding: 11px 8px; }
+  #tab-mando .bc-auditoria-card .cc-actividad-icono { width: 32px; height: 32px; font-size: 15px; }
+  #tab-mando .bc-auditoria-card-date { grid-column: 2; max-width: none; text-align: left; padding: 0; }
+  .bc-auditoria-inv-create { grid-template-columns: minmax(0,1fr); }
+  .bc-auditoria-inv-create > button { width: 100%; }
+  .bc-auditoria-inv-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .bc-auditoria-inv-line-values { grid-template-columns: minmax(0,1fr); }
+  .bc-auditoria-inv-review { grid-template-columns: minmax(0,1fr); }
+  .bc-auditoria-inv-review .bc-auditoria-inv-actions { grid-column: auto; }
+  .bc-auditoria-inv-actions > button,
+  .bc-transfer-share-actions > button { flex: 1 1 100%; min-height: 42px; }
+  .bc-auditoria-inv-detail-head { align-items: flex-start; }
+  .bc-auditoria-inv-history { grid-template-columns: minmax(0,1fr); }
+  .bc-auditoria-inv-history-state { justify-self: start; }
+  .bc-auditoria-inv-history-meta { grid-column: auto; }
+}

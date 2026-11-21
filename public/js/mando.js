@@ -56,30 +56,114 @@ async function refrescarAuditoria() {
   }
 }
 
+const ETIQUETAS_AUDITORIA = {
+  compra: "Compra de mercancía",
+  venta: "Venta registrada",
+  transferencia: "Transferencia entre almacenes",
+  vale: "Salida de productos",
+  producto: "Producto creado",
+  producto_actualizar: "Producto actualizado",
+  producto_estado: "Estado del producto cambiado",
+  usuario_rol: "Permisos de usuario actualizados",
+  usuario_estado: "Estado de usuario actualizado",
+  sincronizacion: "Sincronización",
+  auditoria_inventario: "Auditoría física de inventario"
+};
+
+function etiquetaTipoAuditoria(tipo) {
+  return ETIQUETAS_AUDITORIA[tipo] || "Movimiento del sistema";
+}
+
+function etiquetaEstadoAuditoria(estado) {
+  switch (String(estado || "").toLowerCase()) {
+    case "exito": return "Completada";
+    case "pendiente": return "Pendiente";
+    case "requiere_atencion": return "Requiere revisión";
+    case "error": return "No completada";
+    default: return "Registrada";
+  }
+}
+
+function textoDescripcionAuditoria(fila) {
+  const original = String(fila.descripcion || "").trim();
+  const sinUuid = original.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi, "").replace(/\s*[·:#-]\s*$/, "").trim();
+  const tipo = String(fila.tipo || "");
+  if (tipo === "transferencia" && /^transferencia registrada/i.test(sinUuid)) {
+    return "Transferencia registrada entre almacenes";
+  }
+  if (tipo === "compra" && /^compra registrada/i.test(sinUuid)) {
+    return "Compra de mercancía registrada";
+  }
+  if (tipo === "venta" && /^venta registrada/i.test(sinUuid)) {
+    return "Venta registrada";
+  }
+  if (sinUuid && !/^(operación|movimiento)\s+(compra|venta|transferencia|vale)\s+(ejecutada|registrada)/i.test(sinUuid)) {
+    return sinUuid;
+  }
+  return etiquetaTipoAuditoria(tipo);
+}
+
 function renderAuditoria(filas) {
   const el = document.getElementById("mando-auditoria");
   if (!el) return;
-  // Supabase RPC contract: an audit page must be an array. Avoid a TypeError
-  // and distinguish a malformed response from a legitimate empty audit list.
   if (!Array.isArray(filas)) {
-    el.innerHTML = '<p class="lista-estado">No se pudo cargar auditoría: respuesta inválida del servidor.</p>';
+    el.innerHTML = '<p class="lista-estado">No se pudo cargar el historial: la respuesta del servidor no tiene el formato esperado.</p>';
     renderPaginacionAuditoria(0);
     return;
   }
   if (filas.length === 0) {
-    el.innerHTML = '<p class="lista-estado">Sin registros de auditoría.</p>';
+    el.innerHTML = '<div class="bc-auditoria-empty"><span class="bc-auditoria-empty-icon">✓</span><strong>No hay movimientos que mostrar</strong><p class="muted">Prueba otros filtros o vuelve más tarde.</p></div>';
     renderPaginacionAuditoria(0);
     return;
   }
   el.innerHTML = "";
-  filas.forEach((f) => {
-    const div = document.createElement("div");
-    div.className = "cc-actividad-item cc-prioridad-" + (f.estado === "requiere_atencion" || f.estado === "error" ? "critico" : "normal");
-    const fechaTxt = f.fecha ? fechaHora(f.fecha) : "";
-    const idemp = f.idempotency_key ? " · " + idCorto(f.idempotency_key) : "";
-    div.innerHTML = '<span class="cc-actividad-icono">' + escHtml(iconoAuditoria(f.tipo)) + "</span>"
-      + '<span class="cc-actividad-texto">' + escHtml(f.descripcion || f.tipo || "—") + '<br><span class="muted">' + escHtml(f.usuario_nombre || "—") + " · " + escHtml(f.tipo || "") + " · " + escHtml(f.estado || "") + idemp + "</span></span>"
-      + '<span class="cc-actividad-meta"><span class="muted">' + escHtml(fechaTxt) + "</span></span>";
+  filas.forEach((fila) => {
+    const tipo = String(fila.tipo || "");
+    const estado = String(fila.estado || "").toLowerCase();
+    const div = document.createElement("article");
+    div.className = "cc-actividad-item bc-auditoria-card bc-auditoria-state-" +
+      (estado === "requiere_atencion" || estado === "error" ? "review" : estado === "pendiente" ? "pending" : "done");
+
+    const icon = document.createElement("span");
+    icon.className = "cc-actividad-icono";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = iconoAuditoria(tipo);
+
+    const content = document.createElement("div");
+    content.className = "cc-actividad-texto bc-auditoria-card-content";
+
+    const title = document.createElement("strong");
+    title.className = "bc-auditoria-card-title";
+    title.textContent = textoDescripcionAuditoria(fila);
+
+    const metadata = document.createElement("div");
+    metadata.className = "bc-auditoria-card-meta";
+    const type = document.createElement("span");
+    type.className = "bc-auditoria-type";
+    type.textContent = etiquetaTipoAuditoria(tipo);
+    const status = document.createElement("span");
+    status.className = "bc-auditoria-status " +
+      (estado === "requiere_atencion" || estado === "error" ? "review" : estado === "pendiente" ? "pending" : "done");
+    status.textContent = etiquetaEstadoAuditoria(estado);
+    metadata.appendChild(type);
+    metadata.appendChild(status);
+
+    const actor = document.createElement("div");
+    actor.className = "bc-auditoria-card-actor";
+    actor.textContent = fila.usuario_nombre || "Usuario no identificado";
+
+    content.appendChild(title);
+    content.appendChild(metadata);
+    content.appendChild(actor);
+
+    const date = document.createElement("time");
+    date.className = "cc-actividad-meta bc-auditoria-card-date";
+    if (fila.fecha) date.dateTime = fila.fecha;
+    date.textContent = fila.fecha ? fechaHora(fila.fecha) : "Fecha no disponible";
+
+    div.appendChild(icon);
+    div.appendChild(content);
+    div.appendChild(date);
     el.appendChild(div);
   });
   renderPaginacionAuditoria(filas.length);
@@ -91,10 +175,13 @@ function iconoAuditoria(tipo) {
     case "compra": return "📦";
     case "transferencia": return "↔";
     case "vale": return "📋";
-    case "producto": return "🏷️";
-    case "usuario_rol": return "👤";
+    case "producto":
+    case "producto_actualizar":
+    case "producto_estado": return "🏷️";
+    case "usuario_rol":
     case "usuario_estado": return "👤";
     case "sincronizacion": return "🔄";
+    case "auditoria_inventario": return "📋";
     default: return "•";
   }
 }
@@ -126,15 +213,15 @@ function renderPaginacionAuditoria(cargadas) {
 }
 
 function poblarFiltrosAuditoria() {
-  const tipos = ["compra", "venta", "transferencia", "vale", "producto", "usuario_rol", "usuario_estado", "sincronizacion"];
+  const tipos = ["compra", "venta", "transferencia", "vale", "producto", "producto_actualizar", "producto_estado", "usuario_rol", "usuario_estado", "sincronizacion", "auditoria_inventario"];
   const estados = ["exito", "pendiente", "requiere_atencion", "error"];
   const selTipo = document.getElementById("filtro-aud-tipo");
   const selEstado = document.getElementById("filtro-aud-estado");
   if (selTipo && selTipo.options.length <= 1) {
-    tipos.forEach((t) => { const o = document.createElement("option"); o.value = t; o.textContent = t; selTipo.appendChild(o); });
+    tipos.forEach((t) => { const o = document.createElement("option"); o.value = t; o.textContent = etiquetaTipoAuditoria(t); selTipo.appendChild(o); });
   }
   if (selEstado && selEstado.options.length <= 1) {
-    estados.forEach((e) => { const o = document.createElement("option"); o.value = e; o.textContent = e; selEstado.appendChild(o); });
+    estados.forEach((e) => { const o = document.createElement("option"); o.value = e; o.textContent = etiquetaEstadoAuditoria(e); selEstado.appendChild(o); });
   }
 }
 

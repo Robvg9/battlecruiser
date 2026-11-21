@@ -1111,7 +1111,7 @@ test("Paso 4 RWHT: filtros de Auditoría por tipo/estado y Limpiar restauran los
   state.dispatchEvent(new c.window.Event("change", { bubbles: true }));
   assert.ok(await esperarHasta(() => calls.some((p) => p.p_tipo === "venta" && p.p_estado === "error")),
     "el selector de estado debe combinarse con el tipo activo");
-  assert.ok(await esperarHasta(() => /Sin registros de auditoría/i.test(list.textContent)),
+  assert.ok(await esperarHasta(() => /No hay movimientos que mostrar/i.test(list.textContent)),
     "la combinación sin resultados debe mostrar el estado vacío, no datos incorrectos");
 
   clear.click();

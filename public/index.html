@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.137">
+<link rel="stylesheet" href="style.css?v=9.5.138">
 <link rel="stylesheet" href="bc7-jornada-inventory-mobile.css?v=20261116.2">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
@@ -100,7 +100,7 @@
       <button type="button" class="login-utility" id="password-recovery-request-btn">Enviar solicitud a Administración</button>
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote app-version-label">v9.5.137 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.138 — BattleCruiser</p>
     </form>
   </div>
 
@@ -388,6 +388,15 @@
       <form id="form-transferencia" class="inline-form">
         <select id="trf-origen" required></select>
         <select id="trf-destino" required></select>
+        <div id="trf-responsable-receptor-wrap" class="trf-responsable-receptor-wrap hidden">
+          <label for="trf-responsable-receptor">
+            <span>Responsable que recibe la mercancía</span>
+            <select id="trf-responsable-receptor">
+              <option value="">Selecciona quién recibe…</option>
+            </select>
+          </label>
+          <p class="muted">Obligatorio cuando el destino es un almacén minorista.</p>
+        </div>
         <select id="trf-producto" required></select>
         <input id="trf-cantidad" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Cantidad" required>
         <button type="submit">Transferir</button>
@@ -606,7 +615,7 @@
 
     <section id="tab-mando" class="tab-panel" aria-label="Auditoría y trazabilidad">
       <div class="pendientes-header">
-        <div><h2>Auditoría</h2><p class="muted">Registro trazable de acciones y cambios.</p></div>
+        <div><h2>Auditoría</h2><p class="muted">Aquí puedes revisar quién hizo qué y cuándo.</p></div>
         <span id="mando-conn-info" class="muted"></span>
       </div>
       <div class="cc-bloque">
@@ -618,6 +627,39 @@
         <div id="mando-auditoria" class="lista" aria-live="polite"></div>
         <div class="mando-paginacion" id="mando-paginacion"></div>
       </div>
+
+      <section class="cc-bloque bc-auditoria-inv-shell" aria-labelledby="bc-auditoria-inv-title">
+        <div class="bc-auditoria-inv-header">
+          <div>
+            <h3 id="bc-auditoria-inv-title">Conteo físico de inventario</h3>
+            <p class="muted">Auditorías independientes de Jornada, disponibles solo en almacenes de almacenamiento.</p>
+          </div>
+        </div>
+        <div id="mando-auditoria-inventario">
+          <div class="bc-auditoria-inv-create">
+            <label for="bc-auditoria-inv-warehouse">
+              <span>Almacén de almacenamiento</span>
+              <select id="bc-auditoria-inv-warehouse" required>
+                <option value="">Cargando almacenes…</option>
+              </select>
+            </label>
+            <label for="bc-auditoria-inv-note">
+              <span>Observación (opcional)</span>
+              <input id="bc-auditoria-inv-note" type="text" maxlength="500" placeholder="Motivo o referencia de este conteo">
+            </label>
+            <button type="button" class="cc-accion primary" data-audit-create>Iniciar conteo físico</button>
+          </div>
+          <p id="bc-auditoria-inv-message" class="msg bc-auditoria-inv-message" aria-live="polite"></p>
+          <div id="bc-auditoria-inv-detail" class="bc-auditoria-inv-detail hidden"></div>
+          <div class="bc-auditoria-inv-history-heading">
+            <h4>Historial de auditorías</h4>
+            <button type="button" class="cc-accion" data-audit-refresh>Actualizar</button>
+          </div>
+          <div id="bc-auditoria-inv-list" class="bc-auditoria-inv-list" aria-live="polite">
+            <p class="lista-estado">Cargando auditorías…</p>
+          </div>
+        </div>
+      </section>
     </section>
 
     <section id="tab-usuarios" class="tab-panel">
@@ -683,14 +725,14 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.137 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.138 — BattleCruiser</span>
     </footer>
   </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script src="js/core.js?v=9.5.117"></script>
 <script src="js/auth.js?v=9.5.118"></script>
-<script src="js/offline.js?v=9.5.100"></script>
+<script src="js/offline.js?v=9.5.138"></script>
 <script src="js/network-core.js?v=20261109.3"></script>
 <script src="js/loading-guard.js"></script>
 <script src="js/centro-control.js?v=9.5.71"></script>
@@ -698,12 +740,12 @@
 <script src="js/productos.js?v=20261118.1"></script>
 <script src="js/presentaciones.js?v=20261105.2"></script>
 <script src="js/almacenes.js?v=20261111.1"></script>
-<script src="js/transferencias.js?v=20261109.1"></script>
+<script src="js/transferencias.js?v=20261121.1"></script>
 <script src="js/vales.js?v=20261107.1"></script>
 <script src="js/ventas.js?v=20261105.2"></script>
 <script src="js/catalogos.js?v=20261106.1"></script>
 <script src="js/usuarios-permisos.js"></script>
-<script src="js/mando.js?v=9.5.64"></script>
+<script src="js/mando.js?v=9.5.138"></script>
 <script src="js/reportes.js?v=20261105.1"></script>
 <script src="js/historial-detalle.js?v=h1.2"></script>
 <script src="js/nucleo-operativo.js?v=9.5.69"></script>
@@ -716,6 +758,6 @@
 <script src="js/bc-modal-manager.js?v=1.0"></script>
 <script src="js/mi-cuenta.js?v=1.3"></script>
 <script src="js/m27-5-theme-dark-reset.js?v=27.5a3"></script>
-<script src="app.js?v=9.5.137"></script>
+<script src="app.js?v=9.5.138"></script>
 </body>
 </html>

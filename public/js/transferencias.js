@@ -11,7 +11,7 @@ async function refrescarTransferencias() {
   setLoading("lista-transferencias", "Cargando transferencias…");
   const { data } = await client
     .from("transferencias")
-    .select("id, fecha, estado, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
+    .select("id, fecha, estado, responsable_receptor_id, responsable_receptor_nombre, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
     .order("fecha", { ascending: false })
     .limit(20);
   _cache.transferencias = data || [];
@@ -122,6 +122,126 @@ function actualizarStockTransferenciaUI() {
   }
 }
 
+function formatearMensajeTransferenciaWhatsApp(reporte) {
+  if (!reporte || !reporte.almacen || !reporte.responsable || !Array.isArray(reporte.productos) || !reporte.productos.length) {
+    throw new Error("El reporte de transferencia está incompleto.");
+  }
+  const fecha = new Date(reporte.fecha);
+  if (Number.isNaN(fecha.getTime())) throw new Error("La transferencia no tiene una fecha válida.");
+  const fechaTexto = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    timeZone: "America/Havana"
+  }).format(fecha);
+  const fechaHoraTexto = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    timeZone: "America/Havana"
+  }).format(fecha);
+  const productos = reporte.productos.map((producto, index) => {
+    const unidad = String(producto.unidad || "unidad").trim();
+    return (index + 1) + ". " + String(producto.nombre || "Producto") +
+      " — " + fmtNumTransfer(producto.cantidad) + " " + unidad;
+  });
+  return [
+    "ALMACÉN: " + String(reporte.almacen),
+    "FECHA: " + fechaTexto,
+    "FECHA Y HORA DE LA ENTREGA: " + fechaHoraTexto,
+    "RESPONSABLE QUE RECIBIÓ: " + String(reporte.responsable),
+    "",
+    "PRODUCTOS ENTREGADOS:",
+    ...productos
+  ].join("\n");
+}
+window.__BC_FORMAT_TRANSFER_SHARE__ = formatearMensajeTransferenciaWhatsApp;
+
+function almacenPorIdTransferencia(id) {
+  return (_cache.almacenes || []).find((almacen) => String(almacen.id) === String(id)) || null;
+}
+
+let _responsablesTransferencia = null;
+let _cargandoResponsablesTransferencia = null;
+
+async function listarResponsablesTransferencia() {
+  if (_responsablesTransferencia) return _responsablesTransferencia;
+  if (_cargandoResponsablesTransferencia) return _cargandoResponsablesTransferencia;
+  _cargandoResponsablesTransferencia = (async function () {
+    const { data, error } = await client.rpc("bc_listar_responsables_transferencia");
+    if (error) throw error;
+    _responsablesTransferencia = (Array.isArray(data) ? data : [])
+      .filter((usuario) => usuario && usuario.id && usuario.nombre)
+      .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+    return _responsablesTransferencia;
+  })();
+  try {
+    return await _cargandoResponsablesTransferencia;
+  } finally {
+    _cargandoResponsablesTransferencia = null;
+  }
+}
+
+async function actualizarResponsableReceptorTransferencia() {
+  const destino = (document.getElementById("trf-destino") || {}).value || "";
+  const contenedor = document.getElementById("trf-responsable-receptor-wrap");
+  const select = document.getElementById("trf-responsable-receptor");
+  if (!contenedor || !select) return;
+  const almacen = almacenPorIdTransferencia(destino);
+  const requerido = !!almacen && almacen.tipo === "minorista";
+  contenedor.classList.toggle("hidden", !requerido);
+  select.required = requerido;
+  if (!requerido) {
+    select.value = "";
+    select.innerHTML = '<option value="">No requerido para este almacén</option>';
+    return;
+  }
+  select.innerHTML = '<option value="">Cargando responsables…</option>';
+  try {
+    const responsables = await listarResponsablesTransferencia();
+    select.innerHTML = '<option value="">Selecciona quién recibe la mercancía…</option>' +
+      responsables.map((usuario) =>
+        '<option value="' + escHtml(usuario.id) + '">' + escHtml(usuario.nombre || "Usuario") + "</option>"
+      ).join("");
+    if (!responsables.length) {
+      setMsg("msg-transferencias", "No hay responsables activos disponibles para recibir esta transferencia.", false);
+    }
+  } catch (error) {
+    select.innerHTML = '<option value="">No se pudieron cargar los responsables</option>';
+    setMsg("msg-transferencias", "No se pudo cargar la lista de responsables: " + explicarError(error, "transferencia"), false);
+  }
+}
+
+async function copiarMensajeTransferenciaWhatsApp(texto) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(texto);
+    return;
+  }
+  const temporal = document.createElement("textarea");
+  temporal.value = texto;
+  temporal.setAttribute("readonly", "");
+  temporal.style.position = "fixed";
+  temporal.style.opacity = "0";
+  document.body.appendChild(temporal);
+  temporal.select();
+  const copiado = document.execCommand("copy");
+  temporal.remove();
+  if (!copiado) throw new Error("El navegador no permitió copiar el mensaje.");
+}
+
+async function compartirMensajeTransferenciaWhatsApp(texto) {
+  if (typeof navigator.share !== "function") {
+    await copiarMensajeTransferenciaWhatsApp(texto);
+    setMsg("msg-transferencias", "Mensaje copiado. Ya puedes pegarlo en el grupo de WhatsApp.", true);
+    return;
+  }
+  try {
+    await navigator.share({ text: texto });
+    setMsg("msg-transferencias", "Selecciona WhatsApp, elige el grupo y confirma el envío.", true);
+  } catch (error) {
+    if (error && error.name === "AbortError") return;
+    await copiarMensajeTransferenciaWhatsApp(texto);
+    setMsg("msg-transferencias", "No se abrió el menú de compartir. El mensaje quedó copiado para pegarlo en WhatsApp.", true);
+  }
+}
+
 let _enviandoTransferencia = false;
 
 safeInit("form-transferencia", () => {
@@ -135,6 +255,12 @@ safeInit("form-transferencia", () => {
       el.addEventListener("change", actualizarStockTransferenciaUI);
     }
   });
+  const destinoEl = document.getElementById("trf-destino");
+  if (destinoEl && !destinoEl.dataset.bcTrfReceiver) {
+    destinoEl.dataset.bcTrfReceiver = "1";
+    destinoEl.addEventListener("change", actualizarResponsableReceptorTransferencia);
+    actualizarResponsableReceptorTransferencia();
+  }
   const cantEl = document.getElementById("trf-cantidad");
   if (cantEl && !cantEl.dataset.bcTrfStock) {
     cantEl.dataset.bcTrfStock = "1";
@@ -166,6 +292,11 @@ safeInit("form-transferencia", () => {
     const producto_id = document.getElementById("trf-producto").value;
     const cantidad = parseFloat(document.getElementById("trf-cantidad").value);
     const submitBtn = e.target.querySelector("button[type='submit']");
+    const almacenDestino = almacenPorIdTransferencia(destino);
+    const esDestinoMinorista = !!almacenDestino && almacenDestino.tipo === "minorista";
+    const responsableReceptorId = esDestinoMinorista
+      ? ((document.getElementById("trf-responsable-receptor") || {}).value || "")
+      : "";
 
     if (!origen || !destino || !producto_id) {
       setMsg("msg-transferencias", "Completá origen, destino y producto.", false);
@@ -173,6 +304,10 @@ safeInit("form-transferencia", () => {
     }
     if (String(origen) === String(destino)) {
       setMsg("msg-transferencias", "El origen y el destino no pueden ser el mismo almacén.", false);
+      return;
+    }
+    if (esDestinoMinorista && !responsableReceptorId) {
+      setMsg("msg-transferencias", "Selecciona quién recibe la mercancía en el almacén minorista.", false);
       return;
     }
     if (!(cantidad > 0) || !Number.isFinite(cantidad)) {
@@ -207,11 +342,16 @@ safeInit("form-transferencia", () => {
       }
       if (submitBtn) submitBtn.textContent = "Procesando…";
 
-      const resultado = await ejecutarOperacion("transferencia", {
+      const payloadTransferencia = {
         p_origen_id: origen,
         p_destino_id: destino,
         p_lineas: [{ producto_id: producto_id, cantidad: cantidad }],
-      });
+      };
+      if (esDestinoMinorista) payloadTransferencia.p_responsable_receptor_id = responsableReceptorId;
+      const resultado = await ejecutarOperacion(
+        esDestinoMinorista ? "transferencia_receptor" : "transferencia",
+        payloadTransferencia
+      );
 
       if (!resultado.ok) {
         setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(resultado.error, "transferencia"), false);
@@ -232,6 +372,9 @@ safeInit("form-transferencia", () => {
       await refrescarStockYSelects();
       if (typeof window.__BC_TRANSFER_STOCK_REFRESH__ === "function") await window.__BC_TRANSFER_STOCK_REFRESH__();
       actualizarStockTransferenciaUI();
+      if (esDestinoMinorista && resultado.data) {
+        await mostrarDetalleTransferencia(String(resultado.data));
+      }
     } finally {
       _enviandoTransferencia = false;
       if (submitBtn) {
@@ -253,43 +396,95 @@ async function mostrarDetalleTransferencia(trfId) {
     _enlazarCerrarTrfDetalle();
     return;
   }
+
   const fechaHora = trf.fecha ? fechaHoraCompleta(trf.fecha) : "—";
   const estadoTxt = trf.estado ? escHtml(trf.estado) : "Registrada";
   let lineasHtml = "";
+  let shareHtml = "";
+  let reporteCompartir = null;
+
   try {
     if (navigator.onLine && trf.id) {
       const { data: lineas, error } = await client
         .from("transferencias_lineas")
-        .select("producto_id, cantidad, productos(nombre)")
+        .select("producto_id, cantidad, productos(nombre, unidad)")
         .eq("transferencia_id", trf.id);
-      if (!error && lineas && lineas.length > 0) {
+      if (error) throw error;
+      if (lineas && lineas.length > 0) {
         lineasHtml = '<div class="detalle-fila detalle-seccion"><span class="detalle-etiqueta">Productos</span></div>';
-        lineas.forEach((l, i) => {
-          const nombre = (l.productos && l.productos.nombre)
-            || (typeof resolverNombreProducto === "function" ? resolverNombreProducto(l.producto_id) : idCorto(l.producto_id));
-          lineasHtml += '<div class="detalle-fila"><span class="detalle-etiqueta">  ' + (i + 1) + '. ' + escHtml(nombre) +
-            '</span><span class="detalle-valor">' + fmtNumTransfer(l.cantidad || 0) + ' u</span></div>';
+        lineas.forEach((linea, index) => {
+          const nombre = (linea.productos && linea.productos.nombre)
+            || (typeof resolverNombreProducto === "function" ? resolverNombreProducto(linea.producto_id) : idCorto(linea.producto_id));
+          const unidad = (linea.productos && linea.productos.unidad) || "u";
+          lineasHtml += '<div class="detalle-fila"><span class="detalle-etiqueta">' + (index + 1) + ". " + escHtml(nombre) +
+            '</span><span class="detalle-valor">' + fmtNumTransfer(linea.cantidad || 0) + " " + escHtml(unidad) + "</span></div>";
         });
       }
     }
-  } catch (e) {
-    console.warn("[Battlecruiser] No se pudieron cargar líneas de transferencia:", e);
+  } catch (error) {
+    console.warn("[BattleCruiser] No se pudieron cargar líneas de transferencia:", error);
+    lineasHtml = '<p class="msg error">No se pudieron cargar los productos de esta transferencia.</p>';
   }
-  cont.innerHTML = '<div class="detalle-cabecera">'
-    + '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + '</span>'
-    + '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
-    + '</div>'
-    + '<div class="detalle-cuerpo">'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || "—") + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + estadoTxt + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + '</span></div>'
-    + lineasHtml
-    + '<p class="muted detalle-nota">El stock se movió al registrar la transferencia (operación atómica). No hay recepción ni cancelación posterior en el modelo actual.</p>'
-    + '</div>';
+
+  const completada = String(trf.estado || "").toLocaleLowerCase() === "completada";
+  if (trf.responsable_receptor_nombre && completada && navigator.onLine) {
+    try {
+      const { data, error } = await client.rpc("bc_mensaje_transferencia", {
+        p_transferencia_id: trf.id
+      });
+      if (error) throw error;
+      reporteCompartir = data;
+      const texto = formatearMensajeTransferenciaWhatsApp(reporteCompartir);
+      shareHtml = '<section class="bc-transfer-share">' +
+        '<div class="bc-transfer-share-heading"><strong>Mensaje para el grupo de WhatsApp</strong>' +
+        '<span class="muted">Comprueba los datos y compártelo cuando estés listo.</span></div>' +
+        '<textarea class="bc-transfer-share-text" aria-label="Mensaje de transferencia para WhatsApp" readonly>' +
+        escHtml(texto) + '</textarea>' +
+        '<div class="bc-transfer-share-actions">' +
+        '<button type="button" class="cc-accion primary" data-trf-share-whatsapp>Compartir por WhatsApp</button>' +
+        '<button type="button" class="cc-accion" data-trf-copy-whatsapp>Copiar mensaje</button>' +
+        '</div><p class="muted">BattleCruiser no lo envía automáticamente. Selecciona el grupo y confirma el envío en WhatsApp.</p>' +
+        '</section>';
+    } catch (error) {
+      shareHtml = '<p class="msg error">No se pudo preparar el mensaje para compartir: ' +
+        escHtml(error && error.message ? error.message : "datos incompletos") + "</p>";
+    }
+  }
+
+  cont.innerHTML = '<div class="detalle-cabecera">' +
+    '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + "</span>" +
+    '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>' +
+    "</div>" +
+    '<div class="detalle-cuerpo">' +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || "—") + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + estadoTxt + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + "</span></div>" +
+    lineasHtml + shareHtml +
+    '<p class="muted detalle-nota">El stock se movió al registrar la transferencia mediante una operación atómica.</p>' +
+    "</div>";
+
   cont.classList.remove("hidden");
   _enlazarCerrarTrfDetalle();
+  const textoCompartir = reporteCompartir ? formatearMensajeTransferenciaWhatsApp(reporteCompartir) : "";
+  const compartir = cont.querySelector("[data-trf-share-whatsapp]");
+  if (compartir) compartir.addEventListener("click", async () => {
+    try {
+      await compartirMensajeTransferenciaWhatsApp(textoCompartir);
+    } catch (error) {
+      setMsg("msg-transferencias", error.message || "No se pudo compartir el mensaje.", false);
+    }
+  });
+  const copiar = cont.querySelector("[data-trf-copy-whatsapp]");
+  if (copiar) copiar.addEventListener("click", async () => {
+    try {
+      await copiarMensajeTransferenciaWhatsApp(textoCompartir);
+      setMsg("msg-transferencias", "Mensaje copiado. Ya puedes pegarlo en WhatsApp.", true);
+    } catch (error) {
+      setMsg("msg-transferencias", error.message || "No se pudo copiar el mensaje.", false);
+    }
+  });
   cont.focus();
 }
 
