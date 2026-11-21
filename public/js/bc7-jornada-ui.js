@@ -507,8 +507,8 @@
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
     const pill=rest?'<span class="bc7-pill">Descanso</span>':isClosed?'<span class="bc7-pill closed">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const isTerminal=isClosed||['CANCELADA','CANCELADO'].includes(status);
-    const viewable=isClosed;
+    const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status);
+    const viewable=status==='COMPLETADA';
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     let reschedule='';
     if(state.admin&&!isTerminal){
