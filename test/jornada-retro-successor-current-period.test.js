@@ -50,6 +50,6 @@ test("the form inherits the previous period length and explains genuine date con
 });
 
 test("the updated Jornada UI is invalidated in the online loader and offline shell",()=>{
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.45"]'));
-  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.45"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.46"]'));
+  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.46"));
 });

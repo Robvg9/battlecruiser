@@ -239,6 +239,7 @@ function bcAuthDiagnostic(code, visible, cause, shape, fingerprint, trace) {
   var safeTrace = trace || "NONE";
   var diagnostic = { code: code, storage: storage, cause: safeCause, shape: safeShape, fingerprint: safeFingerprint, trace: safeTrace };
   window.__BC_AUTH_DIAGNOSTIC__ = diagnostic;
+  window.dispatchEvent(new Event("bc:auth-diagnostic"));
   // Keep allowlisted diagnostics for support, but never render session internals on the login screen.
   console.warn("[BattleCruiser] auth diagnostic", diagnostic);
 }
@@ -406,6 +407,7 @@ function bcResolverBootSinSesion() {
   document.documentElement.classList.remove("bc-auth-booting");
   if (loginForm) loginForm.removeAttribute("aria-busy");
   showLogin();
+  if (typeof window.bcOfflineRestoreLastUser === "function") window.bcOfflineRestoreLastUser().catch(function () {});
 }
 
 function bcResolverBootConSesion(session) {
@@ -623,6 +625,8 @@ client.auth.onAuthStateChange(function (event, session) {
     bcRechazarRecuperacionDirecta();
     return;
   }
+  if (event === "SIGNED_OUT" && window.__BC_OFFLINE_AUTH__ === true &&
+      window.__BC_OFFLINE_EXPLICIT_LOGOUT__ !== true) return;
   // Old direct password-recovery links are rejected; dependents must use owner approval.
   if (event === "PASSWORD_RECOVERY" && session) {
     _bcRecoveryMode = true;
@@ -650,13 +654,15 @@ client.auth.onAuthStateChange(function (event, session) {
 function bcUsernameLoginEndpoint() {
   // The shared PR preview is a different origin from production. Route only
   // that exact host through its isolated Worker proxy; LIVE keeps direct Supabase.
-  return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
+  return ["https://bc-pr-224-battlecruiser.robvg9.workers.dev",
+    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"].includes(window.location.origin)
     ? "/__bc_preview/functions/v1/bc-username-login"
     : SUPABASE_URL + "/functions/v1/bc-username-login";
 }
 
 function bcPasswordRecoveryEndpoint() {
-  return window.location.origin === "https://bc-pr-224-battlecruiser.robvg9.workers.dev"
+  return ["https://bc-pr-224-battlecruiser.robvg9.workers.dev",
+    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"].includes(window.location.origin)
     ? "/__bc_preview/functions/v1/bc-password-recovery-admin"
     : SUPABASE_URL + "/functions/v1/bc-password-recovery-admin";
 }
@@ -688,16 +694,24 @@ safeInit("login", () => {
         return;
       }
 
+      if (!navigator.onLine && typeof window.bcOfflineLogin === "function" &&
+          await window.bcOfflineLogin(nombreUsuario, password)) return;
       let respuestaLogin;
       try {
-        respuestaLogin = await fetch(bcUsernameLoginEndpoint(), {
-          method: "POST",
-          headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({ username: nombreUsuario, password }),
-          cache: "no-store",
-        });
+        const controller = typeof AbortController === "function" ? new AbortController() : null;
+        const timeoutId = controller ? window.setTimeout(function () { controller.abort(); }, 8000) : null;
+        try {
+          respuestaLogin = await fetch(bcUsernameLoginEndpoint(), {
+            method: "POST",
+            headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ username: nombreUsuario, password }),
+            cache: "no-store",
+            signal: controller ? controller.signal : undefined,
+          });
+        } finally { if (timeoutId) window.clearTimeout(timeoutId); }
       } catch (errorRed) {
-        loginError.textContent = "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento.";
+        if (typeof window.bcOfflineLogin === "function" && await window.bcOfflineLogin(nombreUsuario, password)) return;
+        loginError.textContent = "No se pudo conectar al servicio de acceso. Comprueba la red o usa el acceso local de este dispositivo si ya fue preparado.";
         return;
       }
 
@@ -711,6 +725,8 @@ safeInit("login", () => {
         return;
       }
       if (!respuestaLogin.ok || !resultadoLogin?.session?.access_token || !resultadoLogin?.session?.refresh_token) {
+        if (respuestaLogin.status >= 500 && typeof window.bcOfflineLogin === "function" &&
+            await window.bcOfflineLogin(nombreUsuario, password)) return;
         loginError.textContent = (!navigator.onLine || respuestaLogin.status >= 500)
           ? "El servicio de acceso no está disponible temporalmente. Intenta de nuevo en un momento."
           : "Usuario o contraseña incorrectos.";
@@ -724,6 +740,13 @@ safeInit("login", () => {
       if (errorSesion) {
         loginError.textContent = "No se pudo establecer la sesión. Intenta nuevamente.";
         return;
+      }
+      window.__BC_OFFLINE_AUTH__ = false;
+      window.__BC_OFFLINE_AUTH_USER_ID__ = null;
+      if (typeof window.bcOfflineRememberCredentials === "function" &&
+          resultadoLogin.session.user && resultadoLogin.session.user.id) {
+        try { await window.bcOfflineRememberCredentials(nombreUsuario, password, resultadoLogin.session.user.id); }
+        catch (offlineSaveError) { console.warn("[BattleCruiser] No se pudo preparar el acceso offline en este dispositivo:", offlineSaveError); }
       }
     } catch (e) {
       loginError.textContent = "Sin conexión o la red está lenta ahora mismo. Intenta de nuevo en un momento.";
