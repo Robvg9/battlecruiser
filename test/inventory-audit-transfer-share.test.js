@@ -80,8 +80,8 @@ test("audit log hides idempotency keys and exposes a separate physical-count vie
   assert.doesNotMatch(mando, /idemp \+ /);
   assert.match(index, /mando-auditoria-vista-fisica/);
   assert.match(index, /mando-auditoria-fisica/);
-  assert.match(app, /\["inventario-auditoria\.js","1\.0"\]/);
-  assert.match(sw, /inventario-auditoria\.js\?v=1\.0/);
+  assert.match(app, /\["inventario-auditoria\.js","1\.1"\]/);
+  assert.match(sw, /inventario-auditoria\.js\?v=1\.1/);
 });
 
 
