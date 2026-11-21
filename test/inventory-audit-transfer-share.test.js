@@ -20,8 +20,8 @@ test("physical audit is limited server-side to storage warehouses", () => {
   assert.match(inventoryUi, /w\.tipo === 'almacenamiento'/);
   assert.match(migration, /v_auditoria\.creado_por <> auth\.uid\(\)/);
   assert.match(migration, /public\.tiene_permiso\('auditoria','crear'\)/);
-  const saveCounts = migration.match(/create or replace function public\\.inventario_auditoria_guardar_conteos\\([\\s\\S]*?\\$function\\$;/i)?.[0] || "";
-  assert.match(saveCounts, /v_auditoria\\.creado_por <> auth\\.uid\\(\\)[\\s\\S]*?not public\\.bc_actor_is_admin\\(\\)[\\s\\S]*?not public\\.tiene_permiso\\('auditoria','editar_any'\\)/i);
+  const saveCounts = migration.match(/create or replace function public\.inventario_auditoria_guardar_conteos\([\s\S]*?\$function\$;/i)?.[0] || "";
+  assert.match(saveCounts, /v_auditoria\.creado_por <> auth\.uid\(\)[\s\S]*?not public\.bc_actor_is_admin\(\)[\s\S]*?not public\.tiene_permiso\('auditoria','editar_any'\)/i);
   assert.match(migration, /inventario_auditoria_cancelar\(\s*p_auditoria_id uuid,\s*p_motivo text/s);
   assert.match(inventoryUi, /id="inv-audit-cancel"/);
   assert.match(inventoryUi, /rpc\('inventario_auditoria_cancelar'/);
