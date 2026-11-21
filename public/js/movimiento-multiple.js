@@ -19,6 +19,7 @@
   }
   function fmt(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   let lineas = [], enviando = false, selectors = null, catalogosRefreshPromise = null, stockRefreshPromise = null;
+  let receiverOptions = null, receiverLoadPromise = null;
   let selectedProductIds = Object.create(null), transferDrafts = Object.create(null), transferStep = 1;
   if (!Array.isArray(window.__BC_TRANSFER_STOCK_SNAPSHOT__)) window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
   if (typeof window.__BC_TRANSFER_STOCK_CONFIRMED__ !== 'boolean') window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
@@ -32,6 +33,54 @@
     el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
   }
   function producto(id) { return productos().find(p => String(p.id) === String(id)) || null; }
+
+  function warehouseForTransfer(id) {
+    return almacenes().find((warehouse) => String(warehouse.id) === String(id)) || null;
+  }
+
+  async function loadTransferReceivers() {
+    if (receiverOptions) return receiverOptions;
+    if (receiverLoadPromise) return receiverLoadPromise;
+    receiverLoadPromise = (async function () {
+      const api = window.client || (typeof client !== 'undefined' ? client : null);
+      if (!api || typeof api.rpc !== 'function') throw new Error('Cliente de datos no disponible.');
+      const result = await api.rpc('bc_listar_responsables_transferencia');
+      if (result.error) throw result.error;
+      receiverOptions = (Array.isArray(result.data) ? result.data : [])
+        .filter(user => user && user.id && user.activo === true && user.archivado !== true)
+        .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+      return receiverOptions;
+    })();
+    try {
+      return await receiverLoadPromise;
+    } finally {
+      receiverLoadPromise = null;
+    }
+  }
+
+  async function actualizarReceptorTransferenciaMultiple() {
+    if (!selectors || !selectors.receiver || !selectors.receiverWrap) return;
+    const warehouse = warehouseForTransfer(selectors.destination.value);
+    const required = !!warehouse && warehouse.tipo === 'minorista';
+    selectors.receiverWrap.hidden = !required;
+    selectors.receiver.required = required;
+    if (!required) {
+      selectors.receiver.value = '';
+      selectors.receiver.innerHTML = '<option value="">No se requiere para este almacén</option>';
+      return;
+    }
+    selectors.receiver.innerHTML = '<option value="">Cargando responsables…</option>';
+    try {
+      const users = await loadTransferReceivers();
+      selectors.receiver.innerHTML = '<option value="">Selecciona quién recibe la mercancía…</option>' +
+        users.map(user => '<option value="' + esc(user.id) + '">' + esc(user.nombre || 'Usuario') + '</option>').join('');
+      if (!users.length) feedback('No hay responsables activos disponibles para recibir la mercancía.', false);
+    } catch (error) {
+      selectors.receiver.innerHTML = '<option value="">No se pudieron cargar</option>';
+      feedback('No se pudo cargar la lista de responsables: ' + (error && error.message || 'error'), false);
+    }
+  }
+
 
   function poblarSelects() {
     if (!selectors) return;
@@ -399,6 +448,7 @@
       '<p class="mov-transfer-intro">Agrupa varios productos del mismo origen al mismo destino. Se registra una sola transferencia.</p>' +
       '<div class="mov-transfer-warehouses"><label><span>Origen</span><select id="mov-multiple-origen" aria-label="Almacén de origen"><option value="" disabled selected hidden>Seleccionar origen</option></select></label>' +
       '<label><span>Destino</span><select id="mov-multiple-destino" aria-label="Almacén de destino"><option value="" disabled selected hidden>Seleccionar destino</option></select></label></div>' +
+      '<div id="mov-transfer-receiver-wrap" class="mov-transfer-receiver-wrap" hidden><label><span>Responsable que recibe</span><select id="mov-transfer-receiver"><option value="">Selecciona quién recibe…</option></select></label><small>Obligatorio si el destino es un almacén minorista.</small></div>' +
       '<section id="mov-transfer-step-products" class="mov-transfer-step">' +
         '<p class="mov-transfer-step-label">PASO 1 DE 2 · Selecciona los productos</p>' +
         '<label class="mov-transfer-search">Buscar producto<input id="mov-transfer-product-search" type="search" placeholder="Escribe el nombre del producto"></label>' +
@@ -420,13 +470,15 @@
     legacyForm.parentNode.insertBefore(panel, legacyForm); legacyForm.style.display = 'none'; legacyForm.setAttribute('aria-hidden', 'true');
     selectors = {
       origin: panel.querySelector('#mov-multiple-origen'), destination: panel.querySelector('#mov-multiple-destino'),
-      product: panel.querySelector('#mov-multiple-producto'), quantity: panel.querySelector('#mov-multiple-cantidad')
+      product: panel.querySelector('#mov-multiple-producto'), quantity: panel.querySelector('#mov-multiple-cantidad'),
+      receiverWrap: panel.querySelector('#mov-transfer-receiver-wrap'), receiver: panel.querySelector('#mov-transfer-receiver')
     };
     selectors.origin.addEventListener('change', function(){ actualizarStockHint(); });
     selectors.product.addEventListener('change', actualizarStockHint);
     selectors.destination.addEventListener('change', function () {
       if (selectors.origin.value && selectors.origin.value === selectors.destination.value) feedback('El origen y el destino deben ser distintos.', false);
       else feedback('', true);
+      actualizarReceptorTransferenciaMultiple();
     });
     panel.querySelector('#mov-transfer-product-picker').addEventListener('change', function(event){
       const box = event.target.closest('[data-mov-select]');
