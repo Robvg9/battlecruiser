@@ -407,9 +407,10 @@
   }
 
   function onClick(event) {
-    const target = event.target.closest("[data-audit-open],[data-audit-create],[data-audit-save],[data-audit-close],[data-audit-cancel],[data-audit-resolve],[data-audit-writeoff]");
+    const target = event.target.closest("[data-audit-open],[data-audit-create],[data-audit-save],[data-audit-close],[data-audit-cancel],[data-audit-resolve],[data-audit-writeoff],[data-audit-refresh]");
     if (!target) return;
     if (target.hasAttribute("data-audit-create")) return void createAudit();
+    if (target.hasAttribute("data-audit-refresh")) return void loadAudits();
     if (target.hasAttribute("data-audit-open")) return void openAudit(target.dataset.auditOpen).catch((e) => setMessage(e.message, false));
     if (target.hasAttribute("data-audit-save")) return void saveCount();
     if (target.hasAttribute("data-audit-close")) return void closeAudit();
