@@ -38,7 +38,8 @@ test("physical audit never performs stock adjustments automatically", () => {
     assert.doesNotMatch(fn, /delete\s+from\s+public\.stock/i);
   }
   assert.match(migration, /Debes explicar cada diferencia/i);
-  assert.match(inventoryUi, /no se modificar[aá]n existencias autom[aá]ticamente/i);
+  assert.match(inventoryUi, /no se aplicaron ajustes autom[aá]ticos/i);
+  assert.match(inventoryUi, /no se modific[oó] el stock/i);
 });
 
 test("transfer receiver is persisted through a backward-compatible atomic RPC extension", () => {
