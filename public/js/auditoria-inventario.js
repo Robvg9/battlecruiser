@@ -436,6 +436,12 @@
       root.innerHTML = '<p class="lista-estado">No tienes permiso para acceder a esta sección.</p>';
       return;
     }
+    const isAdmin = typeof tienePermiso === "function" &&
+      (tienePermiso("turnos", "editar_any") || tienePermiso("ciclos", "editar_any"));
+    if (!isAdmin) {
+      root.innerHTML = '<p class="lista-estado">El conteo físico es una función exclusiva del Dueño/Admin.</p>';
+      return;
+    }
     root.addEventListener("click", onClick);
     root.addEventListener("input", onInput);
     try {
