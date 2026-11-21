@@ -29,6 +29,54 @@ async function fetchText(assetPath, attempt) {
   return { status: response.status, body, url: response.url };
 }
 
+async function verifyPreviewAuthProxy(functionSlug) {
+  const endpoint = base + "/__bc_preview/functions/v1/" + functionSlug;
+  const preflight = await fetch(endpoint, {
+    method: "OPTIONS",
+    headers: {
+      Origin: base,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "apikey, content-type",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
+  if (
+    preflight.status !== 204 ||
+    preflight.headers.get("access-control-allow-origin") !== base ||
+    !String(preflight.headers.get("access-control-allow-methods") || "").includes("POST")
+  ) {
+    throw new Error(
+      functionSlug + " preview CORS preflight failed: status=" + preflight.status +
+      " allow-origin=" + String(preflight.headers.get("access-control-allow-origin") || "missing")
+    );
+  }
+
+  // Safe no-credential diagnostic: the proxy must reach the real Edge Function,
+  // which intentionally rejects GET with 405 before auth, rate-limit or DB work.
+  const diagnostic = await fetch(endpoint, {
+    method: "GET",
+    headers: { Origin: base },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15000),
+  });
+  const body = await diagnostic.text();
+  if (diagnostic.status !== 405 || !body.includes("Método no permitido.")) {
+    throw new Error(
+      functionSlug + " preview proxy did not reach the expected Edge Function: status=" +
+      diagnostic.status + " body=" + body.slice(0, 160)
+    );
+  }
+  console.log("[preview-auth] PASS — " + functionSlug + " CORS proxy + upstream route");
+}
+
+async function verifyPreviewAuthProxies() {
+  await Promise.all([
+    verifyPreviewAuthProxy("bc-username-login"),
+    verifyPreviewAuthProxy("bc-password-recovery-admin"),
+  ]);
+}
+
 (async () => {
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
@@ -48,6 +96,7 @@ async function fetchText(assetPath, attempt) {
           "[preview] PASS — index.html, app.js and Service Worker HTTP 200; app=" +
           expectedAppVersion + " sw=" + expectedSwVersion
         );
+        await verifyPreviewAuthProxies();
         // Return normally so Undici/Node can close completed fetch sockets cleanly.
         return;
       }
@@ -61,7 +110,7 @@ async function fetchText(assetPath, attempt) {
     }
     await delay(2000);
   }
-  throw new Error("Preview assets failed to respond or versions did not align within 60 seconds.");
+  throw new Error("Preview assets or authenticated Edge Function proxy failed within 60 seconds.");
 })().catch((error) => {
   console.error("[preview] FAIL:", error && error.stack ? error.stack : error);
   process.exitCode = 1;
