@@ -61,6 +61,7 @@ test("Transfer WhatsApp report uses the exact stored delivery data and requested
     lastIndex = index;
   }
   assert.equal((message.match(/Cerveza Bucanero/g) || []).length, 1);
+  assert.match(message, /07:34/, "transfer time must be formatted in the Havana business timezone");
   assert.doesNotMatch(message, /undefined|null|transferencia_id|producto_id/i);
 });
 
