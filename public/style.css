@@ -1941,7 +1941,7 @@ html[data-bc-theme="light"] select optgroup {
 .bc-transfer-share-heading strong { font-size: 13px; }
 .bc-transfer-share-heading span,
 .bc-transfer-share > p { font-size: 10.5px; }
-.bc-transfer-share-text { width: 100%; min-height: 180px; resize: vertical; padding: 10px; font: 12px/1.5 inherit; white-space: pre-wrap; }
+.bc-transfer-share-text { width: 100%; min-height: 180px; resize: vertical; padding: 10px; font-family: inherit; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
 .bc-transfer-share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .bc-transfer-share > p { margin: 0; color: var(--mist, #777); }
 
