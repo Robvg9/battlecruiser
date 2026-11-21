@@ -4,6 +4,12 @@
   if (window.__BC_MOVIMIENTO_MULTIPLE__) return;
   window.__BC_MOVIMIENTO_MULTIPLE__ = true;
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function formatQtyForShare(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric)
+      ? new Intl.NumberFormat('es-ES', { maximumFractionDigits: 3 }).format(numeric)
+      : String(value == null ? '' : value);
+  }
   function productos() {
     const rows = (typeof _cache !== 'undefined' && Array.isArray(_cache.productos)) ? _cache.productos : [];
     return typeof productosOperativos === 'function' ? productosOperativos(rows) : rows.filter(p => !p.inventario_mixto || !!p.producto_padre_id);
@@ -73,7 +79,7 @@
       'Fecha: *' + dia + ' · ' + hora + '*',
       'Recibe: *@⁨' + recibe + '⁩*',
       '',
-      ...data.lineas.map(item => '- ' + fmt(item.cantidad) + ' ' + item.nombre)
+      ...data.lineas.map(item => '- ' + formatQtyForShare(item.cantidad) + ' ' + item.nombre)
     ];
     lastShareText = lines.join('\n');
     const host = document.getElementById('mov-transfer-share');
