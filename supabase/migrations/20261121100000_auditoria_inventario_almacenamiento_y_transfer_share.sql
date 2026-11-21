@@ -55,6 +55,36 @@ CREATE TABLE IF NOT EXISTS public.auditorias_inventario_lineas (
 CREATE INDEX IF NOT EXISTS idx_auditoria_inventario_lineas_auditoria
   ON public.auditorias_inventario_lineas(auditoria_id, producto_nombre);
 
+CREATE OR REPLACE FUNCTION public.bc_guard_almacen_tipo_durante_auditoria()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF (OLD.tipo IS DISTINCT FROM NEW.tipo
+      OR (OLD.activo IS DISTINCT FROM NEW.activo AND NEW.activo IS FALSE))
+     AND EXISTS (
+       SELECT 1 FROM public.auditorias_inventario ai
+       WHERE ai.almacen_id = OLD.id
+         AND ai.estado = 'EN_CONTEO'
+         AND ai.vence_en > now()
+     ) THEN
+    RAISE EXCEPTION 'No se puede cambiar el tipo ni desactivar el almacén mientras tenga un conteo físico abierto.'
+      USING ERRCODE = '55000';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.bc_guard_almacen_tipo_durante_auditoria() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS bc_guard_almacen_tipo_durante_auditoria ON public.almacenes;
+CREATE TRIGGER bc_guard_almacen_tipo_durante_auditoria
+BEFORE UPDATE OF tipo, activo ON public.almacenes
+FOR EACH ROW
+EXECUTE FUNCTION public.bc_guard_almacen_tipo_durante_auditoria();
+
 ALTER TABLE public.auditorias_inventario ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auditorias_inventario_lineas ENABLE ROW LEVEL SECURITY;
 
@@ -286,19 +316,43 @@ BEGIN
     p.id,
     p.nombre,
     coalesce(nullif(btrim(p.unidad),''),'unidad'),
-    nullif(btrim(p.variante_nombre),''),
+    CASE
+      WHEN p.inventario_mixto IS TRUE
+        AND p.producto_padre_id IS NULL
+        AND coalesce(s.cantidad,0) > 0
+      THEN 'Inventario sin distribuir'
+      ELSE nullif(btrim(p.variante_nombre),'')
+    END,
     coalesce(s.cantidad,0)
   FROM public.productos p
   LEFT JOIN public.stock s
     ON s.producto_id = p.id AND s.almacen_id = p_almacen_id
   WHERE p.activo IS TRUE
     AND p.archivado_at IS NULL
+    AND (
+      p.producto_padre_id IS NOT NULL
+      OR p.inventario_mixto IS NOT TRUE
+      OR coalesce(s.cantidad,0) > 0
+      OR NOT EXISTS (
+        SELECT 1 FROM public.productos v
+        WHERE v.producto_padre_id = p.id AND v.activo IS TRUE
+      )
+    )
   ORDER BY p.nombre, p.id;
 
   GET DIAGNOSTICS v_lineas = ROW_COUNT;
   IF v_lineas = 0 THEN
     RAISE EXCEPTION 'Este almacén no tiene productos activos para contar.';
   END IF;
+
+  PERFORM private.registrar_auditoria_interna(
+    'auditoria_inventario',
+    'Se inició un conteo físico en ' || (SELECT nombre FROM public.almacenes WHERE id = p_almacen_id) || '.',
+    'exito',
+    v_id::text,
+    p_idempotency_key,
+    jsonb_build_object('almacen_id',p_almacen_id,'lineas',v_lineas,'vence_en',now() + interval '4 hours')
+  );
 
   RETURN jsonb_build_object(
     'ok', true,
@@ -493,6 +547,15 @@ BEGIN
   SET estado = 'CERRADA', fecha_cierre = now()
   WHERE id = p_auditoria_id;
 
+  PERFORM private.registrar_auditoria_interna(
+    'auditoria_inventario',
+    'Se cerró el conteo físico de ' || (SELECT nombre FROM public.almacenes WHERE id = v_almacen_id) || '.',
+    'exito',
+    p_auditoria_id::text,
+    md5('bc-auditoria-inventario-cierre:' || p_auditoria_id::text)::uuid,
+    jsonb_build_object('diferencias',v_diferencias)
+  );
+
   RETURN jsonb_build_object(
     'ok',true,
     'diferencias',v_diferencias,
@@ -540,6 +603,15 @@ BEGIN
       fecha_cierre = now(),
       observacion = concat_ws(E'\n', nullif(observacion,''), 'Cancelada: ' || coalesce(nullif(btrim(p_motivo),''),'sin motivo adicional'))
   WHERE id = p_auditoria_id;
+
+  PERFORM private.registrar_auditoria_interna(
+    'auditoria_inventario',
+    'Se canceló el conteo físico de ' || (SELECT nombre FROM public.almacenes WHERE id = v_almacen_id) || '.',
+    'exito',
+    p_auditoria_id::text,
+    md5('bc-auditoria-inventario-cancelacion:' || p_auditoria_id::text)::uuid,
+    jsonb_build_object('motivo',nullif(btrim(p_motivo),''))
+  );
 
   RETURN jsonb_build_object('ok',true,'estado','CANCELADA');
 END;
@@ -590,6 +662,15 @@ BEGIN
   UPDATE public.auditorias_inventario_lineas
   SET decision = p_decision, motivo = btrim(p_motivo), actualizado_en = now()
   WHERE id = p_linea_id AND auditoria_id = p_auditoria_id;
+
+  PERFORM private.registrar_auditoria_interna(
+    'auditoria_inventario',
+    'Se revisó una diferencia del conteo físico.',
+    'exito',
+    p_linea_id::text,
+    md5('bc-auditoria-inventario-revision:' || p_linea_id::text || ':' || p_decision || ':' || md5(p_motivo))::uuid,
+    jsonb_build_object('auditoria_id',p_auditoria_id,'decision',p_decision,'motivo',btrim(p_motivo))
+  );
 
   RETURN jsonb_build_object('ok',true,'decision',p_decision);
 END;
@@ -668,6 +749,15 @@ BEGIN
       baja_id = v_baja_id,
       actualizado_en = now()
   WHERE id = p_linea_id;
+
+  PERFORM private.registrar_auditoria_interna(
+    'auditoria_inventario',
+    'Se registró una baja desde una auditoría física.',
+    'exito',
+    p_linea_id::text,
+    v_key,
+    jsonb_build_object('auditoria_id',p_auditoria_id,'baja_id',v_baja_id,'cantidad',abs(v_linea.diferencia),'motivo',btrim(p_motivo))
+  );
 
   RETURN jsonb_build_object(
     'ok',true,
