@@ -21,6 +21,7 @@
   let currentDetail = null;
   let warehouseOptions = [];
   let searchTerm = "";
+  let draftCounts = Object.create(null);
   let busy = false;
 
   function byId(id) { return document.getElementById(id); }
@@ -157,6 +158,7 @@
     if (!data || !data.cabecera || !Array.isArray(data.lineas)) {
       throw new Error("El servidor devolvió un detalle de auditoría incompleto.");
     }
+    if (currentAudit !== id) draftCounts = Object.create(null);
     currentAudit = id;
     currentDetail = data;
     renderDetail();
@@ -237,7 +239,9 @@
       " " + esc(line.unidad || "unidad") + "</strong></span>";
     if (open) {
       content += '<label><span>Conteo físico</span><input type="number" min="0" step="0.01" inputmode="decimal" data-audit-line="' +
-        esc(line.id) + '" value="' + (line.cantidad_fisica == null ? "" : esc(line.cantidad_fisica)) +
+        esc(line.id) + '" value="' + (Object.prototype.hasOwnProperty.call(draftCounts, line.id)
+          ? esc(draftCounts[line.id])
+          : (line.cantidad_fisica == null ? "" : esc(line.cantidad_fisica))) +
         '" placeholder="Cantidad contada"></label>';
     } else {
       content += '<span>Conteo físico <strong>' + (line.cantidad_fisica == null ? "—" : number(line.cantidad_fisica)) +
@@ -270,18 +274,15 @@
 
   async function saveCount() {
     if (!currentAudit || busy) return;
-    const panel = byId("bc-auditoria-inv-detail");
-    const inputs = panel ? [...panel.querySelectorAll("[data-audit-line]")] : [];
     const lines = [];
-    for (const input of inputs) {
-      if (input.value.trim() === "") continue;
-      const value = Number(input.value);
+    for (const [id, raw] of Object.entries(draftCounts)) {
+      if (String(raw).trim() === "") continue;
+      const value = Number(raw);
       if (!Number.isFinite(value) || value < 0) {
-        input.focus();
         setMessage("Introduce cantidades válidas e iguales o mayores que cero.", false);
         return;
       }
-      lines.push({ id: input.dataset.auditLine, cantidad_fisica: value });
+      lines.push({ id, cantidad_fisica: value });
     }
     setBusy(true);
     try {
@@ -290,6 +291,7 @@
         p_lineas: lines,
       });
       if (error) throw new Error(rpcError(error, "No se pudo guardar el conteo."));
+      draftCounts = Object.create(null);
       await openAudit(currentAudit);
       setMessage("Conteo guardado: " + number(data && data.lineas_guardadas || 0) + " productos actualizados.", true);
     } catch (error) {
@@ -300,25 +302,26 @@
   }
 
   async function closeAudit() {
-    if (!currentAudit || busy) return;
-    const detail = currentDetail;
-    const inputs = byId("bc-auditoria-inv-detail").querySelectorAll("[data-audit-line]");
-    if (inputs.length !== detail.lineas.length) {
-      setMessage("Quita la búsqueda para mostrar todos los productos y completar el conteo antes de cerrar.", false);
-      return;
-    }
-    const incomplete = [...inputs].some((input) => input.value.trim() === "");
-    if (incomplete) {
-      setMessage("Completa la cantidad física de todos los productos antes de cerrar.", false);
-      return;
+    if (!currentAudit || busy || !currentDetail) return;
+    const lines = [];
+    for (const line of currentDetail.lineas) {
+      const value = Object.prototype.hasOwnProperty.call(draftCounts, line.id)
+        ? draftCounts[line.id]
+        : line.cantidad_fisica;
+      if (value == null || String(value).trim() === "") {
+        setMessage("Completa la cantidad física de todos los productos antes de cerrar. Usa la búsqueda para localizar los que faltan.", false);
+        return;
+      }
+      const quantity = Number(value);
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        setMessage("Hay una cantidad inválida. Revísala antes de cerrar el conteo.", false);
+        return;
+      }
+      lines.push({ id: line.id, cantidad_fisica: quantity });
     }
     if (!window.confirm("¿Cerrar el conteo? Se liberará el almacén para volver a registrar movimientos. Las diferencias quedarán pendientes de revisión y no se ajustará stock automáticamente.")) return;
     setBusy(true);
     try {
-      const lines = [...inputs].map((input) => ({
-        id: input.dataset.auditLine,
-        cantidad_fisica: Number(input.value),
-      }));
       const { error: saveError } = await client.rpc(RPC.save, {
         p_auditoria_id: currentAudit,
         p_lineas: lines,
@@ -326,6 +329,7 @@
       if (saveError) throw new Error(rpcError(saveError, "No se pudo guardar el conteo."));
       const { error } = await client.rpc(RPC.close, { p_auditoria_id: currentAudit });
       if (error) throw new Error(rpcError(error, "No se pudo cerrar la auditoría."));
+      draftCounts = Object.create(null);
       await openAudit(currentAudit);
       await loadAudits();
       setMessage("Conteo cerrado. El stock no fue modificado; revisa las diferencias y decide cómo resolver cada una.", true);
@@ -424,6 +428,13 @@
   }
 
   function onInput(event) {
+    if (event.target.matches("[data-audit-line]")) {
+      const id = event.target.dataset.auditLine;
+      const value = event.target.value.trim();
+      if (value === "") delete draftCounts[id];
+      else draftCounts[id] = value;
+      return;
+    }
     if (event.target.matches("[data-audit-search]")) {
       searchTerm = event.target.value;
       const cursor = event.target.selectionStart;
