@@ -1045,8 +1045,8 @@ async function main() {
     "La fixture sintética debe habilitar Operaciones sin iniciar sesión ni escribir datos: " + JSON.stringify(operationTabAccess));
   const operationsTabClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=operacion]');if(!b)return false;b.click();return true})()");
   assert(operationsTabClicked, "No se pudo abrir Operaciones con el permiso sintético.");
-  await waitUntil("Operaciones y acción primaria Agregar gasto visibles", "(()=>{const t=document.querySelector('#tab-operacion');const b=t&&t.querySelector('[data-op-action=\\\\\"gasto\\\\\"]');return !!(t&&t.classList.contains('visible')&&b&&b.isConnected&&getComputedStyle(b).display!=='none')})()", 10000);
-  const gastoPoint = await evaluate("(()=>{const b=document.querySelector('#tab-operacion [data-op-action=\\\\\"gasto\\\\\"]');if(!b)return null;b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height,connected:b.isConnected}})()");
+  await waitUntil("Operaciones y acción primaria Agregar gasto visibles", "(()=>{const t=document.querySelector('#tab-operacion');const b=t&&t.querySelector('[data-op-action=gasto]');return !!(t&&t.classList.contains('visible')&&b&&b.isConnected&&getComputedStyle(b).display!=='none')})()", 10000);
+  const gastoPoint = await evaluate("(()=>{const b=document.querySelector('#tab-operacion [data-op-action=gasto]');if(!b)return null;b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height,connected:b.isConnected}})()");
   report.evidence.operationsPrimaryTarget = gastoPoint;
   assert(gastoPoint && gastoPoint.connected && gastoPoint.width > 0 && gastoPoint.height > 0,
     "La acción primaria Agregar gasto no tiene un objetivo de clic visible: " + JSON.stringify(gastoPoint));
