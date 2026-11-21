@@ -11,7 +11,7 @@ async function refrescarTransferencias() {
   setLoading("lista-transferencias", "Cargando transferencias…");
   const { data } = await client
     .from("transferencias")
-    .select("id, fecha, estado, responsable_receptor_id, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
+    .select("id, fecha, estado, responsable_receptor_id, responsable_receptor_nombre, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
     .order("fecha", { ascending: false })
     .limit(20);
   _cache.transferencias = data || [];
@@ -425,7 +425,7 @@ async function mostrarDetalleTransferencia(trfId) {
   }
 
   const completada = String(trf.estado || "").toLocaleLowerCase() === "completada";
-  if (trf.responsable_receptor_id && completada && navigator.onLine) {
+  if (trf.responsable_receptor_nombre && completada && navigator.onLine) {
     try {
       const { data, error } = await client.rpc("bc_mensaje_transferencia", {
         p_transferencia_id: trf.id
