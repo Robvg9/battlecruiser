@@ -123,6 +123,11 @@ function bcGuardarSnapshotPermisos() {
     efectivos: clonarPermisosEfectivos(_permisosEfectivos),
     exitosa: true
   };
+  if (typeof window.bcOfflineSaveContext === "function") {
+    window.bcOfflineSaveContext(_bcPermisosSnapshot).catch(function (error) {
+      console.warn("[BattleCruiser] El contexto se conserva en memoria, pero no pudo guardarse para offline:", error);
+    });
+  }
 }
 
 function bcRestaurarSnapshotPermisos(motivo) {
@@ -198,6 +203,27 @@ async function cargarContextoUsuario(sessionInicial) {
       authUser = sesion.session.user;
     }
 
+    if (typeof window.bcOfflineLoadContext === "function") {
+      try {
+        var storedContext = await window.bcOfflineLoadContext(authUser.id);
+        if (storedContext && String(storedContext.userId) === String(authUser.id)) _bcPermisosSnapshot = storedContext;
+      } catch (_) {}
+    }
+    if (sessionInicial && sessionInicial.bcOffline === true) {
+      _usuarioActual = null;
+      if (!bcRestaurarSnapshotPermisos("perfil local previamente validado")) {
+        _permisosEfectivos = {};
+        _permisosCargaExitosa = false;
+        mostrarEstadoIdentidadEnHeader("Perfil offline no disponible — entra online");
+        asegurarBotonReintentarContexto();
+        if (typeof showLogin === "function") showLogin();
+        return;
+      }
+      _permisosCargaFallidaRed = true;
+      if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
+      if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
+      return;
+    }
     var perfilRes = null;
     var permsRes = null;
     try {

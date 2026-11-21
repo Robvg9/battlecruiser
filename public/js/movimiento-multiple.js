@@ -227,7 +227,12 @@
   }
   window.__BC_TRANSFER_STOCK_REFRESH__ = actualizarInventarioConfirmado;
 
+  function transferenciaPuedeEncolarseOffline() {
+    return window.__BC_OFFLINE_AUTH__ === true || !navigator.onLine ||
+      (typeof window.estaRealmenteDesconectado === "function" && window.estaRealmenteDesconectado());
+  }
   function validarStock(id, amount, source) {
+    if (transferenciaPuedeEncolarseOffline()) return { ok: true, info: null, validacionPendiente: true };
     if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
       const detail = window.__BC_TRANSFER_STOCK_ERROR__ ? ' Detalle: ' + String(window.__BC_TRANSFER_STOCK_ERROR__) : '';
       return { ok: false, message: 'No se ha confirmado una lectura reciente del inventario desde Supabase. Actualiza existencias antes de transferir.' + detail };
@@ -305,7 +310,7 @@
     if (step === 2) {
       if (!selectors.origin.value || !selectors.destination.value) return feedback('Selecciona el almacén de origen y el de destino.', false);
       if (String(selectors.origin.value) === String(selectors.destination.value)) return feedback('El origen y el destino deben ser distintos.', false);
-      if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
+      if (!transferenciaPuedeEncolarseOffline() && window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
         feedback('Confirmando existencias actuales antes de continuar…', true);
         if (!(await actualizarInventarioConfirmado())) return feedback('No se pudo confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), false);
       }
@@ -316,7 +321,9 @@
       document.getElementById('mov-transfer-step-products').hidden = true;
       document.getElementById('mov-transfer-step-details').hidden = false;
       render();
-      feedback('Indica la cantidad de cada producto. Se comprobará contra el stock confirmado.', true);
+      feedback(transferenciaPuedeEncolarseOffline()
+        ? 'Indica las cantidades. El stock real se comprobará en Supabase al sincronizar.'
+        : 'Indica la cantidad de cada producto. Se comprobará contra el stock confirmado.', true);
       return;
     }
     if (transferStep === 2) saveTransferDrafts();
@@ -348,7 +355,7 @@
     return !!lineas.length;
   }
   async function agregarLinea() {
-    if (window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
+    if (!transferenciaPuedeEncolarseOffline() && window.__BC_TRANSFER_STOCK_CONFIRMED__ !== true) {
       feedback('Consultando existencias actuales en Supabase…', true);
       if (!(await actualizarInventarioConfirmado())) {
         return feedback('No se pudo confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), false);
@@ -377,13 +384,17 @@
     if (String(source) === String(dest)) return feedback('El origen y el destino deben ser distintos.', false);
     if (transferStep !== 2) return feedback('Completa primero la selección de productos.', false);
     if (!collectTransferQuantities()) return false;
-    feedback('Confirmando las existencias actuales desde Supabase…', true);
-    if (!(await actualizarInventarioConfirmado())) {
-      return feedback('No se puede registrar la transferencia sin confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Reintenta la lectura.'), false);
-    }
-    for (const item of lineas) {
-      const valid = validarStock(item.producto_id, item.cantidad, source);
-      if (!valid.ok) return feedback(item.nombre + ': ' + valid.message, false);
+    if (!transferenciaPuedeEncolarseOffline()) {
+      feedback('Confirmando las existencias actuales desde Supabase…', true);
+      if (!(await actualizarInventarioConfirmado())) {
+        return feedback('No se puede registrar la transferencia sin confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Reintenta la lectura.'), false);
+      }
+      for (const item of lineas) {
+        const valid = validarStock(item.producto_id, item.cantidad, source);
+        if (!valid.ok) return feedback(item.nombre + ': ' + valid.message, false);
+      }
+    } else {
+      feedback('Guardando localmente. El servidor comprobará existencias y permisos al sincronizar…', true);
     }
     const summary = lineas.length + (lineas.length === 1 ? ' producto' : ' productos');
     if (!window.confirm('¿Registrar una transferencia con ' + summary + '? El stock se moverá entre almacenes.')) return;
@@ -404,8 +415,8 @@
       if (!result || !result.ok) throw (result && result.error) || new Error('No se pudo registrar la transferencia.');
       if (result.offline) feedback(
         receiver
-          ? '✓ Transferencia guardada en este dispositivo; se sincronizará al recuperar la conexión.'
-          : '✓ Transferencia guardada en este dispositivo; quedó pendiente identificar quién recibe. Esta operación no tendrá comprobante de WhatsApp.',
+          ? '✓ Transferencia guardada localmente. Stock y permisos se validarán en Supabase al sincronizar.'
+          : '✓ Transferencia guardada localmente; falta identificar quién recibe. Stock y permisos se validarán en Supabase al sincronizar.',
         true
       );
       else {

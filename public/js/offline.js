@@ -489,6 +489,7 @@ async function actualizarContadorColaPendiente() {
 // para la proyección de stock y excluye REQUIERE_ATENCION a propósito).
 const ETIQUETA_TIPO_OP = {
   compra: "Compra",
+  compra_multiple: "Compra múltiple",
   venta: "Venta",
   venta_jornada: "Venta de Jornada",
   transferencia: "Transferencia",
@@ -515,7 +516,12 @@ const ETIQUETA_TIPO_OP = {
 function resumenOperacionPendiente(op) {
   const p = (op && op.payload) || {};
   switch (op && op.tipo) {
-    case "compra": {
+    case "compra":
+    case "compra_multiple": {
+      if (op.tipo === "compra_multiple") {
+        const lines = Array.isArray(p.p_lineas) ? p.p_lineas : [];
+        return "Entrada de stock · " + lines.length + " producto(s)";
+      }
       const cant = p.p_presentacion_id
         ? (Number(p.p_cantidad_presentacion) || 0) + " presentación(es)"
         : (Number(p.p_cantidad) || 0) + " unidades";
@@ -1034,6 +1040,7 @@ function ajustePendiente(producto_id, almacen_id) {
 //                                                la cola ni se reintenta sola).
 const RPC_POR_TIPO = {
   compra: "registrar_compra",
+  compra_multiple: "registrar_compra_multiple",
   venta: "registrar_venta",
   venta_jornada: "bc7_registrar_venta_jornada",
   transferencia: "registrar_transferencia",
@@ -1149,12 +1156,15 @@ async function ejecutarOperacion(tipo, payload) {
     const operacion = await guardarOperacionPendiente(
       crearOperacionPendiente(tipo, payload, idempotency_key)
     );
+    if (!operacion) {
+      return { ok: false, offline: false, error: { message: "No se pudo guardar en este dispositivo. No se registró la operación; comprueba el espacio disponible y vuelve a intentarlo." } };
+    }
     await refrescarOperacionesPendientesCache();
     bcNotificarCambioDatos(tipo, true);
     return { ok: true, offline: true, operacion };
   }
 
-  if (!navigator.onLine) {
+  if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true) {
     marcarConectividadReal("offline");
     return encolar();
   }
@@ -1236,8 +1246,7 @@ function reconciliarTrasOperacion(tipo, resultado) {
       if (resultado === "exito") marcarRefrescoPendiente("productos");
       break;
     case "compra":
-      // Compra = entrada de stock. (refrescarStockYSelects cubre productos
-      // + almacenes + stock, asi que "stock" incluye "productos").
+    case "compra_multiple":
       marcarRefrescoPendiente("stock");
       break;
     case "venta":
@@ -1356,6 +1365,7 @@ function sincronizandoGlobal(activo) {
 }
 
 async function procesarColaSincronizacion() {
+  if (window.__BC_OFFLINE_AUTH__ === true) return;
   if (_sincronizando) return;
   // Bind one drain pass to the user who started it. An IndexedDB await can
   // outlive logout/login, so filtering only the initial queue snapshot is not
@@ -1375,7 +1385,7 @@ async function procesarColaSincronizacion() {
     if (usuarioIdParaCola() !== usuarioIdSincronizacion) return;
 
     for (const op of operaciones) {
-      if (!navigator.onLine) break; // se perdió la conexión a mitad de la cola
+      if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true) break;
       if (usuarioIdParaCola() !== usuarioIdSincronizacion) break;
       // Fail closed if the stored owner does not match the identity bound to
       // this pass, even if a future query/index regression returns a foreign op.
