@@ -90,6 +90,8 @@ test("audit history uses readable activity cards instead of raw operation codes"
   assert.match(mando, /bc-audit-entry__category/);
   assert.match(mando, /bc-audit-entry__actor-label/);
   assert.match(mando, /bc-audit-entry__status/);
+  assert.match(mando, /Actualizaciones de producto/);
+  assert.match(mando, /Requiere revisión/);
   assert.match(mando, /Referencia #/);
   assert.match(mando, /Lote #/);
   assert.doesNotMatch(mando, /escHtml\(f\.tipo \|\| ""\)/);
