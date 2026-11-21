@@ -40,6 +40,27 @@
     host.className = 'msg inv-audit-message' + (message ? (ok ? ' success' : ' error') : '');
   }
 
+  function isMissingAuditRpc(error) {
+    const message = [
+      error && error.message,
+      error && error.details,
+      error && error.hint
+    ].filter(Boolean).join(' ');
+    return !!error && (
+      error.code === 'PGRST202' ||
+      (/could not find the function|schema cache/i.test(message) &&
+        /inventario_auditoria_(listar|iniciar|detalle|guardar_conteos|finalizar|cancelar)/i.test(message))
+    );
+  }
+
+  function auditErrorMessage(error, fallback) {
+    if (isMissingAuditRpc(error)) {
+      return 'El conteo físico aún no está habilitado en Supabase LIVE. La migración de esta función todavía no se ha aplicado; no inicies ni guardes un conteo hasta que se complete ese paso.';
+    }
+    return error && error.message ? error.message : fallback;
+  }
+
+
   async function rpc(name, args) {
     const clientApi = api();
     if (!clientApi || typeof clientApi.rpc !== 'function') throw new Error('La conexión con Supabase no está lista.');
@@ -107,7 +128,7 @@
       const rows = await rpc('inventario_auditoria_listar', { p_almacen_id: null });
       renderHistory(Array.isArray(rows) ? rows : []);
     } catch (error) {
-      showMessage(error.message || 'No se pudo cargar el historial de conteos.', false);
+      showMessage(auditErrorMessage(error, 'No se pudo cargar el historial de conteos.'), false);
     }
   }
 
@@ -143,7 +164,7 @@
       await loadAuditDetail(id);
       showMessage('Conteo iniciado. El sistema ya está bloqueando movimientos de este almacén.', true);
     } catch (error) {
-      showMessage(error.message || 'No se pudo iniciar el conteo.', false);
+      showMessage(auditErrorMessage(error, 'No se pudo iniciar el conteo.'), false);
     } finally { busy = false; }
   }
 
@@ -162,7 +183,7 @@
     if (busy) return;
     busy = true;
     try { await loadAuditDetail(id); }
-    catch (error) { showMessage(error.message || 'No se pudo abrir el detalle del conteo.', false); }
+    catch (error) { showMessage(auditErrorMessage(error, 'No se pudo abrir el detalle del conteo.'), false); }
     finally { busy = false; }
   }
 
@@ -243,7 +264,7 @@
       await loadAuditDetail(currentAuditId);
       showMessage(andFinish ? 'Conteo finalizado. Las diferencias quedaron documentadas y no se modificó el stock.' : 'Conteos guardados.', true);
     } catch (error) {
-      showMessage(error.message || 'No se pudo guardar el conteo.', false);
+      showMessage(auditErrorMessage(error, 'No se pudo guardar el conteo.'), false);
     } finally { busy = false; }
   }
 
@@ -264,7 +285,7 @@
       await loadAuditDetail(currentAuditId);
       showMessage('Conteo cancelado. El almacén fue desbloqueado sin modificar existencias.', true);
     } catch (error) {
-      showMessage(error.message || 'No se pudo cancelar el conteo.', false);
+      showMessage(auditErrorMessage(error, 'No se pudo cancelar el conteo.'), false);
     } finally { busy = false; }
   }
 
@@ -297,6 +318,9 @@
       '.inv-audit-start{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin:12px 0}' +
       '.inv-audit-start label{display:grid;gap:4px;font-size:.76rem}' +
       '.inv-audit-start select,.inv-audit-line input{width:100%;min-width:0;box-sizing:border-box;min-height:40px;padding:8px 10px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--void,#0d1b17);color:var(--text)}' +
+      '.inv-audit-start select{background:linear-gradient(180deg,var(--gold-bright),var(--gold))!important;color:#211605!important;font-weight:700;color-scheme:light;cursor:pointer}' +
+      '.inv-audit-start select option,.inv-audit-start select optgroup{background:#f3d27c!important;color:#211605!important;font-weight:600}' +
+      '.inv-audit-start select:focus-visible{outline:2px solid var(--gold-bright);outline-offset:2px}' +
       '.inv-audit-start button,.inv-audit-actions button{min-height:40px;padding:8px 13px;border:0;border-radius:7px;background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;font-weight:700}' +
       '.inv-audit-actions #inv-audit-cancel{background:transparent;border:1px solid rgba(190,80,80,.65);color:var(--danger,#d47b7b)}' +
       '.inv-audit-policy,.inv-audit-help{font-size:.76rem;line-height:1.45;margin:8px 0 12px}' +
