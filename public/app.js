@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.139 — Readable audit history and high-contrast physical-count controls.
+// v9.5.140 — Color-coded jornada statuses and single modern transfer picker.
 (function hotfixV9475(){
-  const VERSION="9.5.139";
+  const VERSION="9.5.140";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -171,7 +171,7 @@
     ["m29-turnos-organizacion.js","29.22"],["m31-turno-asignaciones.js","31.2"],["m33-turnos-final.js","33.21"],["bc7-legacy-history.js","1.0"],["turno-cash-handover-ui.js","1.2"],["hotfix-turno-forceclose-20260902.js","20261030.1"],["m34-turnos-filter-final.js","34.3"],
     ["m35-turnos-asignaciones-fix.js","35.2"],["m36-turnos-asignaciones-offline.js","36.2"],["m38-productos-cards.js","38.2"],["m42-reportes-dashboard.js","42.2"],
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
-    ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261120.1"],["inventario-auditoria.js","1.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
+    ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261121.1"],["inventario-auditoria.js","1.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
     ["m53-inventario-centro.js","53.9"],["m55-productos-import.js","55.5"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.8"],["m57-turnos-sesion-ux-fix.js","57.6"],
     ["m68-ventas-pos-definitivo.js","9.5.139"],["hotfix-regresiones-20260902.js","20261120.2"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],

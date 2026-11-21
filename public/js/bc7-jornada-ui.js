@@ -239,6 +239,7 @@
       '#tab-jornada .bc7-pill{display:inline-block;padding:4px 7px;border:1px solid var(--gold-dim);border-radius:999px;font-size:10px;color:var(--mist);white-space:nowrap}',
       '#tab-jornada .bc7-pill.ok{color:#9fd7ad;border-color:#4b8860}',
       '#tab-jornada .bc7-pill.warn{color:#ebcf7e;border-color:#a9873c}',
+      '#tab-jornada .bc7-pill.closed{color:#efaaa2;border-color:#a45353;background:rgba(164,83,83,.10)}',
       '#tab-jornada .bc7-table-wrap{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}',
       '#tab-jornada .bc7-table{width:100%;min-width:720px;border-collapse:collapse;font-size:12px;table-layout:auto}',
       '#tab-jornada .bc7-table.bc7-table-wide{min-width:980px}',
@@ -503,9 +504,11 @@
   function rowHtml(r){
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
     const rest=!r.trabaja||r.estado==='DESCANSO';
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':status==='COMPLETADA'?'<span class="bc7-pill ok">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':status==='PROGRAMADA'||status==='PENDIENTE'?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status);
-    const viewable=status==='COMPLETADA';
+    const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
+    const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
+    const pill=rest?'<span class="bc7-pill">Descanso</span>':isClosed?'<span class="bc7-pill closed">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const isTerminal=isClosed||['CANCELADA','CANCELADO'].includes(status);
+    const viewable=isClosed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     let reschedule='';
     if(state.admin&&!isTerminal){
