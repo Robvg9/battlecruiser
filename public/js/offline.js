@@ -90,6 +90,35 @@ async function idbSet(clave, datos) {
   }
 }
 
+// User-scoped RPC snapshots reuse the existing IndexedDB "lecturas" store.
+// No second database/cache or credential storage is introduced.
+const BC_RPC_SNAPSHOT_PREFIX = "__bc_rpc_snapshot_v1::";
+window.bcOfflineRememberRpcSnapshot = async function(name, params, data) {
+  if (!name) return false;
+  try {
+    const key = BC_RPC_SNAPSHOT_PREFIX + String(name) + "::" + JSON.stringify(params || {});
+    await idbSet(key, { data: data, savedAt: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    console.warn("[BattleCruiser] No se pudo guardar la lectura offline:", name, error);
+    return false;
+  }
+};
+window.bcOfflineReadRpcSnapshot = async function(name, params) {
+  if (!name) return null;
+  try {
+    const key = BC_RPC_SNAPSHOT_PREFIX + String(name) + "::" + JSON.stringify(params || {});
+    const record = await idbGet(key);
+    const snapshot = record && record.datos;
+    return snapshot && Object.prototype.hasOwnProperty.call(snapshot, "data")
+      ? { found: true, data: snapshot.data, savedAt: snapshot.savedAt || record.actualizado || null }
+      : null;
+  } catch (error) {
+    console.warn("[BattleCruiser] No se pudo recuperar la lectura offline:", name, error);
+    return null;
+  }
+};
+
 const _estadoCacheClaves = {};
 
 // Claves que este dispositivo cachea para lectura offline (Etapa A). Se usa
@@ -489,9 +518,14 @@ async function actualizarContadorColaPendiente() {
 // para la proyección de stock y excluye REQUIERE_ATENCION a propósito).
 const ETIQUETA_TIPO_OP = {
   compra: "Compra",
+  compra_multiple: "Compra múltiple",
   venta: "Venta",
   venta_jornada: "Venta de Jornada",
   transferencia: "Transferencia",
+  gasto_jornada: "Gasto de Jornada",
+  reinversion_jornada: "Reinversión de Jornada",
+  baja_jornada: "Baja de Jornada",
+  ajuste_jornada: "Merma de Jornada",
   vale: "Vale de salida",
   producto: "Creación de producto",
   producto_actualizar: "Edición de producto",
@@ -515,7 +549,12 @@ const ETIQUETA_TIPO_OP = {
 function resumenOperacionPendiente(op) {
   const p = (op && op.payload) || {};
   switch (op && op.tipo) {
-    case "compra": {
+    case "compra":
+    case "compra_multiple": {
+      if (op.tipo === "compra_multiple") {
+        const lines = Array.isArray(p.p_lineas) ? p.p_lineas : [];
+        return "Entrada de stock · " + lines.length + " producto(s)";
+      }
       const cant = p.p_presentacion_id
         ? (Number(p.p_cantidad_presentacion) || 0) + " presentación(es)"
         : (Number(p.p_cantidad) || 0) + " unidades";
@@ -533,6 +572,14 @@ function resumenOperacionPendiente(op) {
       const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
       return lineas.length + " línea(s) · " + totalUnidades + " unidades";
     }
+    case "gasto_jornada":
+      return (p.p_concepto || "Gasto") + " · " + (Number(p.p_monto) || 0).toFixed(2);
+    case "reinversion_jornada":
+      return (Array.isArray(p.p_lineas) ? p.p_lineas.length : 0) + " línea(s) · reinversión pendiente";
+    case "baja_jornada":
+      return (Array.isArray(p.p_lineas) ? p.p_lineas.length : 0) + " producto(s) · baja pendiente";
+    case "ajuste_jornada":
+      return (p.p_tipo || "merma") + " · " + (Number(p.p_cantidad) || 0) + " unidades";
     case "vale": {
       return (p.p_tipo || "vale") + " · " + (Number(p.p_cantidad) || 0) + " unidades";
     }
@@ -1034,9 +1081,14 @@ function ajustePendiente(producto_id, almacen_id) {
 //                                                la cola ni se reintenta sola).
 const RPC_POR_TIPO = {
   compra: "registrar_compra",
+  compra_multiple: "registrar_compra_multiple",
   venta: "registrar_venta",
   venta_jornada: "bc7_registrar_venta_jornada",
   transferencia: "registrar_transferencia",
+  gasto_jornada: "bc7_registrar_gasto_jornada",
+  reinversion_jornada: "bc7_registrar_reinversion_jornada",
+  baja_jornada: "bc7_registrar_bajas_multiple_jornada",
+  ajuste_jornada: "bc7_registrar_ajuste_jornada",
   vale: "registrar_vale_salida",
   // que compra/venta/transferencia/vale, en vez de un INSERT directo aparte.
   producto: "crear_producto",
@@ -1072,7 +1124,11 @@ function tipoAuditableFrontend(tipo) {
     case "venta_jornada":
     case "transferencia":
     case "vale":
-      // Ya auditados por el trigger auditar_mutacion_operativa().
+    case "gasto_jornada":
+    case "reinversion_jornada":
+    case "baja_jornada":
+    case "ajuste_jornada":
+      // Estos RPC registran su procedencia/auditoría en el backend de Jornada.
       return false;
     default:
       // turno, cuadre, responsabilidad, incidencia, mensaje, conversacion, etc.
@@ -1090,6 +1146,10 @@ const BC_DATA_DOMAINS_BY_OPERATION = {
   venta: ['stock', 'inventory', 'movements', 'sales'],
   venta_jornada: ['stock', 'inventory', 'movements', 'sales'],
   transferencia: ['stock', 'inventory', 'movements', 'transfers'],
+  gasto_jornada: ['turnos', 'finance', 'movements'],
+  reinversion_jornada: ['turnos', 'finance', 'stock', 'inventory', 'movements'],
+  baja_jornada: ['turnos', 'stock', 'inventory', 'movements'],
+  ajuste_jornada: ['turnos', 'stock', 'inventory', 'movements'],
   vale: ['stock', 'inventory', 'movements', 'vales'],
   almacen: ['warehouses', 'stock', 'inventory'],
   almacen_actualizar: ['warehouses', 'stock', 'inventory'],
@@ -1142,19 +1202,26 @@ async function ejecutarOperacion(tipo, payload) {
     }
   }
   if (typeof sincronizarUsuarioIdParaOperaciones === "function") sincronizarUsuarioIdParaOperaciones();
-  const idempotency_key = crypto.randomUUID();
+  const idempotency_key = String(payload && payload.p_idempotency_key || crypto.randomUUID());
   const rpcNombre = RPC_POR_TIPO[tipo];
 
   async function encolar() {
     const operacion = await guardarOperacionPendiente(
       crearOperacionPendiente(tipo, payload, idempotency_key)
     );
+    if (!operacion) {
+      return { ok: false, offline: false, error: { message: "No se pudo guardar en este dispositivo. No se registró la operación; comprueba el espacio disponible y vuelve a intentarlo." } };
+    }
     await refrescarOperacionesPendientesCache();
     bcNotificarCambioDatos(tipo, true);
     return { ok: true, offline: true, operacion };
   }
 
-  if (!navigator.onLine) {
+  if (window.__BC_PREVIEW_READ_ONLY__ === true) {
+    // Preview writes stay in IndexedDB and are never sent to the production project.
+    return encolar();
+  }
+  if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true) {
     marcarConectividadReal("offline");
     return encolar();
   }
@@ -1236,8 +1303,7 @@ function reconciliarTrasOperacion(tipo, resultado) {
       if (resultado === "exito") marcarRefrescoPendiente("productos");
       break;
     case "compra":
-      // Compra = entrada de stock. (refrescarStockYSelects cubre productos
-      // + almacenes + stock, asi que "stock" incluye "productos").
+    case "compra_multiple":
       marcarRefrescoPendiente("stock");
       break;
     case "venta":
@@ -1356,6 +1422,8 @@ function sincronizandoGlobal(activo) {
 }
 
 async function procesarColaSincronizacion() {
+  // Preview operations are never replayed against LIVE.
+  if (window.__BC_PREVIEW_READ_ONLY__ === true || window.__BC_OFFLINE_AUTH__ === true) return;
   if (_sincronizando) return;
   // Bind one drain pass to the user who started it. An IndexedDB await can
   // outlive logout/login, so filtering only the initial queue snapshot is not
@@ -1375,7 +1443,7 @@ async function procesarColaSincronizacion() {
     if (usuarioIdParaCola() !== usuarioIdSincronizacion) return;
 
     for (const op of operaciones) {
-      if (!navigator.onLine) break; // se perdió la conexión a mitad de la cola
+      if (!navigator.onLine || window.__BC_OFFLINE_AUTH__ === true || window.__BC_PREVIEW_READ_ONLY__ === true) break;
       if (usuarioIdParaCola() !== usuarioIdSincronizacion) break;
       // Fail closed if the stored owner does not match the identity bound to
       // this pass, even if a future query/index regression returns a foreign op.

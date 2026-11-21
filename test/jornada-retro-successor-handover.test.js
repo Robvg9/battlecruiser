@@ -49,8 +49,8 @@ test("owner-approved physical differences stay on the receipt and do not mutate 
   assert.equal(resolver.includes("PERFORM public.bc7_corregir_inventario_final_jornada"),false);
 });
 test("completed sessions expose read-only viewing but no operational management or rescheduling",()=>{
-  assert.ok(jornada.includes("const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status)"));
-  assert.ok(jornada.includes("const viewable=status==='COMPLETADA'"));
+  assert.ok(jornada.includes("const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status)"));
+  assert.ok(jornada.includes("const viewable=status==='COMPLETADA'||isOperationallySealed"));
   assert.ok(jornada.includes("viewable?'Ver jornada':'Gestionar jornada'"));
   assert.ok(jornada.includes("data-bc7-open="));
   assert.ok(jornada.includes("state.admin&&!isTerminal"));

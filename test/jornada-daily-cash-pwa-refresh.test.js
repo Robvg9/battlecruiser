@@ -15,8 +15,8 @@ const CSS = read("public/style.css");
 
 test("PWA shell, Jornada UI and approvals stay aligned with the current release", () => {
   assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
-  assert.ok(INDEX.includes('js/offline.js?v=9.5.100'));
-  assert.ok(SW.includes('./js/offline.js?v=9.5.100'));
+  assert.ok(INDEX.includes('js/offline.js?v=9.5.103'));
+  assert.ok(SW.includes('./js/offline.js?v=9.5.103'));
   assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"bc7-jornada-ui.js"});
   assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"aprobaciones-admin.js"});
 });
@@ -144,7 +144,7 @@ test("Owner can count the declared final cash only after session completion with
   assert.match(UI, /data-bc7-final-cash-amount/);
   assert.match(UI, /rpc\('bc5_contar_dinero_entregado'/);
   assert.match(UI, /p_declaracion_id:declarationId,p_monto_contado:amount/);
-  assert.ok(UI.includes("String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'"));
+  assert.ok(UI.includes("['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(state.detail?.sesion?.estado||'').toUpperCase())"));
   assert.match(UI, /declaration\.monto_contado==null/);
   assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
   assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);

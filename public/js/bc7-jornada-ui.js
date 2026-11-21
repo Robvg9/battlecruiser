@@ -179,16 +179,79 @@
       return true;
     }catch(_){return false;}
   }
+  const OFFLINE_JORNADA_WRITE_TYPES={
+    bc7_registrar_gasto_jornada:'gasto_jornada',
+    bc7_registrar_reinversion_jornada:'reinversion_jornada',
+    bc7_registrar_bajas_multiple_jornada:'baja_jornada',
+    bc7_registrar_ajuste_jornada:'ajuste_jornada'
+  };
+  const OFFLINE_JORNADA_READS=new Set([
+    'bc_actor_is_admin','bc5_mis_jornadas','turno_actual_usuario',
+    'bc5_obtener_configuracion_jornada','bc5_listar_patrones_jornada',
+    'listar_almacenes_para_turnos','bc7_obtener_inventario_jornada',
+    'bc7_estado_entrega_inventario_jornada','bc7_estado_confirmaciones_jornada',
+    'bc7_productos_ajuste_jornada','bc7_liquidacion_inventario_jornada',
+    'bc7_finanzas_jornada','bc7_ventas_jornada','bc7_entregas_diarias_jornada',
+    'bc7_movimientos_sesion','bc7_transferencias_pendientes_vinculo_jornada'
+  ]);
+  function offlineReadAvailable(){
+    return window.__BC_OFFLINE_AUTH__===true||!navigator.onLine||
+      (typeof estaRealmenteDesconectado==='function'&&estaRealmenteDesconectado());
+  }
+  async function readJornadaSnapshot(name,params){
+    if(!OFFLINE_JORNADA_READS.has(name)||typeof window.bcOfflineReadRpcSnapshot!=='function')return null;
+    const snapshot=await window.bcOfflineReadRpcSnapshot(name,params||{});
+    return snapshot&&snapshot.found?snapshot:null;
+  }
   async function rpc(name,params){
-    if(!navigator.onLine)throw new Error('Estás sin conexión. Reconecta para consultar o guardar datos; nada se ha enviado.');
-    if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
+    const args=params||{};
     if(!authenticatedContextReady()){
       const error=new Error('La sesión todavía está validando el usuario y sus permisos. No se consultaron ni modificaron datos.');
       error.code='BC_AUTH_CONTEXT_NOT_READY';error.rpc=name;throw error;
     }
-    const r=await client.rpc(name,params||{});
-    if(r&&r.error){const e=new Error(r.error.message||r.error.details||'La operación fue rechazada.');e.code=r.error.code;e.rpc=name;throw e;}
-    return r?r.data:null;
+    const queuedType=OFFLINE_JORNADA_WRITE_TYPES[name];
+    if(queuedType){
+      if(typeof window.ejecutarOperacion!=='function')throw new Error('La cola segura de operaciones no está disponible. No se envió ni guardó nada.');
+      const payload=Object.assign({},args);
+      if(!payload.p_idempotency_key){
+        if(!window.crypto||typeof window.crypto.randomUUID!=='function')throw new Error('No se pudo preparar una clave segura anti-duplicados.');
+        payload.p_idempotency_key=window.crypto.randomUUID();
+      }
+      const queued=await window.ejecutarOperacion(queuedType,payload);
+      if(!queued||!queued.ok)throw (queued&&queued.error)||new Error('No se pudo registrar la operación.');
+      if(queued.offline)return {__bcOfflineQueued:true,queueId:queued.operacion&&queued.operacion.id||null,operationType:queuedType};
+      return queued.data;
+    }
+    if(offlineReadAvailable()){
+      const snapshot=await readJornadaSnapshot(name,args);
+      if(snapshot)return snapshot.data;
+      if(!navigator.onLine||window.__BC_OFFLINE_AUTH__===true)
+        throw new Error('Sin conexión: esta lectura de Jornada todavía no tiene una copia guardada en este dispositivo.');
+    }
+    if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
+    try{
+      const r=await client.rpc(name,args);
+      if(r&&r.error){
+        const e=new Error(r.error.message||r.error.details||'La operación fue rechazada.');
+        e.code=r.error.code;e.rpc=name;
+        const networkError=typeof esErrorDeRed==='function'&&esErrorDeRed(r.error);
+        if(networkError){
+          const snapshot=await readJornadaSnapshot(name,args);
+          if(snapshot)return snapshot.data;
+        }
+        throw e;
+      }
+      if(OFFLINE_JORNADA_READS.has(name)&&typeof window.bcOfflineRememberRpcSnapshot==='function')
+        await window.bcOfflineRememberRpcSnapshot(name,args,r?r.data:null);
+      return r?r.data:null;
+    }catch(error){
+      const networkError=typeof esErrorDeRed==='function'&&esErrorDeRed(error);
+      if(networkError){
+        const snapshot=await readJornadaSnapshot(name,args);
+        if(snapshot)return snapshot.data;
+      }
+      throw error;
+    }
   }
   function busy(btn,on){if(!btn)return;if(on){if(btn.dataset.bc7Busy==='1')return false;btn.dataset.bc7Busy='1';btn.disabled=true;btn.setAttribute('aria-busy','true');return true;}btn.dataset.bc7Busy='0';btn.disabled=false;btn.removeAttribute('aria-busy');return true;}
   function navTo(tab){try{if(typeof window.irATab==='function')window.irATab(tab);else{const b=document.querySelector('.tab-btn[data-tab="'+tab+'"]');if(b)b.click();}}catch(e){}}
@@ -239,6 +302,7 @@
       '#tab-jornada .bc7-pill{display:inline-block;padding:4px 7px;border:1px solid var(--gold-dim);border-radius:999px;font-size:10px;color:var(--mist);white-space:nowrap}',
       '#tab-jornada .bc7-pill.ok{color:#9fd7ad;border-color:#4b8860}',
       '#tab-jornada .bc7-pill.warn{color:#ebcf7e;border-color:#a9873c}',
+      '#tab-jornada .bc7-pill.closed{color:#efaaa2;border-color:#a45353;background:rgba(164,83,83,.10)}',
       '#tab-jornada .bc7-table-wrap{display:block;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}',
       '#tab-jornada .bc7-table{width:100%;min-width:720px;border-collapse:collapse;font-size:12px;table-layout:auto}',
       '#tab-jornada .bc7-table.bc7-table-wide{min-width:980px}',
@@ -326,9 +390,10 @@
 
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const sessionIsOpen=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO';
-    const canAdjust=sessionIsOpen&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
-    const canCreateReinvestment=sessionIsOpen&&isAssigned&&can('reinversiones','crear');
+    const sessionStatus=String(detail.sesion.estado||'').toUpperCase();
+    const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
+    const canAdjust=sessionAcceptsPendingOps&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
+    const canCreateReinvestment=sessionAcceptsPendingOps&&isAssigned&&can('reinversiones','crear');
     // Reinversiones must use the live active-product catalog too: the inventory
     // snapshot can omit products with zero opening stock or products added later.
     const needsProductCatalog=canAdjust||canCreateReinvestment;
@@ -503,9 +568,12 @@
   function rowHtml(r){
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
     const rest=!r.trabaja||r.estado==='DESCANSO';
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':status==='COMPLETADA'?'<span class="bc7-pill ok">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':status==='PROGRAMADA'||status==='PENDIENTE'?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status);
-    const viewable=status==='COMPLETADA';
+    const isOperationallySealed=status==='CERRADA_OPERATIVAMENTE';
+    const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
+    const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
+    const pill=rest?'<span class="bc7-pill">Descanso</span>':isOperationallySealed?'<span class="bc7-pill warn">Cerrada · pendiente de cuadre</span>':isClosed?'<span class="bc7-pill closed">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
+    const viewable=status==='COMPLETADA'||isOperationallySealed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     let reschedule='';
     if(state.admin&&!isTerminal){
@@ -557,7 +625,7 @@
     return opened;
   }
   function checklistConfirmButtonHtml(detail,key,isAssigned){
-    if(!isAssigned)return '';
+    if(!isAssigned||String(detail?.sesion?.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE')return '';
     const done=detail?.checklist?.[key]?.completado===true;
     const label=key==='gastos'?'gastos':key==='reinversiones'?'reinversiones':'bajas';
     return '<div class="bc7-checklist-confirm"><p class="bc7-muted">'+(done?'Este bloque ya está confirmado. Si agregas otro registro, se reabrirá automáticamente.':'Cuando termines de registrar '+label+', confirma aquí que no falta nada.')+'</p><button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+key+'" data-completed="'+(done?'true':'false')+'">'+(done?'Reabrir bloque':'Sí, ya terminé de agregar '+label)+'</button></div>';
@@ -573,13 +641,17 @@
     const showReinvestments=state.admin||isAssigned;
     const showSales=!isRetail&&(state.admin||can('ventas','ver'));
     const showSettlement=isRetail&&(state.admin||isAssigned);
-    const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
-    const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
+    const acceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(status||'').toUpperCase());
+    const hasWritableTranche=status==='EN_CURSO'?!!detail.tramo_activo:true;
+    const createExpenses=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('gastos','crear');
+    const createReinvestments=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('reinversiones','crear');
     const manageSalary=isRetail&&isOwner;
     if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments&&!manageSalary)return '';
     let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
     if(isRetail){
       html+='<p class="bc7-muted">La Cueva calcula las unidades vendidas por diferencia entre inventarios y movimientos aprobados. No utiliza ventas individuales de POS ni reparte existencias por sabores.</p>';
+      if(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&(createExpenses||createReinvestments))
+        html+='<div class="bc7-note"><b>Registro tardío de esta Jornada</b><p>Puedes añadir gastos o reinversiones que quedaron pendientes. Se guardarán con la fecha y el responsable de esta Jornada, quedarán sujetos a validación del servidor y aprobación del Dueño y no cambiarán caja ni inventario antes de aprobarse.</p></div>';
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
       if(manageSalary){
         html+='<details class="bc7-finance-fold"><summary>Configurar porcentaje salarial</summary><form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
@@ -641,6 +713,9 @@
     const finalSaved=!!declaration&&(!tramoId||String(declaration.turno_tramo_id)===String(tramoId));
     const today=dateHavana();
     let html='<div class="bc7-list">';
+    if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&!declaration){
+      html+='<div class="bc7-note"><b>Transcribir declaración de efectivo de la responsable</b><p>Registra el importe que la responsable comunicó o dejó documentado. Esto no es el conteo físico del Dueño. El conteo real se registra en un paso separado.</p><form data-bc7-admin-cash-declaration="'+esc(sessionId)+'"><label class="bc7-field">Importe declarado por la responsable (CUP)<input data-bc7-admin-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></label><label class="bc7-field">Fuente / observación obligatoria<input data-bc7-admin-cash-note maxlength="1000" required placeholder="Ej.: importe comunicado por la responsable al entregar el efectivo"></label><div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar declaración transcrita</button></div><p class="bc7-msg" data-bc7-admin-cash-msg></p></form></div>';
+    }
     for(let index=0;index<totalDays;index++){
       const date=addDays(firstDate,index),isFinal=date===lastDate;
       const row=rows.find(item=>String(item.fecha||'').slice(0,10)===date);
@@ -649,9 +724,9 @@
       if(isFinal&&finalSaved){
         const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
         html+='<span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(finalCashState))+'. El importe declarado no sustituye el conteo físico.</p>';
-        if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='COMPLETADA'&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
+        if(detail.is_admin&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase())&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
           html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
-        }else if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()!=='COMPLETADA'&&declaration.monto_contado==null){
+        }else if(detail.is_admin&&!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase())&&declaration.monto_contado==null){
           html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
         }else if(declaration.monto_contado!=null){
           html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
@@ -800,6 +875,35 @@
       busy(saveButton,false);
     }
   }
+  async function saveAdminCashDeclaration(form){
+    const sessionId=String(form?.dataset?.bc7AdminCashDeclaration||'');
+    const amountInput=form?.querySelector('[data-bc7-admin-cash-amount]');
+    const noteInput=form?.querySelector('[data-bc7-admin-cash-note]');
+    const amount=amountInput&&amountInput.value.trim()!==''?Number(amountInput.value):NaN;
+    const note=String(noteInput?.value||'').trim();
+    const message=form?.querySelector('[data-bc7-admin-cash-msg]');
+    const button=form?.querySelector('button[type="submit"]');
+    if(!state.admin||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='CERRADA_OPERATIVAMENTE'){
+      msg(message,'Solo ADMIN puede transcribir una declaración de efectivo después del sello operativo.','error');return false;
+    }
+    if(!Number.isFinite(amount)||amount<0||note.length<5){
+      msg(message,'Introduce un importe válido y una fuente/observación de al menos 5 caracteres.','error');return false;
+    }
+    if(!confirm('Se registrará el importe declarado por la responsable según la fuente indicada. No se guardará todavía ningún conteo físico. ¿Confirmas?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_admin_transcribir_declaracion_dinero',{
+        p_turno_sesion_id:sessionId,p_monto:amount,p_observacion:note
+      });
+      const loaded=await openWorkspace(sessionId);
+      if(!loaded)throw new Error('La declaración fue enviada pero no se pudo recargar la Jornada.');
+      setStatus('Declaración transcrita y auditada. El conteo físico del Dueño sigue separado.','ok');
+      return true;
+    }catch(error){
+      msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');
+      return false;
+    }finally{busy(button,false);}
+  }
   async function countFinalCash(form){
     const declarationId=String(form?.dataset?.bc7FinalCashCount||'');
     const sessionId=String(form?.dataset?.bc7FinalCashSession||'');
@@ -809,7 +913,7 @@
     const message=form?.querySelector('[data-bc7-final-cash-msg]');
     const button=form?.querySelector('button[type="submit"]');
     const declaration=state.detail?.declaracion_dinero;
-    if(!state.admin||!declarationId||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'){
+    if(!state.admin||!declarationId||!sessionId||!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(state.detail?.sesion?.estado||'').toUpperCase())){
       msg(message,'El conteo solo está disponible para ADMIN después de completar esta jornada.','error');return false;
     }
     if(!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null){
@@ -1060,6 +1164,12 @@
         });
       }else{
         throw new Error('Tipo de operación financiera desconocido.');
+      }
+      if(createdId&&createdId.__bcOfflineQueued){
+        form.reset();keyField.value='';
+        msg(message,'Guardado en este dispositivo para esta Jornada. Queda pendiente de sincronización y aprobación; no se ha aplicado a caja ni inventario. Referencia local: '+(createdId.queueId||'pendiente'),'ok');
+        setStatus('Gasto/reinversión pendiente de sincronización. No se confirmó ningún efecto real.','ok');
+        return;
       }
       const canReadThisType=state.admin||can('turnos','ver');
       if(!canReadThisType){
@@ -1766,17 +1876,24 @@
       actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cinco pasos; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
     }else if(status==='COMPLETADA'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
+    }else if(status==='COMPLETADA'&&s.es_minorista===true){
+      actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
     }else if(status==='COMPLETADA'){
       actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
+    }else if(status==='CERRADA_OPERATIVAMENTE'&&s.es_minorista===true){
+      actionArea='<div class="bc7-note"><b>Sellado operativo · pendiente de conciliación.</b><p>La operación terminó a las '+esc(String(s.corte_operativo_at||s.cierre_operativo_at||'').slice(11,16)||'hora registrada')+'. No se inventó inventario final, declaración de efectivo ni aprobación. El Dueño completará los cinco controles y el conteo físico cuando revise la Jornada.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
     }else{
       actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     }
+    if(status==='EN_CURSO'&&s.es_minorista===true){
+      actionArea+='<div class="bc7-note bc7-operational-seal"><b>Sellado operativo rápido · sin cuadre</b><p>Usa esta acción si la responsable terminó su jornada y no puede completar ahora los formularios. El servidor cierra el tramo a la hora programada (o registra la hora real y el motivo si es anticipado). No confirma inventario ni declara efectivo.</p><label class="bc7-field">Motivo obligatorio solo si cierras antes de la hora programada<input id="bc7-operational-close-reason" maxlength="1000" placeholder="Ej.: cierre anticipado por cansancio o incidencia"></label><div class="bc7-actions"><button class="bc7-btn danger" type="button" data-bc7-operational-close="'+esc(s.id)+'" '+(!isAssigned&&!state.admin?'disabled':'')+'>Cerrar operación · dejar cuadre pendiente</button></div><p class="bc7-msg" data-bc7-operational-close-msg></p></div>';
+    }
     const ownerTurnId=s.turno_id||detail.turno_id||detail.turno?.id;
-    if(status==='COMPLETADA'&&ownerTurnId&&(can('auditoria','editar_any')||can('entregas_caja','editar_any')||can('turnos','editar_any'))){
+    if(['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(status)&&ownerTurnId&&(can('auditoria','editar_any')||can('entregas_caja','editar_any')||can('turnos','editar_any'))){
       actionArea+='<div class="bc7-note"><b>Revisión del Dueño</b><p>Abre el expediente completo de esta jornada: inventario, ventas estimadas, costos documentados, efectivo, diferencias y movimientos por validar.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-open-owner-review="'+esc(ownerTurnId)+'">Abrir revisión integral del turno</button></div></div>';
     }
     let adjustment='';
-    if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
+    if(['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status)&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos_ajuste);
       const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
       const adjustmentStorageType=canCreateBaja?'baja':'merma';
@@ -2130,6 +2247,33 @@
       return false;
     }finally{if(!alreadyBusy)busy(btn,false);}
   }
+  async function closeOperationalSession(button){
+    const sessionId=String(button?.dataset?.bc7OperationalClose||'');
+    const reason=String($('bc7-operational-close-reason')?.value||'').trim()||null;
+    const message=$('bc7-operational-close-msg');
+    if(!sessionId||!state.detail||String(state.detail.sesion?.id)!==sessionId||
+       String(state.detail.sesion?.estado||'').toUpperCase()!=='EN_CURSO'||
+       state.detail.sesion?.es_minorista!==true){
+      msg(message,'La Jornada cambió o ya no está operativamente abierta. Actualiza antes de continuar.','error');return false;
+    }
+    if(!confirm('Se cerrará únicamente la operación de esta Jornada. No se registrará inventario final, declaración de efectivo ni aprobación. La Jornada quedará pendiente de conciliación del Dueño. ¿Continuar?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_cerrar_jornada_operativa',{
+        p_turno_sesion_id:sessionId,
+        p_motivo_excepcion:reason
+      });
+      await loadCalendar();
+      await loadCurrentSession();
+      const loaded=await openWorkspace(sessionId);
+      if(!loaded)throw new Error('El sello se registró pero no se pudo recargar la Jornada. Actualiza la pantalla.');
+      setStatus('Operación sellada. Inventario, caja y conciliación siguen pendientes.','ok');
+      return true;
+    }catch(error){
+      msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');
+      return false;
+    }finally{busy(button,false);}
+  }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
     let amount=$('bc7-cash')?.value.trim();
@@ -2415,6 +2559,7 @@
     const detail=form.querySelector('[data-bc7-ajust-reason]').value.trim();
     const msgEl=form.querySelector('[data-bc7-ajust-msg]');
     const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+    const sessionSealed=String(state.detail?.sesion?.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
     const lines=rows.map(row=>{
       const select=row.querySelector('[data-bc7-ajust-product]');
       const quantityInput=row.querySelector('[data-bc7-ajust-qty]');
@@ -2430,7 +2575,7 @@
     if(storageType!=='baja'&&lines.length!==1){
       msg(msgEl,'Una merma corresponde a un solo producto. Para varios productos, selecciona «Baja de inventario».','error');return;
     }
-    if(lines.some(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock)){
+    if(!sessionSealed&&lines.some(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock)){
       const bad=lines.find(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock);
       const selected=bad?.row.querySelector('[data-bc7-ajust-product]');
       const selectedName=selected?.options?.[selected.selectedIndex]?.textContent||'uno de los productos';
@@ -2459,10 +2604,15 @@
         });
       }else{
         const line=lines[0];
-        await rpc('bc7_registrar_ajuste_jornada',{
+        result=await rpc('bc7_registrar_ajuste_jornada',{
           p_turno_sesion_id:sessionId,p_tipo:'merma',p_producto_id:line.producto_id,
           p_cantidad:line.cantidad,p_motivo:reason,p_idempotency_key:idempotencyKey
         });
+      }
+      if(result&&result.__bcOfflineQueued){
+        keyField.value='';form.reset();
+        const queuedMessage='Solicitud guardada localmente para esta Jornada. Sigue pendiente de sincronización y revisión; el stock no se ha modificado. Referencia local: '+(result.queueId||'pendiente');
+        msg(msgEl,queuedMessage,'ok');setStatus(queuedMessage,'ok');return;
       }
       const bajaState=String(result?.estado||'PENDIENTE').toUpperCase();
       const successMessage=storageType==='baja'
@@ -2804,6 +2954,7 @@
     if(t.hasAttribute('data-bc7-retro-handover-open')){await openRetroSuccessorPanel(t);return;}
     if(t.hasAttribute('data-bc7-start-retro')){await startRetroSuccessor(t);return;}
     if(t.hasAttribute('data-bc7-open')){await openWorkspace(t.dataset.bc7Open);return;}
+    if(t.hasAttribute('data-bc7-operational-close')){await closeOperationalSession(t);return;}
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
     if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
     if(t.hasAttribute('data-bc7-delivery-decision')){await resolveSharedDelivery(t);return;}
@@ -2824,6 +2975,7 @@
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
+    else if(f.matches('[data-bc7-admin-cash-declaration]')){e.preventDefault();await saveAdminCashDeclaration(f);}
     else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
   });
   document.addEventListener('change',function(e){

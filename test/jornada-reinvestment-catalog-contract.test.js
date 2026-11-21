@@ -9,8 +9,10 @@ test("reinvestment picker loads the full active product catalogue independently 
   const loadStart=ui.indexOf("function ensureWorkspaceOperationData(detail){");
   const loadEnd=ui.indexOf("function ",loadStart+20);
   const load=ui.slice(loadStart,loadEnd);
-  assert.match(load,/const canCreateReinvestment=sessionIsOpen&&isAssigned&&can\('reinversiones','crear'\)/,
-    "the assigned worker's reinvestment permission must trigger catalog loading");
+  assert.match(load,/const sessionAcceptsPendingOps=\['EN_CURSO','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionStatus\)/,
+    "a jornada sealed operationally can still accept late pending operations");
+  assert.match(load,/const canCreateReinvestment=sessionAcceptsPendingOps&&isAssigned&&can\('reinversiones','crear'\)/,
+    "the assigned worker's reinvestment permission must trigger catalog loading while the jornada is active or operationally sealed");
   assert.match(load,/const needsProductCatalog=canAdjust\|\|canCreateReinvestment/,
     "the product catalogue must load for either adjustments or reinvestments");
   assert.match(load,/rpc\('bc7_productos_ajuste_jornada'/,

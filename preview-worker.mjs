@@ -1,4 +1,7 @@
-const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
+const PREVIEW_ORIGINS = new Set([
+  "https://bc-pr-224-battlecruiser.robvg9.workers.dev",
+  "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"
+]);
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
@@ -22,7 +25,7 @@ export default {
 
     // This Worker script is only enabled for the exact shared PR preview host.
     // All unrelated asset requests continue through the configured ASSETS binding.
-    if (url.origin !== PREVIEW_ORIGIN) {
+    if (!PREVIEW_ORIGINS.has(url.origin)) {
       return env.ASSETS.fetch(request);
     }
     const upstreamFunction = url.pathname === LOGIN_PROXY_PATH
@@ -36,13 +39,13 @@ export default {
 
     const requestOrigin = request.headers.get("Origin");
     if (request.method === "OPTIONS") {
-      if (requestOrigin !== PREVIEW_ORIGIN) {
+      if (!PREVIEW_ORIGINS.has(requestOrigin)) {
         return json({ error: "Origen no permitido." }, 403);
       }
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": PREVIEW_ORIGIN,
+          "Access-Control-Allow-Origin": url.origin,
           "Access-Control-Allow-Headers": "apikey, x-client-info, content-type, authorization",
           "Access-Control-Allow-Methods": "POST, OPTIONS",
           "Access-Control-Max-Age": "600",
@@ -55,8 +58,8 @@ export default {
     // A browser POST from the preview must carry its exact same-origin marker.
     // A GET is allowed only as a no-credential diagnostic: the upstream function
     // returns 405 before its rate limiter or auth/database logic can run.
-    const foreignOrigin = requestOrigin && requestOrigin !== PREVIEW_ORIGIN;
-    if ((request.method === "POST" && requestOrigin !== PREVIEW_ORIGIN) ||
+    const foreignOrigin = requestOrigin && !PREVIEW_ORIGINS.has(requestOrigin);
+    if ((request.method === "POST" && !PREVIEW_ORIGINS.has(requestOrigin)) ||
         (request.method === "GET" && foreignOrigin)) {
       return json({ error: "Origen no permitido." }, 403);
     }
