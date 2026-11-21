@@ -24,7 +24,7 @@ test("Jornada e inventario explica el propósito y los pasos en lenguaje operati
 
 test("el estado vacío del calendario propone siguientes pasos sin fingir éxito", () => {
   assert.match(JOURNADA_UI, /No hay jornadas visibles en este rango/);
-  assert.match(JOURNADA_UI, /amplía “Días a consultar”/);
+  assert.match(JOURNADA_UI, /Prueba otro mes/);
   assert.match(JOURNADA_UI, /Una lista vacía no demuestra que el servidor esté caído/);
   assert.match(JOURNADA_UI, /Una asignación solo queda confirmada cuando la valida el servidor/);
 });
