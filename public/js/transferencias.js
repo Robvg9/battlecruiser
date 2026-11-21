@@ -290,6 +290,11 @@ safeInit("form-transferencia", () => {
     const producto_id = document.getElementById("trf-producto").value;
     const cantidad = parseFloat(document.getElementById("trf-cantidad").value);
     const submitBtn = e.target.querySelector("button[type='submit']");
+    const almacenDestino = almacenPorIdTransferencia(destino);
+    const esDestinoMinorista = !!almacenDestino && almacenDestino.tipo === "minorista";
+    const responsableReceptorId = esDestinoMinorista
+      ? ((document.getElementById("trf-responsable-receptor") || {}).value || "")
+      : "";
 
     if (!origen || !destino || !producto_id) {
       setMsg("msg-transferencias", "Completá origen, destino y producto.", false);
@@ -297,6 +302,10 @@ safeInit("form-transferencia", () => {
     }
     if (String(origen) === String(destino)) {
       setMsg("msg-transferencias", "El origen y el destino no pueden ser el mismo almacén.", false);
+      return;
+    }
+    if (esDestinoMinorista && !responsableReceptorId) {
+      setMsg("msg-transferencias", "Selecciona quién recibe la mercancía en el almacén minorista.", false);
       return;
     }
     if (!(cantidad > 0) || !Number.isFinite(cantidad)) {
@@ -331,11 +340,16 @@ safeInit("form-transferencia", () => {
       }
       if (submitBtn) submitBtn.textContent = "Procesando…";
 
-      const resultado = await ejecutarOperacion("transferencia", {
+      const payloadTransferencia = {
         p_origen_id: origen,
         p_destino_id: destino,
         p_lineas: [{ producto_id: producto_id, cantidad: cantidad }],
-      });
+      };
+      if (esDestinoMinorista) payloadTransferencia.p_responsable_receptor_id = responsableReceptorId;
+      const resultado = await ejecutarOperacion(
+        esDestinoMinorista ? "transferencia_receptor" : "transferencia",
+        payloadTransferencia
+      );
 
       if (!resultado.ok) {
         setMsg("msg-transferencias", "No se pudo transferir: " + explicarError(resultado.error, "transferencia"), false);
@@ -356,6 +370,9 @@ safeInit("form-transferencia", () => {
       await refrescarStockYSelects();
       if (typeof window.__BC_TRANSFER_STOCK_REFRESH__ === "function") await window.__BC_TRANSFER_STOCK_REFRESH__();
       actualizarStockTransferenciaUI();
+      if (esDestinoMinorista && resultado.data) {
+        await mostrarDetalleTransferencia(String(resultado.data));
+      }
     } finally {
       _enviandoTransferencia = false;
       if (submitBtn) {
