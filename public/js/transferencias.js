@@ -394,43 +394,95 @@ async function mostrarDetalleTransferencia(trfId) {
     _enlazarCerrarTrfDetalle();
     return;
   }
+
   const fechaHora = trf.fecha ? fechaHoraCompleta(trf.fecha) : "—";
   const estadoTxt = trf.estado ? escHtml(trf.estado) : "Registrada";
   let lineasHtml = "";
+  let shareHtml = "";
+  let reporteCompartir = null;
+
   try {
     if (navigator.onLine && trf.id) {
       const { data: lineas, error } = await client
         .from("transferencias_lineas")
-        .select("producto_id, cantidad, productos(nombre)")
+        .select("producto_id, cantidad, productos(nombre, unidad)")
         .eq("transferencia_id", trf.id);
-      if (!error && lineas && lineas.length > 0) {
+      if (error) throw error;
+      if (lineas && lineas.length > 0) {
         lineasHtml = '<div class="detalle-fila detalle-seccion"><span class="detalle-etiqueta">Productos</span></div>';
-        lineas.forEach((l, i) => {
-          const nombre = (l.productos && l.productos.nombre)
-            || (typeof resolverNombreProducto === "function" ? resolverNombreProducto(l.producto_id) : idCorto(l.producto_id));
-          lineasHtml += '<div class="detalle-fila"><span class="detalle-etiqueta">  ' + (i + 1) + '. ' + escHtml(nombre) +
-            '</span><span class="detalle-valor">' + fmtNumTransfer(l.cantidad || 0) + ' u</span></div>';
+        lineas.forEach((linea, index) => {
+          const nombre = (linea.productos && linea.productos.nombre)
+            || (typeof resolverNombreProducto === "function" ? resolverNombreProducto(linea.producto_id) : idCorto(linea.producto_id));
+          const unidad = (linea.productos && linea.productos.unidad) || "u";
+          lineasHtml += '<div class="detalle-fila"><span class="detalle-etiqueta">' + (index + 1) + ". " + escHtml(nombre) +
+            '</span><span class="detalle-valor">' + fmtNumTransfer(linea.cantidad || 0) + " " + escHtml(unidad) + "</span></div>";
         });
       }
     }
-  } catch (e) {
-    console.warn("[Battlecruiser] No se pudieron cargar líneas de transferencia:", e);
+  } catch (error) {
+    console.warn("[BattleCruiser] No se pudieron cargar líneas de transferencia:", error);
+    lineasHtml = '<p class="msg error">No se pudieron cargar los productos de esta transferencia.</p>';
   }
-  cont.innerHTML = '<div class="detalle-cabecera">'
-    + '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + '</span>'
-    + '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>'
-    + '</div>'
-    + '<div class="detalle-cuerpo">'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || "—") + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + estadoTxt + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + '</span></div>'
-    + '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + '</span></div>'
-    + lineasHtml
-    + '<p class="muted detalle-nota">El stock se movió al registrar la transferencia (operación atómica). No hay recepción ni cancelación posterior en el modelo actual.</p>'
-    + '</div>';
+
+  const completada = String(trf.estado || "").toLocaleLowerCase() === "completada";
+  if (trf.responsable_receptor_id && completada && navigator.onLine) {
+    try {
+      const { data, error } = await client.rpc("bc_mensaje_transferencia", {
+        p_transferencia_id: trf.id
+      });
+      if (error) throw error;
+      reporteCompartir = data;
+      const texto = formatearMensajeTransferenciaWhatsApp(reporteCompartir);
+      shareHtml = '<section class="bc-transfer-share">' +
+        '<div class="bc-transfer-share-heading"><strong>Mensaje para el grupo de WhatsApp</strong>' +
+        '<span class="muted">Comprueba los datos y compártelo cuando estés listo.</span></div>' +
+        '<textarea class="bc-transfer-share-text" aria-label="Mensaje de transferencia para WhatsApp" readonly>' +
+        escHtml(texto) + '</textarea>' +
+        '<div class="bc-transfer-share-actions">' +
+        '<button type="button" class="cc-accion primary" data-trf-share-whatsapp>Compartir por WhatsApp</button>' +
+        '<button type="button" class="cc-accion" data-trf-copy-whatsapp>Copiar mensaje</button>' +
+        '</div><p class="muted">BattleCruiser no lo envía automáticamente. Selecciona el grupo y confirma el envío en WhatsApp.</p>' +
+        '</section>';
+    } catch (error) {
+      shareHtml = '<p class="msg error">No se pudo preparar el mensaje para compartir: ' +
+        escHtml(error && error.message ? error.message : "datos incompletos") + "</p>";
+    }
+  }
+
+  cont.innerHTML = '<div class="detalle-cabecera">' +
+    '<span class="detalle-tipo">Transferencia #' + (trf.id ? idCorto(trf.id) : "—") + "</span>" +
+    '<button type="button" class="detalle-cerrar-btn trf-detalle-cerrar-btn" aria-label="Cerrar detalle">&times;</button>' +
+    "</div>" +
+    '<div class="detalle-cuerpo">' +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Referencia</span><span class="detalle-valor">' + escHtml(trf.id || "—") + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Fecha y hora</span><span class="detalle-valor">' + escHtml(fechaHora) + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Estado</span><span class="detalle-valor">' + estadoTxt + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén origen</span><span class="detalle-valor">' + escHtml(trf.origen ? trf.origen.nombre : "—") + "</span></div>" +
+    '<div class="detalle-fila"><span class="detalle-etiqueta">Almacén destino</span><span class="detalle-valor">' + escHtml(trf.destino ? trf.destino.nombre : "—") + "</span></div>" +
+    lineasHtml + shareHtml +
+    '<p class="muted detalle-nota">El stock se movió al registrar la transferencia mediante una operación atómica.</p>' +
+    "</div>";
+
   cont.classList.remove("hidden");
   _enlazarCerrarTrfDetalle();
+  const textoCompartir = reporteCompartir ? formatearMensajeTransferenciaWhatsApp(reporteCompartir) : "";
+  const compartir = cont.querySelector("[data-trf-share-whatsapp]");
+  if (compartir) compartir.addEventListener("click", async () => {
+    try {
+      await compartirMensajeTransferenciaWhatsApp(textoCompartir);
+    } catch (error) {
+      setMsg("msg-transferencias", error.message || "No se pudo compartir el mensaje.", false);
+    }
+  });
+  const copiar = cont.querySelector("[data-trf-copy-whatsapp]");
+  if (copiar) copiar.addEventListener("click", async () => {
+    try {
+      await copiarMensajeTransferenciaWhatsApp(textoCompartir);
+      setMsg("msg-transferencias", "Mensaje copiado. Ya puedes pegarlo en WhatsApp.", true);
+    } catch (error) {
+      setMsg("msg-transferencias", error.message || "No se pudo copiar el mensaje.", false);
+    }
+  });
   cont.focus();
 }
 
