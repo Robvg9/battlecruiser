@@ -11,6 +11,7 @@ const app = fs.readFileSync("public/app.js", "utf8");
 const sw = fs.readFileSync("public/service-worker.js", "utf8");
 const index = fs.readFileSync("public/index.html", "utf8");
 const mando = fs.readFileSync("public/js/mando.js", "utf8");
+const styles = fs.readFileSync("public/style.css", "utf8");
 
 test("physical audit is limited server-side to storage warehouses", () => {
   assert.match(migration, /v_almacen\.tipo\s*<>\s*'almacenamiento'/i);
@@ -81,4 +82,25 @@ test("audit log hides idempotency keys and exposes a separate physical-count vie
   assert.match(index, /mando-auditoria-fisica/);
   assert.match(app, /\["inventario-auditoria\.js","1\.0"\]/);
   assert.match(sw, /inventario-auditoria\.js\?v=1\.0/);
+});
+
+
+test("audit history uses readable activity cards instead of raw operation codes", () => {
+  assert.match(mando, /function presentarRegistroAuditoria\(fila\)/);
+  assert.match(mando, /bc-audit-entry__category/);
+  assert.match(mando, /bc-audit-entry__actor-label/);
+  assert.match(mando, /bc-audit-entry__status/);
+  assert.match(mando, /Referencia #/);
+  assert.match(mando, /Lote #/);
+  assert.doesNotMatch(mando, /escHtml\(f\.tipo \|\| ""\)/);
+  assert.match(styles, /\.bc-audit-entry__title/);
+  assert.match(styles, /@media \(max-width: 520px\)[\s\S]*?\.bc-audit-entry__meta/);
+});
+
+test("physical count selector is high-contrast and missing LIVE RPC is explained", () => {
+  assert.match(inventoryUi, /\.inv-audit-start select\{background:linear-gradient/);
+  assert.match(inventoryUi, /color:#211605!important/);
+  assert.match(inventoryUi, /select option,\.inv-audit-start select optgroup/);
+  assert.match(inventoryUi, /El conteo físico aún no está habilitado en Supabase LIVE/);
+  assert.match(inventoryUi, /PGRST202/);
 });
