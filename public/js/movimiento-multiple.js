@@ -364,8 +364,10 @@
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('transferencias', 'crear')) return feedback('Tu usuario no tiene permiso para registrar transferencias.', false);
     const source = selectors.origin.value, dest = selectors.destination.value;
     const receiver = selectors.receiver && selectors.receiver.value;
+    const estaDesconectado = !navigator.onLine ||
+      (typeof window.estaRealmenteDesconectado === 'function' && window.estaRealmenteDesconectado());
     if (!source || !dest) return feedback('Selecciona el origen y el destino.', false);
-    if (!receiver) return feedback('Selecciona quién recibe la transferencia.', false);
+    if (!receiver && !estaDesconectado) return feedback('Selecciona quién recibe la transferencia.', false);
     if (String(source) === String(dest)) return feedback('El origen y el destino deben ser distintos.', false);
     if (transferStep !== 2) return feedback('Completa primero la selección de productos.', false);
     if (!collectTransferQuantities()) return false;
@@ -383,12 +385,23 @@
     enviando = true; if (button) { button.disabled = true; button.textContent = 'Procesando…'; }
     limpiarCompartir();
     try {
-      const result = await window.ejecutarOperacion('transferencia', {
-        p_origen_id: source, p_destino_id: dest, p_recibido_por: receiver,
+      const payload = {
+        p_origen_id: source,
+        p_destino_id: dest,
         p_lineas: lineas.map(item => ({ producto_id: item.producto_id, cantidad: item.cantidad }))
-      });
+      };
+      // Keep offline-first transfer queue compatible: when the receiver list
+      // is unavailable offline, omit the 5th RPC argument and use the legacy
+      // 4-argument signature on replay. If a cached receiver is selected, keep it.
+      if (receiver) payload.p_recibido_por = receiver;
+      const result = await window.ejecutarOperacion('transferencia', payload);
       if (!result || !result.ok) throw (result && result.error) || new Error('No se pudo registrar la transferencia.');
-      if (result.offline) feedback('✓ Transferencia guardada en este dispositivo; se sincronizará al recuperar la conexión.', true);
+      if (result.offline) feedback(
+        receiver
+          ? '✓ Transferencia guardada en este dispositivo; se sincronizará al recuperar la conexión.'
+          : '✓ Transferencia guardada en este dispositivo; quedó pendiente identificar quién recibe. Esta operación no tendrá comprobante de WhatsApp.',
+        true
+      );
       else {
         let missingMinimums = [];
         try {

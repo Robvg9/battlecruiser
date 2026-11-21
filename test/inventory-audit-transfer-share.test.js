@@ -58,6 +58,9 @@ test("WhatsApp share uses the compact recipient template only after successful o
   assert.match(transferUi, /navigator\.share/);
   assert.match(transferUi, /web\.whatsapp\.com\/send\?text=/);
   assert.match(transferUi, /if \(!result\.offline && result\.data\)/);
+  assert.match(transferUi, /const estaDesconectado = !navigator\.onLine/);
+  assert.match(transferUi, /if \(receiver\) payload\.p_recibido_por = receiver/);
+  assert.match(transferUi, /no tendr[aá] comprobante de WhatsApp/i);
   assert.match(transferUi, /obtener_transferencia_compartir/);
 });
 
