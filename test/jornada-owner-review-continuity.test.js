@@ -55,7 +55,7 @@ test("Unpriced products with zero sales do not block the Jornada settlement",()=
 test("The Owner review does not display zero profit or cost when provisional rows are hidden",()=>{
   assert.ok(REVIEW.includes("No calculable"));
   assert.ok(REVIEW.includes("Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte."));
-  assert.ok(REVIEW.includes("todavía no se ha completado."));
+  assert.ok(REVIEW.includes("liquidación todavía no calculable"));
 });
 test("Salary percentage can be explicitly set after a completed session but before master approval",()=>{
   assert.match(MIG,/v_master_estado IN \('CERRADO','CANCELADO'\)/);

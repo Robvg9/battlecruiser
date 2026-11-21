@@ -230,9 +230,9 @@ test("Saved light/dark preference is applied before first paint", () => {
   assert.match(theme, /setAttribute\('data-bc-theme', appearance\)/,
     "runtime theme changes must keep the first-paint state synchronized");
   assert.ok(indexHtml.includes('js/core.js?v=9.5.117'));
-  assert.ok(indexHtml.includes('js/auth.js?v=9.5.118'));
+  assert.ok(indexHtml.includes('js/auth.js?v=9.5.120'));
   assert.ok(indexHtml.includes('js/m27-5-theme-dark-reset.js?v=27.5a3'));
   assert.ok(serviceWorker.includes('./js/core.js?v=9.5.117'));
-  assert.ok(serviceWorker.includes('./js/auth.js?v=9.5.118'));
+  assert.ok(serviceWorker.includes('./js/auth.js?v=9.5.120'));
   assert.ok(serviceWorker.includes('./js/m27-5-theme-dark-reset.js?v=27.5a3'));
 });

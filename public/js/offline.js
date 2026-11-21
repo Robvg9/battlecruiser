@@ -90,6 +90,35 @@ async function idbSet(clave, datos) {
   }
 }
 
+// User-scoped RPC snapshots reuse the existing IndexedDB "lecturas" store.
+// No second database/cache or credential storage is introduced.
+const BC_RPC_SNAPSHOT_PREFIX = "__bc_rpc_snapshot_v1::";
+window.bcOfflineRememberRpcSnapshot = async function(name, params, data) {
+  if (!name) return false;
+  try {
+    const key = BC_RPC_SNAPSHOT_PREFIX + String(name) + "::" + JSON.stringify(params || {});
+    await idbSet(key, { data: data, savedAt: new Date().toISOString() });
+    return true;
+  } catch (error) {
+    console.warn("[BattleCruiser] No se pudo guardar la lectura offline:", name, error);
+    return false;
+  }
+};
+window.bcOfflineReadRpcSnapshot = async function(name, params) {
+  if (!name) return null;
+  try {
+    const key = BC_RPC_SNAPSHOT_PREFIX + String(name) + "::" + JSON.stringify(params || {});
+    const record = await idbGet(key);
+    const snapshot = record && record.datos;
+    return snapshot && Object.prototype.hasOwnProperty.call(snapshot, "data")
+      ? { found: true, data: snapshot.data, savedAt: snapshot.savedAt || record.actualizado || null }
+      : null;
+  } catch (error) {
+    console.warn("[BattleCruiser] No se pudo recuperar la lectura offline:", name, error);
+    return null;
+  }
+};
+
 const _estadoCacheClaves = {};
 
 // Claves que este dispositivo cachea para lectura offline (Etapa A). Se usa
@@ -493,6 +522,10 @@ const ETIQUETA_TIPO_OP = {
   venta: "Venta",
   venta_jornada: "Venta de Jornada",
   transferencia: "Transferencia",
+  gasto_jornada: "Gasto de Jornada",
+  reinversion_jornada: "Reinversión de Jornada",
+  baja_jornada: "Baja de Jornada",
+  ajuste_jornada: "Merma de Jornada",
   vale: "Vale de salida",
   producto: "Creación de producto",
   producto_actualizar: "Edición de producto",
@@ -539,6 +572,14 @@ function resumenOperacionPendiente(op) {
       const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0);
       return lineas.length + " línea(s) · " + totalUnidades + " unidades";
     }
+    case "gasto_jornada":
+      return (p.p_concepto || "Gasto") + " · " + (Number(p.p_monto) || 0).toFixed(2);
+    case "reinversion_jornada":
+      return (Array.isArray(p.p_lineas) ? p.p_lineas.length : 0) + " línea(s) · reinversión pendiente";
+    case "baja_jornada":
+      return (Array.isArray(p.p_lineas) ? p.p_lineas.length : 0) + " producto(s) · baja pendiente";
+    case "ajuste_jornada":
+      return (p.p_tipo || "merma") + " · " + (Number(p.p_cantidad) || 0) + " unidades";
     case "vale": {
       return (p.p_tipo || "vale") + " · " + (Number(p.p_cantidad) || 0) + " unidades";
     }
@@ -1044,6 +1085,10 @@ const RPC_POR_TIPO = {
   venta: "registrar_venta",
   venta_jornada: "bc7_registrar_venta_jornada",
   transferencia: "registrar_transferencia",
+  gasto_jornada: "bc7_registrar_gasto_jornada",
+  reinversion_jornada: "bc7_registrar_reinversion_jornada",
+  baja_jornada: "bc7_registrar_bajas_multiple_jornada",
+  ajuste_jornada: "bc7_registrar_ajuste_jornada",
   vale: "registrar_vale_salida",
   // que compra/venta/transferencia/vale, en vez de un INSERT directo aparte.
   producto: "crear_producto",
@@ -1079,7 +1124,11 @@ function tipoAuditableFrontend(tipo) {
     case "venta_jornada":
     case "transferencia":
     case "vale":
-      // Ya auditados por el trigger auditar_mutacion_operativa().
+    case "gasto_jornada":
+    case "reinversion_jornada":
+    case "baja_jornada":
+    case "ajuste_jornada":
+      // Estos RPC registran su procedencia/auditoría en el backend de Jornada.
       return false;
     default:
       // turno, cuadre, responsabilidad, incidencia, mensaje, conversacion, etc.
@@ -1097,6 +1146,10 @@ const BC_DATA_DOMAINS_BY_OPERATION = {
   venta: ['stock', 'inventory', 'movements', 'sales'],
   venta_jornada: ['stock', 'inventory', 'movements', 'sales'],
   transferencia: ['stock', 'inventory', 'movements', 'transfers'],
+  gasto_jornada: ['turnos', 'finance', 'movements'],
+  reinversion_jornada: ['turnos', 'finance', 'stock', 'inventory', 'movements'],
+  baja_jornada: ['turnos', 'stock', 'inventory', 'movements'],
+  ajuste_jornada: ['turnos', 'stock', 'inventory', 'movements'],
   vale: ['stock', 'inventory', 'movements', 'vales'],
   almacen: ['warehouses', 'stock', 'inventory'],
   almacen_actualizar: ['warehouses', 'stock', 'inventory'],
@@ -1149,7 +1202,7 @@ async function ejecutarOperacion(tipo, payload) {
     }
   }
   if (typeof sincronizarUsuarioIdParaOperaciones === "function") sincronizarUsuarioIdParaOperaciones();
-  const idempotency_key = crypto.randomUUID();
+  const idempotency_key = String(payload && payload.p_idempotency_key || crypto.randomUUID());
   const rpcNombre = RPC_POR_TIPO[tipo];
 
   async function encolar() {

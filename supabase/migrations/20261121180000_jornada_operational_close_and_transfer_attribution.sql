@@ -709,4 +709,84 @@ BEGIN
 END;
 $patch_owner_review$;
 
+-- Late entry after operational sealing is allowed only while the master Turn
+-- remains open. The original responsable and exact completed tranche stay bound
+-- to the Jornada; no physical count, cash declaration or approval is inferred.
+CREATE OR REPLACE FUNCTION public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id uuid)
+RETURNS public.turno_tramos
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public','pg_temp'
+AS $function$
+DECLARE
+  v_s public.turno_sesiones;
+  v_p public.turno_jornada_programacion;
+  v_t public.turno_tramos;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
+  END IF;
+  IF NOT public.tiene_permiso('turnos','ver') THEN
+    RAISE EXCEPTION 'No tienes permiso para operar dentro de jornadas.' USING ERRCODE='42501';
+  END IF;
+  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;
+  IF NOT FOUND OR v_s.bloque<>'JORNADA' OR v_s.jornada_programacion_id IS NULL
+     OR v_s.estado NOT IN ('EN_CURSO','CERRADA_OPERATIVAMENTE') THEN
+    RAISE EXCEPTION 'La operación solo se permite dentro de una Jornada en curso o sellada pendiente de conciliación.' USING ERRCODE='23514';
+  END IF;
+  IF v_s.estado='CERRADA_OPERATIVAMENTE' AND NOT EXISTS (
+    SELECT 1 FROM public.turnos t WHERE t.id=v_s.turno_id AND t.estado='ABIERTO'
+  ) THEN
+    RAISE EXCEPTION 'El Turno maestro ya no está abierto; no se admiten registros tardíos.' USING ERRCODE='23514';
+  END IF;
+  SELECT * INTO v_p FROM public.turno_jornada_programacion WHERE id=v_s.jornada_programacion_id FOR SHARE;
+  IF NOT FOUND OR v_p.responsable_id IS DISTINCT FROM auth.uid()
+     OR NOT EXISTS (
+       SELECT 1 FROM public.turno_asignaciones a
+       WHERE a.turno_sesion_id=v_s.id AND a.usuario_id=auth.uid() AND a.retirado_at IS NULL
+     ) THEN
+    RAISE EXCEPTION 'Solo la responsable asignada actualmente puede registrar operaciones en esta Jornada.' USING ERRCODE='42501';
+  END IF;
+  SELECT * INTO v_t FROM public.turno_tramos
+  WHERE turno_sesion_id=v_s.id AND usuario_id=auth.uid()
+    AND (
+      (v_s.estado='EN_CURSO' AND estado='ACTIVO')
+      OR (v_s.estado='CERRADA_OPERATIVAMENTE' AND estado='COMPLETADO'
+          AND fin_at=v_s.corte_operativo_at)
+    )
+  ORDER BY inicio_at DESC NULLS LAST,created_at DESC NULLS LAST
+  LIMIT 1 FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No se encontró el tramo correspondiente a la Jornada y su responsable.' USING ERRCODE='23514';
+  END IF;
+  RETURN v_t;
+END;
+$function$;
+
+-- The multi-item Baja RPC already performs payload idempotency, exact actor
+-- binding and stock reservation checks. Widen only its state predicate after
+-- the helper above has verified the sealed tranche and open master Turn.
+DO $patch_late_bajas$
+DECLARE
+  v_def text;
+  v_old text := 'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado<>''EN_CURSO'' THEN';
+  v_new text := 'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado NOT IN (''EN_CURSO'',''CERRADA_OPERATIVAMENTE'') THEN';
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure
+  ) INTO v_def;
+  IF strpos(v_def,v_old)=0 THEN
+    IF strpos(v_def,'CERRADA_OPERATIVAMENTE')=0 THEN
+      RAISE EXCEPTION 'No se pudo localizar el guard de estado de bc7_registrar_bajas_multiple_jornada.';
+    END IF;
+  ELSE
+    v_def:=replace(v_def,v_old,v_new);
+    EXECUTE v_def;
+  END IF;
+END;
+$patch_late_bajas$;
+
+REVOKE ALL ON FUNCTION public.bc7_validar_tramo_responsable_jornada(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.bc7_validar_tramo_responsable_jornada(uuid) TO authenticated;
+
 COMMIT;

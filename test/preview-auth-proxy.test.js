@@ -177,9 +177,9 @@ test("non-proxy paths remain static assets", async () => {
 });
 
 test("frontend uses the exact preview-only same-origin login endpoint and keeps LIVE direct", () => {
-  assert.match(authSource, /bc-pr-224-battlecruiser\\.robvg9\\.workers\\.dev/);
-  assert.match(authSource, /ux-jornada-status-colors-transfer-modern-picker-battlecruiser\\.robvg9\\.workers\\.dev/);
-  assert.match(authSource, /window\.location\.origin === "https:\/\/bc-pr-224-battlecruiser\.robvg9\.workers\.dev"/);
+  assert.ok(authSource.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));
+  assert.ok(authSource.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
+  assert.ok(authSource.includes("].includes(window.location.origin)"));
   assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
   assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 2,

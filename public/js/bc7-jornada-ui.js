@@ -179,16 +179,79 @@
       return true;
     }catch(_){return false;}
   }
+  const OFFLINE_JORNADA_WRITE_TYPES={
+    bc7_registrar_gasto_jornada:'gasto_jornada',
+    bc7_registrar_reinversion_jornada:'reinversion_jornada',
+    bc7_registrar_bajas_multiple_jornada:'baja_jornada',
+    bc7_registrar_ajuste_jornada:'ajuste_jornada'
+  };
+  const OFFLINE_JORNADA_READS=new Set([
+    'bc_actor_is_admin','bc5_mis_jornadas','turno_actual_usuario',
+    'bc5_obtener_configuracion_jornada','bc5_listar_patrones_jornada',
+    'listar_almacenes_para_turnos','bc7_obtener_inventario_jornada',
+    'bc7_estado_entrega_inventario_jornada','bc7_estado_confirmaciones_jornada',
+    'bc7_productos_ajuste_jornada','bc7_liquidacion_inventario_jornada',
+    'bc7_finanzas_jornada','bc7_ventas_jornada','bc7_entregas_diarias_jornada',
+    'bc7_movimientos_sesion','bc7_transferencias_pendientes_vinculo_jornada'
+  ]);
+  function offlineReadAvailable(){
+    return window.__BC_OFFLINE_AUTH__===true||!navigator.onLine||
+      (typeof estaRealmenteDesconectado==='function'&&estaRealmenteDesconectado());
+  }
+  async function readJornadaSnapshot(name,params){
+    if(!OFFLINE_JORNADA_READS.has(name)||typeof window.bcOfflineReadRpcSnapshot!=='function')return null;
+    const snapshot=await window.bcOfflineReadRpcSnapshot(name,params||{});
+    return snapshot&&snapshot.found?snapshot:null;
+  }
   async function rpc(name,params){
-    if(!navigator.onLine)throw new Error('Estás sin conexión. Reconecta para consultar o guardar datos; nada se ha enviado.');
-    if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
+    const args=params||{};
     if(!authenticatedContextReady()){
       const error=new Error('La sesión todavía está validando el usuario y sus permisos. No se consultaron ni modificaron datos.');
       error.code='BC_AUTH_CONTEXT_NOT_READY';error.rpc=name;throw error;
     }
-    const r=await client.rpc(name,params||{});
-    if(r&&r.error){const e=new Error(r.error.message||r.error.details||'La operación fue rechazada.');e.code=r.error.code;e.rpc=name;throw e;}
-    return r?r.data:null;
+    const queuedType=OFFLINE_JORNADA_WRITE_TYPES[name];
+    if(queuedType){
+      if(typeof window.ejecutarOperacion!=='function')throw new Error('La cola segura de operaciones no está disponible. No se envió ni guardó nada.');
+      const payload=Object.assign({},args);
+      if(!payload.p_idempotency_key){
+        if(!window.crypto||typeof window.crypto.randomUUID!=='function')throw new Error('No se pudo preparar una clave segura anti-duplicados.');
+        payload.p_idempotency_key=window.crypto.randomUUID();
+      }
+      const queued=await window.ejecutarOperacion(queuedType,payload);
+      if(!queued||!queued.ok)throw (queued&&queued.error)||new Error('No se pudo registrar la operación.');
+      if(queued.offline)return {__bcOfflineQueued:true,queueId:queued.operacion&&queued.operacion.id||null,operationType:queuedType};
+      return queued.data;
+    }
+    if(offlineReadAvailable()){
+      const snapshot=await readJornadaSnapshot(name,args);
+      if(snapshot)return snapshot.data;
+      if(!navigator.onLine||window.__BC_OFFLINE_AUTH__===true)
+        throw new Error('Sin conexión: esta lectura de Jornada todavía no tiene una copia guardada en este dispositivo.');
+    }
+    if(typeof client==='undefined'||!client||typeof client.rpc!=='function')throw new Error('Cliente Supabase no disponible.');
+    try{
+      const r=await client.rpc(name,args);
+      if(r&&r.error){
+        const e=new Error(r.error.message||r.error.details||'La operación fue rechazada.');
+        e.code=r.error.code;e.rpc=name;
+        const networkError=typeof esErrorDeRed==='function'&&esErrorDeRed(r.error);
+        if(networkError){
+          const snapshot=await readJornadaSnapshot(name,args);
+          if(snapshot)return snapshot.data;
+        }
+        throw e;
+      }
+      if(OFFLINE_JORNADA_READS.has(name)&&typeof window.bcOfflineRememberRpcSnapshot==='function')
+        await window.bcOfflineRememberRpcSnapshot(name,args,r?r.data:null);
+      return r?r.data:null;
+    }catch(error){
+      const networkError=typeof esErrorDeRed==='function'&&esErrorDeRed(error);
+      if(networkError){
+        const snapshot=await readJornadaSnapshot(name,args);
+        if(snapshot)return snapshot.data;
+      }
+      throw error;
+    }
   }
   function busy(btn,on){if(!btn)return;if(on){if(btn.dataset.bc7Busy==='1')return false;btn.dataset.bc7Busy='1';btn.disabled=true;btn.setAttribute('aria-busy','true');return true;}btn.dataset.bc7Busy='0';btn.disabled=false;btn.removeAttribute('aria-busy');return true;}
   function navTo(tab){try{if(typeof window.irATab==='function')window.irATab(tab);else{const b=document.querySelector('.tab-btn[data-tab="'+tab+'"]');if(b)b.click();}}catch(e){}}
@@ -327,9 +390,10 @@
 
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const sessionIsOpen=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO';
-    const canAdjust=sessionIsOpen&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
-    const canCreateReinvestment=sessionIsOpen&&isAssigned&&can('reinversiones','crear');
+    const sessionStatus=String(detail.sesion.estado||'').toUpperCase();
+    const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
+    const canAdjust=sessionAcceptsPendingOps&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
+    const canCreateReinvestment=sessionAcceptsPendingOps&&isAssigned&&can('reinversiones','crear');
     // Reinversiones must use the live active-product catalog too: the inventory
     // snapshot can omit products with zero opening stock or products added later.
     const needsProductCatalog=canAdjust||canCreateReinvestment;
@@ -507,7 +571,7 @@
     const isOperationallySealed=status==='CERRADA_OPERATIVAMENTE';
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':isOperationallySealed?'<span class="bc7-pill warn">Cerrada · pendiente de cuadre</span>':isClosed?'<span class="bc7-pill closed">Completada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const pill=rest?'<span class="bc7-pill">Descanso</span>':isOperationallySealed?'<span class="bc7-pill warn">Cerrada · pendiente de cuadre</span>':isClosed?'<span class="bc7-pill closed">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
     const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
     const viewable=status==='COMPLETADA'||isOperationallySealed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
@@ -561,7 +625,7 @@
     return opened;
   }
   function checklistConfirmButtonHtml(detail,key,isAssigned){
-    if(!isAssigned)return '';
+    if(!isAssigned||String(detail?.sesion?.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE')return '';
     const done=detail?.checklist?.[key]?.completado===true;
     const label=key==='gastos'?'gastos':key==='reinversiones'?'reinversiones':'bajas';
     return '<div class="bc7-checklist-confirm"><p class="bc7-muted">'+(done?'Este bloque ya está confirmado. Si agregas otro registro, se reabrirá automáticamente.':'Cuando termines de registrar '+label+', confirma aquí que no falta nada.')+'</p><button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+key+'" data-completed="'+(done?'true':'false')+'">'+(done?'Reabrir bloque':'Sí, ya terminé de agregar '+label)+'</button></div>';
@@ -577,13 +641,17 @@
     const showReinvestments=state.admin||isAssigned;
     const showSales=!isRetail&&(state.admin||can('ventas','ver'));
     const showSettlement=isRetail&&(state.admin||isAssigned);
-    const createExpenses=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('gastos','crear');
-    const createReinvestments=isAssigned&&status==='EN_CURSO'&&!!detail.tramo_activo&&can('reinversiones','crear');
+    const acceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(status||'').toUpperCase());
+    const hasWritableTranche=status==='EN_CURSO'?!!detail.tramo_activo:true;
+    const createExpenses=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('gastos','crear');
+    const createReinvestments=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('reinversiones','crear');
     const manageSalary=isRetail&&isOwner;
     if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments&&!manageSalary)return '';
     let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
     if(isRetail){
       html+='<p class="bc7-muted">La Cueva calcula las unidades vendidas por diferencia entre inventarios y movimientos aprobados. No utiliza ventas individuales de POS ni reparte existencias por sabores.</p>';
+      if(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&(createExpenses||createReinvestments))
+        html+='<div class="bc7-note"><b>Registro tardío de esta Jornada</b><p>Puedes añadir gastos o reinversiones que quedaron pendientes. Se guardarán con la fecha y el responsable de esta Jornada, quedarán sujetos a validación del servidor y aprobación del Dueño y no cambiarán caja ni inventario antes de aprobarse.</p></div>';
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
       if(manageSalary){
         html+='<details class="bc7-finance-fold"><summary>Configurar porcentaje salarial</summary><form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
@@ -1096,6 +1164,12 @@
         });
       }else{
         throw new Error('Tipo de operación financiera desconocido.');
+      }
+      if(createdId&&createdId.__bcOfflineQueued){
+        form.reset();keyField.value='';
+        msg(message,'Guardado en este dispositivo para esta Jornada. Queda pendiente de sincronización y aprobación; no se ha aplicado a caja ni inventario. Referencia local: '+(createdId.queueId||'pendiente'),'ok');
+        setStatus('Gasto/reinversión pendiente de sincronización. No se confirmó ningún efecto real.','ok');
+        return;
       }
       const canReadThisType=state.admin||can('turnos','ver');
       if(!canReadThisType){
@@ -1819,7 +1893,7 @@
       actionArea+='<div class="bc7-note"><b>Revisión del Dueño</b><p>Abre el expediente completo de esta jornada: inventario, ventas estimadas, costos documentados, efectivo, diferencias y movimientos por validar.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-open-owner-review="'+esc(ownerTurnId)+'">Abrir revisión integral del turno</button></div></div>';
     }
     let adjustment='';
-    if(status==='EN_CURSO'&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
+    if(['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status)&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
       const products=arr(detail.productos_ajuste);
       const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
       const adjustmentStorageType=canCreateBaja?'baja':'merma';
@@ -2485,6 +2559,7 @@
     const detail=form.querySelector('[data-bc7-ajust-reason]').value.trim();
     const msgEl=form.querySelector('[data-bc7-ajust-msg]');
     const rows=Array.from(form.querySelectorAll('[data-bc7-adjustment-row]'));
+    const sessionSealed=String(state.detail?.sesion?.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
     const lines=rows.map(row=>{
       const select=row.querySelector('[data-bc7-ajust-product]');
       const quantityInput=row.querySelector('[data-bc7-ajust-qty]');
@@ -2500,7 +2575,7 @@
     if(storageType!=='baja'&&lines.length!==1){
       msg(msgEl,'Una merma corresponde a un solo producto. Para varios productos, selecciona «Baja de inventario».','error');return;
     }
-    if(lines.some(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock)){
+    if(!sessionSealed&&lines.some(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock)){
       const bad=lines.find(line=>!Number.isFinite(line.stock)||line.stock<=0||line.cantidad>line.stock);
       const selected=bad?.row.querySelector('[data-bc7-ajust-product]');
       const selectedName=selected?.options?.[selected.selectedIndex]?.textContent||'uno de los productos';
@@ -2529,10 +2604,15 @@
         });
       }else{
         const line=lines[0];
-        await rpc('bc7_registrar_ajuste_jornada',{
+        result=await rpc('bc7_registrar_ajuste_jornada',{
           p_turno_sesion_id:sessionId,p_tipo:'merma',p_producto_id:line.producto_id,
           p_cantidad:line.cantidad,p_motivo:reason,p_idempotency_key:idempotencyKey
         });
+      }
+      if(result&&result.__bcOfflineQueued){
+        keyField.value='';form.reset();
+        const queuedMessage='Solicitud guardada localmente para esta Jornada. Sigue pendiente de sincronización y revisión; el stock no se ha modificado. Referencia local: '+(result.queueId||'pendiente');
+        msg(msgEl,queuedMessage,'ok');setStatus(queuedMessage,'ok');return;
       }
       const bajaState=String(result?.estado||'PENDIENTE').toUpperCase();
       const successMessage=storageType==='baja'

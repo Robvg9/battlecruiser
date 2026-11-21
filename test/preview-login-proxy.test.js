@@ -32,7 +32,7 @@ test("preview proxy answers a valid preflight without forwarding it",async t=>{
 });
 test("preview auth routing targets the isolated PR Worker while LIVE remains direct",()=>{
  const auth=read("public/js/auth.js"),worker=read("preview-worker.mjs"),config=read("wrangler.preview.toml"),edge=read("supabase/functions/bc-username-login/index.ts");
- assert.match(auth,/bc-pr-224-battlecruiser\\.robvg9\\.workers\\.dev/);assert.match(auth,/ux-jornada-status-colors-transfer-modern-picker-battlecruiser\\.robvg9\\.workers\\.dev/);
+ assert.ok(auth.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));assert.ok(auth.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
  assert.match(auth,/\/__bc_preview\/functions\/v1\/bc-password-recovery-admin/);
  assert.match(worker,/const PREVIEW_ORIGINS = new Set/);assert.match(worker,/ux-jornada-status-colors-transfer-modern-picker-battlecruiser/);
  assert.match(config,/run_worker_first = \["\/__bc_preview\/\*"\]/);

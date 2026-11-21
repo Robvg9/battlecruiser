@@ -22,7 +22,7 @@ test("operational close is a separate state and records cutoff/seal evidence",()
 });
 
 test("automatic and manual operational seals never fabricate the final stock count or a cash declaration",()=>{
-  for(const flag of ["inventario_final_confirmado','false","declaracion_efectivo_creada','false","conciliacion_completada','false"])
+  for(const flag of ["inventario_final_confirmado',false","declaracion_efectivo_creada',false","conciliacion_completada',false"])
     assert.ok(migration.includes(flag));
   assert.match(migration,/IF v_now < v_cutoff AND v_reason IS NULL/);
   assert.match(migration,/corte_operativo_at=v_cutoff/);
@@ -39,7 +39,7 @@ test("Owner may later count cash and reconcile, but final approval still require
   assert.match(migration,/bc7_estado_confirmaciones_jornada/);
   assert.match(migration,/bc7_resolver_revision_jornada/);
   assert.match(migration,/JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO/);
-  assert.match(migration,/v_liq->>'calculable'/);
+  assert.match(migration,/v_liq->>''calculable''/);
   assert.match(migration,/No está completa. Revisa precios, movimientos, inventario, salario y efectivo/);
 });
 
@@ -55,7 +55,7 @@ test("La Cueva's Jornada row presents operationally sealed as pending reconcilia
   assert.match(ui,/CERRADA_OPERATIVAMENTE/);
   assert.match(ui,/data-bc7-operational-close/);
   assert.match(ui,/Sellado operativo/);
-  assert.match(ui,/no declara efectivo ni confirma inventario/);
+  assert.match(ui,/No se registrará inventario final, declaración de efectivo ni aprobación/);
 });
 
 test("Owner review recognises the sealed state without treating it as final approval",()=>{
