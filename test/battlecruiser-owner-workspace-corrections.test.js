@@ -60,7 +60,7 @@ test("saved product families reload variants from Supabase and cannot be acciden
 });
 
 test("Operations hub exposes four compact primary create actions and keeps admin functions under More options", () => {
-  const mainCards = operations.match(/cards\.push\(\{ tone:/g) || [];
+  const mainCards = operations.match(/cards\.push\(\{ key:/g) || [];
   assert.equal(mainCards.length, 4);
   assert.match(operations, /title: 'Agregar gasto'/);
   assert.match(operations, /title: 'Agregar baja'/);
