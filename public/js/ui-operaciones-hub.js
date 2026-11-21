@@ -1,4 +1,4 @@
-// BattleCruiser — Operaciones Hub (v9.2.37)
+// BattleCruiser — Operaciones Hub (v9.2.38)
 // 6 tarjetas. Listas de responsabilidades/incidencias solo dentro de modal.
 // Sin "Ver movimientos". Sin bloques legacy visibles debajo.
 // M12-FE.8: resp→responsabilidades.crear; inc→incidencias.crear (no turnos.crear).
@@ -6,7 +6,7 @@
   'use strict';
   var MODAL_ID = 'bc-op-modal';
   var HUB_ID = 'bc-op-hub';
-  var HUB_VER = '45';
+  var HUB_VER = '46';
   function can(s, a) { return typeof tienePermiso === 'function' && tienePermiso(s, a); }
   /** Defensa en profundidad: ver NUNCA basta para crear. */
   function requireCrear(seccion) {
@@ -451,16 +451,16 @@
   function buildCardsList() {
     var cards = [];
     if (can('gastos', 'ver') && can('gastos', 'crear')) {
-      cards.push({ tone: 'gold', icon: '💸', title: 'Agregar gasto', fn: openGasto });
+      cards.push({ key: 'gasto', tone: 'gold', icon: '💸', title: 'Agregar gasto', fn: openGasto });
     }
     if (can('bajas', 'ver') && can('bajas', 'crear')) {
-      cards.push({ tone: 'red', icon: '📦', title: 'Agregar baja', fn: openBaja });
+      cards.push({ key: 'baja', tone: 'red', icon: '📦', title: 'Agregar baja', fn: openBaja });
     }
     if (can('reinversiones', 'ver') && can('reinversiones', 'crear')) {
-      cards.push({ tone: 'green', icon: '🔄', title: 'Agregar reinversión', fn: openReinversion });
+      cards.push({ key: 'reinversion', tone: 'green', icon: '🔄', title: 'Agregar reinversión', fn: openReinversion });
     }
     if (can('incidencias', 'ver') && can('incidencias', 'crear')) {
-      cards.push({ tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', fn: openIncidencia });
+      cards.push({ key: 'incidencia', tone: 'purple', icon: '⚠️', title: 'Reportar incidencia', fn: openIncidencia });
     }
     return cards;
   }
@@ -468,25 +468,53 @@
   function buildSecondaryActions() {
     var actions = [];
     if (can('responsabilidades', 'ver') && can('responsabilidades', 'crear')) {
-      actions.push({ label: 'Responsabilidades', fn: openResponsabilidad });
+      actions.push({ key: 'responsabilidades', label: 'Responsabilidades', fn: openResponsabilidad });
     }
     if (can('auditoria', 'ver') && (can('gastos', 'editar_any') || can('mermas', 'editar_any') || can('bajas', 'editar_any') || can('auditoria', 'editar_any') || can('entregas_caja', 'editar_any'))) {
-      actions.push({ label: 'Aprobaciones', fn: goAprobaciones });
+      actions.push({ key: 'aprobaciones', label: 'Aprobaciones', fn: goAprobaciones });
     }
     return actions;
   }
 
   function fillCardsGrid(grid) {
     if (!grid) return;
-    grid.innerHTML = '';
-    buildCardsList().forEach(function (card) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'op-card op-action-button tone-' + card.tone;
-      btn.setAttribute('aria-label', card.title);
-      btn.innerHTML = '<span class="op-card-icon" aria-hidden="true">' + card.icon + '</span><span class="op-action-label">' + esc(card.title) + '</span>';
-      btn.onclick = card.fn;
-      grid.appendChild(btn);
+    var cards = buildCardsList();
+    var existing = new Map();
+    Array.from(grid.children).forEach(function (button) {
+      var key = button.getAttribute('data-op-action');
+      if (key) existing.set(key, button);
+    });
+    var desired = new Set();
+
+    cards.forEach(function (card, index) {
+      var key = card.key || card.title;
+      var button = existing.get(key);
+      var className = 'op-card op-action-button tone-' + card.tone;
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('data-op-action', key);
+        button.className = className;
+        button.setAttribute('aria-label', card.title);
+        button.innerHTML = '<span class="op-card-icon" aria-hidden="true">' + card.icon + '</span><span class="op-action-label">' + esc(card.title) + '</span>';
+        button.onclick = card.fn;
+      } else {
+        if (button.className !== className) button.className = className;
+        if (button.getAttribute('aria-label') !== card.title) button.setAttribute('aria-label', card.title);
+        var icon = button.querySelector('.op-card-icon');
+        var label = button.querySelector('.op-action-label');
+        if (icon && icon.textContent !== card.icon) icon.textContent = card.icon;
+        if (label && label.textContent !== card.title) label.textContent = card.title;
+      }
+
+      desired.add(key);
+      // No mover un nodo que ya está en la posición correcta: conserva foco y objetivo del clic.
+      var atPosition = grid.children[index];
+      if (atPosition !== button) grid.insertBefore(button, atPosition || null);
+    });
+
+    existing.forEach(function (button, key) {
+      if (!desired.has(key)) button.remove();
     });
   }
 
@@ -496,14 +524,35 @@
     container.hidden = !actions.length;
     var grid = container.querySelector('#op-secondary-grid');
     if (!grid) return;
-    grid.innerHTML = '';
-    actions.forEach(function (action) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'op-secondary-action';
-      btn.textContent = action.label;
-      btn.onclick = action.fn;
-      grid.appendChild(btn);
+
+    var existing = new Map();
+    Array.from(grid.children).forEach(function (button) {
+      var key = button.getAttribute('data-op-secondary-action');
+      if (key) existing.set(key, button);
+    });
+    var desired = new Set();
+
+    actions.forEach(function (action, index) {
+      var key = action.key || action.label;
+      var button = existing.get(key);
+      if (!button) {
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'op-secondary-action';
+        button.setAttribute('data-op-secondary-action', key);
+        button.textContent = action.label;
+        button.onclick = action.fn;
+      } else if (button.textContent !== action.label) {
+        button.textContent = action.label;
+      }
+
+      desired.add(key);
+      var atPosition = grid.children[index];
+      if (atPosition !== button) grid.insertBefore(button, atPosition || null);
+    });
+
+    existing.forEach(function (button, key) {
+      if (!desired.has(key)) button.remove();
     });
   }
 

@@ -1749,6 +1749,45 @@ html[data-bc-theme="light"] select optgroup {
   cursor: not-allowed;
 }
 
+/* Final header lock: visible icon controls only; accessible names stay in aria-label. */
+#app-shell.visible > .app-header .header-right > #mi-cuenta-btn,
+#app-shell.visible > .app-header .header-right > #logout-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  letter-spacing: 0 !important;
+  text-indent: 0 !important;
+  white-space: nowrap !important;
+}
+#app-shell.visible > .app-header .header-right > #mi-cuenta-btn > svg,
+#app-shell.visible > .app-header .header-right > #logout-btn > svg {
+  display: block !important;
+  width: 19px !important;
+  height: 19px !important;
+  flex: 0 0 19px !important;
+  pointer-events: none !important;
+}
+#app-shell.visible > .app-header .header-right > #mi-cuenta-btn > :not(svg),
+#app-shell.visible > .app-header .header-right > #logout-btn > :not(svg) {
+  display: none !important;
+}
+@media (max-width: 759px) {
+  #app-shell.visible > .app-header .header-right > #mi-cuenta-btn,
+  #app-shell.visible > .app-header .header-right > #logout-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+  }
+}
+
 /* Header actions: icon-only with accessible names retained. */
 .header-right .bc-header-icon-button{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;min-width:38px;min-height:38px;padding:0!important;border-radius:9px;font-size:0!important;line-height:1}
 .header-right .bc-header-icon-button svg{display:block;width:19px;height:19px;flex:0 0 19px}

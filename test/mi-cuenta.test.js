@@ -110,6 +110,11 @@ test("Mi Cuenta loads its shared modal dependency before the profile module and 
     "critical Configuración scroll fix must load directly from the shell");
   assert.ok(css.includes(".bc-modal-overlay"), "shared overlay structure must be defined centrally");
   assert.ok(css.includes(".bc-modal-dialog"), "shared dialog scrolling primitive must be defined centrally");
+  const iconLock = css.slice(css.indexOf("/* Final header lock"), css.indexOf("/* Header actions: icon-only"));
+  assert.ok(iconLock.includes("#mi-cuenta-btn") && iconLock.includes("#logout-btn"));
+  assert.match(iconLock, /font-size: 0 !important/);
+  assert.match(iconLock, /> svg/);
+
   assert.ok(css.includes(".bc-account-overlay.hidden") === false, "feature CSS must no longer own the generic hidden primitive");
   assert.ok(sw.includes("./js/bc-modal-manager.js?v=1.0"), "the shared dependency must be in the offline shell");
   assert.ok(sw.includes("./js/mi-cuenta.js?v=1.3"), "the updated account module must be in the offline shell");
