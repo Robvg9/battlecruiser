@@ -92,6 +92,7 @@
     if (as.some(a => String(a.id) === old.o)) selectors.origin.value = old.o;
     if (as.some(a => String(a.id) === old.d)) selectors.destination.value = old.d;
     if (ps.some(p => String(p.id) === old.p)) selectors.product.value = old.p;
+    actualizarReceptorTransferenciaMultiple();
   }
   function asegurarCatalogos() {
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('transferencias','crear')) {
@@ -358,14 +359,23 @@
       if (!valid.ok) return feedback(item.nombre + ': ' + valid.message, false);
     }
     const summary = lineas.length + (lineas.length === 1 ? ' producto' : ' productos');
+    const destinationWarehouse = warehouseForTransfer(dest);
+    const retailDestination = !!destinationWarehouse && destinationWarehouse.tipo === 'minorista';
+    const receiverId = retailDestination && selectors.receiver ? selectors.receiver.value : '';
+    if (retailDestination && !receiverId) return feedback('Selecciona quién recibe la mercancía en el almacén minorista.', false);
     if (!window.confirm('¿Registrar una transferencia con ' + summary + '? El stock se moverá entre almacenes.')) return;
     const button = document.getElementById('mov-multiple-confirmar');
     enviando = true; if (button) { button.disabled = true; button.textContent = 'Procesando…'; }
     try {
-      const result = await window.ejecutarOperacion('transferencia', {
+      const transferPayload = {
         p_origen_id: source, p_destino_id: dest,
         p_lineas: lineas.map(item => ({ producto_id: item.producto_id, cantidad: item.cantidad }))
-      });
+      };
+      if (retailDestination) transferPayload.p_responsable_receptor_id = receiverId;
+      const result = await window.ejecutarOperacion(
+        retailDestination ? 'transferencia_receptor' : 'transferencia',
+        transferPayload
+      );
       if (!result || !result.ok) throw (result && result.error) || new Error('No se pudo registrar la transferencia.');
       if (result.offline) feedback('✓ Transferencia guardada en este dispositivo; se sincronizará al recuperar la conexión.', true);
       else {
@@ -387,6 +397,9 @@
           true);
         if (typeof window.refrescarTransferencias === 'function') await window.refrescarTransferencias();
         await actualizarInventarioConfirmado();
+        if (retailDestination && result.data && typeof window.mostrarDetalleTransferencia === 'function') {
+          await window.mostrarDetalleTransferencia(String(result.data));
+        }
       }
       lineas = []; selectedProductIds = Object.create(null); transferDrafts = Object.create(null);
       transferStep = 1;
