@@ -411,6 +411,13 @@ begin
     raise exception 'La auditoría no está abierta.';
   end if;
 
+  -- Only the creator, an administrator, or a cross-audit editor can change counts.
+  if v_auditoria.creado_por <> auth.uid()
+    and not public.bc_actor_is_admin()
+    and not public.tiene_permiso('auditoria','editar_any') then
+    raise exception 'Solo quien inició el conteo o un responsable autorizado puede registrar conteos.' using errcode = '42501';
+  end if;
+
   for v_item in select value from jsonb_array_elements(p_conteos)
   loop
     if not (v_item ? 'linea_id') or not (v_item ? 'cantidad_fisica') then
