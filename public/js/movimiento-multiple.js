@@ -19,6 +19,7 @@
   }
   function fmt(v) { return typeof window.numberFmt === 'function' ? window.numberFmt(v) : String(v == null ? 0 : v); }
   let lineas = [], enviando = false, selectors = null, catalogosRefreshPromise = null, stockRefreshPromise = null;
+  let transferRecipients = [], lastShareText = '';
   let selectedProductIds = Object.create(null), transferDrafts = Object.create(null), transferStep = 1;
   if (!Array.isArray(window.__BC_TRANSFER_STOCK_SNAPSHOT__)) window.__BC_TRANSFER_STOCK_SNAPSHOT__ = null;
   if (typeof window.__BC_TRANSFER_STOCK_CONFIRMED__ !== 'boolean') window.__BC_TRANSFER_STOCK_CONFIRMED__ = false;
@@ -32,6 +33,70 @@
     el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite');
   }
   function producto(id) { return productos().find(p => String(p.id) === String(id)) || null; }
+
+  async function cargarReceptores() {
+    const select = document.getElementById('mov-multiple-recibido-por');
+    const api = window.client || (typeof client !== 'undefined' ? client : null);
+    if (!select || !api || typeof api.rpc !== 'function' || !navigator.onLine) return false;
+    const previous = select.value;
+    const result = await api.rpc('listar_receptores_transferencia');
+    if (result && result.error) throw result.error;
+    transferRecipients = Array.isArray(result && result.data) ? result.data : [];
+    select.innerHTML = '<option value="">Seleccionar quién recibe…</option>' +
+      transferRecipients.map(user => '<option value="' + esc(user.id) + '">' + esc(user.nombre) + '</option>').join('');
+    if (transferRecipients.some(user => String(user.id) === previous)) select.value = previous;
+    select.disabled = transferRecipients.length === 0;
+    return transferRecipients.length > 0;
+  }
+
+  function limpiarCompartir() {
+    lastShareText = '';
+    const host = document.getElementById('mov-transfer-share');
+    if (host) host.innerHTML = '';
+  }
+
+  async function prepararMensajeCompartir(transferenciaId) {
+    const api = window.client || (typeof client !== 'undefined' ? client : null);
+    if (!api || typeof api.rpc !== 'function') throw new Error('No se pudo consultar el comprobante de transferencia.');
+    const result = await api.rpc('obtener_transferencia_compartir', { p_transferencia_id: transferenciaId });
+    if (result && result.error) throw result.error;
+    const data = result && result.data;
+    if (!data || !data.fecha || !data.almacen || !data.recibe || !Array.isArray(data.lineas)) {
+      throw new Error('El comprobante no contiene todos los datos necesarios.');
+    }
+    const fecha = new Date(data.fecha);
+    const dia = fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+    const hora = fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const recibe = String(data.recibe).replace(/^@+/, '');
+    const lines = [
+      '📜 Entradas · ' + data.almacen + ' 📜',
+      'Fecha: *' + dia + ' · ' + hora + '*',
+      'Recibe: *@⁨' + recibe + '⁩*',
+      '',
+      ...data.lineas.map(item => '- ' + fmt(item.cantidad) + ' ' + item.nombre)
+    ];
+    lastShareText = lines.join('\n');
+    const host = document.getElementById('mov-transfer-share');
+    if (host) {
+      host.innerHTML = '<button type="button" class="mov-transfer-share-btn" id="mov-transfer-share-btn">Compartir por WhatsApp</button>';
+      host.querySelector('#mov-transfer-share-btn').addEventListener('click', compartirPorWhatsApp);
+    }
+  }
+
+  async function compartirPorWhatsApp() {
+    if (!lastShareText) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: lastShareText });
+        return;
+      } catch (error) {
+        if (error && error.name === 'AbortError') return;
+      }
+    }
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+    const url = (mobile ? 'https://wa.me/?text=' : 'https://web.whatsapp.com/send?text=') + encodeURIComponent(lastShareText);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 
   function poblarSelects() {
     if (!selectors) return;
@@ -91,6 +156,8 @@
         console.warn('[BattleCruiser] No se pudieron cargar catálogos de transferencia:', error);
       }
       poblarSelects(); actualizarStockHint();
+      try { await cargarReceptores(); }
+      catch (error) { console.warn('[BattleCruiser] No se pudieron cargar los responsables de transferencia:', error); }
     })();
     return catalogosRefreshPromise.finally(function () { catalogosRefreshPromise = null; });
   }
@@ -296,7 +363,9 @@
     if (enviando) return;
     if (typeof window.tienePermiso === 'function' && !window.tienePermiso('transferencias', 'crear')) return feedback('Tu usuario no tiene permiso para registrar transferencias.', false);
     const source = selectors.origin.value, dest = selectors.destination.value;
+    const receiver = selectors.receiver && selectors.receiver.value;
     if (!source || !dest) return feedback('Selecciona el origen y el destino.', false);
+    if (!receiver) return feedback('Selecciona quién recibe la transferencia.', false);
     if (String(source) === String(dest)) return feedback('El origen y el destino deben ser distintos.', false);
     if (transferStep !== 2) return feedback('Completa primero la selección de productos.', false);
     if (!collectTransferQuantities()) return false;
@@ -312,9 +381,10 @@
     if (!window.confirm('¿Registrar una transferencia con ' + summary + '? El stock se moverá entre almacenes.')) return;
     const button = document.getElementById('mov-multiple-confirmar');
     enviando = true; if (button) { button.disabled = true; button.textContent = 'Procesando…'; }
+    limpiarCompartir();
     try {
       const result = await window.ejecutarOperacion('transferencia', {
-        p_origen_id: source, p_destino_id: dest,
+        p_origen_id: source, p_destino_id: dest, p_recibido_por: receiver,
         p_lineas: lineas.map(item => ({ producto_id: item.producto_id, cantidad: item.cantidad }))
       });
       if (!result || !result.ok) throw (result && result.error) || new Error('No se pudo registrar la transferencia.');
@@ -339,6 +409,10 @@
         if (typeof window.refrescarTransferencias === 'function') await window.refrescarTransferencias();
         await actualizarInventarioConfirmado();
       }
+      if (!result.offline && result.data) {
+        try { await prepararMensajeCompartir(result.data); }
+        catch (shareError) { feedback('Transferencia registrada. No se pudo preparar el mensaje de WhatsApp: ' + (shareError.message || 'error'), true); }
+      }
       lineas = []; selectedProductIds = Object.create(null); transferDrafts = Object.create(null);
       transferStep = 1;
       document.getElementById('mov-transfer-step-products').hidden = false;
@@ -358,6 +432,9 @@
       '#movimiento-multiple-panel .mov-transfer-warehouses{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}' +
       '#movimiento-multiple-panel .mov-transfer-warehouses label,#movimiento-multiple-panel .mov-transfer-line-editor label{display:grid;gap:4px;min-width:0}' +
       '#movimiento-multiple-panel .mov-transfer-warehouses label>span,#movimiento-multiple-panel .mov-transfer-line-editor label>span{font-size:11px;color:var(--mist)}' +
+      '#movimiento-multiple-panel .mov-transfer-receiver{display:grid;gap:4px;font-size:11px;color:var(--mist)}' +
+      '#movimiento-multiple-panel .mov-transfer-receiver select{width:100%;height:42px;min-width:0;box-sizing:border-box;padding:0 10px;border:1px solid rgba(212,176,92,.32);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font-size:.82rem}' +
+      '#movimiento-multiple-panel .mov-transfer-share-btn{margin-top:8px;min-height:40px;padding:8px 13px;border:0;border-radius:7px;background:#25d366;color:#052b17;font-weight:800}' +
       '#movimiento-multiple-panel .mov-transfer-line-editor{display:grid;grid-template-columns:minmax(0,1fr) 104px auto;gap:7px;align-items:center}' +
       '#movimiento-multiple-panel select,#movimiento-multiple-panel input{width:100%;height:42px;min-width:0;box-sizing:border-box;padding:0 10px;border:1px solid rgba(212,176,92,.32);border-radius:7px;background:var(--void,#0c1c18);color:var(--text);font-size:.82rem}' +
       '#movimiento-multiple-panel button{min-height:40px;padding:8px 12px;border:1px solid rgba(212,176,92,.28);border-radius:7px;background:var(--stone-2);color:var(--text);font-weight:600;cursor:pointer}' +
@@ -399,6 +476,7 @@
       '<p class="mov-transfer-intro">Agrupa varios productos del mismo origen al mismo destino. Se registra una sola transferencia.</p>' +
       '<div class="mov-transfer-warehouses"><label><span>Origen</span><select id="mov-multiple-origen" aria-label="Almacén de origen"><option value="" disabled selected hidden>Seleccionar origen</option></select></label>' +
       '<label><span>Destino</span><select id="mov-multiple-destino" aria-label="Almacén de destino"><option value="" disabled selected hidden>Seleccionar destino</option></select></label></div>' +
+      '<label class="mov-transfer-receiver"><span>Recibe</span><select id="mov-multiple-recibido-por" aria-label="Persona que recibe la transferencia"><option value="">Cargando responsables…</option></select></label>' +
       '<section id="mov-transfer-step-products" class="mov-transfer-step">' +
         '<p class="mov-transfer-step-label">PASO 1 DE 2 · Selecciona los productos</p>' +
         '<label class="mov-transfer-search">Buscar producto<input id="mov-transfer-product-search" type="search" placeholder="Escribe el nombre del producto"></label>' +
@@ -416,10 +494,12 @@
       '<p id="mov-multiple-stock" class="muted mov-transfer-stock">El stock se valida en el almacén de origen.</p>' +
       '<button type="button" id="mov-multiple-refresh-stock">Actualizar existencias</button>' +
       '<div class="mov-transfer-line-editor" hidden><select id="mov-multiple-producto"></select><input id="mov-multiple-cantidad" type="number"><button type="button" id="mov-multiple-add">Agregar</button></div>' +
-      '<p id="mov-multiple-msg" class="msg mov-transfer-feedback" role="status" aria-live="polite"></p>';
+      '<p id="mov-multiple-msg" class="msg mov-transfer-feedback" role="status" aria-live="polite"></p>' +
+      '<div id="mov-transfer-share" aria-live="polite"></div>';
     legacyForm.parentNode.insertBefore(panel, legacyForm); legacyForm.style.display = 'none'; legacyForm.setAttribute('aria-hidden', 'true');
     selectors = {
       origin: panel.querySelector('#mov-multiple-origen'), destination: panel.querySelector('#mov-multiple-destino'),
+      receiver: panel.querySelector('#mov-multiple-recibido-por'),
       product: panel.querySelector('#mov-multiple-producto'), quantity: panel.querySelector('#mov-multiple-cantidad')
     };
     selectors.origin.addEventListener('change', function(){ actualizarStockHint(); });
@@ -458,6 +538,7 @@
         'No se pudo confirmar el inventario. ' + (window.__BC_TRANSFER_STOCK_ERROR__ || 'Comprueba la conexión y vuelve a intentar.'), ok);
     });
     panel.querySelector('#mov-multiple-confirmar').addEventListener('click', confirmarTransferencia);
+    selectors.receiver.addEventListener('change', limpiarCompartir);
     panel.querySelector('#mov-multiple-limpiar').addEventListener('click', function () {
       lineas = []; selectedProductIds = Object.create(null); transferDrafts = Object.create(null);
       selectors.quantity.value = ''; transferStep = 1;

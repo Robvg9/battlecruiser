@@ -76,10 +76,10 @@ function renderAuditoria(filas) {
     const div = document.createElement("div");
     div.className = "cc-actividad-item cc-prioridad-" + (f.estado === "requiere_atencion" || f.estado === "error" ? "critico" : "normal");
     const fechaTxt = f.fecha ? fechaHora(f.fecha) : "";
-    const idemp = f.idempotency_key ? " · " + idCorto(f.idempotency_key) : "";
+    const estadoTxt = ({ exito: "Correcto", pendiente: "Pendiente", requiere_atencion: "Revisar", error: "Error" })[f.estado] || f.estado || "—";
     div.innerHTML = '<span class="cc-actividad-icono">' + escHtml(iconoAuditoria(f.tipo)) + "</span>"
-      + '<span class="cc-actividad-texto">' + escHtml(f.descripcion || f.tipo || "—") + '<br><span class="muted">' + escHtml(f.usuario_nombre || "—") + " · " + escHtml(f.tipo || "") + " · " + escHtml(f.estado || "") + idemp + "</span></span>"
-      + '<span class="cc-actividad-meta"><span class="muted">' + escHtml(fechaTxt) + "</span></span>";
+      + '<span class="cc-actividad-texto"><strong>' + escHtml(f.descripcion || f.tipo || "—") + '</strong><br><span class="muted">' + escHtml(f.usuario_nombre || "—") + " · " + escHtml(f.tipo || "") + "</span></span>"
+      + '<span class="cc-actividad-meta"><strong>' + escHtml(estadoTxt) + '</strong><br><span class="muted">' + escHtml(fechaTxt) + "</span></span>";
     el.appendChild(div);
   });
   renderPaginacionAuditoria(filas.length);

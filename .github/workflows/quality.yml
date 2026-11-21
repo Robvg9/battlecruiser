@@ -74,6 +74,8 @@ jobs:
           node --check public/js/password-recovery-admin.js
           node --check public/js/m33-turnos-final.js
           node --check public/js/bc7-jornada-ui.js
+          node --check public/js/inventario-auditoria.js
+          node --check public/js/movimiento-multiple.js
           node --check public/js/turnos-maestro.js
           node --check public/js/turno-cash-handover-ui.js
           node --check test/verify-pr-preview-assets.js

@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=9.5.137">
+<link rel="stylesheet" href="style.css?v=9.5.138">
 <link rel="stylesheet" href="bc7-jornada-inventory-mobile.css?v=20261116.2">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
@@ -100,7 +100,7 @@
       <button type="button" class="login-utility" id="password-recovery-request-btn">Enviar solicitud a Administración</button>
       <p class="msg" id="password-recovery-msg" role="status" aria-live="polite"></p>
       <button type="button" class="login-utility" id="update-app-btn-login">Actualizar app / borrar caché</button>
-      <p class="footnote app-version-label">v9.5.137 — BattleCruiser</p>
+      <p class="footnote app-version-label">v9.5.138 — BattleCruiser</p>
     </form>
   </div>
 
@@ -609,7 +609,11 @@
         <div><h2>Auditoría</h2><p class="muted">Registro trazable de acciones y cambios.</p></div>
         <span id="mando-conn-info" class="muted"></span>
       </div>
-      <div class="cc-bloque">
+      <div id="mando-auditoria-vistas">
+        <button type="button" id="mando-auditoria-vista-acciones" aria-pressed="true">Bitácora</button>
+        <button type="button" id="mando-auditoria-vista-fisica" aria-pressed="false">Conteo físico</button>
+      </div>
+      <div id="mando-auditoria-acciones" class="cc-bloque">
         <div class="mando-filtros" id="mando-filtros">
           <select id="filtro-aud-tipo" aria-label="Filtrar auditoría por tipo"><option value="">Todos los tipos</option></select>
           <select id="filtro-aud-estado" aria-label="Filtrar auditoría por estado"><option value="">Todos los estados</option></select>
@@ -618,6 +622,7 @@
         <div id="mando-auditoria" class="lista" aria-live="polite"></div>
         <div class="mando-paginacion" id="mando-paginacion"></div>
       </div>
+      <div id="mando-auditoria-fisica" class="cc-bloque" hidden></div>
     </section>
 
     <section id="tab-usuarios" class="tab-panel">
@@ -683,7 +688,7 @@
 
     <footer class="app-footer">
       <span>Salón Privado Battlecruiser</span>
-      <span class="app-footer-version">v9.5.137 — BattleCruiser</span>
+      <span class="app-footer-version">v9.5.138 — BattleCruiser</span>
     </footer>
   </div>
 
@@ -716,6 +721,6 @@
 <script src="js/bc-modal-manager.js?v=1.0"></script>
 <script src="js/mi-cuenta.js?v=1.3"></script>
 <script src="js/m27-5-theme-dark-reset.js?v=27.5a3"></script>
-<script src="app.js?v=9.5.137"></script>
+<script src="app.js?v=9.5.138"></script>
 </body>
 </html>
