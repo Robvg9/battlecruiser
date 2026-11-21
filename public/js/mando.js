@@ -56,6 +56,73 @@ async function refrescarAuditoria() {
   }
 }
 
+function etiquetaTipoAuditoria(tipo) {
+  const labels = {
+    venta: "Venta",
+    compra: "Compra",
+    transferencia: "Transferencia",
+    vale: "Vale de salida",
+    producto: "Producto",
+    producto_actualizar: "Producto",
+    producto_crear: "Producto",
+    usuario_rol: "Usuarios",
+    usuario_estado: "Usuarios",
+    sincronizacion: "Sincronización"
+  };
+  if (labels[tipo]) return labels[tipo];
+  const readable = String(tipo || "Actividad").replace(/[_-]+/g, " ").trim();
+  return readable ? readable.charAt(0).toUpperCase() + readable.slice(1) : "Actividad";
+}
+
+function presentarRegistroAuditoria(fila) {
+  const tipo = String(fila.tipo || "");
+  let titulo = String(fila.descripcion || "").trim();
+  let referencia = "";
+  const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+  const uuid = titulo.match(uuidPattern);
+  if (uuid) {
+    const shortId = uuid[0].slice(0, 8).toUpperCase();
+    if (tipo === "transferencia" || /^Transferencia registrada/i.test(titulo)) {
+      titulo = "Transferencia registrada";
+      referencia = "Referencia #" + shortId;
+    } else if (tipo === "compra" || /^Compra registrada/i.test(titulo)) {
+      const isLot = /lote/i.test(titulo);
+      titulo = "Compra registrada";
+      referencia = (isLot ? "Lote #" : "Referencia #") + shortId;
+    } else {
+      titulo = titulo.replace(uuidPattern, "").replace(/\s*[·:|–-]\s*$/g, "").trim();
+      referencia = "Referencia #" + shortId;
+    }
+  }
+  if (!titulo || titulo === tipo) titulo = etiquetaTipoAuditoria(tipo) + " registrada";
+  const status = String(fila.estado || "").toLowerCase();
+  const statusLabel = ({
+    exito: "Correcto",
+    pendiente: "Pendiente",
+    requiere_atencion: "Revisar",
+    error: "Error"
+  })[status] || (status ? status.replace(/[_-]+/g, " ") : "Sin estado");
+  const statusClass = status === "error" || status === "requiere_atencion"
+    ? "is-error"
+    : status === "pendiente" ? "is-pending" : "is-success";
+  const date = fila.fecha ? new Date(fila.fecha) : null;
+  const validDate = date && Number.isFinite(date.getTime());
+  const timeLabel = validDate
+    ? date.toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "Fecha no disponible";
+  return {
+    title: titulo,
+    reference: referencia,
+    category: etiquetaTipoAuditoria(tipo),
+    icon: iconoAuditoria(tipo),
+    statusLabel,
+    statusClass,
+    timeLabel,
+    datetime: validDate ? date.toISOString() : "",
+    actor: String(fila.usuario_nombre || "Usuario no identificado")
+  };
+}
+
 function renderAuditoria(filas) {
   const el = document.getElementById("mando-auditoria");
   if (!el) return;
@@ -67,31 +134,42 @@ function renderAuditoria(filas) {
     return;
   }
   if (filas.length === 0) {
-    el.innerHTML = '<p class="lista-estado">Sin registros de auditoría.</p>';
+    el.innerHTML = '<p class="lista-estado">Todavía no hay movimientos para mostrar.</p>';
     renderPaginacionAuditoria(0);
     return;
   }
   el.innerHTML = "";
   filas.forEach((f) => {
-    const div = document.createElement("div");
-    div.className = "cc-actividad-item cc-prioridad-" + (f.estado === "requiere_atencion" || f.estado === "error" ? "critico" : "normal");
-    const fechaTxt = f.fecha ? fechaHora(f.fecha) : "";
-    const estadoTxt = ({ exito: "Correcto", pendiente: "Pendiente", requiere_atencion: "Revisar", error: "Error" })[f.estado] || f.estado || "—";
-    div.innerHTML = '<span class="cc-actividad-icono">' + escHtml(iconoAuditoria(f.tipo)) + "</span>"
-      + '<span class="cc-actividad-texto"><strong>' + escHtml(f.descripcion || f.tipo || "—") + '</strong><br><span class="muted">' + escHtml(f.usuario_nombre || "—") + " · " + escHtml(f.tipo || "") + "</span></span>"
-      + '<span class="cc-actividad-meta"><strong>' + escHtml(estadoTxt) + '</strong><br><span class="muted">' + escHtml(fechaTxt) + "</span></span>";
-    el.appendChild(div);
+    const view = presentarRegistroAuditoria(f);
+    const entry = document.createElement("article");
+    entry.className = "bc-audit-entry " + view.statusClass;
+    entry.innerHTML =
+      '<span class="bc-audit-entry__icon" aria-hidden="true">' + escHtml(view.icon) + "</span>" +
+      '<div class="bc-audit-entry__body">' +
+        '<div class="bc-audit-entry__eyebrow"><span class="bc-audit-entry__category">' + escHtml(view.category) + "</span>" +
+          (view.reference ? '<span class="bc-audit-entry__reference">' + escHtml(view.reference) + "</span>" : "") +
+        "</div>" +
+        '<h4 class="bc-audit-entry__title">' + escHtml(view.title) + "</h4>" +
+        '<div class="bc-audit-entry__actor"><span class="bc-audit-entry__actor-label">Responsable</span>' +
+          "<strong>" + escHtml(view.actor) + "</strong></div>" +
+      "</div>" +
+      '<div class="bc-audit-entry__meta">' +
+        (view.datetime ? '<time datetime="' + escHtml(view.datetime) + '">' + escHtml(view.timeLabel) + "</time>" :
+          '<span class="bc-audit-entry__time">' + escHtml(view.timeLabel) + "</span>") +
+        '<span class="bc-audit-entry__status">' + escHtml(view.statusLabel) + "</span>" +
+      "</div>";
+    el.appendChild(entry);
   });
   renderPaginacionAuditoria(filas.length);
 }
 
 function iconoAuditoria(tipo) {
+  if (/^producto/.test(String(tipo || ""))) return "🏷️";
   switch (tipo) {
     case "venta": return "🛒";
     case "compra": return "📦";
     case "transferencia": return "↔";
     case "vale": return "📋";
-    case "producto": return "🏷️";
     case "usuario_rol": return "👤";
     case "usuario_estado": return "👤";
     case "sincronizacion": return "🔄";
