@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.138 — Restore accessible header icon controls after legacy modules initialize.
+// v9.5.139 — Readable audit history and high-contrast physical-count controls.
 (function hotfixV9475(){
-  const VERSION="9.5.138";
+  const VERSION="9.5.139";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
