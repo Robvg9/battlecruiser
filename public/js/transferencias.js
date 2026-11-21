@@ -11,7 +11,7 @@ async function refrescarTransferencias() {
   setLoading("lista-transferencias", "Cargando transferencias…");
   const { data } = await client
     .from("transferencias")
-    .select("id, fecha, estado, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
+    .select("id, fecha, estado, responsable_receptor_id, origen:almacen_origen_id(nombre), destino:almacen_destino_id(nombre)")
     .order("fecha", { ascending: false })
     .limit(20);
   _cache.transferencias = data || [];
@@ -122,6 +122,124 @@ function actualizarStockTransferenciaUI() {
   }
 }
 
+function formatearMensajeTransferenciaWhatsApp(reporte) {
+  if (!reporte || !reporte.almacen || !reporte.responsable || !Array.isArray(reporte.productos) || !reporte.productos.length) {
+    throw new Error("El reporte de transferencia está incompleto.");
+  }
+  const fecha = new Date(reporte.fecha);
+  if (Number.isNaN(fecha.getTime())) throw new Error("La transferencia no tiene una fecha válida.");
+  const fechaTexto = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit", month: "2-digit", year: "numeric"
+  }).format(fecha);
+  const fechaHoraTexto = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).format(fecha);
+  const productos = reporte.productos.map((producto, index) => {
+    const unidad = String(producto.unidad || "unidad").trim();
+    return (index + 1) + ". " + String(producto.nombre || "Producto") +
+      " — " + fmtNumTransfer(producto.cantidad) + " " + unidad;
+  });
+  return [
+    "ALMACÉN: " + String(reporte.almacen),
+    "FECHA: " + fechaTexto,
+    "FECHA Y HORA DE LA ENTREGA: " + fechaHoraTexto,
+    "RESPONSABLE QUE RECIBIÓ: " + String(reporte.responsable),
+    "",
+    "PRODUCTOS ENTREGADOS:",
+    ...productos
+  ].join("\n");
+}
+window.__BC_FORMAT_TRANSFER_SHARE__ = formatearMensajeTransferenciaWhatsApp;
+
+function almacenPorIdTransferencia(id) {
+  return (_cache.almacenes || []).find((almacen) => String(almacen.id) === String(id)) || null;
+}
+
+let _responsablesTransferencia = null;
+let _cargandoResponsablesTransferencia = null;
+
+async function listarResponsablesTransferencia() {
+  if (_responsablesTransferencia) return _responsablesTransferencia;
+  if (_cargandoResponsablesTransferencia) return _cargandoResponsablesTransferencia;
+  _cargandoResponsablesTransferencia = (async function () {
+    const { data, error } = await client.rpc("listar_usuarios_admin", { p_incluir_archivados: false });
+    if (error) throw error;
+    _responsablesTransferencia = (Array.isArray(data) ? data : [])
+      .filter((usuario) => usuario && usuario.id && usuario.activo === true && usuario.archivado !== true)
+      .sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es"));
+    return _responsablesTransferencia;
+  })();
+  try {
+    return await _cargandoResponsablesTransferencia;
+  } finally {
+    _cargandoResponsablesTransferencia = null;
+  }
+}
+
+async function actualizarResponsableReceptorTransferencia() {
+  const destino = (document.getElementById("trf-destino") || {}).value || "";
+  const contenedor = document.getElementById("trf-responsable-receptor-wrap");
+  const select = document.getElementById("trf-responsable-receptor");
+  if (!contenedor || !select) return;
+  const almacen = almacenPorIdTransferencia(destino);
+  const requerido = !!almacen && almacen.tipo === "minorista";
+  contenedor.classList.toggle("hidden", !requerido);
+  select.required = requerido;
+  if (!requerido) {
+    select.value = "";
+    select.innerHTML = '<option value="">No requerido para este almacén</option>';
+    return;
+  }
+  select.innerHTML = '<option value="">Cargando responsables…</option>';
+  try {
+    const responsables = await listarResponsablesTransferencia();
+    select.innerHTML = '<option value="">Selecciona quién recibe la mercancía…</option>' +
+      responsables.map((usuario) =>
+        '<option value="' + escHtml(usuario.id) + '">' + escHtml(usuario.nombre || "Usuario") + "</option>"
+      ).join("");
+    if (!responsables.length) {
+      setMsg("msg-transferencias", "No hay responsables activos disponibles para recibir esta transferencia.", false);
+    }
+  } catch (error) {
+    select.innerHTML = '<option value="">No se pudieron cargar los responsables</option>';
+    setMsg("msg-transferencias", "No se pudo cargar la lista de responsables: " + explicarError(error, "transferencia"), false);
+  }
+}
+
+async function copiarMensajeTransferenciaWhatsApp(texto) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    await navigator.clipboard.writeText(texto);
+    return;
+  }
+  const temporal = document.createElement("textarea");
+  temporal.value = texto;
+  temporal.setAttribute("readonly", "");
+  temporal.style.position = "fixed";
+  temporal.style.opacity = "0";
+  document.body.appendChild(temporal);
+  temporal.select();
+  const copiado = document.execCommand("copy");
+  temporal.remove();
+  if (!copiado) throw new Error("El navegador no permitió copiar el mensaje.");
+}
+
+async function compartirMensajeTransferenciaWhatsApp(texto) {
+  if (typeof navigator.share !== "function") {
+    await copiarMensajeTransferenciaWhatsApp(texto);
+    setMsg("msg-transferencias", "Mensaje copiado. Ya puedes pegarlo en el grupo de WhatsApp.", true);
+    return;
+  }
+  try {
+    await navigator.share({ text: texto });
+    setMsg("msg-transferencias", "Selecciona WhatsApp, elige el grupo y confirma el envío.", true);
+  } catch (error) {
+    if (error && error.name === "AbortError") return;
+    await copiarMensajeTransferenciaWhatsApp(texto);
+    setMsg("msg-transferencias", "No se abrió el menú de compartir. El mensaje quedó copiado para pegarlo en WhatsApp.", true);
+  }
+}
+
 let _enviandoTransferencia = false;
 
 safeInit("form-transferencia", () => {
@@ -135,6 +253,12 @@ safeInit("form-transferencia", () => {
       el.addEventListener("change", actualizarStockTransferenciaUI);
     }
   });
+  const destinoEl = document.getElementById("trf-destino");
+  if (destinoEl && !destinoEl.dataset.bcTrfReceiver) {
+    destinoEl.dataset.bcTrfReceiver = "1";
+    destinoEl.addEventListener("change", actualizarResponsableReceptorTransferencia);
+    actualizarResponsableReceptorTransferencia();
+  }
   const cantEl = document.getElementById("trf-cantidad");
   if (cantEl && !cantEl.dataset.bcTrfStock) {
     cantEl.dataset.bcTrfStock = "1";
