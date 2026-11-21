@@ -504,11 +504,12 @@
   function rowHtml(r){
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
     const rest=!r.trabaja||r.estado==='DESCANSO';
+    const isOperationallySealed=status==='CERRADA_OPERATIVAMENTE';
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':isClosed?'<span class="bc7-pill closed">Cerrada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const isTerminal=['COMPLETADA','CANCELADA','CANCELADO'].includes(status);
-    const viewable=status==='COMPLETADA';
+    const pill=rest?'<span class="bc7-pill">Descanso</span>':isOperationallySealed?'<span class="bc7-pill warn">Cerrada · pendiente de cuadre</span>':isClosed?'<span class="bc7-pill closed">Completada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
+    const viewable=status==='COMPLETADA'||isOperationallySealed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     let reschedule='';
     if(state.admin&&!isTerminal){
@@ -652,9 +653,9 @@
       if(isFinal&&finalSaved){
         const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
         html+='<span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(finalCashState))+'. El importe declarado no sustituye el conteo físico.</p>';
-        if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='COMPLETADA'&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
+        if(detail.is_admin&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase())&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
           html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
-        }else if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()!=='COMPLETADA'&&declaration.monto_contado==null){
+        }else if(detail.is_admin&&!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase())&&declaration.monto_contado==null){
           html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
         }else if(declaration.monto_contado!=null){
           html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
@@ -812,7 +813,7 @@
     const message=form?.querySelector('[data-bc7-final-cash-msg]');
     const button=form?.querySelector('button[type="submit"]');
     const declaration=state.detail?.declaracion_dinero;
-    if(!state.admin||!declarationId||!sessionId||String(state.detail?.sesion?.estado||'').toUpperCase()!=='COMPLETADA'){
+    if(!state.admin||!declarationId||!sessionId||!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(state.detail?.sesion?.estado||'').toUpperCase())){
       msg(message,'El conteo solo está disponible para ADMIN después de completar esta jornada.','error');return false;
     }
     if(!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null){
@@ -1769,13 +1770,20 @@
       actionArea='<div class="bc7-note"><b>Dinero entregado al Dueño.</b><p>Guarda el importe declarado. El Dueño lo contará cuando estén completos los cinco pasos; esta entrega de efectivo no cierra el Turno.</p><form data-bc7-close-form="'+esc(s.id)+'"><div class="bc7-grid"><label class="bc7-field">Dinero entregado (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" required placeholder="0.00" inputmode="decimal" value="'+(saved?esc(detail.declaracion_dinero.monto):'')+'" '+(saved?'readonly':'')+'></label><label class="bc7-field">Motivo de cierre fuera del horario<input id="bc7-close-reason" maxlength="1000" placeholder="Explica por qué se cierra fuera del horario previsto"><small class="bc7-muted">Obligatorio solo si cierras en otra fecha u hora distinta de la programada. Si cierras a tiempo, déjalo vacío.</small></label></div><div class="bc7-actions">'+(saved?'<span class="bc7-pill ok">Dinero guardado</span>':'<button type="button" class="bc7-btn" data-bc7-save-cash '+(!tramo||!isAssigned?'disabled':'')+'>Guardar dinero entregado</button>')+'<button type="submit" class="bc7-btn danger" '+(!final||!tramo||!isAssigned?'disabled':'')+'>'+(saved?'Finalizar jornada':'Guardar entrega y finalizar')+'</button></div><p class="bc7-msg" data-bc7-close-msg></p>'+(final?'':'<p class="bc7-muted">El cierre se habilitará al confirmar el inventario final. Puedes guardar el importe ahora.</p>')+'</form></div>';
     }else if(status==='COMPLETADA'&&s.es_minorista===true){
       actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
+    }else if(status==='COMPLETADA'&&s.es_minorista===true){
+      actionArea='<div class="bc7-note"><b>Jornada completada.</b><p>El registro de efectivo de cada día permanece disponible como historial.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
     }else if(status==='COMPLETADA'){
       actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
+    }else if(status==='CERRADA_OPERATIVAMENTE'&&s.es_minorista===true){
+      actionArea='<div class="bc7-note"><b>Sellado operativo · pendiente de conciliación.</b><p>La operación terminó a las '+esc(String(s.corte_operativo_at||s.cierre_operativo_at||'').slice(11,16)||'hora registrada')+'. No se inventó inventario final, declaración de efectivo ni aprobación. El Dueño completará los cinco controles y el conteo físico cuando revise la Jornada.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
     }else{
       actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     }
+    if(status==='EN_CURSO'&&s.es_minorista===true){
+      actionArea+='<div class="bc7-note bc7-operational-seal"><b>Sellado operativo rápido · sin cuadre</b><p>Usa esta acción si la responsable terminó su jornada y no puede completar ahora los formularios. El servidor cierra el tramo a la hora programada (o registra la hora real y el motivo si es anticipado). No confirma inventario ni declara efectivo.</p><label class="bc7-field">Motivo obligatorio solo si cierras antes de la hora programada<input id="bc7-operational-close-reason" maxlength="1000" placeholder="Ej.: cierre anticipado por cansancio o incidencia"></label><div class="bc7-actions"><button class="bc7-btn danger" type="button" data-bc7-operational-close="'+esc(s.id)+'" '+(!isAssigned&&!state.admin?'disabled':'')+'>Cerrar operación · dejar cuadre pendiente</button></div><p class="bc7-msg" data-bc7-operational-close-msg></p></div>';
+    }
     const ownerTurnId=s.turno_id||detail.turno_id||detail.turno?.id;
-    if(status==='COMPLETADA'&&ownerTurnId&&(can('auditoria','editar_any')||can('entregas_caja','editar_any')||can('turnos','editar_any'))){
+    if(['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(status)&&ownerTurnId&&(can('auditoria','editar_any')||can('entregas_caja','editar_any')||can('turnos','editar_any'))){
       actionArea+='<div class="bc7-note"><b>Revisión del Dueño</b><p>Abre el expediente completo de esta jornada: inventario, ventas estimadas, costos documentados, efectivo, diferencias y movimientos por validar.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-open-owner-review="'+esc(ownerTurnId)+'">Abrir revisión integral del turno</button></div></div>';
     }
     let adjustment='';
@@ -2132,6 +2140,36 @@
       setStatus('No se pudo confirmar la declaración del último día.','error');
       return false;
     }finally{if(!alreadyBusy)busy(btn,false);}
+  }
+  async function closeOperationalSession(button){
+    const sessionId=String(button?.dataset?.bc7OperationalClose||'');
+    const reason=String($('bc7-operational-close-reason')?.value||'').trim()||null;
+    const message=$('bc7-operational-close-msg');
+    if(!sessionId||!state.detail||String(state.detail.sesion?.id)!==sessionId||
+       String(state.detail.sesion?.estado||'').toUpperCase()!=='EN_CURSO'||
+       state.detail.sesion?.es_minorista!==true){
+      msg(message,'La Jornada cambió o ya no está operativamente abierta. Actualiza antes de continuar.','error');return false;
+    }
+    if(!state.admin&&!state.isAssigned&&String(state.detail.sesion?.responsable_id||'')!==String(state.userId||'')){
+      msg(message,'Solo el responsable asignado o ADMIN puede sellar la operación.','error');return false;
+    }
+    if(!confirm('Se cerrará únicamente la operación de esta Jornada. No se registrará inventario final, declaración de efectivo ni aprobación. La Jornada quedará pendiente de conciliación del Dueño. ¿Continuar?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_cerrar_jornada_operativa',{
+        p_turno_sesion_id:sessionId,
+        p_motivo_excepcion:reason
+      });
+      await loadCalendar();
+      await loadCurrentSession();
+      const loaded=await openWorkspace(sessionId);
+      if(!loaded)throw new Error('El sello se registró pero no se pudo recargar la Jornada. Actualiza la pantalla.');
+      setStatus('Operación sellada. Inventario, caja y conciliación siguen pendientes.','ok');
+      return true;
+    }catch(error){
+      msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');
+      return false;
+    }finally{busy(button,false);}
   }
   async function closeSession(form){
     const sessionId=form.dataset.bc7CloseForm;
@@ -2807,6 +2845,7 @@
     if(t.hasAttribute('data-bc7-retro-handover-open')){await openRetroSuccessorPanel(t);return;}
     if(t.hasAttribute('data-bc7-start-retro')){await startRetroSuccessor(t);return;}
     if(t.hasAttribute('data-bc7-open')){await openWorkspace(t.dataset.bc7Open);return;}
+    if(t.hasAttribute('data-bc7-operational-close')){await closeOperationalSession(t);return;}
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
     if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
     if(t.hasAttribute('data-bc7-delivery-decision')){await resolveSharedDelivery(t);return;}

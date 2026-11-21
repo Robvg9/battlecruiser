@@ -255,8 +255,8 @@
     const blockers=[];
     sessions.forEach(s=>{
       const l=s.liquidacion||{};
-      if(!['COMPLETADA','CANCELADA'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía no se ha completado.');
-      if(s.estado==='COMPLETADA'&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
+      if(!['COMPLETADA','CANCELADA','CERRADA_OPERATIVAMENTE'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía está operativamente abierta.');
+      if(['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(s.estado)&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
       if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Jornada '+fmtDate(s.fecha)+': movimientos posteriores sin clasificar');
     });
     const approved=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
