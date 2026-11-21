@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 
-const migration = fs.readFileSync("supabase/migrations/20261121120000_transfer_whatsapp_inventory_count_audit.sql", "utf8");
+const migration = fs.readFileSync("supabase/migrations/20261121124129_transfer_whatsapp_inventory_count_audit.sql", "utf8");
 const inventoryUi = fs.readFileSync("public/js/inventario-auditoria.js", "utf8");
 const transferUi = fs.readFileSync("public/js/movimiento-multiple.js", "utf8");
 const app = fs.readFileSync("public/app.js", "utf8");
