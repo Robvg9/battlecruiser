@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'supabase/migrations/20261121120000_transfer_whatsapp_inventory_count_audit.sql'
+      - 'supabase/migrations/20261121124129_transfer_whatsapp_inventory_count_audit.sql'
       - 'test/inventory-audit-transfer-share-fixture.sql'
       - 'test/inventory-audit-transfer-share-contract.sql'
       - 'test/inventory-audit-transfer-share.test.js'
@@ -51,7 +51,7 @@ jobs:
       - name: Build isolated transfer and inventory schema fixture
         run: psql -v ON_ERROR_STOP=1 -f test/inventory-audit-transfer-share-fixture.sql
       - name: Apply physical inventory audit and transfer receipt migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261121120000_transfer_whatsapp_inventory_count_audit.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261121124129_transfer_whatsapp_inventory_count_audit.sql
       - name: Verify real PostgreSQL behavior, permission boundaries, and ACLs
         run: psql -v ON_ERROR_STOP=1 -f test/inventory-audit-transfer-share-contract.sql
       - name: Verify WhatsApp multiline formatter and client contract
