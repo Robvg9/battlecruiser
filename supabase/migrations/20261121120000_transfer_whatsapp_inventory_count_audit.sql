@@ -515,6 +515,63 @@ begin
 end;
 $function$;
 
+create or replace function public.inventario_auditoria_cancelar(
+  p_auditoria_id uuid,
+  p_motivo text
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $function$
+declare
+  v_auditoria public.inventario_auditorias%rowtype;
+  v_motivo text;
+begin
+  if auth.uid() is null then
+    raise exception 'Sesión no autenticada' using errcode = '42501';
+  end if;
+
+  v_motivo := nullif(btrim(coalesce(p_motivo,'')), '');
+  if v_motivo is null then
+    raise exception 'Debes indicar el motivo para cancelar el conteo.';
+  end if;
+
+  select * into v_auditoria
+  from public.inventario_auditorias
+  where id = p_auditoria_id
+  for update;
+
+  if not found or v_auditoria.estado <> 'ABIERTA' then
+    raise exception 'La auditoría no está abierta.';
+  end if;
+
+  if v_auditoria.creado_por <> auth.uid()
+    and not public.bc_actor_is_admin()
+    and not public.tiene_permiso('auditoria','editar_any') then
+    raise exception 'Solo quien inició el conteo o un responsable autorizado puede cancelarlo.' using errcode = '42501';
+  end if;
+
+  update public.inventario_auditorias
+  set estado = 'CANCELADA',
+      finalizado_por = auth.uid(),
+      finalizado_en = now(),
+      observaciones = v_motivo
+  where id = p_auditoria_id;
+
+  update public.almacenes
+  set auditoria_inventario_activa_id = null
+  where id = v_auditoria.almacen_id
+    and auditoria_inventario_activa_id = p_auditoria_id;
+
+  if not found then
+    raise exception 'No se pudo liberar el almacén después de cancelar el conteo.';
+  end if;
+
+  return 'CANCELADA';
+end;
+$function$;
+
 create or replace function public.inventario_auditoria_listar(p_almacen_id uuid default null)
 returns table(
   id uuid,
@@ -602,6 +659,7 @@ revoke all on function public.obtener_transferencia_compartir(uuid) from public,
 revoke all on function public.inventario_auditoria_iniciar(uuid) from public, anon, authenticated;
 revoke all on function public.inventario_auditoria_guardar_conteos(uuid,jsonb) from public, anon, authenticated;
 revoke all on function public.inventario_auditoria_finalizar(uuid) from public, anon, authenticated;
+revoke all on function public.inventario_auditoria_cancelar(uuid,text) from public, anon, authenticated;
 revoke all on function public.inventario_auditoria_listar(uuid) from public, anon, authenticated;
 revoke all on function public.inventario_auditoria_detalle(uuid) from public, anon, authenticated;
 
@@ -611,6 +669,7 @@ grant execute on function public.obtener_transferencia_compartir(uuid) to authen
 grant execute on function public.inventario_auditoria_iniciar(uuid) to authenticated;
 grant execute on function public.inventario_auditoria_guardar_conteos(uuid,jsonb) to authenticated;
 grant execute on function public.inventario_auditoria_finalizar(uuid) to authenticated;
+grant execute on function public.inventario_auditoria_cancelar(uuid,text) to authenticated;
 grant execute on function public.inventario_auditoria_listar(uuid) to authenticated;
 grant execute on function public.inventario_auditoria_detalle(uuid) to authenticated;
 

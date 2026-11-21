@@ -20,6 +20,9 @@ test("physical audit is limited server-side to storage warehouses", () => {
   assert.match(inventoryUi, /w\.tipo === 'almacenamiento'/);
   assert.match(migration, /v_auditoria\.creado_por <> auth\.uid\(\)/);
   assert.match(migration, /public\.tiene_permiso\('auditoria','crear'\)/);
+  assert.match(migration, /inventario_auditoria_cancelar\(\\s*p_auditoria_id uuid,\\s*p_motivo text/s);
+  assert.match(inventoryUi, /id="inv-audit-cancel"/);
+  assert.match(inventoryUi, /rpc\('inventario_auditoria_cancelar'/);
 });
 
 test("physical audit snapshots zero stock and distinguishes not-counted from zero", () => {
@@ -33,7 +36,7 @@ test("physical audit snapshots zero stock and distinguishes not-counted from zer
 
 test("physical audit never performs stock adjustments automatically", () => {
   const auditFunctions = migration.match(/create or replace function public\.inventario_auditoria_[\s\S]*?\$function\$;/gi) || [];
-  assert.equal(auditFunctions.length, 5, "the physical-audit API should expose five narrowly scoped RPC functions");
+  assert.equal(auditFunctions.length, 6, "the physical-audit API should expose six narrowly scoped RPC functions");
   for (const fn of auditFunctions) {
     assert.doesNotMatch(fn, /update\s+public\.stock/i);
     assert.doesNotMatch(fn, /insert\s+into\s+public\.stock/i);

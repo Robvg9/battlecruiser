@@ -82,8 +82,10 @@
     $('inv-audit-detail').addEventListener('click', async (event) => {
       const save = event.target.closest('#inv-audit-save');
       const finish = event.target.closest('#inv-audit-finish');
+      const cancel = event.target.closest('#inv-audit-cancel');
       if (save) await saveCounts(false);
       if (finish) await saveCounts(true);
+      if (cancel) await cancelAudit();
     });
   }
 
@@ -197,7 +199,8 @@
         '</article>';
       }).join('') + '</div>' +
       (open ? '<div class="inv-audit-actions"><button type="button" class="cc-accion" id="inv-audit-save">Guardar conteos</button>' +
-        '<button type="button" id="inv-audit-finish">Finalizar conteo</button></div>' : '');
+        '<button type="button" id="inv-audit-finish">Finalizar conteo</button>' +
+        '<button type="button" id="inv-audit-cancel">Cancelar conteo</button></div>' : '');
   }
 
   function collectCounts() {
@@ -244,6 +247,27 @@
     } finally { busy = false; }
   }
 
+  async function cancelAudit() {
+    if (busy || !currentAuditId || !currentAudit || currentAudit.estado !== 'ABIERTA') return;
+    const reason = window.prompt('Motivo para cancelar este conteo físico:');
+    if (reason == null) return;
+    if (!reason.trim()) return showMessage('El motivo de cancelación es obligatorio.', false);
+    if (!window.confirm('¿Cancelar el conteo y desbloquear el almacén? No se cambiarán existencias.')) return;
+    busy = true;
+    try {
+      showMessage('Cancelando el conteo y liberando el almacén…', true);
+      await rpc('inventario_auditoria_cancelar', {
+        p_auditoria_id: currentAuditId,
+        p_motivo: reason.trim()
+      });
+      await refreshAll();
+      await loadAuditDetail(currentAuditId);
+      showMessage('Conteo cancelado. El almacén fue desbloqueado sin modificar existencias.', true);
+    } catch (error) {
+      showMessage(error.message || 'No se pudo cancelar el conteo.', false);
+    } finally { busy = false; }
+  }
+
   function switchView(view) {
     const actions = $('mando-auditoria-acciones');
     const physical = $('mando-auditoria-fisica');
@@ -274,6 +298,7 @@
       '.inv-audit-start label{display:grid;gap:4px;font-size:.76rem}' +
       '.inv-audit-start select,.inv-audit-line input{width:100%;min-width:0;box-sizing:border-box;min-height:40px;padding:8px 10px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--void,#0d1b17);color:var(--text)}' +
       '.inv-audit-start button,.inv-audit-actions button{min-height:40px;padding:8px 13px;border:0;border-radius:7px;background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#211605;font-weight:700}' +
+      '.inv-audit-actions #inv-audit-cancel{background:transparent;border:1px solid rgba(190,80,80,.65);color:var(--danger,#d47b7b)}' +
       '.inv-audit-policy,.inv-audit-help{font-size:.76rem;line-height:1.45;margin:8px 0 12px}' +
       '.inv-audit-history{display:grid;gap:6px;margin:12px 0}' +
       '.inv-audit-history h4{margin:4px 0;font-size:.85rem}' +
