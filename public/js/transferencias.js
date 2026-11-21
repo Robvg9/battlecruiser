@@ -129,11 +129,13 @@ function formatearMensajeTransferenciaWhatsApp(reporte) {
   const fecha = new Date(reporte.fecha);
   if (Number.isNaN(fecha.getTime())) throw new Error("La transferencia no tiene una fecha válida.");
   const fechaTexto = new Intl.DateTimeFormat("es-ES", {
-    day: "2-digit", month: "2-digit", year: "numeric"
+    day: "2-digit", month: "2-digit", year: "numeric",
+    timeZone: "America/Havana"
   }).format(fecha);
   const fechaHoraTexto = new Intl.DateTimeFormat("es-ES", {
     day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    timeZone: "America/Havana"
   }).format(fecha);
   const productos = reporte.productos.map((producto, index) => {
     const unidad = String(producto.unidad || "unidad").trim();
