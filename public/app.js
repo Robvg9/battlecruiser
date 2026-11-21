@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.136 — Version-aware PWA update notice and unified two-step operation flows.
+// v9.5.137 — Restore accessible header icon controls after legacy modules initialize.
 (function hotfixV9475(){
-  const VERSION="9.5.136";
+  const VERSION="9.5.137";
   window.__BC_VERSION__=VERSION;
   function aplicarVersion(){
     const input=document.getElementById("email");
@@ -173,7 +173,7 @@
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
     ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261120.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
     ["m53-inventario-centro.js","53.9"],["m55-productos-import.js","55.5"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.8"],["m57-turnos-sesion-ux-fix.js","57.6"],
-    ["m68-ventas-pos-definitivo.js","9.5.136"],["hotfix-regresiones-20260902.js","20261101.1"],["hotfix-configuracion-20260902.js","20261020.4"],
+    ["m68-ventas-pos-definitivo.js","9.5.136"],["hotfix-regresiones-20260902.js","20261120.2"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.2"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.4"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.7"],["hotfix-17-final-loader-20260903.js","20261030.2"],
@@ -229,6 +229,34 @@
     });
   }
 
+
+  // The public shell owns the visible account/logout icon contract. Legacy modules
+  // may decorate actions; restore the SVGs once every dynamic module has settled.
+  function normalizarAccionHeader(id,label,svgMarkup){
+    const button=document.getElementById(id);
+    if(!button)return {present:false,svg:false};
+    const valid=button.children.length===1&&button.children[0].tagName&&
+      button.children[0].tagName.toLowerCase()==="svg"&&button.querySelector("svg path,svg circle")&&
+      !(button.textContent||"").trim();
+    if(!valid)button.innerHTML=svgMarkup;
+    button.type="button";
+    button.classList.add("bc-header-icon-button");
+    button.setAttribute("aria-label",label);
+    button.setAttribute("title",label);
+    const svg=button.querySelector("svg");
+    return {present:true,svg:!!svg,childCount:button.children.length,text:(button.textContent||"").trim()};
+  }
+  function normalizarAccionesHeader(){
+    const state={
+      account:normalizarAccionHeader("mi-cuenta-btn","Mi cuenta",
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.4"></circle><path d="M5 20c.6-3.4 3.2-5.4 7-5.4s6.4 2 7 5.4"></path></svg>'),
+      logout:normalizarAccionHeader("logout-btn","Cerrar sesión",
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4h6v16h-6"></path><path d="M3 12h11"></path><path d="m10 8 4 4-4 4"></path></svg>')
+    };
+    window.__BC_HEADER_ACTIONS_NORMALIZED__=state;
+    return state;
+  }
+
   function terminarBootUI(results){
     if(window.__BC_UI_READY_RESOLVED__)return;
     const safeResults=Array.isArray(results)?results:[];
@@ -244,6 +272,12 @@
       results:safeResults
     };
     window.__BC_MODULE_LOAD_STATE__=summary;
+    try {
+      summary.headerActions=normalizarAccionesHeader();
+    } catch(error) {
+      summary.headerActions={error:String(error&&error.message||error)};
+      console.error("[BattleCruiser] No se pudieron normalizar los iconos del encabezado:",error);
+    }
     window.__BC_UI_READY_DEGRADED__=summary.status==="degraded";
     window.__BC_UI_READY_RESOLVED__=true;
     resolveUIReady(summary);

@@ -48,9 +48,9 @@
     const btn = document.getElementById('logout-btn');
     if (!btn || btn.dataset.bcRegLogout === '1') return;
     btn.dataset.bcRegLogout = '1';
-    btn.classList.add('bc-reg-logout');
-    btn.textContent = 'LogOut';
-    btn.setAttribute('aria-label','LogOut');
+    btn.classList.add('bc-reg-logout','bc-header-icon-button');
+    btn.setAttribute('aria-label','Cerrar sesión');
+    btn.setAttribute('title','Cerrar sesión');
     btn.onclick = async ev => {
       ev.preventDefault(); ev.stopPropagation();
       window.__bcLogoutEnCurso = true;

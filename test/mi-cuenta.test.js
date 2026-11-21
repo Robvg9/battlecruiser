@@ -140,3 +140,21 @@ test("Los controles de cuenta y salida son solo iconos SVG, con nombre accesible
     dom.window.close();
   }
 });
+
+
+test("El arranque restaura los SVG del encabezado después de inicializar módulos legacy", () => {
+  const app = read("public/app.js");
+  const hotfix = read("public/js/hotfix-regresiones-20260902.js");
+  const sw = read("public/service-worker.js");
+  assert.ok(app.includes("function normalizarAccionesHeader()"));
+  const boot = app.slice(app.indexOf("function terminarBootUI"), app.indexOf("const pendientes="));
+  assert.ok(boot.includes("normalizarAccionesHeader()"),
+    "la normalización final debe ejecutarse después de cargar los módulos dinámicos");
+  assert.ok(app.includes('const VERSION="9.5.137"'));
+  assert.ok(!hotfix.includes("btn.textContent = 'LogOut'"),
+    "el hotfix legacy no debe reemplazar el SVG de Salir por texto");
+  assert.ok(hotfix.includes("btn.setAttribute('aria-label','Cerrar sesión')"));
+  assert.ok(app.includes('["hotfix-regresiones-20260902.js","20261120.2"]'));
+  assert.ok(sw.includes("./js/hotfix-regresiones-20260902.js?v=20261120.2"),
+    "el shell offline debe precargar el hotfix corregido");
+});
