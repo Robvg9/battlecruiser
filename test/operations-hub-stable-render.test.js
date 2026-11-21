@@ -60,7 +60,7 @@ function setup(t) {
   return window;
 }
 
-test("Operations preserves primary action nodes across permission refreshes and opens on the first click", () => {
+test("Operations preserves primary action nodes across permission refreshes and opens on the first click", (t) => {
   const window = setup(t);
   const doc = window.document;
   const grid = doc.getElementById("op-card-grid");
