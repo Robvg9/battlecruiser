@@ -73,8 +73,17 @@ function montarEntorno() {
       // Por defecto éxito. Las pruebas pueden overridear client.__setRpcResult.
       return client.__rpcResult;
     },
-    from: () => ({
-      select: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }),
+    from: (table) => ({
+      select: () => ({
+        order: () => ({
+          limit: () => Promise.resolve({
+            // Keep async reads bound to the test-owned cache so a late bootstrap
+            // query cannot replace a row fixture with an artificial empty result.
+            data: window._cache && Array.isArray(window._cache[table]) ? window._cache[table] : [],
+            error: null
+          })
+        })
+      })
     }),
     __rpcCalls: rpcCalls,
     __rpcResult: { data: "ok", error: null },
