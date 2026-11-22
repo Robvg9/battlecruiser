@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.50 — reprogramación visual y segura de períodos completos desde el calendario.
+// v7.51 — reprogramación visual y segura de períodos completos desde el calendario.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarCache:new Map(),calendarPromises:new Map()};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -86,6 +86,10 @@
       html+='<div class="'+classes.join(' ')+'" data-date="'+iso+'" role="gridcell" aria-selected="'+(selected?'true':'false')+'"><div class="bc7-month-day-top"><button type="button" class="bc7-month-date" '+(!inside?'disabled':'')+' data-bc7-calendar-select="'+iso+'" aria-label="'+esc(fmtDateHuman(iso))+'" aria-pressed="'+(selected?'true':'false')+'">'+date.getUTCDate()+'</button>'+(today===iso?'<span class="bc7-month-today-tag">HOY</span>':'')+(dayRows.length?'<span class="bc7-month-count">'+dayRows.length+'</span>':'')+'</div><div class="bc7-month-day-events">'+chips+more+empty+'</div></div>';
     }
     host.innerHTML=html;
+    const weekRows=cells/7;
+    host.style.display='grid';host.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
+    host.style.gridTemplateRows='34px repeat('+weekRows+',minmax(62px,1fr))';
+    host.setAttribute('role','grid');host.setAttribute('aria-colcount','7');host.setAttribute('aria-rowcount',String(weekRows+1));
     const label=$('bc7-month-label');
     if(label)label.textContent=monthTitle(month);
   }
@@ -798,57 +802,39 @@
   function ensureWorkspaceOperationData(detail){
     if(!detail||!detail.sesion||!detail.sesion.id)return Promise.resolve(false);
     const sessionId=String(detail.sesion.id);
-    if(state.workspaceOperationSessionId!==sessionId){
-      state.workspaceOperationSessionId=sessionId;
-      state.workspaceOperationPromise=null;
-      state.workspaceOperationLoaded=false;
-    }
-    if(state.workspaceOperationLoaded)return Promise.resolve(true);
-    if(state.workspaceOperationPromise)return state.workspaceOperationPromise;
-
-    const requestVersion=state.workspaceRequestVersion;
-    const panel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
-    if(panel)panel.innerHTML='<div class="bc7-empty" data-bc7-operation-loading>Consultando los datos de Operación y liquidación…</div>';
-
+    if(state.workspaceOperationSessionId!==sessionId){state.workspaceOperationSessionId=sessionId;state.workspaceOperationPromise=null;state.workspaceOperationLoaded=false;}
+    if(state.workspaceOperationLoaded)return Promise.resolve(true);if(state.workspaceOperationPromise)return state.workspaceOperationPromise;
+    const requestVersion=state.workspaceRequestVersion,panel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
+    if(panel)panel.innerHTML='<div class="bc7-empty">Verificando responsable y cargando Operación y liquidación…</div>';
+    const retail=detail.sesion.es_minorista===true,status=String(detail.sesion.estado||'').toUpperCase();
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const sessionStatus=String(detail.sesion.estado||'').toUpperCase();
-    const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
-    const canAdjust=sessionAcceptsPendingOps&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
-    const canCreateReinvestment=sessionAcceptsPendingOps&&isAssigned&&can('reinversiones','crear');
-    // Reinversiones must use the live active-product catalog too: the inventory
-    // snapshot can omit products with zero opening stock or products added later.
-    const needsProductCatalog=canAdjust||canCreateReinvestment;
-    const checklistPromise=rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
-    const adjustmentPromise=needsProductCatalog
-      ?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId})
-      :Promise.resolve([]);
-    const liquidationPromise=detail.sesion.es_minorista===true
-      ?rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})
-      :Promise.resolve(null);
-
-    state.workspaceOperationPromise=Promise.all([checklistPromise,adjustmentPromise,liquidationPromise]).then(([checklist,adjustmentCatalog,liquidation])=>{
-      const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
-      if(!stillCurrent)return false;
-      detail.checklist=checklist;
-      detail.productos_ajuste=Array.isArray(adjustmentCatalog)?adjustmentCatalog:[];
-      if(liquidation!==null)detail.liquidacion=liquidation;
-      state.workspaceOperationLoaded=true;
-      state.workspaceOperationPromise=null;
-      renderWorkspace(detail);
-      return true;
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const access=retail&&!state.admin?rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId}).then(data=>({ok:true,data:data||{}}),error=>({ok:false,error})):Promise.resolve({ok:true,data:null});
+    state.workspaceOperationPromise=access.then(async accessResult=>{
+      const current=()=>state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
+      if(!current())return false;
+      detail.server_responsible_access=!!accessResult.ok;
+      if(retail&&!state.admin&&accessResult.ok){state.dailyCashData=accessResult.data;state.dailyCashSessionId=sessionId;}
+      const assigned=retail?(!!state.admin||detail.server_responsible_access):localAssignment;
+      const canOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status)&&assigned;
+      const needsCatalog=canOps&&(can('mermas','crear')||can('bajas','crear')||can('reinversiones','crear'));
+      const results=await Promise.allSettled([
+        rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId}),
+        needsCatalog?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve([]),
+        retail?rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve(null)
+      ]);
+      if(!current())return false;
+      detail.checklist=results[0].status==='fulfilled'?results[0].value:{};
+      detail.productos_ajuste=results[1].status==='fulfilled'&&Array.isArray(results[1].value)?results[1].value:[];
+      if(results[2].status==='fulfilled'&&results[2].value!==null)detail.liquidacion=results[2].value;
+      detail.operation_load_warnings=results.map((r,index)=>r.status==='rejected'?{index,message:friendlyError(r.reason,'calendar')}:null).filter(Boolean);
+      state.workspaceOperationLoaded=true;state.workspaceOperationPromise=null;renderWorkspace(detail);return true;
     }).catch(error=>{
-      const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
-      if(stillCurrent)state.workspaceOperationPromise=null;
-      if(stillCurrent){
-        const operationPanel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
-        if(operationPanel){
-          operationPanel.innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificaron datos. <button class="bc7-btn" type="button" data-bc7-operation-retry>Reintentar carga</button></div>';
-        }
-      }
+      const current=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
+      if(current){state.workspaceOperationPromise=null;const p=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
+        if(p)p.innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificaron datos. <button class="bc7-btn" type="button" data-bc7-operation-retry>Reintentar carga</button></div>';}
       return false;
-    });
-    return state.workspaceOperationPromise;
+    });return state.workspaceOperationPromise;
   }
 
   function activateWorkspaceTab(name){
@@ -1004,42 +990,42 @@
     }
     return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+periodMove+'</div>'+reschedule+'</article>';
   }
-  async function loadCalendar(){
-    const board=$('bc7-month-board'),list=$('bc7-schedule-list');
-    if(!board&&!list)return;
-    const monthInput=$('bc7-calendar-month');
-    const fallback=$('bc7-list-from')?.value||dateHavana();
-    let month=String(monthInput&&monthInput.value||fallback.slice(0,7)).slice(0,7);
-    if(!monthParts(month))month=dateHavana().slice(0,7);
-    const from=month+'-01';
-    const days=monthDayCount(month);
-    const to=month+'-'+String(days).padStart(2,'0');
-    if(monthInput)monthInput.value=month;
-    const hiddenFrom=$('bc7-list-from');if(hiddenFrom)hiddenFrom.value=from;
+  async function loadCalendar(options){
+    options=options||{};const force=options.force===true;
+    const board=$('bc7-month-board'),list=$('bc7-schedule-list');if(!board&&!list)return false;
+    const monthInput=$('bc7-calendar-month'),fallback=$('bc7-list-from')?.value||dateHavana();
+    let month=String(monthInput&&monthInput.value||fallback.slice(0,7)).slice(0,7);if(!monthParts(month))month=dateHavana().slice(0,7);
+    const from=month+'-01',days=monthDayCount(month),to=month+'-'+String(days).padStart(2,'0');
+    if(monthInput)monthInput.value=month;const hiddenFrom=$('bc7-list-from');if(hiddenFrom)hiddenFrom.value=from;
     const hiddenDays=$('bc7-list-days');if(hiddenDays)hiddenDays.value=String(days);
     const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
-    if(board)board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
-    if(list)list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
-    msg($('bc7-list-msg'),'');
-    try{
+    const user=currentUser()||{},key=String(user.id||user.username||user.email||'authenticated-user')+'|'+month;
+    const renderRows=data=>{
+      if(String($('bc7-calendar-month')?.value||month)!==month)return;
+      state.rows=data;if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
+        const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;
+      }
+      if(board)renderMonthCalendar(month,data);renderCalendarDetail(state.calendarSelectedDate,data);
+      if(list)list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango mensual.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
+    };
+    const cached=state.calendarCache.get(key);
+    if(!force&&cached&&Date.now()-cached.at<60000){renderRows(cached.rows);return true;}
+    const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
+    if(board&&!board.querySelector('.bc7-month-day'))board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    if(list&&!list.querySelector('.bc7-jornada'))list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
+    request=(async()=>{try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
-      state.rows=data;
-      if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
-        const today=dateHavana();
-        state.calendarSelectedDate=today.slice(0,7)===month?today:from;
-      }
-      if(board)renderMonthCalendar(month,data);
-      renderCalendarDetail(state.calendarSelectedDate,data);
-      if(list){
-        list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango mensual.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
-      }
+      state.calendarCache.set(key,{at:Date.now(),rows:data});while(state.calendarCache.size>6)state.calendarCache.delete(state.calendarCache.keys().next().value);
+      renderRows(data);msg($('bc7-list-msg'),'');return true;
     }catch(e){
-      state.rows=[];
-      if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
-      if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
-      const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
-      msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');
-    }
+      if(String($('bc7-calendar-month')?.value||month)===month){if(!cached){state.rows=[];
+        if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+        if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+        const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';}
+        msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');}return false;
+    }finally{if(state.calendarPromises.get(key)===request)state.calendarPromises.delete(key);}})();
+    state.calendarPromises.set(key,request);return request;
   }
   function renderCurrentSession(current){
     state.currentSession=current&&current.turno_sesion_id?current:null;
@@ -1159,9 +1145,7 @@
     }
     const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));
     const sessionState=String(detail.sesion.estado||'').toUpperCase();
-    const currentUserId=String(currentUser()?.id||'');
-    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=currentUserId===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const isAssigned=!!detail.is_admin||detail.server_responsible_access===true;
     const tranche=detail.tramo_registrable||detail.tramo_activo||null;
     const editable=(sessionState==='EN_CURSO'&&!!detail.tramo_activo&&isAssigned)||(sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail.tramo_registrable&&(isAssigned||!!detail.is_admin));
     const rows=arr(state.dailyCashData.entregas);
@@ -2056,9 +2040,8 @@
     const finalDone=checks.inventario_final?.completado===true;
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':'¿Ya pusiste el inventario final?')+'</small></div>'+
-      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button>'+
-      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
+      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':(closed?'No se ofrece un inventario final retroactivo después del sello operativo; requiere revisión ADMIN.':'¿Ya pusiste el inventario final?'))+'</small></div>'+
+      (closed&&!detail.is_admin?'<button type="button" class="bc7-btn" disabled>Bloqueado tras el sello</button>':'<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button><button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>')+
     '</div>';
     const cashDeclared=checks.declaracion_dinero?.completado===true;
     const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
@@ -2311,7 +2294,8 @@
     const status=String(s.estado||'').toUpperCase();
     const currentUserId=String(currentUser()?.id||'');
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
+    const localAssignment=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
+    const isAssigned=s.es_minorista===true?(!!state.admin||detail.server_responsible_access===true):localAssignment;
     const tramo=detail.tramo_activo;
     let actionArea='';
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial&&s.sucesora_retroactiva===true){
@@ -2406,7 +2390,7 @@
       if(state.workspaceRequestVersion!==requestVersion)return false;
       detail.entrega_compartida=delivery;
       detail.is_admin=!!state.admin;
-      if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
+      if(isNewSelection&&detail.sesion?.es_minorista===true&&['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase()))state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
     }catch(e){
       if(state.workspaceRequestVersion!==requestVersion)return false;
@@ -3290,8 +3274,7 @@
     if(staffRetry)staffRetry.addEventListener('click',async()=>{try{await ensureResponsibleCatalog(true);}catch(_){}});
     const listFrom=$('bc7-list-from');if(listFrom)listFrom.addEventListener('change',()=>{state.lastPreview=null;});
     const monthPicker=$('bc7-calendar-month');if(monthPicker)monthPicker.addEventListener('change',()=>{state.calendarSelectedDate=null;loadCalendar();});
-    await loadCurrentSession();
-    await loadCalendar();
+    await Promise.all([loadCurrentSession(),loadCalendar()]);
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
@@ -3433,7 +3416,7 @@
     if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
-    if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
+    if(t.hasAttribute('data-bc7-refresh')){await loadCalendar({force:true});return;}
     if(t.hasAttribute('data-bc7-preview')){await previewPattern(t);return;}
     if(t.hasAttribute('data-bc7-create')){await createSchedule(t);return;}
     if(t.hasAttribute('data-bc7-retro-handover-open')){await openRetroSuccessorPanel(t);return;}

@@ -141,6 +141,9 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     window.document.querySelectorAll("#bc7-month-board .bc7-month-day").length,
     expectedCells
   );
+  assert.equal(window.document.getElementById("bc7-month-board").style.gridTemplateRows,
+    `34px repeat(${expectedCells / 7}, minmax(62px, 1fr))`);
+  assert.equal(window.document.getElementById("bc7-month-board").getAttribute("aria-colcount"), "7");
 
   const read = calls.find((call) => call.name === "bc5_mis_jornadas");
   assert.ok(read, "the board must use the existing authenticated Jornada read RPC");

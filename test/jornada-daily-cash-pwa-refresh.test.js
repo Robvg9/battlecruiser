@@ -37,14 +37,18 @@ test("PWA update banner waits for the user-approved worker activation before rel
   assert.doesNotMatch(APP, /waiting\.state === "activated"/);
 });
 
-test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
+test("retail access is server-verified for assigned workers and closed Jornada remains editable", () => {
   assert.match(UI, /const activeSessionId=String\(state\.currentSession\?\.turno_sesion_id\|\|''\);/);
   assert.match(UI,/activeSessionId===sessionId/);
   assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*ensureWorkspaceOperationData\(state\.detail\);\s*if\(state\.workspaceOperationLoaded\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}\s*\}/);
   assert.match(UI,/const sessionId=String\(detail\.sesion\.id\)/);
   assert.match(UI,/state\.workspaceOperationLoaded=true;\s*state\.workspaceOperationPromise=null;\s*renderWorkspace\(detail\)/);
   assert.match(UI,/activateWorkspaceTab\(state\.workspaceTab\)/);
-  assert.match(UI,/const isAssigned=.*activeSessionId===sessionId/);
+  assert.match(UI,/detail\.server_responsible_access=!!accessResult\.ok/);
+  assert.match(UI,/Promise\.allSettled\(/);
+  assert.match(UI,/detail\.server_responsible_access===true/);
+  assert.match(UI,/if\(!\[\x27EN_CURSO\x27,\x27CERRADA_OPERATIVAMENTE\x27\]\.includes\(String\(status\|\|\x27\x27\)\.toUpperCase\(\)\)\|\|detail\.sesion\?\.es_minorista!==true\)return/);
+  assert.doesNotMatch(UI,/No tienes acceso a los importes de esta jornada\./);
 });
 
 test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {
