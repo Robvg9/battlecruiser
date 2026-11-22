@@ -242,7 +242,6 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
 });
 
 test("ADMIN can propose and confirm a whole-period move from the accessible date picker", async (t) => {
-  const today = new Date(currentMonth() + "-01T12:00:00Z");
   const now = new Date();
   const todayHavana = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
@@ -300,8 +299,88 @@ test("ADMIN can propose and confirm a whole-period move from the accessible date
   assert.equal(moveCall.payload.p_fecha_inicio, newStart);
   assert.equal(moveCall.payload.p_motivo, "Ajuste de planificación aprobado");
   assert.match(moveCall.payload.p_idempotency_key, /^[0-9a-f-]{36}$/i);
-  await waitFor(() => window.document.getElementById("bc7-calendar-month").value === newStart.slice(0, 7));
-  assert.equal(window.document.getElementById("bc7-period-move-backdrop"), null, "successful movement closes the dialog");
+  const closed = await waitFor(() => window.document.getElementById("bc7-period-move-backdrop") === null);
+  assert.ok(closed, "successful movement closes the dialog");
+  assert.equal(window.document.getElementById("bc7-calendar-month").value, newStart.slice(0, 7));
+});
+
+test("desktop drag previews every day in the period and drop opens the full-range confirmation", async (t) => {
+  const now = new Date();
+  const todayHavana = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(now);
+  const plusDays = (value, n) => {
+    const d = new Date(value + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const sourceStart = plusDays(todayHavana, 10);
+  const rows = [1, 2, 3].map((day) => ({
+    id: "drag-program-" + day,
+    turno_id: "turno-drag-1",
+    almacen_id: "warehouse-1",
+    numero_dia: day,
+    fecha: plusDays(sourceStart, day - 1),
+    fecha_fin: plusDays(sourceStart, day - 1),
+    dias_total: 3,
+    estado_maestro: "PROGRAMADO",
+    trabaja: true,
+    responsable_id: "dep-1",
+    estado: "PROGRAMADA",
+    sesion_id: "drag-session-" + day,
+    sesion_estado: "PROGRAMADA",
+    es_responsable: false
+  }));
+  const { window } = setup(t, { admin: true, rows });
+  const monthInput = window.document.getElementById("bc7-calendar-month");
+  monthInput.value = sourceStart.slice(0, 7);
+  monthInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitFor(() => window.document.querySelector("#bc7-month-board [data-bc7-period-drag='drag-program-2']") !== null);
+
+  const chip = window.document.querySelector("#bc7-month-board [data-bc7-period-drag='drag-program-2']");
+  const dataTransfer = {
+    effectAllowed: "",
+    dropEffect: "",
+    data: {},
+    setData(type, value) { this.data[type] = value; },
+    getData(type) { return this.data[type] || ""; }
+  };
+  const startEvent = new window.Event("dragstart", { bubbles: true, cancelable: true });
+  Object.defineProperty(startEvent, "dataTransfer", { value: dataTransfer });
+  chip.dispatchEvent(startEvent);
+  assert.equal(dataTransfer.effectAllowed, "move");
+
+  const targetDate = plusDays(sourceStart, 8);
+  const targetCell = window.document.querySelector('#bc7-month-board .bc7-month-day[data-date="' + targetDate + '"]');
+  assert.ok(targetCell, "the target date should be represented in the visible calendar");
+  const overEvent = new window.Event("dragover", { bubbles: true, cancelable: true });
+  Object.defineProperty(overEvent, "dataTransfer", { value: dataTransfer });
+  targetCell.dispatchEvent(overEvent);
+  assert.ok(window.document.getElementById("bc7-period-move-preview"), "live preview banner should be visible");
+  assert.equal(
+    window.document.querySelectorAll("#bc7-month-board .bc7-month-period-ghost").length,
+    3,
+    "all three days must be previewed, not just the dragged chip"
+  );
+  assert.match(window.document.getElementById("bc7-period-move-preview").textContent, /3 días/);
+
+  const dropEvent = new window.Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(dropEvent, "dataTransfer", { value: dataTransfer });
+  targetCell.dispatchEvent(dropEvent);
+  const opened = await waitFor(() => window.document.getElementById("bc7-period-move-backdrop") !== null);
+  assert.ok(opened, "dropping a valid target opens explicit confirmation");
+  assert.equal(
+    window.document.querySelector("[data-bc7-period-move-date]").value,
+    plusDays(sourceStart, 7),
+    "dropping day 2 derives the new start by subtracting the day number offset"
+  );
+  assert.equal(
+    window.document.querySelector("[data-bc7-period-move-reason]").required,
+    true,
+    "the period move must require an audit reason"
+  );
+  window.document.querySelector("[data-bc7-period-move-cancel]").click();
+  assert.equal(window.document.getElementById("bc7-period-move-backdrop"), null);
 });
 
 test("consolidated historical ranges and started Jornada rows never expose a period-move action", async (t) => {
