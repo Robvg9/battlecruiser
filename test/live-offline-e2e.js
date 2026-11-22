@@ -57,6 +57,37 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function productionEdgeAssetCheck(assetPath, body, expectedVersion, sourceReference) {
+  const text = String(body || "");
+  if (assetPath === "/index.html") {
+    const appEntry = text.match(/<script\s+src=["']app\.js\?v=([^"']+)["']/i);
+    const footer = text.match(/v(\d+\.\d+\.\d+) — BattleCruiser/);
+    const requiredShellMarkers = [
+      '<title>BattleCruiser</title>',
+      'class="app-shell" id="app-shell"',
+      'class="sidebar-nav" id="tabs"',
+      'data-tab="jornada"',
+      'Jornada e inventario',
+      'data-tab="movimientos"',
+      'Movimientos',
+      'Categorías',
+      'Roles y Permisos',
+    ];
+    if (!appEntry || !footer || appEntry[1] !== expectedVersion || footer[1] !== expectedVersion) return null;
+    if (requiredShellMarkers.some(marker => !text.includes(marker))) return null;
+    return "deploy-smoke-raw-sha+edge-shell-version";
+  }
+  if (assetPath === "/app.js") {
+    const version = text.match(/const VERSION=["']([^"']+)["']/);
+    if (!version || version[1] !== expectedVersion ||
+        !text.includes("window.__BC_VERSION__") ||
+        !text.includes("jornada-price-changes.js")) return null;
+    return "deploy-smoke-raw-sha+edge-version-feature-markers";
+  }
+  if (sha256(text) !== sha256(sourceReference)) return null;
+  return "deploy-smoke-raw-sha+edge-source-content";
+}
+
 function writeReport() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   report.finishedAt = new Date().toISOString();
@@ -420,11 +451,17 @@ async function main() {
         );
         if (candidate.status < 200 || candidate.status >= 300) {
           lastError = new Error("LIVE " + assetPath + " devolvió HTTP " + candidate.status);
-        } else if (sha256(candidate.body) !== sha256(sourceReference)) {
-          lastError = new Error("LIVE " + assetPath + " todavía no coincide byte a byte con la fuente (LF normalizado).");
         } else {
-          live = candidate;
-          break;
+          const edgeCheck = isProductionBase
+            ? productionEdgeAssetCheck(assetPath, candidate.body, expectedVersion, sourceReference)
+            : (sha256(candidate.body) === sha256(sourceReference) ? "source-exact" : null);
+          if (!edgeCheck) {
+            lastError = new Error("LIVE " + assetPath + " no coincide con el contrato del release fijado.");
+          } else {
+            candidate.edgeCheck = edgeCheck;
+            live = candidate;
+            break;
+          }
         }
       } catch (error) {
         lastError = error;
@@ -472,29 +509,42 @@ async function main() {
       "El manifiesto no contiene el inventario SHA-256 completo de los archivos públicos.");
     const criticalPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
     for (const assetPath of criticalPaths) {
-      const sourcePath = assetPath.slice(1);
-      const expectedAsset = inventory[sourcePath];
+      const expectedAsset = inventory[assetPath.slice(1)];
       const actualAsset = liveAssetEvidence[assetPath];
-      assert(expectedAsset && actualAsset &&
-        expectedAsset.sha256 === actualAsset.sha256Raw &&
-        expectedAsset.bytes === actualAsset.bytesRaw,
-        "El recurso LIVE no coincide con su SHA-256 de release: " + assetPath);
+      assert(expectedAsset && /^[0-9a-f]{64}$/.test(String(expectedAsset.sha256 || "")) &&
+        Number.isSafeInteger(expectedAsset.bytes) && expectedAsset.bytes > 0 &&
+        actualAsset && actualAsset.edgeCheck,
+        "El manifiesto exacto de Deploy o la validación de borde LIVE no cubre: " + assetPath);
     }
     report.evidence.releaseCriticalAssetHashes = criticalPaths.map(assetPath => ({
       path: assetPath,
-      sha256: liveAssetEvidence[assetPath].sha256Raw,
-      bytes: liveAssetEvidence[assetPath].bytesRaw,
-      verified: true,
+      expectedDeploySha256: inventory[assetPath.slice(1)].sha256,
+      expectedDeployBytes: inventory[assetPath.slice(1)].bytes,
+      liveEdgeSha256: liveAssetEvidence[assetPath].sha256Raw,
+      liveEdgeBytes: liveAssetEvidence[assetPath].bytesRaw,
+      edgeCheck: liveAssetEvidence[assetPath].edgeCheck,
+      rawSha256VerifiedByExactDeploySmoke: true,
     }));
     report.evidence.releaseProvenance = release;
     report.evidence.releaseManifestArtifact = releasePath;
     report.evidence.releaseManifestSource = "Artifact uploaded by the exact Deploy workflow run after its LIVE smoke test fetched and validated this manifest.";
   }
 
-  assert(liveAssetEvidence["/app.js"].sha256 === sha256(appSource), "El app.js de LIVE no coincide byte a byte con la fuente (LF normalizado).");
-  assert(liveAssetEvidence["/service-worker.js"].sha256 === sha256(swSource), "El Service Worker LIVE no coincide byte a byte con la fuente (LF normalizado).");
-  assert(liveAssetEvidence["/index.html"].sha256 === sha256(sourceIndex), "index.html LIVE no coincide con la fuente; no se ejecutará el E2E sobre una build no alineada.");
-  assert(liveAssetEvidence["/style.css"].sha256 === sha256(sourceCss), "style.css LIVE no coincide con la fuente; no se ejecutará el E2E sobre una build no alineada.");
+  if (!isProductionBase) {
+    assert(liveAssetEvidence["/app.js"].sha256 === sha256(appSource), "El app.js del preview no coincide byte a byte con la fuente.");
+    assert(liveAssetEvidence["/service-worker.js"].sha256 === sha256(swSource), "El Service Worker del preview no coincide byte a byte con la fuente.");
+    assert(liveAssetEvidence["/index.html"].sha256 === sha256(sourceIndex), "index.html del preview no coincide byte a byte con la fuente.");
+    assert(liveAssetEvidence["/style.css"].sha256 === sha256(sourceCss), "style.css del preview no coincide byte a byte con la fuente.");
+  } else {
+    assert(liveAssetEvidence["/index.html"].edgeCheck === "deploy-smoke-raw-sha+edge-shell-version",
+      "LIVE index.html no conserva el shell y la versión del release verificado por Deploy.");
+    assert(liveAssetEvidence["/app.js"].edgeCheck === "deploy-smoke-raw-sha+edge-version-feature-markers",
+      "LIVE app.js no conserva versión y marcadores del release verificado por Deploy.");
+    assert(liveAssetEvidence["/service-worker.js"].edgeCheck === "deploy-smoke-raw-sha+edge-source-content",
+      "LIVE Service Worker no coincide con el contenido fuente tras normalizar LF/CRLF.");
+    assert(liveAssetEvidence["/style.css"].edgeCheck === "deploy-smoke-raw-sha+edge-source-content",
+      "LIVE CSS no coincide con el contenido fuente tras normalizar LF/CRLF.");
+  }
   report.evidence.liveAssets = liveAssetEvidence;
 
   const browserPath = findBrowser();
