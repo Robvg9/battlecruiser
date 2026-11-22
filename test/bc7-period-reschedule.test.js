@@ -89,12 +89,10 @@ function setup(t, options = {}) {
     almacenes: [{ id: "warehouse-1", nombre: "La Cueva", activo: true }],
     usuarios: []
   };
-  try {
-    Object.defineProperty(window.crypto, "randomUUID", {
-      configurable: true,
-      value: () => "83000000-0000-0000-0000-000000000001"
-    });
-  } catch (_) {}
+  Object.defineProperty(window, "crypto", {
+    configurable: true,
+    value: { randomUUID: () => "83000000-0000-0000-0000-000000000001" }
+  });
 
   window.client = {
     rpc: async (name, payload) => {
@@ -143,7 +141,7 @@ function setup(t, options = {}) {
   return { window, calls, getRows: () => rows };
 }
 
-async function openMonthAndSelectSource(env, rows) {
+async function openMonthAndSelectSource(env, rows, expectMove = true) {
   const monthInput = env.window.document.getElementById("bc7-calendar-month");
   monthInput.value = rows[0].fecha.slice(0, 7);
   monthInput.dispatchEvent(new env.window.Event("change", { bubbles: true }));
@@ -156,6 +154,7 @@ async function openMonthAndSelectSource(env, rows) {
   env.window.document.querySelector(
     '#bc7-month-board [data-bc7-calendar-select="' + rows[0].fecha + '"]'
   ).click();
+  if (!expectMove) return true;
   return await waitFor(() =>
     env.window.document.querySelector("#bc7-calendar-detail [data-bc7-period-move]") !== null
   );
@@ -238,7 +237,7 @@ test("active, consolidated and non-admin rows cannot expose a whole-period move 
     ]
   });
   const env = setup(t, { rows: active });
-  await openMonthAndSelectSource(env, active);
+  await openMonthAndSelectSource(env, active, false);
   assert.equal(
     env.window.document.querySelector("#bc7-calendar-detail [data-bc7-period-move]"),
     null,
@@ -252,7 +251,7 @@ test("active, consolidated and non-admin rows cannot expose a whole-period move 
 
   const consolidated = periodRows(start, { consolidatedDay: 1 });
   const envConsolidated = setup(t, { rows: consolidated });
-  await openMonthAndSelectSource(envConsolidated, consolidated);
+  await openMonthAndSelectSource(envConsolidated, consolidated, false);
   assert.equal(
     envConsolidated.window.document.querySelector("#bc7-calendar-detail [data-bc7-period-move]"),
     null,
@@ -260,7 +259,7 @@ test("active, consolidated and non-admin rows cannot expose a whole-period move 
   );
 
   const nonAdmin = setup(t, { rows: periodRows(start), admin: false });
-  await openMonthAndSelectSource(nonAdmin, periodRows(start));
+  await openMonthAndSelectSource(nonAdmin, periodRows(start), false);
   assert.equal(
     nonAdmin.window.document.querySelector("#bc7-calendar-detail [data-bc7-period-move]"),
     null,
