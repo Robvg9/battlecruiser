@@ -79,6 +79,12 @@ function setup(t, options = {}) {
       }
       if (name === "turno_actual_usuario") return { data: null, error: null };
       if (name === "bc5_mis_jornadas") return { data: rows, error: null };
+      if (name === "bc5_reprogramar_periodo_jornada") {
+        const start = payload.p_fecha_inicio;
+        const days = Number(rows.find((row) => String(row.turno_id) === String(payload.p_turno_id))?.dias_total || 2);
+        const end = new Date(Date.parse(start + "T12:00:00Z") + (days - 1) * 86400000).toISOString().slice(0, 10);
+        return { data: { fecha_inicio: start, fecha_fin: end, dias_total: days, idempotente: false }, error: null };
+      }
       return { data: null, error: null };
     }
   };
@@ -227,5 +233,179 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
     window.document.querySelector("#bc7-calendar-detail [data-bc7-reschedule]"),
     null,
     "non-admins must not receive the administrator reschedule editor"
+  );
+  assert.equal(
+    window.document.querySelector("#bc7-schedule-list [data-bc7-period-move-open]"),
+    null,
+    "non-admins must not receive the whole-period move action"
+  );
+});
+
+test("ADMIN can propose and confirm a whole-period move from the accessible date picker", async (t) => {
+  const now = new Date();
+  const todayHavana = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(now);
+  const plusDays = (value, n) => {
+    const d = new Date(value + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const sourceStart = plusDays(todayHavana, 10);
+  const rows = [1, 2, 3].map((day) => ({
+    id: "program-" + day,
+    turno_id: "turno-move-1",
+    almacen_id: "warehouse-1",
+    numero_dia: day,
+    fecha: plusDays(sourceStart, day - 1),
+    fecha_fin: plusDays(sourceStart, day - 1),
+    dias_total: 3,
+    estado_maestro: "PROGRAMADO",
+    trabaja: day !== 2,
+    responsable_id: day === 2 ? null : "dep-1",
+    estado: day === 2 ? "DESCANSO" : "PROGRAMADA",
+    sesion_id: day === 2 ? null : "session-" + day,
+    sesion_estado: day === 2 ? null : "PROGRAMADA",
+    es_responsable: false
+  }));
+  const { window, calls } = setup(t, { admin: true, rows });
+  await waitFor(() => window.document.querySelector("#bc7-schedule-list [data-bc7-period-move-open]") !== null);
+
+  const monthInput = window.document.getElementById("bc7-calendar-month");
+  monthInput.value = sourceStart.slice(0, 7);
+  monthInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitFor(() => window.document.querySelector("#bc7-month-board [data-bc7-period-drag='program-2']") !== null);
+
+  const dragChip = window.document.querySelector("#bc7-month-board [data-bc7-period-drag='program-2']");
+  assert.equal(dragChip.getAttribute("draggable"), "true", "a scheduled rest day can initiate movement of its whole period");
+  const openButton = window.document.querySelector("#bc7-schedule-list [data-bc7-period-move-open='program-2']");
+  assert.ok(openButton, "the mobile/accessibility action must be available for the same full period");
+  openButton.click();
+
+  const dialog = await waitFor(() => window.document.getElementById("bc7-period-move-backdrop"));
+  assert.ok(dialog, "the date-picker dialog should open");
+  const form = window.document.querySelector("[data-bc7-period-move-form]");
+  const newStart = plusDays(sourceStart, 4);
+  const dateInput = form.querySelector("[data-bc7-period-move-date]");
+  dateInput.value = newStart;
+  dateInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  form.querySelector("[data-bc7-period-move-reason]").value = "Ajuste de planificación aprobado";
+
+  form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  const called = await waitFor(() => calls.some((call) => call.name === "bc5_reprogramar_periodo_jornada"));
+  assert.ok(called, "confirmation should call the transactional period-move RPC");
+  const moveCall = calls.find((call) => call.name === "bc5_reprogramar_periodo_jornada");
+  assert.equal(moveCall.payload.p_turno_id, "turno-move-1");
+  assert.equal(moveCall.payload.p_fecha_inicio, newStart);
+  assert.equal(moveCall.payload.p_motivo, "Ajuste de planificación aprobado");
+  assert.match(moveCall.payload.p_idempotency_key, /^[0-9a-f-]{36}$/i);
+  const closed = await waitFor(() => window.document.getElementById("bc7-period-move-backdrop") === null);
+  assert.ok(closed, "successful movement closes the dialog");
+  assert.equal(window.document.getElementById("bc7-calendar-month").value, newStart.slice(0, 7));
+});
+
+test("desktop drag previews every day in the period and drop opens the full-range confirmation", async (t) => {
+  const now = new Date();
+  const todayHavana = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(now);
+  const plusDays = (value, n) => {
+    const d = new Date(value + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const sourceStart = plusDays(todayHavana, 10);
+  const rows = [1, 2, 3].map((day) => ({
+    id: "drag-program-" + day,
+    turno_id: "turno-drag-1",
+    almacen_id: "warehouse-1",
+    numero_dia: day,
+    fecha: plusDays(sourceStart, day - 1),
+    fecha_fin: plusDays(sourceStart, day - 1),
+    dias_total: 3,
+    estado_maestro: "PROGRAMADO",
+    trabaja: true,
+    responsable_id: "dep-1",
+    estado: "PROGRAMADA",
+    sesion_id: "drag-session-" + day,
+    sesion_estado: "PROGRAMADA",
+    es_responsable: false
+  }));
+  const { window } = setup(t, { admin: true, rows });
+  const monthInput = window.document.getElementById("bc7-calendar-month");
+  monthInput.value = sourceStart.slice(0, 7);
+  monthInput.dispatchEvent(new window.Event("change", { bubbles: true }));
+  await waitFor(() => window.document.querySelector("#bc7-month-board [data-bc7-period-drag='drag-program-2']") !== null);
+
+  const chip = window.document.querySelector("#bc7-month-board [data-bc7-period-drag='drag-program-2']");
+  const dataTransfer = {
+    effectAllowed: "",
+    dropEffect: "",
+    data: {},
+    setData(type, value) { this.data[type] = value; },
+    getData(type) { return this.data[type] || ""; }
+  };
+  const startEvent = new window.Event("dragstart", { bubbles: true, cancelable: true });
+  Object.defineProperty(startEvent, "dataTransfer", { value: dataTransfer });
+  chip.dispatchEvent(startEvent);
+  assert.equal(dataTransfer.effectAllowed, "move");
+
+  const targetDate = plusDays(sourceStart, 8);
+  const targetCell = window.document.querySelector('#bc7-month-board .bc7-month-day[data-date="' + targetDate + '"]');
+  assert.ok(targetCell, "the target date should be represented in the visible calendar");
+  const overEvent = new window.Event("dragover", { bubbles: true, cancelable: true });
+  Object.defineProperty(overEvent, "dataTransfer", { value: dataTransfer });
+  targetCell.dispatchEvent(overEvent);
+  assert.ok(window.document.getElementById("bc7-period-move-preview"), "live preview banner should be visible");
+  assert.equal(
+    window.document.querySelectorAll("#bc7-month-board .bc7-month-period-ghost").length,
+    3,
+    "all three days must be previewed, not just the dragged chip"
+  );
+  assert.match(window.document.getElementById("bc7-period-move-preview").textContent, /3 días/);
+
+  const dropEvent = new window.Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(dropEvent, "dataTransfer", { value: dataTransfer });
+  targetCell.dispatchEvent(dropEvent);
+  const opened = await waitFor(() => window.document.getElementById("bc7-period-move-backdrop") !== null);
+  assert.ok(opened, "dropping a valid target opens explicit confirmation");
+  assert.equal(
+    window.document.querySelector("[data-bc7-period-move-date]").value,
+    plusDays(sourceStart, 7),
+    "dropping day 2 derives the new start by subtracting the day number offset"
+  );
+  assert.equal(
+    window.document.querySelector("[data-bc7-period-move-reason]").required,
+    true,
+    "the period move must require an audit reason"
+  );
+  window.document.querySelector("[data-bc7-period-move-cancel]").click();
+  assert.equal(window.document.getElementById("bc7-period-move-backdrop"), null);
+});
+
+test("consolidated historical ranges and started Jornada rows never expose a period-move action", async (t) => {
+  const month = currentMonth();
+  const rows = [{
+    id: "program-consolidated",
+    turno_id: "turno-history",
+    almacen_id: "warehouse-1",
+    numero_dia: 1,
+    fecha: month + "-20",
+    fecha_fin: month + "-22",
+    dias_total: 3,
+    estado_maestro: "CERRADO",
+    trabaja: true,
+    responsable_id: "dep-1",
+    estado: "PROGRAMADA",
+    sesion_id: "session-history",
+    sesion_estado: "COMPLETADA",
+    es_responsable: false
+  }];
+  const { window } = setup(t, { admin: true, rows });
+  await waitFor(() => window.document.querySelector("#bc7-schedule-list .bc7-jornada") !== null);
+  assert.equal(
+    window.document.querySelector("#bc7-schedule-list [data-bc7-period-move-open]"),
+    null,
+    "consolidated historical periods must not be draggable or movable"
   );
 });
