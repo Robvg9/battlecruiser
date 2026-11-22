@@ -1212,6 +1212,8 @@
         html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
       }else if(declaration.monto_contado!=null){
         html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
+      }else if(detail.is_admin&&!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)){
+        html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
       }
       html+='</article>';
     }
