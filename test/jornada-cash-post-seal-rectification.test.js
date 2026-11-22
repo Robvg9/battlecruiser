@@ -100,3 +100,16 @@ test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent a
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.bc5_admin_rectificar_declaracion_a_entrega_diaria/);
   assert.doesNotMatch(migration, /\bDROP\s+TABLE\b|\bTRUNCATE\s/i);
 });
+
+test("daily cash workspace trusts server-verified responsibility and reuses its authorized read", () => {
+  const start=ui.indexOf("async function loadCashDaysWorkspace(detail){");
+  const end=ui.indexOf("async function saveCashDaysWorkspace(",start);
+  assert.ok(start>=0&&end>start,"daily cash loader must exist");
+  const loader=ui.slice(start,end);
+  assert.match(loader,/detail\.server_responsible_access===true/,
+    "retail access comes from the authoritative server check, not the local people catalogue");
+  assert.match(loader,/state\.dailyCashSessionId===sessionId&&state\.dailyCashData/,
+    "the read already authorized for this session is reused instead of fetched twice");
+  assert.doesNotMatch(loader,/const isAssigned=String\(currentUser\(\)\?\.id\|\|''\)===String\(detail\.sesion\.responsable_id/,
+    "the retail cash view must not reject the worker while local identity data is still loading");
+});
