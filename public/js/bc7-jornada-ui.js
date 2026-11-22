@@ -2043,11 +2043,14 @@
       '</div>';
     }).join('');
     const finalDone=checks.inventario_final?.completado===true;
+    const sealed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
+    const finalLocked=sealed&&!finalDone;
+    const finalDescription=finalDone?'Conteo físico final confirmado':(finalLocked?'Bloqueado tras el sello · el inventario final exige el flujo de conciliación y no admite conteo retroactivo':'¿Ya pusiste el inventario final?');
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':'¿Ya pusiste el inventario final?')+'</small></div>'+
-      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button>'+
-      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
+      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+finalDescription+'</small></div>'+
+      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final" '+(finalLocked?'disabled':'')+'>Abrir sección</button>'+
+      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned||finalLocked?'disabled':'')+'>'+(finalDone?'Ver conteo':(finalLocked?'Bloqueado':'Ir a ponerlo'))+'</button>'+
     '</div>';
     const cashDeclared=checks.declaracion_dinero?.completado===true;
     const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
