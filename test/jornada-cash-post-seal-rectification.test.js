@@ -98,7 +98,7 @@ test("desktop calendar uses a warm per-user month cache and an exact seven-colum
   assert.match(ui,/loadCalendar\(\{force:true\}\)/);
   assert.match(ui,/await Promise\.all\(\[loadCurrentSession\(\),loadCalendar\(\)\]\)/);
   assert.match(ui,/host\.style\.gridTemplateColumns='repeat\(7,minmax\(0,1fr\)\)'/);
-  assert.match(ui,/host\.style\.gridTemplateRows='34px repeat\('\+weekRows\+',minmax\(62px,1fr\)\)\)'/);
+  assert.ok(ui.includes("host.style.gridTemplateRows='34px repeat('+weekRows+',minmax(62px,1fr))';"));
   assert.match(ui,/#tab-jornada \.bc7-visual-calendar-layout\{display:grid!important;grid-template-columns:minmax\(0,1fr\) clamp\(300px,27vw,380px\)!important/);
   assert.match(ui,/#tab-jornada \.bc7-visual-calendar-main\{display:flex!important/);
   assert.match(ui,/#tab-jornada \.bc7-visual-calendar-side\{display:flex!important/);

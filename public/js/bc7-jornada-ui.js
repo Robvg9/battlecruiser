@@ -822,10 +822,10 @@
     if(panel)panel.innerHTML='<div class="bc7-empty" data-bc7-operation-loading>Verificando asignación y consultando los datos de Operación y liquidación…</div>';
 
     const isRetail=detail.sesion.es_minorista===true;
-    const status=String(detail.sesion.estado||'').toUpperCase();
+    const sessionStatus=String(detail.sesion.estado||'').toUpperCase();
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status);
+    const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
     const serverAccessPromise=isRetail&&!state.admin
       ?rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})
       :Promise.resolve(null);
