@@ -1178,7 +1178,7 @@
         (rectified?'<p class="bc7-muted">La declaración anterior de '+esc(money(declaration.monto))+' CUP fue rectificada y convertida en entrega diaria del '+esc(fmtDateHuman(declaration.rectificacion_diaria?.fecha||firstDate))+'. Su evidencia original permanece conservada.</p>':'')+
         '<form data-bc7-admin-cash-declaration="'+esc(sessionId)+'"><label class="bc7-field">Total declarado al finalizar el período (CUP)<input data-bc7-admin-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></label><label class="bc7-field">Fuente / observación obligatoria<input data-bc7-admin-cash-note maxlength="1000" required placeholder="Fuente del total entregado al cierre del período"></label><div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar declaración final</button></div><p class="bc7-msg" data-bc7-admin-cash-msg></p></form></div>';
     }
-    if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&declarationMatches&&!rectified&&declaration.monto_contado==null&&['PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA'].includes(declarationState)){
+    if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&declarationMatches&&!rectified&&declaration.monto_contado==null&&['PENDIENTE','ESPERANDO_APROBACION'].includes(declarationState)){
       html+='<div class="bc7-note bc7-cash-rectify"><b>Rectificar la declaración asociada al último día</b><p>Importe conservado: <b>'+esc(money(declaration.monto))+' CUP</b>. Fuente registrada: “'+esc(declaration.observacion_transcripcion||'sin observación recuperada')+'”. Si este importe era del primer o segundo día, conviértelo en una entrega con fecha sin borrar la declaración original.</p>'+
         '<form data-bc7-rectify-cash-declaration="'+esc(declaration.id)+'" data-bc7-rectify-cash-session="'+esc(sessionId)+'"><label class="bc7-field">Fecha real de la entrega<input data-bc7-rectify-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(lastDate)+'" value="'+esc(firstDate)+'" required></label><label class="bc7-field">Motivo de rectificación (obligatorio)<input data-bc7-rectify-cash-note maxlength="1000" required placeholder="El importe corresponde al dinero recogido el primer día, no al cierre final"></label><div class="bc7-actions"><button class="bc7-btn danger" type="submit">Rectificar y asignar a esta fecha</button></div><p class="bc7-msg" data-bc7-rectify-cash-msg></p></form></div>';
     }
@@ -1209,7 +1209,7 @@
       const finalCashState=declarationState||'ESPERANDO_APROBACION';
       html+='<article class="bc7-jornada bc7-cash-final-summary"><div class="bc7-jornada-top"><strong>Declaración final del período · '+esc(fmtDateHuman(lastDate))+'</strong><span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">El conteo físico del Dueño es independiente de las entregas diarias.</p>';
       if(detail.is_admin&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
-        html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
+        html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. No copies el importe declarado como importe contado; introduce únicamente el dinero que contaste físicamente.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
       }else if(declaration.monto_contado!=null){
         html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
       }else if(detail.is_admin&&!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)){
@@ -1271,7 +1271,7 @@
       operations.push({date,isFinal,amount,note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,keyField:day.querySelector('[data-bc7-cash-day-key]')});
     }
     if(options.requireComplete&&missing.length){msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Escribe 0 cuando no se haya recogido dinero.','error');return false;}
-    if(!operations.length){if(!options.requireComplete){msg(message,'No hay importes diarios nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');return true;}msg(message,'No hay importes diarios nuevos para guardar. No se modificó ningún dato.','error');return false;}
+    if(!operations.length){if(!options.requireComplete){msg(message,'No hay importes nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');return true;}msg(message,'No hay importes nuevos que guardar. No se modificó ningún dato.','error');return false;}
     if(!navigator.onLine){msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;}
     if(!options.skipConfirm&&!confirm('Se guardarán los importes introducidos para cada fecha. Las entregas quedarán registradas para revisión del Dueño y no modificarán caja automáticamente. ¿Confirmas?'))return false;
     if(!busy(saveButton,true))return false;
@@ -1280,8 +1280,13 @@
       for(const operation of operations.filter(item=>!item.isFinal)){
         let key=operation.keyField?.value.trim()||'';if(!key){key=freshIdempotencyKey();if(operation.keyField)operation.keyField.value=key;}
         const postClosedAdmin=!!detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
-        const functionName=postClosedAdmin?'bc7_admin_registrar_entrega_diaria_jornada':'bc7_registrar_entrega_diaria_jornada';
-        const id=await rpc(functionName,{p_turno_sesion_id:sessionId,p_fecha:operation.date,p_monto:operation.amount,p_observacion:operation.note,p_idempotency_key:key});
+        const rpcArgs={p_turno_sesion_id:sessionId,p_fecha:operation.date,p_monto:operation.amount,p_observacion:operation.note,p_idempotency_key:key};
+        let id;
+        if(postClosedAdmin){
+          id=await rpc('bc7_admin_registrar_entrega_diaria_jornada',rpcArgs);
+        }else{
+          id=await rpc('bc7_registrar_entrega_diaria_jornada',rpcArgs);
+        }
         dailySubmitted.push({date:operation.date,amount:operation.amount,id:id?String(id):''});
       }
       if(dailySubmitted.length){
@@ -1336,7 +1341,7 @@
     const message=form?.querySelector('[data-bc7-rectify-cash-msg]');
     const button=form?.querySelector('button[type="submit"]');
     const declaration=state.detail?.declaracion_dinero,session=state.detail?.sesion;
-    if(!state.admin||!declarationId||!sessionId||String(session?.estado||'').toUpperCase()!=='CERRADA_OPERATIVAMENTE'||!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null||!['PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA'].includes(String(declaration.estado_aprobacion||'').toUpperCase())){
+    if(!state.admin||!declarationId||!sessionId||String(session?.estado||'').toUpperCase()!=='CERRADA_OPERATIVAMENTE'||!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null||!['PENDIENTE','ESPERANDO_APROBACION'].includes(String(declaration.estado_aprobacion||'').toUpperCase())){
       msg(message,'La declaración ya cambió o no está disponible para rectificación. Actualiza la Jornada.','error');return false;
     }
     if(!date||date<String(session.fecha||'').slice(0,10)||date>String(session.fecha_fin||session.fecha||'').slice(0,10)||note.length<5){
@@ -2665,7 +2670,9 @@
     const input=$('bc7-cash');
     const raw=input?input.value.trim():'';
     const amount=Number(raw);
-    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&!['RECHAZADA','RECTIFICADA'].includes(String(state.detail.declaracion_dinero.estado_aprobacion||'').toUpperCase());
+    const declaration=state.detail?.declaracion_dinero;
+    const declarationState=String(declaration?.estado_aprobacion||'').toUpperCase();
+    const saved=declaration&&String(declaration.turno_tramo_id)===String(tramoId)&&String(declaration.estado_aprobacion||'').toUpperCase()!=='RECHAZADA'&&declarationState!=='RECTIFICADA';
     const message=form.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg');
     if(saved){msg(message,'El dinero del último día ya está guardado.','ok');return true;}
     if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return false;}
