@@ -27,7 +27,7 @@ CREATE OR REPLACE FUNCTION public.bc5_reprogramar_periodo_jornada(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'pg_temp'
+SET search_path = ''
 AS $function$
 DECLARE
   v_uid uuid := auth.uid();
