@@ -85,3 +85,26 @@ test("Operations preserves primary action nodes across permission refreshes and 
   assert.ok(modal, "one primary click must synchronously open the Gasto modal");
   assert.match(modal.textContent, /Registrar gasto/);
 });
+
+test("Operations rebinds the current action when reusing an existing primary card", (t) => {
+  const window = setup(t);
+  const doc = window.document;
+  const grid = doc.getElementById("op-card-grid");
+  const gasto = grid.querySelector('[data-op-action="gasto"]');
+  assert.ok(gasto, "Gasto primary action must exist");
+
+  // Simulate a connected legacy/pre-rendered button whose handler was lost.
+  gasto.onclick = null;
+  assert.equal(typeof gasto.onclick, "object");
+
+  window.aplicarPermisosAInterfaz();
+
+  assert.equal(gasto.isConnected, true, "permission refresh must preserve the reused card node");
+  assert.equal(typeof gasto.onclick, "function", "permission refresh must restore the current Gasto callback");
+  gasto.click();
+
+  const modal = doc.getElementById("bc-op-modal");
+  assert.ok(modal, "a reused Gasto card must open its modal after one click");
+  assert.match(modal.textContent, /Registrar gasto/);
+});
+
