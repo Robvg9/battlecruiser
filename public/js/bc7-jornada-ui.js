@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.45 — nombres de responsables reutilizables entre módulos sin consultas duplicadas.
+// v7.49 — reprogramación visual y segura de períodos completos desde el calendario.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -206,6 +206,8 @@
     const input=form.querySelector('[data-bc7-period-start]');
     const reason=form.querySelector('[data-bc7-period-reason]');
     const start=String(input&&input.value||'').slice(0,10);
+    const reasonValue=String(reason&&reason.value||draft.reason||'');
+    draft.reason=reasonValue;
     const range=form.querySelector('[data-bc7-period-range]');
     const button=form.querySelector('[data-bc7-period-confirm]');
     const valid=/^\d{4}-\d{2}-\d{2}$/.test(start)&&start>=dateHavana()&&start!==draft.originalStart;
@@ -232,7 +234,7 @@
       '<p class="bc7-muted">Se desplazarán juntos los días de trabajo y descanso, conservando responsables, secuencia y almacén. El servidor vuelve a comprobar inventario, actividad, conflictos y permisos antes de guardar.</p>'+
       '<div class="bc7-period-move-original"><span>Actual</span><strong>'+esc(fmtDateHuman(draft.originalStart))+' — '+esc(fmtDateHuman(draft.originalEnd))+'</strong></div>'+
       '<form data-bc7-period-move-form><label class="bc7-field">Nueva fecha del primer día<input type="date" data-bc7-period-start min="'+esc(dateHavana())+'" value="'+esc(draft.nextStart)+'" required></label>'+
-      '<label class="bc7-field">Motivo obligatorio<textarea data-bc7-period-reason rows="2" maxlength="1000" required placeholder="Explica por qué se desplaza este período"></textarea></label>'+
+      '<label class="bc7-field">Motivo obligatorio<textarea data-bc7-period-reason rows="2" maxlength="1000" required placeholder="Explica por qué se desplaza este período">'+esc(draft.reason||'')+'</textarea></label>'+
       '<p class="bc7-period-move-range" data-bc7-period-range role="status" aria-live="polite"></p>'+
       '<div class="bc7-actions"><button class="bc7-btn primary" type="submit" data-bc7-period-confirm disabled>Confirmar traslado</button><button class="bc7-btn" type="button" data-bc7-period-cancel>Cancelar</button></div>'+
       '<p class="bc7-msg" data-bc7-period-msg role="status" aria-live="polite"></p></form>';
@@ -252,7 +254,8 @@
       const input=form.querySelector('[data-bc7-period-start]');
       if(input)input.value=start;
       syncPeriodMovePreview(form);
-      $('bc7-period-move-preview')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+      const previewHost=$('bc7-period-move-preview');
+      if(previewHost&&typeof previewHost.scrollIntoView==='function')previewHost.scrollIntoView({behavior:'smooth',block:'nearest'});
       input?.focus();
     }
   }
@@ -269,6 +272,7 @@
     if(!window.crypto||typeof window.crypto.randomUUID!=='function'){
       msg(message,'Este navegador no ofrece una llave segura anti-duplicados. Actualiza el navegador antes de continuar.','error');return;
     }
+    if(!window.confirm('Se moverán los '+draft.days+' días completos de '+fmtDate(draft.originalStart)+' a '+fmtDate(start)+'. El cambio quedará auditado y no se podrá aplicar a sesiones con actividad o inventario. ¿Confirmas el traslado?'))return;
     if(!draft.idempotencyKey)draft.idempotencyKey=window.crypto.randomUUID();
     const btn=form.querySelector('[data-bc7-period-confirm]');
     if(!busy(btn,true))return;
@@ -414,6 +418,7 @@
     else if(code==='BC_AUTH_CONTEXT_NOT_READY') message='La sesión todavía se está validando. Espera a que termine la verificación de tu cuenta y vuelve a actualizar el calendario.';
     else if(code==='42501'&&/permission denied for function/.test(value)) message='El servidor rechazó la llamada de jornada antes de consultar los datos. Vuelve a validar la sesión; no concedas permisos administrativos para resolverlo.';
     else if(code==='42501'||/solo admin|sin permiso|not authorized|no autorizado/.test(value)) message='Tu cuenta no tiene permiso para hacer este cambio. Pide al administrador que revise tu acceso.';
+    else if(code==='55P03') message='La jornada se está abriendo o editando en este momento. No se cambió ninguna fecha; vuelve a intentarlo en unos instantes.';
     else if(code==='23505') message='Hay una jornada o asignación que se repite. Revisa las fechas y los responsables antes de volver a intentarlo.';
     else if(context==='inventory'&&code==='22023'&&/(\d+)\s+esperadas;\s*(\d+)\s+recibidas/i.test(raw)){const counts=raw.match(/(\d+)\s+esperadas;\s*(\d+)\s+recibidas/i);message='El conteo llegó incompleto: el servidor espera '+counts[1]+' productos/familias y recibió '+counts[2]+'. Actualiza la Jornada y revisa el listado antes de volver a guardar.';}
     else if(context==='inventory'&&code==='22023') message='El servidor rechazó el inventario porque faltan productos o hay líneas que no pertenecen a esta jornada. Actualiza la pantalla y revisa que estén todos los productos del listado.';
@@ -3385,7 +3390,7 @@
       const receiveForm=t.closest('form[data-bc7-receive-form]');
       if(receiveForm)syncReceiveFormState(receiveForm);
     }
-    if(t&&t.matches('[data-bc7-period-reason]')){const form=t.closest('form');if(form){const btn=form.querySelector('[data-bc7-period-confirm]');const date=form.querySelector('[data-bc7-period-start]')?.value||'';if(btn)btn.disabled=!String(t.value||'').trim()||date<dateHavana()||date===state.periodMoveDraft?.originalStart||!navigator.onLine;if(state.periodMoveDraft)state.periodMoveDraft.idempotencyKey=null;}return;}
+    if(t&&t.matches('[data-bc7-period-reason]')){const form=t.closest('form');if(form)syncPeriodMovePreview(form);return;}
     const reinvestment=t&&t.closest&&t.closest('[data-bc7-finance-form="reinversion"]');
     if(reinvestment&&t.matches('[data-bc7-reinvestment-quantity],[data-bc7-reinvestment-unit-cost]'))updateReinvestmentEstimate(reinvestment);
     if(t&&t.matches('[data-bc7-ajust-qty]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));
