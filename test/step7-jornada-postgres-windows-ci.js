@@ -386,6 +386,7 @@ function applySql(file) {
     log("\\r\\n=== Apply atomic future Jornada period movement and verify its PostgreSQL 17 contract ===");
     applySql("supabase/migrations/20261122031500_jornada_period_rescheduling_atomic.sql");
     applySql("supabase/migrations/20261122034600_jornada_period_rescheduling_fk_index.sql");
+    applySql("supabase/migrations/20261122035500_jornada_calendar_period_metadata.sql");
     applySql("test/jornada-period-reprogramming-contract.sql");
     log("\\r\\nPASS Jornada period rescheduling: overlapping shifts, conflicts, inventory/activity freeze, audit, idempotency and RBAC.");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with mandatory physical count and effective-dated price/cost history.");
