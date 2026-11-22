@@ -3,12 +3,12 @@ DO $test$
 DECLARE
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
   v_worker uuid := '20000000-0000-0000-0000-000000000002';
-  v_store_move uuid := '10000000-0000-0000-0000-000000000004';
-  v_store_occupied uuid := '10000000-0000-0000-0000-000000000005';
-  v_store_legacy uuid := '10000000-0000-0000-0000-000000000006';
-  v_store_inventory uuid := '10000000-0000-0000-0000-000000000007';
-  v_store_started uuid := '10000000-0000-0000-0000-000000000008';
-  v_store_legacy_assignment uuid := '10000000-0000-0000-0000-000000000009';
+  v_store_move uuid := 'a1000000-0000-0000-0000-000000000001';
+  v_store_occupied uuid := 'a1000000-0000-0000-0000-000000000002';
+  v_store_legacy uuid := 'a1000000-0000-0000-0000-000000000003';
+  v_store_inventory uuid := 'a1000000-0000-0000-0000-000000000004';
+  v_store_started uuid := 'a1000000-0000-0000-0000-000000000005';
+  v_store_legacy_assignment uuid := 'a1000000-0000-0000-0000-000000000006';
   v_base date := (now() AT TIME ZONE 'America/Havana')::date + 10;
   v_result jsonb;
   v_turn uuid;
