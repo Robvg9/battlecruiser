@@ -314,7 +314,7 @@ test("desktop drag previews every day in the period and drop opens the full-rang
     d.setUTCDate(d.getUTCDate() + n);
     return d.toISOString().slice(0, 10);
   };
-  const sourceStart = plusDays(todayHavana, 10);
+  const sourceStart = plusDays(todayHavana, 2);
   const rows = [1, 2, 3].map((day) => ({
     id: "drag-program-" + day,
     turno_id: "turno-drag-1",
@@ -351,8 +351,13 @@ test("desktop drag previews every day in the period and drop opens the full-rang
   assert.equal(dataTransfer.effectAllowed, "move");
 
   const targetDate = plusDays(sourceStart, 2);
-  const targetCell = window.document.querySelector('#bc7-month-board .bc7-month-day[data-date="' + targetDate + '"]');
-  assert.ok(targetCell, "the target date should be represented in the visible calendar");
+  const board = window.document.getElementById("bc7-month-board");
+  const boardDates = Array.from(board.querySelectorAll(".bc7-month-day[data-date]")).map((cell) => cell.getAttribute("data-date"));
+  const targetCell = board.querySelector('.bc7-month-day[data-date="' + targetDate + '"]');
+  assert.ok(targetCell, "target " + targetDate + " should be represented in the visible calendar grid");
+  for (const previewDate of [plusDays(sourceStart, 1), plusDays(sourceStart, 2), plusDays(sourceStart, 3)]) {
+    assert.ok(boardDates.includes(previewDate), "preview date " + previewDate + " must be present in the grid: " + boardDates.join(", "));
+  }
   const overEvent = new window.Event("dragover", { bubbles: true, cancelable: true });
   Object.defineProperty(overEvent, "dataTransfer", { value: dataTransfer });
   targetCell.dispatchEvent(overEvent);
@@ -371,7 +376,7 @@ test("desktop drag previews every day in the period and drop opens the full-rang
   assert.ok(opened, "dropping a valid target opens explicit confirmation");
   assert.equal(
     window.document.querySelector("[data-bc7-period-move-date]").value,
-    plusDays(sourceStart, 7),
+    plusDays(sourceStart, 1),
     "dropping day 2 derives the new start by subtracting the day number offset"
   );
   assert.equal(
