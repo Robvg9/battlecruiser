@@ -1212,9 +1212,15 @@
     if(!host||!detail||detail.sesion?.es_minorista!==true)return;
     const sessionId=String(detail.sesion.id||'');
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const isAssigned=detail.sesion.es_minorista===true
+      ?detail.server_responsible_access===true
+      :localAssignment;
     if(!state.admin&&!isAssigned){
-      host.innerHTML='<div class="bc7-empty">No tienes acceso a los importes de esta jornada.</div>';return;
+      host.innerHTML='<div class="bc7-empty">El servidor aún no ha confirmado tu asignación a esta jornada. No se mostraron importes.</div>';return;
+    }
+    if(state.dailyCashSessionId===sessionId&&state.dailyCashData){
+      renderCashDaysWorkspace(detail);return;
     }
     host.innerHTML='<div class="bc7-empty">Consultando los importes del período…</div>';
     try{
