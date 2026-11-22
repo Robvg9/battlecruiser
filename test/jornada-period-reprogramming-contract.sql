@@ -9,6 +9,7 @@ DECLARE
   v_store_inventory uuid := 'a1000000-0000-0000-0000-000000000004';
   v_store_started uuid := 'a1000000-0000-0000-0000-000000000005';
   v_store_legacy_assignment uuid := 'a1000000-0000-0000-0000-000000000006';
+  v_store_range uuid := 'a1000000-0000-0000-0000-000000000007';
   v_base date := (now() AT TIME ZONE 'America/Havana')::date + 10;
   v_result jsonb;
   v_turn uuid;
@@ -24,17 +25,20 @@ BEGIN
     (v_store_legacy,'Reprogramación con asignación legacy','VENTA',true),
     (v_store_inventory,'Reprogramación con inventario inicial','VENTA',true),
     (v_store_started,'Reprogramación con actividad','VENTA',true),
-    (v_store_legacy_assignment,'Turno legacy de conflicto','VENTA',true);
+    (v_store_legacy_assignment,'Turno legacy de conflicto','VENTA',true),
+    (v_store_range,'Jornada consolidada con fecha_fin','VENTA',true);
 
   INSERT INTO public.turno_jornada_configuracion(almacen_id)
   SELECT id FROM public.almacenes WHERE id IN (
-    v_store_move,v_store_occupied,v_store_legacy,v_store_inventory,v_store_started,v_store_legacy_assignment
+    v_store_move,v_store_occupied,v_store_legacy,v_store_inventory,v_store_started,v_store_legacy_assignment,v_store_range
   ) ON CONFLICT (almacen_id) DO NOTHING;
 
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','',false);
 
+  -- A normal day-row with fecha_fin equal to fecha must shift both endpoints.
+  -- Consolidated ranges (fecha_fin > fecha) are rejected below.
   -- Forward/backward shifts overlap the original range; the function must order rows safely.
   v_result := public.bc5_crear_jornada_unica(
     v_store_move,v_base,3,
@@ -47,6 +51,7 @@ BEGIN
   );
   v_turn := (v_result->>'turno_id')::uuid;
   IF v_turn IS NULL THEN RAISE EXCEPTION 'FAIL: fixture did not create a Jornada master'; END IF;
+  UPDATE public.turno_jornada_programacion SET fecha_fin=fecha WHERE turno_id=v_turn;
 
   v_result := public.bc5_reprogramar_periodo_jornada(v_turn,v_base+2,'Mover dos días hacia delante',v_key);
   IF (v_result->>'idempotente')::boolean IS DISTINCT FROM false
@@ -55,6 +60,9 @@ BEGIN
      OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=1)<>v_base+2
      OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=2)<>v_base+3
      OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=3)<>v_base+4
+     OR (SELECT fecha_fin FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=1)<>v_base+2
+     OR (SELECT fecha_fin FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=2)<>v_base+3
+     OR (SELECT fecha_fin FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=3)<>v_base+4
      OR (SELECT s.fecha FROM public.turno_sesiones s JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id WHERE p.turno_id=v_turn AND p.numero_dia=1)<>v_base+2
      OR (SELECT s.fecha FROM public.turno_sesiones s JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id WHERE p.turno_id=v_turn AND p.numero_dia=3)<>v_base+4 THEN
     RAISE EXCEPTION 'FAIL: forward overlapping shift did not move the period consistently';
@@ -64,7 +72,8 @@ BEGIN
     '93000000-0000-0000-0000-000000000102');
   IF (v_result->>'desplazamiento_dias')::integer<>-1
      OR (SELECT fecha FROM public.turnos WHERE id=v_turn)<>v_base+1
-     OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=3)<>v_base+3 THEN
+     OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=3)<>v_base+3
+     OR (SELECT fecha_fin FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=3)<>v_base+3 THEN
     RAISE EXCEPTION 'FAIL: backward overlapping shift did not preserve day offsets';
   END IF;
 
@@ -218,6 +227,35 @@ BEGIN
   END;
   IF NOT v_error OR (SELECT fecha FROM public.turnos WHERE id=v_turn)<>v_base+60 THEN
     RAISE EXCEPTION 'FAIL: a started session did not freeze the whole period';
+  END IF;
+
+
+  -- A consolidated multi-day row uses fecha_fin > fecha (retroactive successor shape).
+  -- Do not reprogram it using the daily-row algorithm, even if the master is future-dated.
+  v_result := public.bc5_crear_jornada_unica(
+    v_store_range,v_base+70,2,
+    jsonb_build_array(
+      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_owner),
+      jsonb_build_object('numero_dia',2,'trabaja',false,'responsable_id',NULL)
+    ),'Fixture con fecha_fin consolidada'
+  );
+  v_turn := (v_result->>'turno_id')::uuid;
+  UPDATE public.turno_jornada_programacion
+  SET fecha_fin=fecha+1
+  WHERE turno_id=v_turn AND numero_dia=1;
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc5_reprogramar_periodo_jornada(
+      v_turn,v_base+71,'No mover rango consolidado',
+      '93000000-0000-0000-0000-000000000110'
+    );
+  EXCEPTION WHEN check_violation THEN v_error:=true;
+  END;
+  IF NOT v_error
+     OR (SELECT fecha FROM public.turnos WHERE id=v_turn)<>v_base+70
+     OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=1)<>v_base+70
+     OR (SELECT fecha_fin FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=1)<>v_base+71 THEN
+    RAISE EXCEPTION 'FAIL: consolidated fecha_fin period was not safely rejected without mutation';
   END IF;
 
   -- Non-admin and anon access are denied; authenticated access remains available to the RPC gate.
