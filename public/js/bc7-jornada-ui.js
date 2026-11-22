@@ -220,8 +220,8 @@
     renderPeriodMoveGhost();
   }
   function renderPeriodMovePreview(){
-    const detail=$('bc7-calendar-detail');
-    if(!detail)return;
+    const container=$('bc7-calendar-section')||$('bc7-calendar-detail')?.parentElement;
+    if(!container)return;
     let host=$('bc7-period-move-preview');
     if(!state.periodMoveDraft){
       if(host)host.remove();
@@ -229,7 +229,7 @@
       return;
     }
     const draft=state.periodMoveDraft;
-    if(!host){host=document.createElement('section');host.id='bc7-period-move-preview';host.className='bc7-period-move-preview';detail.appendChild(host);}
+    if(!host){host=document.createElement('section');host.id='bc7-period-move-preview';host.className='bc7-period-move-preview';container.appendChild(host);}
     host.innerHTML='<div class="bc7-period-move-head"><div><span class="bc7-muted">VISTA PREVIA · TODAVÍA SIN GUARDAR</span><h4>Mover período completo</h4></div><span class="bc7-period-move-days">'+draft.days+' días</span></div>'+
       '<p class="bc7-muted">Se desplazarán juntos los días de trabajo y descanso, conservando responsables, secuencia y almacén. El servidor vuelve a comprobar inventario, actividad, conflictos y permisos antes de guardar.</p>'+
       '<div class="bc7-period-move-original"><span>Actual</span><strong>'+esc(fmtDateHuman(draft.originalStart))+' — '+esc(fmtDateHuman(draft.originalEnd))+'</strong></div>'+
