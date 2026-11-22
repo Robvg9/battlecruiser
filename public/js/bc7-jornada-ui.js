@@ -1523,8 +1523,9 @@
   }
   async function loadFinances(detail){
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===String(detail.sesion.id||'');
     const isRetail=detail.sesion.es_minorista===true;
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===String(detail.sesion.id||'');
+    const isAssigned=isRetail?(!!state.admin||detail.server_responsible_access===true):localAssignment;
     const hasExpenses=state.admin||isAssigned;
     const hasReinvestments=state.admin||isAssigned;
     const hasSettlement=isRetail&&(state.admin||isAssigned);
