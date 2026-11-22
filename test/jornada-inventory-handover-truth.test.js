@@ -58,8 +58,8 @@ test("owner review messaging no longer promises to rewrite the previous FINAL",(
 });
 
 test("jornada UI asset cache keys are refreshed coherently",()=>{
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.49"]'));
-  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.49"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.50"]'));
+  assert.ok(sw.includes("bc7-jornada-ui.js?v=7.50"));
   assert.equal(app.includes('["bc7-jornada-ui.js","7.35"]'),false);
   assert.equal(sw.includes("bc7-jornada-ui.js?v=7.35"),false);
 });
