@@ -316,7 +316,9 @@ BEGIN
   RETURNING id INTO v_entrega_id;
 
   UPDATE public.turno_declaraciones
-  SET estado_aprobacion='RECTIFICADA'
+  SET estado_aprobacion='RECTIFICADA',
+      aprobado_por=NULL,
+      aprobado_at=NULL
   WHERE id=v_d.id;
 
   INSERT INTO public.turno_eventos
@@ -329,6 +331,8 @@ BEGIN
        'fecha',p_fecha,
        'monto',v_d.monto,
        'estado_anterior',v_d.estado_aprobacion,
+       'aprobado_por_anterior',v_d.aprobado_por,
+       'aprobado_at_anterior',v_d.aprobado_at,
        'estado_nuevo','RECTIFICADA',
        'rectificado_por',v_uid,
        'motivo',v_note
