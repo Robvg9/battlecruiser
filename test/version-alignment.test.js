@@ -175,7 +175,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["bc-modal-manager\.js","1\.0"\]/);
   assert.match(app, /\["mi-cuenta\.js","1\.3"\]/);
   assert.ok(app.indexOf('["bc-modal-manager.js","1.0"]') < app.indexOf('["mi-cuenta.js","1.3"]'));
-  assert.match(app, /\["bc7-jornada-ui\.js","7.48"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7.49"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
@@ -236,7 +236,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.144');"));
+  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.145');"));
 });
 
 
@@ -246,7 +246,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.144"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.145"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
