@@ -806,7 +806,7 @@
     if(state.workspaceOperationLoaded)return Promise.resolve(true);if(state.workspaceOperationPromise)return state.workspaceOperationPromise;
     const requestVersion=state.workspaceRequestVersion,panel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
     if(panel)panel.innerHTML='<div class="bc7-empty">Verificando responsable y cargando Operación y liquidación…</div>';
-    const retail=detail.sesion.es_minorista===true,status=String(detail.sesion.estado||'').toUpperCase();
+    const retail=detail.sesion.es_minorista===true,sessionStatus=String(detail.sesion.estado||'').toUpperCase();
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
     const access=retail&&!state.admin?rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId}).then(data=>({ok:true,data:data||{}}),error=>({ok:false,error})):Promise.resolve({ok:true,data:null});
@@ -816,11 +816,13 @@
       detail.server_responsible_access=!!accessResult.ok;
       if(retail&&!state.admin&&accessResult.ok){state.dailyCashData=accessResult.data;state.dailyCashSessionId=sessionId;}
       const assigned=retail?(!!state.admin||detail.server_responsible_access):localAssignment;
-      const canOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status)&&assigned;
-      const needsCatalog=canOps&&(can('mermas','crear')||can('bajas','crear')||can('reinversiones','crear'));
+      const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
+      const canAdjust=sessionAcceptsPendingOps&&assigned&&(can('mermas','crear')||can('bajas','crear'));
+      const canCreateReinvestment=sessionAcceptsPendingOps&&assigned&&can('reinversiones','crear');
+      const needsProductCatalog=canAdjust||canCreateReinvestment;
       const results=await Promise.allSettled([
         rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId}),
-        needsCatalog?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve([]),
+        needsProductCatalog?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve([]),
         retail?rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve(null)
       ]);
       if(!current())return false;
@@ -2021,7 +2023,7 @@
     };
   }
   function checklistHtml(detail,isAssigned,status){
-    if(status!=='EN_CURSO'||detail.sesion?.es_minorista!==true)return '';
+    if(!['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(status||'').toUpperCase())||detail.sesion?.es_minorista!==true)return '';
     const checks=detail.checklist||{};
     const manual=[
       {key:'gastos',label:'Gastos',question:'¿Ya pusiste todos los gastos?'},
@@ -2030,18 +2032,21 @@
     ];
     const rows=manual.map((item,index)=>{
       const done=checks[item.key]?.completado===true;
+      const action=isAssigned?'<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>':'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>';
+      const description=done?'Confirmado · no tienes que registrar más en este bloque':(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'?'Puedes completar este registro tardío mientras el Turno maestro siga abierto.':item.question);
       return '<div class="bc7-checklist-row '+(done?'is-done':'is-pending')+'">'+
         '<span class="bc7-checklist-mark">'+(done?'✓':String(index+1))+'</span>'+
-        '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+(done?'Confirmado · no tienes que registrar más en este bloque':item.question)+'</small></div>'+
-        '<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>'+
+        '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+description+'</small></div>'+
+        action+
         '<span class="bc7-checklist-state">'+(done?'✓ Confirmado':'Pendiente de confirmación')+'</span>'+
       '</div>';
     }).join('');
     const finalDone=checks.inventario_final?.completado===true;
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':(closed?'No se ofrece un inventario final retroactivo después del sello operativo; requiere revisión ADMIN.':'¿Ya pusiste el inventario final?'))+'</small></div>'+
-      (closed&&!detail.is_admin?'<button type="button" class="bc7-btn" disabled>Bloqueado tras el sello</button>':'<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button><button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>')+
+      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':'¿Ya pusiste el inventario final?')+'</small></div>'+
+      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button>'+
+      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
     '</div>';
     const cashDeclared=checks.declaracion_dinero?.completado===true;
     const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
