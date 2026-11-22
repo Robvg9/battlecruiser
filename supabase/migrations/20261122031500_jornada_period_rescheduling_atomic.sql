@@ -172,12 +172,15 @@ BEGIN
       AND (
         p.almacen_id IS DISTINCT FROM v_turno.almacen_id
         OR p.fecha IS DISTINCT FROM v_turno.fecha + (p.numero_dia - 1)
+        -- A consolidated multi-day retroactive successor uses fecha_fin > fecha
+        -- and is a different period shape; never shift it as if it were a daily row.
+        OR (p.fecha_fin IS NOT NULL AND p.fecha_fin IS DISTINCT FROM p.fecha)
         OR p.estado='CANCELADA'
         OR (p.trabaja AND (p.estado<>'PROGRAMADA' OR p.responsable_id IS NULL))
         OR (NOT p.trabaja AND (p.estado<>'DESCANSO' OR p.responsable_id IS NOT NULL))
       )
   ) THEN
-    RAISE EXCEPTION 'La programación contiene fechas, estados o responsables inconsistentes; corrígela antes de mover el período.'
+    RAISE EXCEPTION 'La programación contiene un rango consolidado, fechas, estados o responsables inconsistentes; corrígela antes de mover el período.'
       USING ERRCODE = '23514';
   END IF;
 
@@ -240,6 +243,7 @@ BEGIN
 
       UPDATE public.turno_jornada_programacion
       SET fecha=fecha+v_delta,
+          fecha_fin=CASE WHEN fecha_fin IS NULL THEN NULL ELSE fecha_fin+v_delta END,
           actualizado_por=v_uid,
           actualizado_en=now()
       WHERE id=v_row.id
@@ -285,6 +289,7 @@ BEGIN
 
       UPDATE public.turno_jornada_programacion
       SET fecha=fecha+v_delta,
+          fecha_fin=CASE WHEN fecha_fin IS NULL THEN NULL ELSE fecha_fin+v_delta END,
           actualizado_por=v_uid,
           actualizado_en=now()
       WHERE id=v_row.id
