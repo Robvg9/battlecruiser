@@ -141,6 +141,9 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     window.document.querySelectorAll("#bc7-month-board .bc7-month-day").length,
     expectedCells
   );
+  assert.equal(window.document.getElementById("bc7-month-board").style.gridTemplateRows,
+    `34px repeat(${expectedCells / 7},minmax(62px,1fr))`);
+  assert.equal(window.document.getElementById("bc7-month-board").getAttribute("aria-colcount"), "7");
 
   const read = calls.find((call) => call.name === "bc5_mis_jornadas");
   assert.ok(read, "the board must use the existing authenticated Jornada read RPC");
@@ -228,4 +231,41 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
     null,
     "non-admins must not receive the administrator reschedule editor"
   );
+});
+
+test("desktop visual calendar keeps a balanced board beside its right-hand inspector", async (t) => {
+  const { window } = setup(t, { admin: true, rows: [] });
+  const trigger = window.document.querySelector("[data-bc7-open-visual-calendar]");
+  const modal = window.document.getElementById("bc7-visual-calendar-modal");
+  assert.ok(trigger && modal, "desktop visual-calendar entry and modal must exist");
+
+  window.matchMedia = () => ({ matches: true });
+  trigger.click();
+  assert.equal(modal.hidden, false, "desktop activation should open the visual calendar");
+
+  const layout = modal.querySelector(".bc7-visual-calendar-layout");
+  assert.ok(layout.querySelector(".bc7-visual-calendar-main #bc7-month-board"),
+    "the symmetric month grid must remain in the main column");
+  const inspector = layout.querySelector("aside.bc7-visual-calendar-side");
+  assert.ok(inspector, "the right-hand inspector must remain present on desktop");
+  assert.ok(inspector.querySelector("#bc7-calendar-detail"),
+    "the inspector must contain the selected-day details");
+
+  const styles = Array.from(window.document.querySelectorAll("style"))
+    .map((style) => style.textContent || "")
+    .join("\n");
+  assert.match(styles, /\.bc7-visual-calendar-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 400px/,
+    "desktop board and inspector must use a two-column layout");
+  assert.match(styles, /\.bc7-visual-calendar-side \.bc7-calendar-detail\{display:flex;flex:1 1 0;flex-direction:column;min-height:170px;max-height:none;overflow:auto/,
+    "the selected-day details should use the inspector height instead of a cramped 48% scroll box");
+  assert.match(styles, /\.bc7-visual-calendar-side \.bc7-calendar-detail \.bc7-jornada-top\{display:grid;grid-template-columns:minmax\(0,1fr\);/,
+    "journey status must sit below the date instead of squeezing its title");
+  assert.match(styles, /#tab-jornada \.bc7-month-chip-status\{display:none\}/,
+    "month cells should prioritize the responsible person's name; status remains encoded by the chip color and accessible label");
+  assert.match(styles, /@media\(min-width:761px\) and \(max-height:760px\).*?390px/,
+    "short desktop windows must preserve the wider inspector");
+  assert.match(styles, /\.bc7-visual-calendar-side\{display:flex;flex-direction:column/,
+    "the inspector must keep its visible desktop layout");
+  assert.match(styles, /@media\(min-width:761px\) and \(max-width:1120px\).*?320px/,
+    "the inspector must retain a responsive desktop width");
 });

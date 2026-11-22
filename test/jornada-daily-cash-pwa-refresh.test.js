@@ -44,7 +44,9 @@ test("finance and operation refresh recognize the authenticated active jornada a
   assert.match(UI,/const sessionId=String\(detail\.sesion\.id\)/);
   assert.match(UI,/state\.workspaceOperationLoaded=true;\s*state\.workspaceOperationPromise=null;\s*renderWorkspace\(detail\)/);
   assert.match(UI,/activateWorkspaceTab\(state\.workspaceTab\)/);
-  assert.match(UI,/const isAssigned=.*activeSessionId===sessionId/);
+  assert.match(UI,/detail\.server_responsible_access=!!accessResult\.ok/);
+  assert.match(UI,/Promise\.allSettled\(/);
+  assert.match(UI,/detail\.server_responsible_access/);
 });
 
 test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {

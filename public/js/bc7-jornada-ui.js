@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.50 — reprogramación visual y segura de períodos completos desde el calendario.
+// v7.52 — reprogramación visual y segura de períodos completos desde el calendario.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarCache:new Map(),calendarPromises:new Map()};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -86,6 +86,10 @@
       html+='<div class="'+classes.join(' ')+'" data-date="'+iso+'" role="gridcell" aria-selected="'+(selected?'true':'false')+'"><div class="bc7-month-day-top"><button type="button" class="bc7-month-date" '+(!inside?'disabled':'')+' data-bc7-calendar-select="'+iso+'" aria-label="'+esc(fmtDateHuman(iso))+'" aria-pressed="'+(selected?'true':'false')+'">'+date.getUTCDate()+'</button>'+(today===iso?'<span class="bc7-month-today-tag">HOY</span>':'')+(dayRows.length?'<span class="bc7-month-count">'+dayRows.length+'</span>':'')+'</div><div class="bc7-month-day-events">'+chips+more+empty+'</div></div>';
     }
     host.innerHTML=html;
+    const weekRows=cells/7;
+    host.style.display='grid';host.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
+    host.style.gridTemplateRows='34px repeat('+weekRows+',minmax(62px,1fr))';
+    host.setAttribute('role','grid');host.setAttribute('aria-colcount','7');host.setAttribute('aria-rowcount',String(weekRows+1));
     const label=$('bc7-month-label');
     if(label)label.textContent=monthTitle(month);
   }
@@ -636,7 +640,7 @@
         "#tab-jornada .bc7-month-chip{display:flex;align-items:center;gap:5px;width:100%;min-width:0;min-height:24px;padding:3px 5px;border:1px solid rgba(212,176,92,.22);border-radius:5px;background:rgba(201,162,77,.06);color:var(--text);text-align:left;cursor:pointer}",
         "#tab-jornada .bc7-month-chip-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--gold)}",
         "#tab-jornada .bc7-month-chip-person{overflow:hidden;min-width:0;color:var(--text);font-size:9px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}",
-        "#tab-jornada .bc7-month-chip-status{margin-left:auto;color:var(--mist);font-size:8px;white-space:nowrap}",
+        "#tab-jornada .bc7-month-chip-status{display:none}",
         "#tab-jornada .bc7-month-chip.is-running{border-color:rgba(95,174,127,.44);background:rgba(95,174,127,.10)}",
         "#tab-jornada .bc7-month-chip.is-running .bc7-month-chip-dot{background:#7fc99a}",
         "#tab-jornada .bc7-month-chip.is-scheduled{border-color:rgba(216,181,92,.48);background:rgba(216,181,92,.09)}",
@@ -646,7 +650,7 @@
         "#tab-jornada .bc7-month-more{justify-self:start;border:0;background:transparent;color:var(--gold);font-size:9px;cursor:pointer}",
         "#tab-jornada .bc7-month-empty{padding:2px 5px;color:var(--mist);font-size:10px;opacity:.4}",
         "#tab-jornada .bc7-calendar-detail{margin-top:12px;padding:10px;border:1px solid var(--gold-dim);border-radius:9px;background:rgba(255,255,255,.018)}",
-        "#tab-jornada .bc7-calendar-detail-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-bottom:8px}",
+        "#tab-jornada .bc7-calendar-detail-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px;margin-bottom:10px}",
         "#tab-jornada .bc7-calendar-detail-head h4{margin:3px 0 0;color:var(--text);font-size:14px;text-transform:capitalize}",
         "#tab-jornada .bc7-calendar-detail-count{color:var(--mist);font-size:10px}",
         "#tab-jornada .bc7-calendar-detail-list{display:grid;gap:7px}",
@@ -661,7 +665,7 @@
         ".bc7-visual-calendar-header h2{margin:5px 0 3px;color:#f5f7ff;font-size:26px;letter-spacing:-.03em}",
         ".bc7-visual-calendar-header p{margin:0;color:#aebbd4;font-size:12px}",
         ".bc7-visual-calendar-close{width:42px;height:42px;border:1px solid rgba(172,190,232,.28);border-radius:12px;background:rgba(255,255,255,.06);color:#fff;font-size:27px;cursor:pointer}",
-        ".bc7-visual-calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;min-height:0;flex:1;padding:18px}",
+        ".bc7-visual-calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:18px;min-height:0;flex:1;padding:18px}",
         ".bc7-visual-calendar-main{display:flex;min-width:0;min-height:0;flex-direction:column;padding:14px;border:1px solid rgba(132,154,207,.19);border-radius:16px;background:rgba(8,15,28,.58)}",
         ".bc7-visual-calendar-main .bc7-month-nav{flex:0 0 auto;margin:0 0 14px;gap:8px}",
         ".bc7-visual-calendar-main .bc7-month-nav .bc7-btn{border-color:rgba(149,169,217,.24);background:rgba(255,255,255,.05);color:#dce5ff}",
@@ -684,10 +688,14 @@
         ".bc7-visual-calendar-side-title>span{color:#a99ee5;font-size:9px;font-weight:800;letter-spacing:.16em}",
         ".bc7-visual-calendar-side-title h3{margin:5px 0;color:#f2f0ff;font-size:17px}",
         ".bc7-visual-calendar-side-title p{margin:0;color:#aab6cf;font-size:11px;line-height:1.5}",
-        ".bc7-visual-calendar-side .bc7-calendar-detail{margin:0;min-height:120px;max-height:48%;overflow:auto;border-color:rgba(153,146,209,.25);background:rgba(4,10,21,.48);color:#eaf0ff}",
-        ".bc7-visual-calendar-side .bc7-calendar-detail-head h4{color:#eef2ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail{display:flex;flex:1 1 0;flex-direction:column;min-height:170px;max-height:none;overflow:auto;margin:0;border-color:rgba(153,146,209,.25);background:rgba(4,10,21,.48);color:#eaf0ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail-head h4{color:#eef2ff;line-height:1.3;overflow-wrap:normal}",
         ".bc7-visual-calendar-side .bc7-calendar-detail-count,.bc7-visual-calendar-side .bc7-muted{color:#b0bdd8}",
-        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada{border-color:rgba(145,154,210,.2);background:rgba(255,255,255,.035);color:#eaf0ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada{padding:13px;border-color:rgba(145,154,210,.2);background:rgba(255,255,255,.035);color:#eaf0ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada-top{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada-top>div{min-width:0}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada strong{font-size:14px;line-height:1.4;overflow-wrap:normal;word-break:normal}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-pill{justify-self:start;max-width:100%;white-space:normal;line-height:1.35}",
         ".bc7-visual-calendar-legend{margin-top:auto;padding:13px;border:1px solid rgba(153,146,209,.22);border-radius:13px;background:rgba(4,10,21,.38)}",
         ".bc7-visual-calendar-legend-row{display:flex;align-items:center;gap:9px;margin-top:9px;color:#d8e0f3;font-size:11px}",
         ".bc7-visual-calendar-legend-row i{width:9px;height:9px;border-radius:50%;background:#c6a24d;box-shadow:0 0 12px currentColor}",
@@ -697,8 +705,8 @@
         ".bc7-visual-calendar-create{width:100%;min-height:44px;border:1px solid rgba(143,165,237,.42);background:linear-gradient(100deg,#536fca,#7653b5);color:#fff;font-weight:800}",
         "body.bc7-visual-calendar-open{overflow:hidden}",
         "@media(max-width:760px),(hover:none) and (pointer:coarse){.bc7-visual-calendar-modal{display:none!important}#tab-jornada .bc7-visual-calendar-open{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}}",
-        "@media(min-width:761px) and (max-height:760px){.bc7-visual-calendar-header{padding:12px 18px}.bc7-visual-calendar-layout{padding:12px;gap:12px;grid-template-columns:minmax(0,1fr) 330px}.bc7-visual-calendar-header h2{font-size:22px}.bc7-visual-calendar-main .bc7-month-day{min-height:52px;padding:5px}.bc7-visual-calendar-side{padding:12px}}",
-        "@media(min-width:761px) and (max-width:1120px){.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) 300px;gap:10px;padding:10px}.bc7-visual-calendar-main{padding:9px}.bc7-visual-calendar-side{padding:10px}}",
+        "@media(min-width:761px) and (max-height:760px){.bc7-visual-calendar-header{padding:12px 18px}.bc7-visual-calendar-layout{padding:12px;gap:12px;grid-template-columns:minmax(0,1fr) 390px}.bc7-visual-calendar-header h2{font-size:22px}.bc7-visual-calendar-main .bc7-month-day{min-height:52px;padding:5px}.bc7-visual-calendar-side{padding:12px}}",
+        "@media(min-width:761px) and (max-width:1120px){.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) 320px;gap:10px;padding:10px}.bc7-visual-calendar-main{padding:9px}.bc7-visual-calendar-side{padding:10px}}",
         "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}}",
         "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}#tab-jornada .bc7-month-nav{display:grid;grid-template-columns:auto minmax(120px,1fr) auto auto;align-items:end;gap:5px}#tab-jornada .bc7-month-nav .bc7-btn{min-height:34px;padding:5px 8px;font-size:10px}#tab-jornada .bc7-month-picker{min-width:0}#tab-jornada .bc7-month-picker input{min-height:34px;width:100%;font-size:10px}#tab-jornada .bc7-month-label{grid-column:1/-1;grid-row:2;margin:2px 0 0;font-size:12px}#tab-jornada .bc7-month-day{min-height:0}}",
         "@media(max-width:420px){#tab-jornada .bc7-month-nav{grid-template-columns:auto minmax(110px,1fr) auto}#tab-jornada .bc7-month-nav [data-bc7-month-next]{grid-column:3;grid-row:1}#tab-jornada .bc7-month-nav [data-bc7-month-today]{grid-column:1;grid-row:2}#tab-jornada .bc7-month-nav [data-bc7-refresh]{grid-column:3;grid-row:2}}"
@@ -798,57 +806,41 @@
   function ensureWorkspaceOperationData(detail){
     if(!detail||!detail.sesion||!detail.sesion.id)return Promise.resolve(false);
     const sessionId=String(detail.sesion.id);
-    if(state.workspaceOperationSessionId!==sessionId){
-      state.workspaceOperationSessionId=sessionId;
-      state.workspaceOperationPromise=null;
-      state.workspaceOperationLoaded=false;
-    }
-    if(state.workspaceOperationLoaded)return Promise.resolve(true);
-    if(state.workspaceOperationPromise)return state.workspaceOperationPromise;
-
-    const requestVersion=state.workspaceRequestVersion;
-    const panel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
-    if(panel)panel.innerHTML='<div class="bc7-empty" data-bc7-operation-loading>Consultando los datos de Operación y liquidación…</div>';
-
+    if(state.workspaceOperationSessionId!==sessionId){state.workspaceOperationSessionId=sessionId;state.workspaceOperationPromise=null;state.workspaceOperationLoaded=false;}
+    if(state.workspaceOperationLoaded)return Promise.resolve(true);if(state.workspaceOperationPromise)return state.workspaceOperationPromise;
+    const requestVersion=state.workspaceRequestVersion,panel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
+    if(panel)panel.innerHTML='<div class="bc7-empty">Verificando responsable y cargando Operación y liquidación…</div>';
+    const retail=detail.sesion.es_minorista===true,sessionStatus=String(detail.sesion.estado||'').toUpperCase();
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const sessionStatus=String(detail.sesion.estado||'').toUpperCase();
-    const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
-    const canAdjust=sessionAcceptsPendingOps&&isAssigned&&(can('mermas','crear')||can('bajas','crear'));
-    const canCreateReinvestment=sessionAcceptsPendingOps&&isAssigned&&can('reinversiones','crear');
-    // Reinversiones must use the live active-product catalog too: the inventory
-    // snapshot can omit products with zero opening stock or products added later.
-    const needsProductCatalog=canAdjust||canCreateReinvestment;
-    const checklistPromise=rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
-    const adjustmentPromise=needsProductCatalog
-      ?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId})
-      :Promise.resolve([]);
-    const liquidationPromise=detail.sesion.es_minorista===true
-      ?rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId})
-      :Promise.resolve(null);
-
-    state.workspaceOperationPromise=Promise.all([checklistPromise,adjustmentPromise,liquidationPromise]).then(([checklist,adjustmentCatalog,liquidation])=>{
-      const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
-      if(!stillCurrent)return false;
-      detail.checklist=checklist;
-      detail.productos_ajuste=Array.isArray(adjustmentCatalog)?adjustmentCatalog:[];
-      if(liquidation!==null)detail.liquidacion=liquidation;
-      state.workspaceOperationLoaded=true;
-      state.workspaceOperationPromise=null;
-      renderWorkspace(detail);
-      return true;
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const access=retail&&!state.admin?rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId}).then(data=>({ok:true,data:data||{}}),error=>({ok:false,error})):Promise.resolve({ok:true,data:null});
+    state.workspaceOperationPromise=access.then(async accessResult=>{
+      const current=()=>state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
+      if(!current())return false;
+      detail.server_responsible_access=!!accessResult.ok;
+      if(retail&&!state.admin&&accessResult.ok){state.dailyCashData=accessResult.data;state.dailyCashSessionId=sessionId;}
+      const assigned=retail?(!!state.admin||detail.server_responsible_access):localAssignment;
+      const sessionAcceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(sessionStatus);
+      const canAdjust=sessionAcceptsPendingOps&&assigned&&(can('mermas','crear')||can('bajas','crear'));
+      const canCreateReinvestment=sessionAcceptsPendingOps&&assigned&&can('reinversiones','crear');
+      const needsProductCatalog=canAdjust||canCreateReinvestment;
+      const results=await Promise.allSettled([
+        rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId}),
+        needsProductCatalog?rpc('bc7_productos_ajuste_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve([]),
+        retail?rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:sessionId}):Promise.resolve(null)
+      ]);
+      if(!current())return false;
+      detail.checklist=results[0].status==='fulfilled'?results[0].value:{};
+      detail.productos_ajuste=results[1].status==='fulfilled'&&Array.isArray(results[1].value)?results[1].value:[];
+      if(results[2].status==='fulfilled'&&results[2].value!==null)detail.liquidacion=results[2].value;
+      detail.operation_load_warnings=results.map((r,index)=>r.status==='rejected'?{index,message:friendlyError(r.reason,'calendar')}:null).filter(Boolean);
+      state.workspaceOperationLoaded=true;state.workspaceOperationPromise=null;renderWorkspace(detail);return true;
     }).catch(error=>{
-      const stillCurrent=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
-      if(stillCurrent)state.workspaceOperationPromise=null;
-      if(stillCurrent){
-        const operationPanel=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
-        if(operationPanel){
-          operationPanel.innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificaron datos. <button class="bc7-btn" type="button" data-bc7-operation-retry>Reintentar carga</button></div>';
-        }
-      }
+      const current=state.workspaceRequestVersion===requestVersion&&state.detail===detail&&String(state.selected||'')===sessionId;
+      if(current){state.workspaceOperationPromise=null;const p=$('bc7-workspace-body')?.querySelector('[data-bc7-workspace-panel="operacion"]');
+        if(p)p.innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificaron datos. <button class="bc7-btn" type="button" data-bc7-operation-retry>Reintentar carga</button></div>';}
       return false;
-    });
-    return state.workspaceOperationPromise;
+    });return state.workspaceOperationPromise;
   }
 
   function activateWorkspaceTab(name){
@@ -1004,42 +996,42 @@
     }
     return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+periodMove+'</div>'+reschedule+'</article>';
   }
-  async function loadCalendar(){
-    const board=$('bc7-month-board'),list=$('bc7-schedule-list');
-    if(!board&&!list)return;
-    const monthInput=$('bc7-calendar-month');
-    const fallback=$('bc7-list-from')?.value||dateHavana();
-    let month=String(monthInput&&monthInput.value||fallback.slice(0,7)).slice(0,7);
-    if(!monthParts(month))month=dateHavana().slice(0,7);
-    const from=month+'-01';
-    const days=monthDayCount(month);
-    const to=month+'-'+String(days).padStart(2,'0');
-    if(monthInput)monthInput.value=month;
-    const hiddenFrom=$('bc7-list-from');if(hiddenFrom)hiddenFrom.value=from;
+  async function loadCalendar(options){
+    options=options||{};const force=options.force===true;
+    const board=$('bc7-month-board'),list=$('bc7-schedule-list');if(!board&&!list)return false;
+    const monthInput=$('bc7-calendar-month'),fallback=$('bc7-list-from')?.value||dateHavana();
+    let month=String(monthInput&&monthInput.value||fallback.slice(0,7)).slice(0,7);if(!monthParts(month))month=dateHavana().slice(0,7);
+    const from=month+'-01',days=monthDayCount(month),to=month+'-'+String(days).padStart(2,'0');
+    if(monthInput)monthInput.value=month;const hiddenFrom=$('bc7-list-from');if(hiddenFrom)hiddenFrom.value=from;
     const hiddenDays=$('bc7-list-days');if(hiddenDays)hiddenDays.value=String(days);
     const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
-    if(board)board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
-    if(list)list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
-    msg($('bc7-list-msg'),'');
-    try{
+    const user=currentUser()||{},key=String(user.id||user.username||user.email||'authenticated-user')+'|'+month;
+    const renderRows=data=>{
+      if(String($('bc7-calendar-month')?.value||month)!==month)return;
+      state.rows=data;if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
+        const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;
+      }
+      if(board)renderMonthCalendar(month,data);renderCalendarDetail(state.calendarSelectedDate,data);
+      if(list)list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango mensual.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
+    };
+    const cached=state.calendarCache.get(key);
+    if(!force&&cached&&Date.now()-cached.at<60000){renderRows(cached.rows);return true;}
+    const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
+    if(board&&!board.querySelector('.bc7-month-day'))board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    if(list&&!list.querySelector('.bc7-jornada'))list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
+    request=(async()=>{try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
-      state.rows=data;
-      if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
-        const today=dateHavana();
-        state.calendarSelectedDate=today.slice(0,7)===month?today:from;
-      }
-      if(board)renderMonthCalendar(month,data);
-      renderCalendarDetail(state.calendarSelectedDate,data);
-      if(list){
-        list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango mensual.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
-      }
+      state.calendarCache.set(key,{at:Date.now(),rows:data});while(state.calendarCache.size>6)state.calendarCache.delete(state.calendarCache.keys().next().value);
+      renderRows(data);msg($('bc7-list-msg'),'');return true;
     }catch(e){
-      state.rows=[];
-      if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
-      if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
-      const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
-      msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');
-    }
+      if(String($('bc7-calendar-month')?.value||month)===month){if(!cached){state.rows=[];
+        if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+        if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+        const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';}
+        msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');}return false;
+    }finally{if(state.calendarPromises.get(key)===request)state.calendarPromises.delete(key);}})();
+    state.calendarPromises.set(key,request);return request;
   }
   function renderCurrentSession(current){
     state.currentSession=current&&current.turno_sesion_id?current:null;
@@ -1159,9 +1151,7 @@
     }
     const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));
     const sessionState=String(detail.sesion.estado||'').toUpperCase();
-    const currentUserId=String(currentUser()?.id||'');
-    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=currentUserId===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const isAssigned=!!detail.is_admin||detail.server_responsible_access===true;
     const tranche=detail.tramo_registrable||detail.tramo_activo||null;
     const editable=(sessionState==='EN_CURSO'&&!!detail.tramo_activo&&isAssigned)||(sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail.tramo_registrable&&(isAssigned||!!detail.is_admin));
     const rows=arr(state.dailyCashData.entregas);
@@ -1226,9 +1216,15 @@
     if(!host||!detail||detail.sesion?.es_minorista!==true)return;
     const sessionId=String(detail.sesion.id||'');
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const isAssigned=detail.sesion.es_minorista===true
+      ?detail.server_responsible_access===true
+      :localAssignment;
     if(!state.admin&&!isAssigned){
-      host.innerHTML='<div class="bc7-empty">No tienes acceso a los importes de esta jornada.</div>';return;
+      host.innerHTML='<div class="bc7-empty">El servidor aún no ha confirmado tu asignación a esta jornada. No se mostraron importes.</div>';return;
+    }
+    if(state.dailyCashSessionId===sessionId&&state.dailyCashData){
+      renderCashDaysWorkspace(detail);return;
     }
     host.innerHTML='<div class="bc7-empty">Consultando los importes del período…</div>';
     try{
@@ -1537,8 +1533,9 @@
   }
   async function loadFinances(detail){
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===String(detail.sesion.id||'');
     const isRetail=detail.sesion.es_minorista===true;
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===String(detail.sesion.id||'');
+    const isAssigned=isRetail?(!!state.admin||detail.server_responsible_access===true):localAssignment;
     const hasExpenses=state.admin||isAssigned;
     const hasReinvestments=state.admin||isAssigned;
     const hasSettlement=isRetail&&(state.admin||isAssigned);
@@ -2037,7 +2034,7 @@
     };
   }
   function checklistHtml(detail,isAssigned,status){
-    if(status!=='EN_CURSO'||detail.sesion?.es_minorista!==true)return '';
+    if(!['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(status||'').toUpperCase())||detail.sesion?.es_minorista!==true)return '';
     const checks=detail.checklist||{};
     const manual=[
       {key:'gastos',label:'Gastos',question:'¿Ya pusiste todos los gastos?'},
@@ -2046,19 +2043,24 @@
     ];
     const rows=manual.map((item,index)=>{
       const done=checks[item.key]?.completado===true;
+      const action=isAssigned?'<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>':'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>';
+      const description=done?'Confirmado · no tienes que registrar más en este bloque':(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'?'Puedes completar este registro tardío mientras el Turno maestro siga abierto.':item.question);
       return '<div class="bc7-checklist-row '+(done?'is-done':'is-pending')+'">'+
         '<span class="bc7-checklist-mark">'+(done?'✓':String(index+1))+'</span>'+
-        '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+(done?'Confirmado · no tienes que registrar más en este bloque':item.question)+'</small></div>'+
-        '<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>'+
+        '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+description+'</small></div>'+
+        action+
         '<span class="bc7-checklist-state">'+(done?'✓ Confirmado':'Pendiente de confirmación')+'</span>'+
       '</div>';
     }).join('');
     const finalDone=checks.inventario_final?.completado===true;
+    const sealed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
+    const finalLocked=sealed&&!finalDone;
+    const finalDescription=finalDone?'Conteo físico final confirmado':(finalLocked?'Bloqueado tras el sello · el inventario final exige el flujo de conciliación y no admite conteo retroactivo':'¿Ya pusiste el inventario final?');
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+(finalDone?'Conteo físico final confirmado':'¿Ya pusiste el inventario final?')+'</small></div>'+
-      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final">Abrir sección</button>'+
-      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned?'disabled':'')+'>'+(finalDone?'Ver conteo':'Ir a ponerlo')+'</button>'+
+      '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+finalDescription+'</small></div>'+
+      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final" '+(finalLocked?'disabled':'')+'>Abrir sección</button>'+
+      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned||finalLocked?'disabled':'')+'>'+(finalDone?'Ver conteo':(finalLocked?'Bloqueado':'Ir a ponerlo'))+'</button>'+
     '</div>';
     const cashDeclared=checks.declaracion_dinero?.completado===true;
     const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
@@ -2311,7 +2313,8 @@
     const status=String(s.estado||'').toUpperCase();
     const currentUserId=String(currentUser()?.id||'');
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
-    const isAssigned=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
+    const localAssignment=currentUserId===String(s.responsable_id||'')||activeSessionId===String(s.id||'');
+    const isAssigned=s.es_minorista===true?(!!state.admin||detail.server_responsible_access===true):localAssignment;
     const tramo=detail.tramo_activo;
     let actionArea='';
     if((status==='PENDIENTE'||status==='PROGRAMADA')&&initial&&s.sucesora_retroactiva===true){
@@ -2406,7 +2409,7 @@
       if(state.workspaceRequestVersion!==requestVersion)return false;
       detail.entrega_compartida=delivery;
       detail.is_admin=!!state.admin;
-      if(isNewSelection&&detail.sesion?.es_minorista===true&&String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO')state.workspaceTab='operacion';
+      if(isNewSelection&&detail.sesion?.es_minorista===true&&['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase()))state.workspaceTab='operacion';
       state.selected=sessionId;renderWorkspace(detail);return true;
     }catch(e){
       if(state.workspaceRequestVersion!==requestVersion)return false;
@@ -3290,8 +3293,7 @@
     if(staffRetry)staffRetry.addEventListener('click',async()=>{try{await ensureResponsibleCatalog(true);}catch(_){}});
     const listFrom=$('bc7-list-from');if(listFrom)listFrom.addEventListener('change',()=>{state.lastPreview=null;});
     const monthPicker=$('bc7-calendar-month');if(monthPicker)monthPicker.addEventListener('change',()=>{state.calendarSelectedDate=null;loadCalendar();});
-    await loadCurrentSession();
-    await loadCalendar();
+    await Promise.all([loadCurrentSession(),loadCalendar()]);
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
   }
@@ -3433,7 +3435,7 @@
     if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
-    if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
+    if(t.hasAttribute('data-bc7-refresh')){await loadCalendar({force:true});return;}
     if(t.hasAttribute('data-bc7-preview')){await previewPattern(t);return;}
     if(t.hasAttribute('data-bc7-create')){await createSchedule(t);return;}
     if(t.hasAttribute('data-bc7-retro-handover-open')){await openRetroSuccessorPanel(t);return;}

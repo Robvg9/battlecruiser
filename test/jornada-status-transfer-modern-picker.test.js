@@ -14,7 +14,7 @@ const index = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf
 
 test("Jornada calendar uses the requested status colors and labels", () => {
   const start = ui.indexOf("function rowHtml(r){");
-  const end = ui.indexOf("async function loadCalendar()", start);
+  const end = ui.indexOf("async function loadCalendar(options)", start);
   assert.ok(start >= 0 && end > start, "calendar row renderer must exist");
   const row = ui.slice(start, end);
 
@@ -39,8 +39,8 @@ test("Transferencia keeps only the modern multi-product picker visible", () => {
     "the legacy single-product add editor must stay hidden despite the hidden attribute/CSS cascade");
   assert.match(transfer, /legacyForm\.style\.display = 'none'/,
     "the old one-product transfer form must also remain hidden");
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.50"]'));
-  assert.ok(serviceWorker.includes("./js/bc7-jornada-ui.js?v=7.50"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.52"]'));
+  assert.ok(serviceWorker.includes("./js/bc7-jornada-ui.js?v=7.52"));
 });
 
 test("PWA release and offline module cache are aligned for the transfer UI update", () => {

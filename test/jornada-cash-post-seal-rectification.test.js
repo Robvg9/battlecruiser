@@ -61,6 +61,16 @@ test("sealed Jornada keeps date-specific cash entries separate from the final-pe
   assert.match(ui, /declarationState==='RECTIFICADA'/);
 });
 
+test("closed retail Jornada keeps the five-step checklist visible while preserving post-seal restrictions", () => {
+  const start=ui.indexOf("function checklistHtml(detail,isAssigned,status){");
+  const end=ui.indexOf("function calculationPhaseHtml(detail){",start);
+  const checklist=ui.slice(start,end);
+  assert.match(checklist,/CERRADA_OPERATIVAMENTE/);
+  for (const step of ["Gastos","Reinversiones","Bajas","Inventario final","Declaración de dinero"]) assert.ok(checklist.includes(step), "missing "+step);
+  assert.match(checklist,/Puedes completar este registro tardío mientras el Turno maestro siga abierto/);
+  assert.match(checklist,/Bloqueado tras el sello/);
+});
+
 test("Owner physical cash count stays locked until Jornada is completed", () => {
   assert.match(ui, /if\(detail\.is_admin&&sessionState==='COMPLETADA'&&declaration\.monto_contado==null/);
   assert.match(ui, /else if\(detail\.is_admin&&sessionState!=='COMPLETADA'\)/);
@@ -89,4 +99,17 @@ test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent a
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.bc7_admin_registrar_entrega_diaria_jornada/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.bc5_admin_rectificar_declaracion_a_entrega_diaria/);
   assert.doesNotMatch(migration, /\bDROP\s+TABLE\b|\bTRUNCATE\s/i);
+});
+
+test("daily cash workspace trusts server-verified responsibility and reuses its authorized read", () => {
+  const start=ui.indexOf("async function loadCashDaysWorkspace(detail){");
+  const end=ui.indexOf("async function saveCashDaysWorkspace(",start);
+  assert.ok(start>=0&&end>start,"daily cash loader must exist");
+  const loader=ui.slice(start,end);
+  assert.match(loader,/detail\.server_responsible_access===true/,
+    "retail access comes from the authoritative server check, not the local people catalogue");
+  assert.match(loader,/state\.dailyCashSessionId===sessionId&&state\.dailyCashData/,
+    "the read already authorized for this session is reused instead of fetched twice");
+  assert.doesNotMatch(loader,/const isAssigned=String\(currentUser\(\)\?\.id\|\|''\)===String\(detail\.sesion\.responsable_id/,
+    "the retail cash view must not reject the worker while local identity data is still loading");
 });
