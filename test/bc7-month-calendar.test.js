@@ -60,6 +60,7 @@ function setup(t, options = {}) {
   window.setInterval = () => 0;
   window.setTimeout = () => 0;
   window.confirm = () => true;
+  window.matchMedia = () => ({ matches: true, media: '(min-width:761px) and (hover:hover) and (pointer:fine)' });
   window._usuarioActual = { id: "owner-1", rol: admin ? "Dueño" : "Dependienta" };
   window._cache = {
     almacenes: [{ id: "warehouse-1", nombre: "La Cueva", activo: true }],
@@ -141,6 +142,10 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     window.document.querySelectorAll("#bc7-month-board .bc7-month-day").length,
     expectedCells
   );
+  assert.equal(window.document.getElementById("bc7-month-board").style.gridTemplateRows.replace(/\s+/g, ""),
+    `34pxrepeat(${expectedCells / 7},minmax(62px,1fr))`,
+    "the board must allocate exactly the number of weeks present in this month");
+  assert.equal(window.document.getElementById("bc7-month-board").getAttribute("aria-colcount"), "7");
 
   const read = calls.find((call) => call.name === "bc5_mis_jornadas");
   assert.ok(read, "the board must use the existing authenticated Jornada read RPC");
@@ -173,6 +178,10 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     false,
     "verified administrators should see the planner shortcut"
   );
+  const beforeModal=calls.filter(call=>call.name==="bc5_mis_jornadas").length;
+  window.document.querySelector("[data-bc7-open-visual-calendar]").click();
+  assert.equal(calls.filter(call=>call.name==="bc5_mis_jornadas").length,beforeModal,
+    "opening the desktop board must reuse the warm monthly cache rather than wait for another RPC");
 });
 
 test("month navigation changes the query window without creating or editing Jornada data", async (t) => {
