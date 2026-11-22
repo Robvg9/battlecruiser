@@ -205,7 +205,12 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(liveOfflineE2e, /releaseCriticalAssetHashes/);
   assert.match(liveOfflineE2e, /sha256Raw/);
   assert.match(liveOfflineE2e, /fetch\(\x27\/index\.html\x27,\{cache:\x27no-store\x27\}\)/);
-  assert.match(liveOfflineE2e, /sha256\(candidate\.body\) !== sha256\(sourceReference\)/);
+  assert.ok(liveOfflineE2e.includes("productionEdgeAssetCheck"));
+  assert.ok(liveOfflineE2e.includes("deploy-smoke-raw-sha+edge-shell-version"));
+  assert.ok(liveOfflineE2e.includes("deploy-smoke-raw-sha+edge-version-feature-markers"));
+  assert.ok(liveOfflineE2e.includes("rawSha256VerifiedByExactDeploySmoke: true"));
+  assert.ok(liveOfflineE2e.includes("if (!isProductionBase)"), "PR preview assets must remain source-exact");
+  assert.ok(liveOfflineE2e.includes("LIVE index.html no conserva el shell"), "LIVE edge HTML must retain the versioned shell contract");
   assert.doesNotMatch(liveOfflineE2e, /fetchText\(BASE_URL \+ "\/" \+ releaseFilename/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_RELEASE_SHA/);
   assert.match(liveOfflineE2e, /BC_EXPECTED_DEPLOY_RUN_ID/);
