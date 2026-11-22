@@ -111,7 +111,7 @@
     return addDays(date,1-day);
   }
   function canOfferPeriodMove(row){
-    if(!state.admin||!row||!row.id||!row.turno_id||!row.fecha||!row.numero_dia)return false;
+    if(!state.admin||!navigator.onLine||!row||!row.id||!row.turno_id||!row.fecha||!row.numero_dia)return false;
     const programState=String(row.estado||'').toUpperCase();
     const sessionState=String(row.sesion_estado||'').toUpperCase();
     if(row.fecha_fin&&String(row.fecha_fin).slice(0,10)!==String(row.fecha).slice(0,10))return false;
@@ -3404,7 +3404,7 @@
     state.periodMoveDragRows=null;
     state.periodMoveDragRowsPromise=fetchMovablePeriod(row).then(period=>{
       state.periodMoveDragRows=period;
-      if(state.periodMoveDragPreview)renderPeriodMoveGhost();
+      if(state.periodMoveDragPreview){state.periodMoveDragPreview.days=period.days;renderPeriodMoveGhost();}
       return period;
     }).catch(error=>{state.periodMoveDragError=error;throw error;});
     state.periodMoveDragRowsPromise.catch(()=>{});
