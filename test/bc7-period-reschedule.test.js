@@ -207,7 +207,7 @@ test("admin can preview, change and confirm a whole future period with an idempo
   );
   assert.ok(saved, "confirmation should call the atomic period RPC");
   const write = env.calls.find((call) => call.name === "bc5_reprogramar_periodo_jornada");
-  assert.deepEqual(write.payload, {
+  assert.deepEqual(JSON.parse(JSON.stringify(write.payload)), {
     p_turno_id: "turn-period-1",
     p_fecha_inicio: nextStart,
     p_motivo: "Ajuste de la planificación semanal",
