@@ -48,6 +48,7 @@ on:
       - 'supabase/migrations/20261119193000_jornada_price_change_optional_cost.sql'
       - 'test/jornada-price-changes-contract.sql'
       - 'supabase/migrations/20261122031500_jornada_period_rescheduling_atomic.sql'
+      - 'supabase/migrations/20261122034600_jornada_period_rescheduling_fk_index.sql'
       - 'test/jornada-period-reprogramming-contract.sql'
       - 'test/jornada-price-changes.test.js'
       - 'public/js/jornada-price-changes.js'
