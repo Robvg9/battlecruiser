@@ -258,6 +258,10 @@ BEGIN
     RAISE EXCEPTION 'FAIL: consolidated fecha_fin period was not safely rejected without mutation';
   END IF;
 
+  IF to_regclass('public.turno_jornada_reprogramacion_turno_id_idx') IS NULL THEN
+    RAISE EXCEPTION 'FAIL: idempotency table Turno FK index is missing';
+  END IF;
+
   -- Non-admin and anon access are denied; authenticated access remains available to the RPC gate.
   PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
   PERFORM set_config('test.bc_admin','false',false);
