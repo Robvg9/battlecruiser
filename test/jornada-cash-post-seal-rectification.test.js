@@ -57,7 +57,8 @@ test("sealed Jornada keeps date-specific cash entries separate from the final-pe
   assert.match(ui, /bc5_admin_rectificar_declaracion_a_entrega_diaria/);
   assert.match(ui, /data-bc7-save-cash-days/);
   assert.match(ui, /closest\('\[data-bc7-close-form\]'\)/);
-  assert.match(ui, /estado_aprobacion.*RECTIFICADA|RECTIFICADA.*estado_aprobacion/);
+  assert.match(ui, /const declarationState=String\(declaration\?\.estado_aprobacion\|\|''\)\.toUpperCase\(\);/);
+  assert.match(ui, /declarationState==='RECTIFICADA'/);
 });
 
 test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent and audited", () => {
