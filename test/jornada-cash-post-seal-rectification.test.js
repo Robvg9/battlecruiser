@@ -61,6 +61,13 @@ test("sealed Jornada keeps date-specific cash entries separate from the final-pe
   assert.match(ui, /declarationState==='RECTIFICADA'/);
 });
 
+test("Owner physical cash count stays locked until Jornada is completed", () => {
+  assert.match(ui, /if\(detail\.is_admin&&sessionState==='COMPLETADA'&&declaration\.monto_contado==null/);
+  assert.match(ui, /else if\(detail\.is_admin&&sessionState!=='COMPLETADA'\)/);
+  assert.match(ui, /El conteo físico del Dueño se habilitará cuando la jornada esté completada\./);
+  assert.doesNotMatch(ui, /if\(detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)/);
+});
+
 test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent and audited", () => {
   assert.match(migration, /ALTER TABLE public\.turno_declaraciones/);
   assert.match(migration, /'RECTIFICADA'::text/);
