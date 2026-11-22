@@ -350,7 +350,7 @@ test("desktop drag previews every day in the period and drop opens the full-rang
   chip.dispatchEvent(startEvent);
   assert.equal(dataTransfer.effectAllowed, "move");
 
-  const targetDate = plusDays(sourceStart, 8);
+  const targetDate = plusDays(sourceStart, 2);
   const targetCell = window.document.querySelector('#bc7-month-board .bc7-month-day[data-date="' + targetDate + '"]');
   assert.ok(targetCell, "the target date should be represented in the visible calendar");
   const overEvent = new window.Event("dragover", { bubbles: true, cancelable: true });
