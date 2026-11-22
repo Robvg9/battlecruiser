@@ -651,7 +651,55 @@
         "#tab-jornada .bc7-calendar-detail-count{color:var(--mist);font-size:10px}",
         "#tab-jornada .bc7-calendar-detail-list{display:grid;gap:7px}",
         "#tab-jornada .bc7-legacy-calendar-controls{display:none!important}",
-        "@media(min-width:761px){#tab-jornada #bc7-schedule-list{display:none!important}}",
+        "#tab-jornada #bc7-schedule-list{display:grid!important}",
+        ".bc7-visual-calendar-modal[hidden]{display:none!important}",
+        ".bc7-visual-calendar-modal{position:fixed;inset:0;z-index:101500;display:grid;place-items:center;padding:18px;box-sizing:border-box}",
+        ".bc7-visual-calendar-backdrop{position:absolute;inset:0;border:0;background:rgba(3,8,17,.84);backdrop-filter:blur(10px);cursor:default}",
+        ".bc7-visual-calendar-dialog{position:relative;z-index:1;width:min(1760px,100%);height:min(960px,calc(100dvh - 36px));display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(115,139,194,.35);border-radius:22px;background:radial-gradient(1200px 520px at 14% -15%,rgba(53,89,158,.36),transparent 62%),linear-gradient(145deg,#101a2c 0%,#0b1220 70%,#0c1724 100%);box-shadow:0 32px 100px rgba(0,0,0,.56);color:#eef3ff}",
+        ".bc7-visual-calendar-header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 24px;border-bottom:1px solid rgba(141,159,203,.18);background:linear-gradient(90deg,rgba(76,108,181,.15),rgba(83,61,145,.10),transparent)}",
+        ".bc7-visual-calendar-kicker{color:#a7b8e9;font-size:10px;font-weight:800;letter-spacing:.18em}",
+        ".bc7-visual-calendar-header h2{margin:5px 0 3px;color:#f5f7ff;font-size:26px;letter-spacing:-.03em}",
+        ".bc7-visual-calendar-header p{margin:0;color:#aebbd4;font-size:12px}",
+        ".bc7-visual-calendar-close{width:42px;height:42px;border:1px solid rgba(172,190,232,.28);border-radius:12px;background:rgba(255,255,255,.06);color:#fff;font-size:27px;cursor:pointer}",
+        ".bc7-visual-calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;min-height:0;flex:1;padding:18px}",
+        ".bc7-visual-calendar-main{display:flex;min-width:0;min-height:0;flex-direction:column;padding:14px;border:1px solid rgba(132,154,207,.19);border-radius:16px;background:rgba(8,15,28,.58)}",
+        ".bc7-visual-calendar-main .bc7-month-nav{flex:0 0 auto;margin:0 0 14px;gap:8px}",
+        ".bc7-visual-calendar-main .bc7-month-nav .bc7-btn{border-color:rgba(149,169,217,.24);background:rgba(255,255,255,.05);color:#dce5ff}",
+        ".bc7-visual-calendar-main .bc7-month-picker{color:#aab9d7}",
+        ".bc7-visual-calendar-main .bc7-month-picker input{background:#101c31;border-color:rgba(149,169,217,.3);color:#f3f6ff}",
+        ".bc7-visual-calendar-main .bc7-month-label{color:#f1f4ff;font-size:18px}",
+        ".bc7-visual-calendar-main .bc7-month-board{flex:1;min-height:0;grid-template-rows:34px repeat(6,minmax(62px,1fr));border-color:rgba(149,169,217,.25);background:rgba(2,8,17,.35)}",
+        ".bc7-visual-calendar-main .bc7-month-weekday{min-height:34px;background:rgba(86,112,178,.12);border-color:rgba(149,169,217,.18);color:#aebff0}",
+        ".bc7-visual-calendar-main .bc7-month-day{min-height:62px;padding:7px;border-color:rgba(149,169,217,.15);background:rgba(255,255,255,.018)}",
+        ".bc7-visual-calendar-main .bc7-month-day--selected{background:rgba(69,119,224,.16);box-shadow:inset 0 0 0 2px rgba(115,157,255,.72)}",
+        ".bc7-visual-calendar-main .bc7-month-day--outside{opacity:.23}",
+        ".bc7-visual-calendar-main .bc7-month-date{color:#f0f4ff}",
+        ".bc7-visual-calendar-main .bc7-month-chip{min-height:25px;border-radius:7px;border-color:rgba(120,151,221,.25);background:rgba(75,104,173,.12);color:#eaf0ff}",
+        ".bc7-visual-calendar-main .bc7-month-chip-person{color:#edf2ff;font-size:10px}",
+        ".bc7-visual-calendar-main .bc7-month-chip-status{color:#b7c6e5;font-size:8px}",
+        ".bc7-visual-calendar-main .bc7-month-chip.is-running{background:rgba(45,153,108,.17);border-color:rgba(69,197,141,.36)}",
+        ".bc7-visual-calendar-main .bc7-month-chip.is-scheduled{background:rgba(204,158,58,.15);border-color:rgba(226,183,89,.38)}",
+        ".bc7-visual-calendar-main .bc7-month-chip.is-closed,.bc7-visual-calendar-main .bc7-month-chip.is-sealed{background:rgba(173,76,104,.16);border-color:rgba(210,108,131,.34)}",
+        ".bc7-visual-calendar-side{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;padding:16px;border:1px solid rgba(137,126,196,.28);border-radius:16px;background:linear-gradient(180deg,rgba(59,60,112,.20),rgba(12,20,35,.9))}",
+        ".bc7-visual-calendar-side-title>span{color:#a99ee5;font-size:9px;font-weight:800;letter-spacing:.16em}",
+        ".bc7-visual-calendar-side-title h3{margin:5px 0;color:#f2f0ff;font-size:17px}",
+        ".bc7-visual-calendar-side-title p{margin:0;color:#aab6cf;font-size:11px;line-height:1.5}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail{margin:0;min-height:120px;max-height:48%;overflow:auto;border-color:rgba(153,146,209,.25);background:rgba(4,10,21,.48);color:#eaf0ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail-head h4{color:#eef2ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail-count,.bc7-visual-calendar-side .bc7-muted{color:#b0bdd8}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada{border-color:rgba(145,154,210,.2);background:rgba(255,255,255,.035);color:#eaf0ff}",
+        ".bc7-visual-calendar-legend{margin-top:auto;padding:13px;border:1px solid rgba(153,146,209,.22);border-radius:13px;background:rgba(4,10,21,.38)}",
+        ".bc7-visual-calendar-legend-row{display:flex;align-items:center;gap:9px;margin-top:9px;color:#d8e0f3;font-size:11px}",
+        ".bc7-visual-calendar-legend-row i{width:9px;height:9px;border-radius:50%;background:#c6a24d;box-shadow:0 0 12px currentColor}",
+        ".bc7-visual-calendar-legend-row i.is-running{background:#57c58d;color:#57c58d}",
+        ".bc7-visual-calendar-legend-row i.is-scheduled{background:#e3b95c;color:#e3b95c}",
+        ".bc7-visual-calendar-legend-row i.is-closed{background:#d7798d;color:#d7798d}",
+        ".bc7-visual-calendar-create{width:100%;min-height:44px;border:1px solid rgba(143,165,237,.42);background:linear-gradient(100deg,#536fca,#7653b5);color:#fff;font-weight:800}",
+        "body.bc7-visual-calendar-open{overflow:hidden}",
+        "@media(max-width:760px),(hover:none) and (pointer:coarse){.bc7-visual-calendar-modal{display:none!important}#tab-jornada .bc7-visual-calendar-open{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}}",
+        "@media(min-width:761px) and (max-height:760px){.bc7-visual-calendar-header{padding:12px 18px}.bc7-visual-calendar-layout{padding:12px;gap:12px;grid-template-columns:minmax(0,1fr) 330px}.bc7-visual-calendar-header h2{font-size:22px}.bc7-visual-calendar-main .bc7-month-day{min-height:52px;padding:5px}.bc7-visual-calendar-side{padding:12px}}",
+        "@media(min-width:761px) and (max-width:1120px){.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) 300px;gap:10px;padding:10px}.bc7-visual-calendar-main{padding:9px}.bc7-visual-calendar-side{padding:10px}}",
+        "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}}",
         "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}#tab-jornada .bc7-month-nav{display:grid;grid-template-columns:auto minmax(120px,1fr) auto auto;align-items:end;gap:5px}#tab-jornada .bc7-month-nav .bc7-btn{min-height:34px;padding:5px 8px;font-size:10px}#tab-jornada .bc7-month-picker{min-width:0}#tab-jornada .bc7-month-picker input{min-height:34px;width:100%;font-size:10px}#tab-jornada .bc7-month-label{grid-column:1/-1;grid-row:2;margin:2px 0 0;font-size:12px}#tab-jornada .bc7-month-day{min-height:0}}",
         "@media(max-width:420px){#tab-jornada .bc7-month-nav{grid-template-columns:auto minmax(110px,1fr) auto}#tab-jornada .bc7-month-nav [data-bc7-month-next]{grid-column:3;grid-row:1}#tab-jornada .bc7-month-nav [data-bc7-month-today]{grid-column:1;grid-row:2}#tab-jornada .bc7-month-nav [data-bc7-refresh]{grid-column:3;grid-row:2}}"
       ].join('\n');
@@ -712,11 +760,19 @@
        '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej. 5" inputmode="numeric"></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+'<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar una jornada atrasada · Entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Prepara una sucesora cuya fecha de inicio ya pasó, aunque el período siga en curso, usando el inventario final del turno ya cerrado. Conserva la duración del período anterior. No se modifica el stock global ni se inventa un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>'+
       '</section></details>'+
-      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Calendario mensual</h3><span class="bc7-muted">Selecciona un día para revisar sus jornadas y acciones.</span></div><button class="bc7-btn primary" type="button" data-bc7-open-planner hidden>+ Programar jornada</button></div>'+
+      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Jornadas programadas</h3><span class="bc7-muted">Tu vista habitual se mantiene aquí. El tablero visual avanzado se abre aparte en computadora.</span></div><button class="bc7-btn primary bc7-visual-calendar-open" type="button" data-bc7-open-visual-calendar aria-haspopup="dialog" aria-controls="bc7-visual-calendar-modal">✦ Abrir tablero visual</button></div>'+
+      '<div id="bc7-visual-calendar-modal" class="bc7-visual-calendar-modal" hidden>'+
+      '<button type="button" class="bc7-visual-calendar-backdrop" data-bc7-close-visual-calendar aria-label="Cerrar calendario visual"></button>'+
+      '<section class="bc7-visual-calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-visual-calendar-title">'+
+      '<header class="bc7-visual-calendar-header"><div><span class="bc7-visual-calendar-kicker">PLANIFICADOR OPERATIVO · BATTLECRUISER</span><h2 id="bc7-visual-calendar-title">Calendario de jornadas</h2><p>Organiza períodos futuros, revisa responsables y mueve jornadas completas con una vista previa segura.</p></div><button type="button" class="bc7-visual-calendar-close" data-bc7-close-visual-calendar aria-label="Cerrar">×</button></header>'+
+      '<div class="bc7-visual-calendar-layout"><section class="bc7-visual-calendar-main">'+
       '<div class="bc7-month-nav" aria-label="Navegación del calendario"><button class="bc7-btn" type="button" data-bc7-month-prev aria-label="Mes anterior">‹</button><label class="bc7-month-picker"><span>Mes</span><input id="bc7-calendar-month" type="month" aria-label="Mes del calendario"></label><button class="bc7-btn" type="button" data-bc7-month-next aria-label="Mes siguiente">›</button><button class="bc7-btn" type="button" data-bc7-month-today>Hoy</button><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar</button><strong id="bc7-month-label" class="bc7-month-label"></strong></div>'+
       '<input type="date" id="bc7-list-from" hidden><input type="number" id="bc7-list-days" min="1" max="31" value="31" hidden>'+
       '<div id="bc7-month-board" class="bc7-month-board" aria-label="Calendario de jornadas"><div class="bc7-empty">Cargando calendario…</div></div>'+
+      '</section><aside class="bc7-visual-calendar-side"><div class="bc7-visual-calendar-side-title"><span>INSPECTOR</span><h3>Jornada seleccionada</h3><p>Selecciona un día para ver sus jornadas y acciones.</p></div>'+
       '<section id="bc7-calendar-detail" class="bc7-calendar-detail" aria-live="polite"><div class="bc7-empty">Selecciona un día del calendario para ver sus detalles.</div></section>'+
+      '<div class="bc7-visual-calendar-legend"><div class="bc7-visual-calendar-side-title"><span>ESTADOS</span><h3>Leyenda</h3></div><div class="bc7-visual-calendar-legend-row"><i class="is-running"></i><span>En curso</span></div><div class="bc7-visual-calendar-legend-row"><i class="is-scheduled"></i><span>Programada</span></div><div class="bc7-visual-calendar-legend-row"><i class="is-closed"></i><span>Cerrada</span></div></div>'+
+      '<button class="bc7-btn primary bc7-visual-calendar-create" type="button" data-bc7-open-planner>+ Programar jornada</button></aside></div></section></div>'+
       '<div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg" role="status" aria-live="polite"></p></section>'+
       '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
       '</div>';
