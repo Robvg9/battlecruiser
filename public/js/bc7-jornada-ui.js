@@ -266,6 +266,9 @@
     if(!start||start<dateHavana()||!reason||reason.length<5){
       msg(message,'Selecciona una fecha actual o futura y escribe un motivo de al menos 5 caracteres.','error');return;
     }
+    if(start===move.sourceStart){
+      msg(message,'Selecciona una fecha inicial distinta a la actual para mover el período.','error');return;
+    }
     const signature=JSON.stringify([move.row.turno_id,start,reason]);
     if(signature!==move.requestSignature){
       try{move.idempotencyKey=createPeriodMoveKey();}
