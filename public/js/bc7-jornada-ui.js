@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.51 — reprogramación visual y segura de períodos completos desde el calendario.
+// v7.52 — reprogramación visual y segura de períodos completos desde el calendario.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;

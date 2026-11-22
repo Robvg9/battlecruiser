@@ -232,3 +232,32 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
     "non-admins must not receive the administrator reschedule editor"
   );
 });
+
+test("desktop visual calendar keeps a balanced board beside its right-hand inspector", async (t) => {
+  const { window } = setup(t, { admin: true, rows: [] });
+  const trigger = window.document.querySelector("[data-bc7-open-visual-calendar]");
+  const modal = window.document.getElementById("bc7-visual-calendar-modal");
+  assert.ok(trigger && modal, "desktop visual-calendar entry and modal must exist");
+
+  window.matchMedia = () => ({ matches: true });
+  trigger.click();
+  assert.equal(modal.hidden, false, "desktop activation should open the visual calendar");
+
+  const layout = modal.querySelector(".bc7-visual-calendar-layout");
+  assert.ok(layout.querySelector(".bc7-visual-calendar-main #bc7-month-board"),
+    "the symmetric month grid must remain in the main column");
+  const inspector = layout.querySelector("aside.bc7-visual-calendar-side");
+  assert.ok(inspector, "the right-hand inspector must remain present on desktop");
+  assert.ok(inspector.querySelector("#bc7-calendar-detail"),
+    "the inspector must contain the selected-day details");
+
+  const styles = Array.from(window.document.querySelectorAll("style"))
+    .map((style) => style.textContent || "")
+    .join("\n");
+  assert.match(styles, /\.bc7-visual-calendar-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 360px/,
+    "desktop board and inspector must use a two-column layout");
+  assert.match(styles, /\.bc7-visual-calendar-side\{display:flex;flex-direction:column/,
+    "the inspector must keep its visible desktop layout");
+  assert.match(styles, /@media\(min-width:761px\) and \(max-width:1120px\).*?300px/,
+    "the inspector must retain a responsive desktop width");
+});
