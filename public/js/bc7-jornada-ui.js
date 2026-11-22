@@ -110,8 +110,8 @@
     if(!Number.isInteger(day)||day<1||day>31||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
     return addDays(date,1-day);
   }
-  function canOfferPeriodMove(row){
-    if(!state.admin||!navigator.onLine||!row||!row.id||!row.turno_id||!row.fecha||!row.numero_dia)return false;
+  function isMovablePeriodDay(row){
+    if(!row||!row.id||!row.turno_id||!row.fecha||!row.numero_dia)return false;
     const programState=String(row.estado||'').toUpperCase();
     const sessionState=String(row.sesion_estado||'').toUpperCase();
     if(row.fecha_fin&&String(row.fecha_fin).slice(0,10)!==String(row.fecha).slice(0,10))return false;
@@ -121,6 +121,13 @@
       return programState==='PROGRAMADA'&&!!row.sesion_id&&['PENDIENTE','PROGRAMADA'].includes(sessionState);
     }
     return row.trabaja===false&&programState==='DESCANSO'&&(!row.sesion_id||sessionState==='CANCELADA');
+  }
+  function canOfferPeriodMove(row){
+    if(!state.admin||!navigator.onLine||!isMovablePeriodDay(row))return false;
+    // When any visible day belonging to this Turno has started, been closed or
+    // become a consolidated range, suppress every drag/action for the same period.
+    const visiblePeriod=state.rows.filter(item=>String(item&&item.turno_id||'')===String(row.turno_id||''));
+    return visiblePeriod.every(isMovablePeriodDay);
   }
   function validateMovablePeriod(sourceRow,rows){
     if(!state.admin)throw new Error('Solo Administración puede mover un período completo.');
