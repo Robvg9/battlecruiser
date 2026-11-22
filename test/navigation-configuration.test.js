@@ -272,7 +272,7 @@ test("app shell, application and Service Worker stay release-aligned and load re
   assert.ok(app.includes('["bc7-legacy-history.js","1.0"]'));
   assert.ok(serviceWorker.includes("js/m29-turnos-organizacion.js?v=29.22"));
   assert.ok(serviceWorker.includes("js/bc7-legacy-history.js?v=1.0"));
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.48"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.49"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.ok(app.includes('["hotfix-regresiones-20260902.js","20261120.2"]'));
   assert.ok(serviceWorker.includes("./js/hotfix-regresiones-20260902.js?v=20261120.2"));
