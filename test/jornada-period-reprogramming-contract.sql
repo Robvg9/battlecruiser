@@ -77,7 +77,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: backward overlapping shift did not preserve day offsets';
   END IF;
 
-  v_result := public.bc5_mis_jornadas(v_base+1,v_base+3);
+  v_result := public.bc5_mis_jornadas(v_base+70,v_base+71);
   IF NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_result) AS item
     WHERE item->>'turno_id'=v_turn::text
