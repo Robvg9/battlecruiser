@@ -59,7 +59,7 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
-  assert.match(app, /bc7-jornada-ui\.js","7\.47"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.47/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.48"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.48/);
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
 });

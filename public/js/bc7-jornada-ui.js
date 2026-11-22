@@ -5,7 +5,7 @@
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -21,6 +21,87 @@
   function fmtDate(v){const s=String(v||'').slice(0,10);const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?m[3]+'/'+m[2]+'/'+m[1]:s||'—';}
   function fmtDateTimeHavana(v){if(!v)return '—';const d=new Date(v);if(!Number.isFinite(d.getTime()))return String(v);return new Intl.DateTimeFormat('es-CU',{timeZone:'America/Havana',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);}
   function fmtDateHuman(v){const p=String(v||'').slice(0,10).split('-').map(Number);if(p.length!==3||!p[0]||!p[1]||!p[2])return fmtDate(v);return new Intl.DateTimeFormat('es-ES',{timeZone:'UTC',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(Date.UTC(p[0],p[1]-1,p[2],12)));}
+  function monthParts(value){
+    const match=String(value||'').match(/^(\d{4})-(\d{2})$/);
+    if(!match)return null;
+    const year=Number(match[1]),month=Number(match[2]);
+    if(month<1||month>12)return null;
+    return {year,month};
+  }
+  function monthDayCount(value){
+    const parts=monthParts(value);
+    return parts?new Date(Date.UTC(parts.year,parts.month,0)).getUTCDate():0;
+  }
+  function shiftMonth(value,delta){
+    const parts=monthParts(value)||monthParts(dateHavana().slice(0,7));
+    const date=new Date(Date.UTC(parts.year,parts.month-1+Number(delta||0),1,12));
+    return date.toISOString().slice(0,7);
+  }
+  function monthTitle(value){
+    const parts=monthParts(value);
+    if(!parts)return 'Calendario';
+    return new Intl.DateTimeFormat('es-ES',{month:'long',year:'numeric',timeZone:'UTC'})
+      .format(new Date(Date.UTC(parts.year,parts.month-1,1,12)));
+  }
+  function calendarStatus(row){
+    const status=String(row&& (row.sesion_estado||row.estado)||'').toUpperCase();
+    if(!row||row.trabaja===false||status==='DESCANSO')return {kind:'rest',short:'Descanso',label:'Descanso'};
+    if(status==='EN_CURSO')return {kind:'running',short:'En curso',label:'En curso'};
+    if(status==='CERRADA_OPERATIVAMENTE')return {kind:'sealed',short:'Pendiente cuadre',label:'Cerrada operativamente · pendiente de cuadre'};
+    if(['COMPLETADA','CERRADA','CERRADO','CANCELADA','CANCELADO'].includes(status))return {kind:'closed',short:'Cerrada',label:humanStatus(status)};
+    if(['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status))return {kind:'scheduled',short:'Programada',label:'Programada'};
+    return {kind:'other',short:humanStatus(status),label:humanStatus(status)};
+  }
+  function renderMonthCalendar(month,rows){
+    const host=$('bc7-month-board');
+    if(!host)return;
+    const parts=monthParts(month);
+    if(!parts){host.innerHTML='<div class="bc7-empty">Elige un mes válido.</div>';return;}
+    const count=monthDayCount(month);
+    const first=new Date(Date.UTC(parts.year,parts.month-1,1,12));
+    const offset=(first.getUTCDay()+6)%7;
+    const cells=Math.ceil((offset+count)/7)*7;
+    const weekdays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    const today=dateHavana();
+    let html=weekdays.map(day=>'<div class="bc7-month-weekday" role="columnheader">'+day+'</div>').join('');
+    for(let index=0;index<cells;index++){
+      const date=new Date(Date.UTC(parts.year,parts.month-1,1+index-offset,12));
+      const iso=date.toISOString().slice(0,10);
+      const dayRows=rows.filter(row=>String(row&&row.fecha||'').slice(0,10)===iso);
+      const inside=iso.slice(0,7)===month;
+      const selected=state.calendarSelectedDate===iso;
+      const classes=['bc7-month-day'];
+      if(!inside)classes.push('bc7-month-day--outside');
+      if(selected)classes.push('bc7-month-day--selected');
+      if(today===iso)classes.push('bc7-month-day--today');
+      const chips=dayRows.slice(0,2).map(row=>{
+        const stateInfo=calendarStatus(row);
+        const person=row.trabaja===false?'Descanso':userName(row.responsable_id);
+        const title=fmtDateHuman(iso)+' · '+person+' · '+stateInfo.label;
+        return '<button type="button" class="bc7-month-chip is-'+stateInfo.kind+'" data-bc7-calendar-select="'+iso+'" title="'+esc(title)+'" aria-label="'+esc(title)+'"><span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(person)+'</span><span class="bc7-month-chip-status">'+esc(stateInfo.short)+'</span></button>';
+      }).join('');
+      const more=dayRows.length>2?'<button type="button" class="bc7-month-more" data-bc7-calendar-select="'+iso+'">+'+(dayRows.length-2)+' más</button>':'';
+      const empty=inside&&!dayRows.length?'<span class="bc7-month-empty">—</span>':'';
+      html+='<div class="'+classes.join(' ')+'" data-date="'+iso+'" role="gridcell" aria-selected="'+(selected?'true':'false')+'"><div class="bc7-month-day-top"><button type="button" class="bc7-month-date" '+(!inside?'disabled':'')+' data-bc7-calendar-select="'+iso+'" aria-label="'+esc(fmtDateHuman(iso))+'" aria-pressed="'+(selected?'true':'false')+'">'+date.getUTCDate()+'</button>'+(today===iso?'<span class="bc7-month-today-tag">HOY</span>':'')+(dayRows.length?'<span class="bc7-month-count">'+dayRows.length+'</span>':'')+'</div><div class="bc7-month-day-events">'+chips+more+empty+'</div></div>';
+    }
+    host.innerHTML=html;
+    const label=$('bc7-month-label');
+    if(label)label.textContent=monthTitle(month);
+  }
+  function renderCalendarDetail(date,rows){
+    const host=$('bc7-calendar-detail');
+    if(!host)return;
+    const dayRows=rows.filter(row=>String(row&&row.fecha||'').slice(0,10)===date);
+    const title=fmtDateHuman(date);
+    host.innerHTML='<div class="bc7-calendar-detail-head"><div><span class="bc7-muted">DÍA SELECCIONADO</span><h4>'+esc(title)+'</h4></div><span class="bc7-calendar-detail-count">'+dayRows.length+' '+(dayRows.length===1?'registro':'registros')+'</span></div>'+(dayRows.length?'<div class="bc7-calendar-detail-list">'+dayRows.map(rowHtml).join('')+'</div>':'<div class="bc7-empty">No hay una jornada programada para esta fecha. Puedes elegir otro día o crear una programación desde el panel de administrador.</div>');
+  }
+  function selectCalendarDate(date){
+    const month=$('bc7-calendar-month')?.value||dateHavana().slice(0,7);
+    if(String(date||'').slice(0,7)!==month)return;
+    state.calendarSelectedDate=date;
+    renderMonthCalendar(month,state.rows);
+    renderCalendarDetail(date,state.rows);
+  }
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
   function money(v){return typeof window.money==='function'?window.money(Number(v||0)):Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function currentUser(){return window._usuarioActual||window.__bcUser||window.usuarioActual||null;}
@@ -69,7 +150,7 @@
   }
   function refreshResponsibleSelectors(){
     const people=eligibleStaff();
-    document.querySelectorAll('#bc7-day-rows [data-bc7-person],#bc7-schedule-list [data-bc7-reperson]').forEach(sel=>{
+    document.querySelectorAll('#bc7-day-rows [data-bc7-person],#bc7-schedule-list [data-bc7-reperson],#bc7-calendar-detail [data-bc7-reperson]').forEach(sel=>{
       const previous=sel.value;
       sel.innerHTML=staffOptions(previous);
       if(previous&&people.some(user=>String(user.id)===String(previous)))sel.value=previous;
@@ -321,7 +402,53 @@
       '@media(max-width:650px){#tab-jornada .bc7-hero{display:block}#tab-jornada .bc7-status{text-align:left;margin-top:9px;max-width:none}#tab-jornada .bc7-grid{grid-template-columns:1fr}#tab-jornada .bc7-day-row{grid-template-columns:1fr;gap:5px}#tab-jornada .bc7-day-row label{margin-top:4px}#tab-jornada .bc7-actions .bc7-btn{flex:1 1 140px}#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:8px 6px}}'
     ].join('\n');
     document.head.appendChild(s);
-    if(!$('bc7-receive-style')){const r=document.createElement('style');r.id='bc7-receive-style';r.textContent='#tab-jornada .bc7-receive-list{display:grid;gap:8px;margin:8px 0}#tab-jornada .bc7-receive-item{display:grid;gap:6px;padding:10px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(255,255,255,.02)}#tab-jornada .bc7-receive-item.is-marked{border-color:var(--gold);background:rgba(201,162,77,.06)}#tab-jornada .bc7-receive-product{display:flex;flex-direction:column;gap:2px}#tab-jornada .bc7-receive-count-wrap{display:grid;gap:2px}#tab-jornada .bc7-receive-item[hidden]{display:none!important}#tab-jornada [data-bc7-receive-pane][hidden]{display:none!important}';document.head.appendChild(r);}
+    if(!$('bc7-month-calendar-style')){
+      const m=document.createElement('style');m.id='bc7-month-calendar-style';
+      m.textContent=[
+        "#tab-jornada .bc7-month-nav{display:flex;align-items:end;flex-wrap:wrap;gap:8px;margin:8px 0 12px}",
+        "#tab-jornada .bc7-month-nav .bc7-btn{min-height:38px}",
+        "#tab-jornada .bc7-month-picker{display:flex;flex-direction:column;gap:3px;min-width:170px;color:var(--mist);font-size:10px}",
+        "#tab-jornada .bc7-month-picker input{box-sizing:border-box;min-height:38px;padding:7px 10px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--void);color:var(--text);font:600 12px Inter,sans-serif}",
+        "#tab-jornada .bc7-month-label{align-self:center;margin:0 auto 0 4px;color:var(--text);font-size:14px;font-weight:700;text-transform:capitalize}",
+        "#tab-jornada .bc7-month-board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));overflow:hidden;border:1px solid var(--gold-dim);border-radius:10px;background:rgba(4,13,12,.24)}",
+        "#tab-jornada .bc7-month-weekday{display:flex;align-items:center;justify-content:center;min-height:34px;padding:5px 3px;border-right:1px solid var(--gold-dim);border-bottom:1px solid var(--gold-dim);background:rgba(201,162,77,.07);color:var(--gold);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}",
+        "#tab-jornada .bc7-month-weekday:nth-child(7){border-right:0}",
+        "#tab-jornada .bc7-month-day{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:112px;padding:8px 7px 6px;border-right:1px solid var(--gold-dim);border-bottom:1px solid var(--gold-dim);background:rgba(255,255,255,.018)}",
+        "#tab-jornada .bc7-month-day:nth-child(7n + 7){border-right:0}",
+        "#tab-jornada .bc7-month-day--outside{background:rgba(0,0,0,.12);opacity:.38}",
+        "#tab-jornada .bc7-month-day--selected{background:rgba(74,153,212,.105);box-shadow:inset 0 0 0 2px rgba(91,174,226,.7)}",
+        "#tab-jornada .bc7-month-day--today .bc7-month-date{border-color:var(--gold);color:var(--gold)}",
+        "#tab-jornada .bc7-month-day-top{display:flex;align-items:center;gap:6px;min-height:24px}",
+        "#tab-jornada .bc7-month-date{display:inline-grid;place-items:center;width:27px;height:27px;padding:0;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--text);font:700 12px Inter,sans-serif;cursor:pointer}",
+        "#tab-jornada .bc7-month-date:disabled{cursor:default}",
+        "#tab-jornada .bc7-month-today-tag{color:var(--gold);font-size:8px;font-weight:800;letter-spacing:.06em}",
+        "#tab-jornada .bc7-month-count{margin-left:auto;color:var(--mist);font:600 9px 'IBM Plex Mono',monospace}",
+        "#tab-jornada .bc7-month-day-events{display:grid;gap:4px;align-content:start;min-width:0}",
+        "#tab-jornada .bc7-month-chip{display:flex;align-items:center;gap:5px;width:100%;min-width:0;min-height:24px;padding:3px 5px;border:1px solid rgba(212,176,92,.22);border-radius:5px;background:rgba(201,162,77,.06);color:var(--text);text-align:left;cursor:pointer}",
+        "#tab-jornada .bc7-month-chip-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--gold)}",
+        "#tab-jornada .bc7-month-chip-person{overflow:hidden;min-width:0;color:var(--text);font-size:9px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}",
+        "#tab-jornada .bc7-month-chip-status{margin-left:auto;color:var(--mist);font-size:8px;white-space:nowrap}",
+        "#tab-jornada .bc7-month-chip.is-running{border-color:rgba(95,174,127,.44);background:rgba(95,174,127,.10)}",
+        "#tab-jornada .bc7-month-chip.is-running .bc7-month-chip-dot{background:#7fc99a}",
+        "#tab-jornada .bc7-month-chip.is-scheduled{border-color:rgba(216,181,92,.48);background:rgba(216,181,92,.09)}",
+        "#tab-jornada .bc7-month-chip.is-closed,#tab-jornada .bc7-month-chip.is-sealed{border-color:rgba(197,105,105,.38);background:rgba(197,105,105,.08)}",
+        "#tab-jornada .bc7-month-chip.is-closed .bc7-month-chip-dot,#tab-jornada .bc7-month-chip.is-sealed .bc7-month-chip-dot{background:#ca7777}",
+        "#tab-jornada .bc7-month-chip.is-rest{border-style:dashed;opacity:.75}",
+        "#tab-jornada .bc7-month-more{justify-self:start;border:0;background:transparent;color:var(--gold);font-size:9px;cursor:pointer}",
+        "#tab-jornada .bc7-month-empty{padding:2px 5px;color:var(--mist);font-size:10px;opacity:.4}",
+        "#tab-jornada .bc7-calendar-detail{margin-top:12px;padding:10px;border:1px solid var(--gold-dim);border-radius:9px;background:rgba(255,255,255,.018)}",
+        "#tab-jornada .bc7-calendar-detail-head{display:flex;align-items:end;justify-content:space-between;gap:10px;margin-bottom:8px}",
+        "#tab-jornada .bc7-calendar-detail-head h4{margin:3px 0 0;color:var(--text);font-size:14px;text-transform:capitalize}",
+        "#tab-jornada .bc7-calendar-detail-count{color:var(--mist);font-size:10px}",
+        "#tab-jornada .bc7-calendar-detail-list{display:grid;gap:7px}",
+        "#tab-jornada .bc7-legacy-calendar-controls{display:none!important}",
+        "@media(min-width:761px){#tab-jornada #bc7-schedule-list{display:none!important}}",
+        "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}#tab-jornada .bc7-month-nav{display:grid;grid-template-columns:auto minmax(120px,1fr) auto auto;align-items:end;gap:5px}#tab-jornada .bc7-month-nav .bc7-btn{min-height:34px;padding:5px 8px;font-size:10px}#tab-jornada .bc7-month-picker{min-width:0}#tab-jornada .bc7-month-picker input{min-height:34px;width:100%;font-size:10px}#tab-jornada .bc7-month-label{grid-column:1/-1;grid-row:2;margin:2px 0 0;font-size:12px}#tab-jornada .bc7-month-day{min-height:0}}",
+        "@media(max-width:420px){#tab-jornada .bc7-month-nav{grid-template-columns:auto minmax(110px,1fr) auto}#tab-jornada .bc7-month-nav [data-bc7-month-next]{grid-column:3;grid-row:1}#tab-jornada .bc7-month-nav [data-bc7-month-today]{grid-column:1;grid-row:2}#tab-jornada .bc7-month-nav [data-bc7-refresh]{grid-column:3;grid-row:2}}"
+      ].join('\n');
+      document.head.appendChild(m);
+    }
+        if(!$('bc7-receive-style')){const r=document.createElement('style');r.id='bc7-receive-style';r.textContent='#tab-jornada .bc7-receive-list{display:grid;gap:8px;margin:8px 0}#tab-jornada .bc7-receive-item{display:grid;gap:6px;padding:10px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(255,255,255,.02)}#tab-jornada .bc7-receive-item.is-marked{border-color:var(--gold);background:rgba(201,162,77,.06)}#tab-jornada .bc7-receive-product{display:flex;flex-direction:column;gap:2px}#tab-jornada .bc7-receive-count-wrap{display:grid;gap:2px}#tab-jornada .bc7-receive-item[hidden]{display:none!important}#tab-jornada [data-bc7-receive-pane][hidden]{display:none!important}';document.head.appendChild(r);}
     if(!$('bc7-compact-style')){const c=document.createElement('style');c.id='bc7-compact-style';c.textContent="#tab-jornada{max-width:1320px!important;padding-bottom:12px!important}\n#tab-jornada .bc7-hero{align-items:center!important;margin:0 0 7px!important;padding:3px 0 7px!important}\n#tab-jornada .bc7-hero h2{font-family:Inter,sans-serif!important;font-size:20px!important;font-weight:700!important}\n#tab-jornada .bc7-hero p{display:none!important}\n#tab-jornada .bc7-status{font-size:10px!important;min-height:0!important;max-width:none!important}\n#tab-jornada .bc7-card{padding:8px!important;margin:6px 0!important;border-radius:8px!important}\n#tab-jornada .bc7-card h3{font-size:13px!important;margin:0 0 5px!important}\n#tab-jornada .bc7-card h4{font-size:12px!important;margin:7px 0 5px!important}\n#tab-jornada .bc7-muted{font-size:10px!important;line-height:1.3!important}\n#tab-jornada .bc7-field{font-size:10px!important;gap:3px!important;margin:4px 0!important}\n#tab-jornada .bc7-field input,#tab-jornada .bc7-field select,#tab-jornada .bc7-field textarea{height:34px!important;min-height:34px!important;padding:6px 8px!important;font-size:11px!important}\n#tab-jornada .bc7-btn{min-height:34px!important;padding:6px 10px!important;font-size:10px!important;border-radius:6px!important}\n#tab-jornada .bc7-actions{gap:5px!important;margin-top:6px!important}\n#tab-jornada .bc7-jornada{display:block;grid-template-columns:minmax(0,1fr);min-width:0;width:100%;max-width:100%;box-sizing:border-box;padding:7px!important}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row]{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:7px}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-jornada-top{display:contents!important}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] strong{font-size:11px!important;line-height:1.2}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] p{font-size:10px!important;margin:2px 0 0!important}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-actions{margin:0!important;grid-column:3}\n#tab-jornada .bc7-jornada[data-bc7-cash-day-row] .bc7-btn{white-space:nowrap;min-height:30px!important;padding:5px 8px!important}\n#tab-jornada .bc7-help,#tab-jornada .bc7-admin-details{margin:4px 0!important;padding:6px 8px;border:1px solid var(--gold-dim);border-radius:7px;background:rgba(255,255,255,.02)}\n#tab-jornada .bc7-help summary,#tab-jornada .bc7-admin-details>summary{font-size:10px!important;font-weight:600;color:var(--gold);cursor:pointer;list-style:none}\n#tab-jornada .bc7-admin-details[hidden],#tab-jornada [hidden]{display:none!important}\n#tab-jornada .bc7-calendar-controls{display:grid;grid-template-columns:minmax(0,1fr) 68px auto;gap:6px;align-items:end}\n#tab-jornada .bc7-calendar-controls .bc7-field{margin:0!important}\n#tab-jornada .bc7-workspace-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}\n#tab-jornada .bc7-workspace-title-wrap{min-width:0;display:flex;align-items:center;gap:8px}\n#tab-jornada .bc7-workspace-head h3{font-size:14px!important;margin:0!important}\n#tab-jornada .bc7-back{min-height:30px!important;padding:5px 8px!important;white-space:nowrap}\n#tab-jornada .bc7-workspace-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:4px 0 8px}\n#tab-jornada .bc7-overview-item{min-width:0;padding:6px 7px;border:1px solid var(--gold-dim);border-radius:6px;background:rgba(255,255,255,.025)}\n#tab-jornada .bc7-overview-item small{display:block;font-size:9px;color:var(--mist);line-height:1.1}\n#tab-jornada .bc7-overview-item b{display:block;font-size:11px;margin-top:3px;overflow-wrap:anywhere}\n#tab-jornada .bc7-workspace-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:6px 0 8px;padding:3px;background:rgba(0,0,0,.18);border:1px solid var(--gold-dim);border-radius:7px}\n#tab-jornada .bc7-workspace-tab{min-width:0;min-height:32px;padding:5px 3px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--mist);font-size:10px;font-weight:600;cursor:pointer}\n#tab-jornada .bc7-workspace-tab[aria-selected=true]{color:var(--text);background:rgba(201,162,77,.16);border-color:var(--gold-dim)}\n#tab-jornada .bc7-workspace-panel[hidden]{display:none!important}\n#tab-jornada .bc7-panel-stack{display:grid;gap:6px}\n#tab-jornada .bc7-detail{border:1px solid var(--gold-dim);border-radius:7px;background:rgba(255,255,255,.018);padding:0 8px}\n#tab-jornada .bc7-detail>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;cursor:pointer;list-style:none;font-size:11px;font-weight:600}\n#tab-jornada .bc7-detail>summary small{font-size:9px;color:var(--mist);font-weight:500}\n#tab-jornada .bc7-detail-body{padding:0 0 7px;min-width:0}\n#tab-jornada .bc7-note{padding:7px!important;font-size:10px!important;line-height:1.3!important}\n#tab-jornada .bc7-table{font-size:10px!important}\n#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:5px!important}\n#tab-jornada .bc7-table input{width:76px!important;padding:5px!important;font-size:11px!important}\n@media(max-width:650px){#tab-jornada .bc7-calendar-controls{grid-template-columns:minmax(0,1fr) 60px auto}#tab-jornada .bc7-jornada{grid-template-columns:minmax(0,1fr) auto;gap:5px}#tab-jornada .bc7-jornada .bc7-actions{grid-column:2;grid-row:2}#tab-jornada .bc7-workspace-overview{grid-template-columns:repeat(3,minmax(0,1fr))}#tab-jornada .bc7-overview-item{padding:5px}#tab-jornada .bc7-overview-item b{font-size:10px}#tab-jornada .bc7-workspace-tab{font-size:9px;min-height:30px}#tab-jornada .bc7-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-jornada .bc7-day-row{grid-template-columns:minmax(70px,.8fr) minmax(80px,1fr) minmax(100px,1.4fr)}#tab-jornada .bc7-day-row label{margin:0!important}}\n@media(max-width:390px){#tab-jornada .bc7-workspace-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}";document.head.appendChild(c);}
   }
   function ensureDayRowsStyles(){
@@ -351,7 +478,12 @@
        '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej. 5" inputmode="numeric"></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+'<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar una jornada atrasada · Entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Prepara una sucesora cuya fecha de inicio ya pasó, aunque el período siga en curso, usando el inventario final del turno ya cerrado. Conserva la duración del período anterior. No se modifica el stock global ni se inventa un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>'+
       '</section></details>'+
-      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><h3>Calendario</h3><span class="bc7-muted">Jornadas asignadas</span></div><div class="bc7-calendar-controls"><label class="bc7-field">Desde<input type="date" id="bc7-list-from"></label><label class="bc7-field">Días<input type="number" id="bc7-list-days" min="1" max="31" value="14"></label><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar calendario</button></div><div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg"></p></section>'+
+      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Calendario mensual</h3><span class="bc7-muted">Selecciona un día para revisar sus jornadas y acciones.</span></div><button class="bc7-btn primary" type="button" data-bc7-open-planner hidden>+ Programar jornada</button></div>'+
+      '<div class="bc7-month-nav" aria-label="Navegación del calendario"><button class="bc7-btn" type="button" data-bc7-month-prev aria-label="Mes anterior">‹</button><label class="bc7-month-picker"><span>Mes</span><input id="bc7-calendar-month" type="month" aria-label="Mes del calendario"></label><button class="bc7-btn" type="button" data-bc7-month-next aria-label="Mes siguiente">›</button><button class="bc7-btn" type="button" data-bc7-month-today>Hoy</button><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar</button><strong id="bc7-month-label" class="bc7-month-label"></strong></div>'+
+      '<input type="date" id="bc7-list-from" hidden><input type="number" id="bc7-list-days" min="1" max="31" value="31" hidden>'+
+      '<div id="bc7-month-board" class="bc7-month-board" aria-label="Calendario de jornadas"><div class="bc7-empty">Cargando calendario…</div></div>'+
+      '<section id="bc7-calendar-detail" class="bc7-calendar-detail" aria-live="polite"><div class="bc7-empty">Selecciona un día del calendario para ver sus detalles.</div></section>'+
+      '<div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg" role="status" aria-live="polite"></p></section>'+
       '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
       '</div>';
     const buildDaysButton=tab.querySelector('[data-bc7-build]');
@@ -582,17 +714,41 @@
     return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
   }
   async function loadCalendar(){
-    const host=$('bc7-schedule-list');if(!host)return;
-    const from=$('bc7-list-from')?.value||dateHavana();
-    const days=Math.max(1,Math.min(31,Number($('bc7-list-days')?.value||14)));
-    const to=addDays(from,days-1);
-    host.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';msg($('bc7-list-msg'),'');
+    const board=$('bc7-month-board'),list=$('bc7-schedule-list');
+    if(!board&&!list)return;
+    const monthInput=$('bc7-calendar-month');
+    const fallback=$('bc7-list-from')?.value||dateHavana();
+    let month=String(monthInput&&monthInput.value||fallback.slice(0,7)).slice(0,7);
+    if(!monthParts(month))month=dateHavana().slice(0,7);
+    const from=month+'-01';
+    const days=monthDayCount(month);
+    const to=month+'-'+String(days).padStart(2,'0');
+    if(monthInput)monthInput.value=month;
+    const hiddenFrom=$('bc7-list-from');if(hiddenFrom)hiddenFrom.value=from;
+    const hiddenDays=$('bc7-list-days');if(hiddenDays)hiddenDays.value=String(days);
+    const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
+    if(board)board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    if(list)list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    msg($('bc7-list-msg'),'');
     try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
       state.rows=data;
-      if(!data.length){host.innerHTML='<div class="bc7-empty"><strong>No hay jornadas visibles en este rango.</strong><p>Prueba a pulsar “Actualizar calendario” o amplía “Días a consultar”. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';return;}
-      host.innerHTML=data.map(rowHtml).join('');
-    }catch(e){host.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');}
+      if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
+        const today=dateHavana();
+        state.calendarSelectedDate=today.slice(0,7)===month?today:from;
+      }
+      if(board)renderMonthCalendar(month,data);
+      renderCalendarDetail(state.calendarSelectedDate,data);
+      if(list){
+        list.innerHTML=data.length?data.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango mensual.</strong><p>Prueba otro mes. Si esperabas una jornada concreta, comprueba la fecha, el almacén y que estés asignado como responsable. Una lista vacía no demuestra que el servidor esté caído.</p></div>';
+      }
+    }catch(e){
+      state.rows=[];
+      if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+      if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+      const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
+      msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');
+    }
   }
   function renderCurrentSession(current){
     state.currentSession=current&&current.turno_sesion_id?current:null;
@@ -2674,7 +2830,7 @@
       const result=await rpc('bc7_admin_programar_sucesora_pendiente',{
         p_entrega_id:deliveryId,p_fecha_fin:end,p_responsable_id:responsible,p_observacion:note
       });
-      $('bc7-list-from').value=start;$('bc7-list-days').value='31';
+      const monthInput=$('bc7-calendar-month');if(monthInput)monthInput.value=start.slice(0,7);state.calendarSelectedDate=start;
       await loadCalendar();
       const host=$('bc7-retro-handover-content');
       if(host)host.innerHTML='<div class="bc7-note"><b>Sucesora preparada.</b><p>Período '+esc(fmtDate(result.fecha_inicio))+'–'+esc(fmtDate(result.fecha_fin))+' · '+esc(result.lineas_inventario)+' familias vinculadas · responsable '+esc(userName(result.responsable_id))+'.</p><p>La jornada sigue bloqueada hasta que se registre la recepción física.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-open="'+esc(result.sesion_id)+'">Abrir recepción física</button></div></div>';
@@ -2765,6 +2921,7 @@
     if(!busy(btn,true))return;
     try{
       const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:mode==='pattern'?null:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
+      const monthInput=$('bc7-calendar-month');if(monthInput)monthInput.value=start.slice(0,7);state.calendarSelectedDate=start;
       const total=Number(result&&result.dias_total),work=Number(result&&result.dias_laborables),rest=Number(result&&result.dias_descanso);
       const summary=Number.isFinite(total)&&Number.isFinite(work)&&Number.isFinite(rest)?(total===1?'Se programó 1 día: ':'Se programaron '+total+' días: ')+work+' de trabajo y '+rest+' de descanso.':'La programación se creó correctamente.';
       msg($('bc7-create-msg'),summary,'ok');
@@ -2806,6 +2963,7 @@
     if($('bc7-start-date'))$('bc7-start-date').value=today;
     if($('bc7-list-from'))$('bc7-list-from').value=today;
     if($('bc7-list-days'))$('bc7-list-days').value='31';
+    if($('bc7-calendar-month'))$('bc7-calendar-month').value=today.slice(0,7);
     state.staffLoaded=eligibleStaff().length>0;
     fillWarehouses();buildDayRows();
     ensureWarehouseCatalog();
@@ -2814,6 +2972,7 @@
     if(state.admin){try{await ensureResponsibleCatalog(true);}catch(_){}}
     if($('bc7-admin-panel'))$('bc7-admin-panel').hidden=false;
     if($('bc7-admin-details'))$('bc7-admin-details').hidden=!state.admin;
+    const plannerShortcut=document.querySelector('[data-bc7-open-planner]');if(plannerShortcut)plannerShortcut.hidden=!state.admin;
     const btn=document.querySelector('.tab-btn[data-tab="jornada"]');if(btn&&state.admin)btn.textContent='Jornada e inventario · Admin';
     if(state.admin)setStatus(navigator.onLine?'Acceso administrativo verificado.':'Sin conexión: solo lectura local, no se permiten escrituras.','ok');
     else setStatus(navigator.onLine?'Acceso limitado al calendario propio.':'Sin conexión. Reconnecta para actualizar el calendario.','');
@@ -2830,6 +2989,7 @@
     const staffRetry=$('bc7-staff-retry');
     if(staffRetry)staffRetry.addEventListener('click',async()=>{try{await ensureResponsibleCatalog(true);}catch(_){}});
     const listFrom=$('bc7-list-from');if(listFrom)listFrom.addEventListener('change',()=>{state.lastPreview=null;});
+    const monthPicker=$('bc7-calendar-month');if(monthPicker)monthPicker.addEventListener('change',()=>{state.calendarSelectedDate=null;loadCalendar();});
     await loadCurrentSession();
     await loadCalendar();
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
@@ -2941,6 +3101,11 @@
       return;
     }
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
+    if(t.hasAttribute('data-bc7-calendar-select')){selectCalendarDate(t.getAttribute('data-bc7-calendar-select'));return;}
+    if(t.hasAttribute('data-bc7-month-prev')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,-1);state.calendarSelectedDate=null;await loadCalendar();return;}
+    if(t.hasAttribute('data-bc7-month-next')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,1);state.calendarSelectedDate=null;await loadCalendar();return;}
+    if(t.hasAttribute('data-bc7-month-today')){const input=$('bc7-calendar-month');if(input)input.value=dateHavana().slice(0,7);state.calendarSelectedDate=dateHavana();await loadCalendar();return;}
+    if(t.hasAttribute('data-bc7-open-planner')){const panel=$('bc7-admin-details');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});$('bc7-start-date')?.focus();}return;}
     if(t.hasAttribute('data-bc7-adjustment-add')){const form=t.closest('[data-bc7-adjust-form]');if(form)addAdjustmentRow(form);return;}
     if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
