@@ -77,6 +77,16 @@ BEGIN
     RAISE EXCEPTION 'FAIL: backward overlapping shift did not preserve day offsets';
   END IF;
 
+  v_result := public.bc5_mis_jornadas(v_base+1,v_base+3);
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_result) AS item
+    WHERE item->>'turno_id'=v_turn::text
+      AND (item->>'dias_total')::integer=3
+      AND item->>'estado_maestro'='PROGRAMADO'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: ADMIN calendar read is missing full-period metadata';
+  END IF;
+
   SELECT count(*) INTO v_events FROM public.turno_jornada_eventos
   WHERE programacion_id IN (SELECT id FROM public.turno_jornada_programacion WHERE turno_id=v_turn)
     AND tipo='JORNADA_PERIODO_REPROGRAMADO';
@@ -273,6 +283,20 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN v_error:=true;
   END;
   IF NOT v_error THEN RAISE EXCEPTION 'FAIL: non-admin invoked period reschedule'; END IF;
+  v_result := public.bc5_mis_jornadas(v_base+1,v_base+3);
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_result) AS item
+    WHERE item->>'turno_id'=v_turn::text
+  ) THEN
+    RAISE EXCEPTION 'FAIL: assigned worker lost access to own Jornada rows';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_result) AS item
+    WHERE item->>'turno_id'=v_turn::text
+      AND ((item->>'dias_total') IS NOT NULL OR (item->>'estado_maestro') IS NOT NULL)
+  ) THEN
+    RAISE EXCEPTION 'FAIL: non-admin calendar read leaked master scheduling metadata';
+  END IF;
   IF has_function_privilege('anon','public.bc5_reprogramar_periodo_jornada(uuid,date,text,uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'FAIL: anon can execute period reschedule RPC';
   END IF;
