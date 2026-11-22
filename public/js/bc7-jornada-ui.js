@@ -1326,6 +1326,31 @@
       return false;
     }finally{busy(button,false);}
   }
+  async function rectifyAdminCashDeclaration(form){
+    const declarationId=String(form?.dataset?.bc7RectifyCashDeclaration||'');
+    const sessionId=String(form?.dataset?.bc7RectifyCashSession||'');
+    const date=String(form?.querySelector('[data-bc7-rectify-cash-date]')?.value||'');
+    const note=String(form?.querySelector('[data-bc7-rectify-cash-note]')?.value||'').trim();
+    const message=form?.querySelector('[data-bc7-rectify-cash-msg]');
+    const button=form?.querySelector('button[type="submit"]');
+    const declaration=state.detail?.declaracion_dinero,session=state.detail?.sesion;
+    if(!state.admin||!declarationId||!sessionId||String(session?.estado||'').toUpperCase()!=='CERRADA_OPERATIVAMENTE'||!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null||!['PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA'].includes(String(declaration.estado_aprobacion||'').toUpperCase())){
+      msg(message,'La declaración ya cambió o no está disponible para rectificación. Actualiza la Jornada.','error');return false;
+    }
+    if(!date||date<String(session.fecha||'').slice(0,10)||date>String(session.fecha_fin||session.fecha||'').slice(0,10)||note.length<5){
+      msg(message,'Selecciona una fecha dentro del período y escribe un motivo de al menos 5 caracteres.','error');return false;
+    }
+    if(!confirm('Se conservará la declaración original de '+money(declaration.monto)+' CUP como RECTIFICADA y se creará una entrega diaria por el mismo importe para el '+fmtDateHuman(date)+'. El conteo físico final quedará pendiente hasta registrar la declaración final correcta. ¿Confirmas?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_admin_rectificar_declaracion_a_entrega_diaria',{p_declaracion_id:declarationId,p_fecha:date,p_observacion:note});
+      const loaded=await openWorkspace(sessionId);
+      if(!loaded)throw new Error('La rectificación se envió, pero no se pudo recargar la Jornada.');
+      setStatus('Declaración rectificada: importe diario y fecha guardados con auditoría.','ok');return true;
+    }catch(error){
+      msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');return false;
+    }finally{busy(button,false);}
+  }
   async function countFinalCash(form){
     const declarationId=String(form?.dataset?.bc7FinalCashCount||'');
     const sessionId=String(form?.dataset?.bc7FinalCashSession||'');
@@ -2632,13 +2657,13 @@
   }
   async function saveCashDeclaration(form,skipConfirm,alreadyBusy){
     if(!form)return false;
-    const sessionId=form.dataset.bc7CloseForm;
-    const tramo=state.detail&&state.detail.tramo_activo;
+    const sessionId=form.dataset.bc7CloseForm||String(state.detail?.sesion?.id||'');
+    const tramo=state.detail&&(state.detail.tramo_registrable||state.detail.tramo_activo);
     const tramoId=tramo&&tramo.id;
     const input=$('bc7-cash');
     const raw=input?input.value.trim():'';
     const amount=Number(raw);
-    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&String(state.detail.declaracion_dinero.estado_aprobacion||'').toUpperCase()!=='RECHAZADA';
+    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&!['RECHAZADA','RECTIFICADA'].includes(String(state.detail.declaracion_dinero.estado_aprobacion||'').toUpperCase());
     const message=form.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg');
     if(saved){msg(message,'El dinero del último día ya está guardado.','ok');return true;}
     if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return false;}
@@ -3300,6 +3325,22 @@
     if(t.id==='bc7-warehouse-retry'){e.preventDefault();ensureWarehouseCatalog();return;}
     if(t.matches&&t.matches('.tab-btn[data-tab="jornada"]')){setTimeout(()=>{ensureWarehouseCatalog();},0);}
   });
+  function openVisualCalendar(){
+    const modal=$('bc7-visual-calendar-modal');
+    const trigger=document.querySelector('[data-bc7-open-visual-calendar]');
+    const supported=window.matchMedia&&window.matchMedia('(min-width:761px) and (hover:hover) and (pointer:fine)').matches;
+    if(!modal||!supported)return;
+    modal.hidden=false;document.body.classList.add('bc7-visual-calendar-open');
+    if(trigger)trigger.setAttribute('aria-expanded','true');
+    modal.querySelector('.bc7-visual-calendar-close')?.focus();loadCalendar();
+  }
+  function closeVisualCalendar(){
+    const modal=$('bc7-visual-calendar-modal');if(!modal)return;
+    modal.hidden=true;document.body.classList.remove('bc7-visual-calendar-open');
+    const trigger=document.querySelector('[data-bc7-open-visual-calendar]');
+    if(trigger){trigger.setAttribute('aria-expanded','false');trigger.focus();}
+  }
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('bc7-visual-calendar-modal')?.hidden)closeVisualCalendar();});
   document.addEventListener('click',async function(e){
     const modeBtn=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-mode]'):null;
     if(modeBtn){
@@ -3367,18 +3408,20 @@
       return;
     }
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
+    if(t.hasAttribute('data-bc7-open-visual-calendar')){openVisualCalendar();return;}
+    if(t.hasAttribute('data-bc7-close-visual-calendar')){closeVisualCalendar();return;}
     if(t.hasAttribute('data-bc7-period-move')){try{await openPeriodMovePreview(t.getAttribute('data-bc7-period-move'));}catch(error){const detail=error&&!error.code&&error.message?error.message:friendlyError(error,'calendar');msg($('bc7-list-msg'),'No se pudo preparar el traslado. '+detail,'error');}return;}
     if(t.hasAttribute('data-bc7-period-cancel')){state.periodMoveDraft=null;renderCalendarDetail(state.calendarSelectedDate||dateHavana(),state.rows);return;}
         if(t.hasAttribute('data-bc7-calendar-select')){selectCalendarDate(t.getAttribute('data-bc7-calendar-select'));return;}
     if(t.hasAttribute('data-bc7-month-prev')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,-1);state.calendarSelectedDate=null;await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-month-next')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,1);state.calendarSelectedDate=null;await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-month-today')){const input=$('bc7-calendar-month');if(input)input.value=dateHavana().slice(0,7);state.calendarSelectedDate=dateHavana();await loadCalendar();return;}
-    if(t.hasAttribute('data-bc7-open-planner')){const panel=$('bc7-admin-details');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});$('bc7-start-date')?.focus();}return;}
+    if(t.hasAttribute('data-bc7-open-planner')){closeVisualCalendar();const panel=$('bc7-admin-details');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});$('bc7-start-date')?.focus();}return;}
     if(t.hasAttribute('data-bc7-adjustment-add')){const form=t.closest('[data-bc7-adjust-form]');if(form)addAdjustmentRow(form);return;}
     if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
-    if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
+    if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
@@ -3410,6 +3453,7 @@
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
     else if(f.matches('[data-bc7-admin-cash-declaration]')){e.preventDefault();await saveAdminCashDeclaration(f);}
+    else if(f.matches('[data-bc7-rectify-cash-declaration]')){e.preventDefault();await rectifyAdminCashDeclaration(f);}
     else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
   });
   document.addEventListener('change',function(e){
