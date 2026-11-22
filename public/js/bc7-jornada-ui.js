@@ -3329,7 +3329,7 @@
       return;
     }
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
-    if(t.hasAttribute('data-bc7-period-move')){try{await openPeriodMovePreview(t.getAttribute('data-bc7-period-move'));}catch(error){msg($('bc7-list-msg'),'No se pudo preparar el traslado. '+friendlyError(error,'calendar'),'error');}return;}
+    if(t.hasAttribute('data-bc7-period-move')){try{await openPeriodMovePreview(t.getAttribute('data-bc7-period-move'));}catch(error){const detail=error&&!error.code&&error.message?error.message:friendlyError(error,'calendar');msg($('bc7-list-msg'),'No se pudo preparar el traslado. '+detail,'error');}return;}
     if(t.hasAttribute('data-bc7-period-cancel')){state.periodMoveDraft=null;renderCalendarDetail(state.calendarSelectedDate||dateHavana(),state.rows);return;}
         if(t.hasAttribute('data-bc7-calendar-select')){selectCalendarDate(t.getAttribute('data-bc7-calendar-select'));return;}
     if(t.hasAttribute('data-bc7-month-prev')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,-1);state.calendarSelectedDate=null;await loadCalendar();return;}
