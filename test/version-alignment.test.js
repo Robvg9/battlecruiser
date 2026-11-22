@@ -205,7 +205,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(app.includes("// v9.5.145 — admin full-period Jornada rescheduling with preview, audit and idempotency."));
   assert.ok(index.includes('<script src="app.js?v=9.5.145"></script>'));
   for (const asset of [
-    'style.css?v=9.5.144',
+    'style.css?v=9.5.145',
     'js/centro-control.js?v=9.5.71',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.139',
@@ -294,9 +294,9 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.144'));
+  assert.ok(index.includes('style.css?v=9.5.145'));
   assert.ok(index.includes('app.js?v=9.5.145'));
-  assert.ok(sw.includes('./style.css?v=9.5.144'));
+  assert.ok(sw.includes('./style.css?v=9.5.145'));
   assert.ok(sw.includes('./app.js?v=9.5.145'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
