@@ -254,10 +254,18 @@ test("desktop visual calendar keeps a balanced board beside its right-hand inspe
   const styles = Array.from(window.document.querySelectorAll("style"))
     .map((style) => style.textContent || "")
     .join("\n");
-  assert.match(styles, /\.bc7-visual-calendar-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 360px/,
+  assert.match(styles, /\.bc7-visual-calendar-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) 400px/,
     "desktop board and inspector must use a two-column layout");
+  assert.match(styles, /\.bc7-visual-calendar-side \.bc7-calendar-detail\{display:flex;flex:1 1 0;flex-direction:column;min-height:170px;max-height:none;overflow:auto/,
+    "the selected-day details should use the inspector height instead of a cramped 48% scroll box");
+  assert.match(styles, /\.bc7-visual-calendar-side \.bc7-calendar-detail \.bc7-jornada-top\{display:grid;grid-template-columns:minmax\(0,1fr\);/,
+    "journey status must sit below the date instead of squeezing its title");
+  assert.match(styles, /#tab-jornada \.bc7-month-chip-status\{display:none\}/,
+    "month cells should prioritize the responsible person's name; status remains encoded by the chip color and accessible label");
+  assert.match(styles, /@media\(min-width:761px\) and \(max-height:760px\).*?390px/,
+    "short desktop windows must preserve the wider inspector");
   assert.match(styles, /\.bc7-visual-calendar-side\{display:flex;flex-direction:column/,
     "the inspector must keep its visible desktop layout");
-  assert.match(styles, /@media\(min-width:761px\) and \(max-width:1120px\).*?300px/,
+  assert.match(styles, /@media\(min-width:761px\) and \(max-width:1120px\).*?320px/,
     "the inspector must retain a responsive desktop width");
 });
