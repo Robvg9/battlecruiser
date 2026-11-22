@@ -213,8 +213,11 @@ test("admin can preview, change and confirm a whole future period with an idempo
     p_motivo: "Ajuste de la planificación semanal",
     p_idempotency_key: "83000000-0000-0000-0000-000000000001"
   });
+  const previewClosed = await waitFor(() =>
+    env.window.document.querySelector("#bc7-period-move-preview") === null
+  );
+  assert.ok(previewClosed, "the preview should close after the RPC response and calendar refresh complete");
   assert.equal(env.window.document.getElementById("bc7-calendar-month").value, nextStart.slice(0, 7));
-  assert.equal(env.window.document.querySelector("#bc7-period-move-preview"), null);
 });
 
 test("admin preflight rejects incomplete periods and never calls the write RPC", async (t) => {
