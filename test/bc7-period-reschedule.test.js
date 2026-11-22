@@ -138,10 +138,17 @@ function setup(t, options = {}) {
     "const client = window.client;\n" + SOURCE
   );
   t.after(() => window.close());
-  return { window, calls, getRows: () => rows };
+  return { window, calls, getRows: () => rows, admin };
 }
 
 async function openMonthAndSelectSource(env, rows, expectMove = true) {
+  if (env.admin) {
+    const authorized = await waitFor(() => {
+      const shortcut = env.window.document.querySelector("[data-bc7-open-planner]");
+      return Boolean(shortcut && shortcut.hidden === false);
+    });
+    assert.ok(authorized, "wait for the ADMIN role check before asserting calendar controls");
+  }
   const monthInput = env.window.document.getElementById("bc7-calendar-month");
   monthInput.value = rows[0].fecha.slice(0, 7);
   monthInput.dispatchEvent(new env.window.Event("change", { bubbles: true }));
