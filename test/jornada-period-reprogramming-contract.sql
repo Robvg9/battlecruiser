@@ -55,8 +55,8 @@ BEGIN
      OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=1)<>v_base+2
      OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=2)<>v_base+3
      OR (SELECT fecha FROM public.turno_jornada_programacion WHERE turno_id=v_turn AND numero_dia=3)<>v_base+4
-     OR (SELECT fecha FROM public.turno_sesiones s JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id WHERE p.turno_id=v_turn AND p.numero_dia=1)<>v_base+2
-     OR (SELECT fecha FROM public.turno_sesiones s JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id WHERE p.turno_id=v_turn AND p.numero_dia=3)<>v_base+4 THEN
+     OR (SELECT s.fecha FROM public.turno_sesiones s JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id WHERE p.turno_id=v_turn AND p.numero_dia=1)<>v_base+2
+     OR (SELECT s.fecha FROM public.turno_sesiones s JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id WHERE p.turno_id=v_turn AND p.numero_dia=3)<>v_base+4 THEN
     RAISE EXCEPTION 'FAIL: forward overlapping shift did not move the period consistently';
   END IF;
 
