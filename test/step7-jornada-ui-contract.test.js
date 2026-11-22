@@ -159,7 +159,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.49");
+  assert.equal(moduleVersion,"7.50");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
   assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261116.2"));

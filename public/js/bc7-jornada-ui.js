@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.49 — reprogramación visual y segura de períodos completos desde el calendario.
+// v7.50 — reprogramación visual y segura de períodos completos desde el calendario.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -651,7 +651,55 @@
         "#tab-jornada .bc7-calendar-detail-count{color:var(--mist);font-size:10px}",
         "#tab-jornada .bc7-calendar-detail-list{display:grid;gap:7px}",
         "#tab-jornada .bc7-legacy-calendar-controls{display:none!important}",
-        "@media(min-width:761px){#tab-jornada #bc7-schedule-list{display:none!important}}",
+        "#tab-jornada #bc7-schedule-list{display:grid!important}",
+        ".bc7-visual-calendar-modal[hidden]{display:none!important}",
+        ".bc7-visual-calendar-modal{position:fixed;inset:0;z-index:101500;display:grid;place-items:center;padding:18px;box-sizing:border-box}",
+        ".bc7-visual-calendar-backdrop{position:absolute;inset:0;border:0;background:rgba(3,8,17,.84);backdrop-filter:blur(10px);cursor:default}",
+        ".bc7-visual-calendar-dialog{position:relative;z-index:1;width:min(1760px,100%);height:min(960px,calc(100dvh - 36px));display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(115,139,194,.35);border-radius:22px;background:radial-gradient(1200px 520px at 14% -15%,rgba(53,89,158,.36),transparent 62%),linear-gradient(145deg,#101a2c 0%,#0b1220 70%,#0c1724 100%);box-shadow:0 32px 100px rgba(0,0,0,.56);color:#eef3ff}",
+        ".bc7-visual-calendar-header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 24px;border-bottom:1px solid rgba(141,159,203,.18);background:linear-gradient(90deg,rgba(76,108,181,.15),rgba(83,61,145,.10),transparent)}",
+        ".bc7-visual-calendar-kicker{color:#a7b8e9;font-size:10px;font-weight:800;letter-spacing:.18em}",
+        ".bc7-visual-calendar-header h2{margin:5px 0 3px;color:#f5f7ff;font-size:26px;letter-spacing:-.03em}",
+        ".bc7-visual-calendar-header p{margin:0;color:#aebbd4;font-size:12px}",
+        ".bc7-visual-calendar-close{width:42px;height:42px;border:1px solid rgba(172,190,232,.28);border-radius:12px;background:rgba(255,255,255,.06);color:#fff;font-size:27px;cursor:pointer}",
+        ".bc7-visual-calendar-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;min-height:0;flex:1;padding:18px}",
+        ".bc7-visual-calendar-main{display:flex;min-width:0;min-height:0;flex-direction:column;padding:14px;border:1px solid rgba(132,154,207,.19);border-radius:16px;background:rgba(8,15,28,.58)}",
+        ".bc7-visual-calendar-main .bc7-month-nav{flex:0 0 auto;margin:0 0 14px;gap:8px}",
+        ".bc7-visual-calendar-main .bc7-month-nav .bc7-btn{border-color:rgba(149,169,217,.24);background:rgba(255,255,255,.05);color:#dce5ff}",
+        ".bc7-visual-calendar-main .bc7-month-picker{color:#aab9d7}",
+        ".bc7-visual-calendar-main .bc7-month-picker input{background:#101c31;border-color:rgba(149,169,217,.3);color:#f3f6ff}",
+        ".bc7-visual-calendar-main .bc7-month-label{color:#f1f4ff;font-size:18px}",
+        ".bc7-visual-calendar-main .bc7-month-board{flex:1;min-height:0;grid-template-rows:34px repeat(6,minmax(62px,1fr));border-color:rgba(149,169,217,.25);background:rgba(2,8,17,.35)}",
+        ".bc7-visual-calendar-main .bc7-month-weekday{min-height:34px;background:rgba(86,112,178,.12);border-color:rgba(149,169,217,.18);color:#aebff0}",
+        ".bc7-visual-calendar-main .bc7-month-day{min-height:62px;padding:7px;border-color:rgba(149,169,217,.15);background:rgba(255,255,255,.018)}",
+        ".bc7-visual-calendar-main .bc7-month-day--selected{background:rgba(69,119,224,.16);box-shadow:inset 0 0 0 2px rgba(115,157,255,.72)}",
+        ".bc7-visual-calendar-main .bc7-month-day--outside{opacity:.23}",
+        ".bc7-visual-calendar-main .bc7-month-date{color:#f0f4ff}",
+        ".bc7-visual-calendar-main .bc7-month-chip{min-height:25px;border-radius:7px;border-color:rgba(120,151,221,.25);background:rgba(75,104,173,.12);color:#eaf0ff}",
+        ".bc7-visual-calendar-main .bc7-month-chip-person{color:#edf2ff;font-size:10px}",
+        ".bc7-visual-calendar-main .bc7-month-chip-status{color:#b7c6e5;font-size:8px}",
+        ".bc7-visual-calendar-main .bc7-month-chip.is-running{background:rgba(45,153,108,.17);border-color:rgba(69,197,141,.36)}",
+        ".bc7-visual-calendar-main .bc7-month-chip.is-scheduled{background:rgba(204,158,58,.15);border-color:rgba(226,183,89,.38)}",
+        ".bc7-visual-calendar-main .bc7-month-chip.is-closed,.bc7-visual-calendar-main .bc7-month-chip.is-sealed{background:rgba(173,76,104,.16);border-color:rgba(210,108,131,.34)}",
+        ".bc7-visual-calendar-side{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;padding:16px;border:1px solid rgba(137,126,196,.28);border-radius:16px;background:linear-gradient(180deg,rgba(59,60,112,.20),rgba(12,20,35,.9))}",
+        ".bc7-visual-calendar-side-title>span{color:#a99ee5;font-size:9px;font-weight:800;letter-spacing:.16em}",
+        ".bc7-visual-calendar-side-title h3{margin:5px 0;color:#f2f0ff;font-size:17px}",
+        ".bc7-visual-calendar-side-title p{margin:0;color:#aab6cf;font-size:11px;line-height:1.5}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail{margin:0;min-height:120px;max-height:48%;overflow:auto;border-color:rgba(153,146,209,.25);background:rgba(4,10,21,.48);color:#eaf0ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail-head h4{color:#eef2ff}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail-count,.bc7-visual-calendar-side .bc7-muted{color:#b0bdd8}",
+        ".bc7-visual-calendar-side .bc7-calendar-detail .bc7-jornada{border-color:rgba(145,154,210,.2);background:rgba(255,255,255,.035);color:#eaf0ff}",
+        ".bc7-visual-calendar-legend{margin-top:auto;padding:13px;border:1px solid rgba(153,146,209,.22);border-radius:13px;background:rgba(4,10,21,.38)}",
+        ".bc7-visual-calendar-legend-row{display:flex;align-items:center;gap:9px;margin-top:9px;color:#d8e0f3;font-size:11px}",
+        ".bc7-visual-calendar-legend-row i{width:9px;height:9px;border-radius:50%;background:#c6a24d;box-shadow:0 0 12px currentColor}",
+        ".bc7-visual-calendar-legend-row i.is-running{background:#57c58d;color:#57c58d}",
+        ".bc7-visual-calendar-legend-row i.is-scheduled{background:#e3b95c;color:#e3b95c}",
+        ".bc7-visual-calendar-legend-row i.is-closed{background:#d7798d;color:#d7798d}",
+        ".bc7-visual-calendar-create{width:100%;min-height:44px;border:1px solid rgba(143,165,237,.42);background:linear-gradient(100deg,#536fca,#7653b5);color:#fff;font-weight:800}",
+        "body.bc7-visual-calendar-open{overflow:hidden}",
+        "@media(max-width:760px),(hover:none) and (pointer:coarse){.bc7-visual-calendar-modal{display:none!important}#tab-jornada .bc7-visual-calendar-open{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}}",
+        "@media(min-width:761px) and (max-height:760px){.bc7-visual-calendar-header{padding:12px 18px}.bc7-visual-calendar-layout{padding:12px;gap:12px;grid-template-columns:minmax(0,1fr) 330px}.bc7-visual-calendar-header h2{font-size:22px}.bc7-visual-calendar-main .bc7-month-day{min-height:52px;padding:5px}.bc7-visual-calendar-side{padding:12px}}",
+        "@media(min-width:761px) and (max-width:1120px){.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) 300px;gap:10px;padding:10px}.bc7-visual-calendar-main{padding:9px}.bc7-visual-calendar-side{padding:10px}}",
+        "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}}",
         "@media(max-width:760px){#tab-jornada .bc7-month-board,#tab-jornada .bc7-calendar-detail{display:none!important}#tab-jornada #bc7-schedule-list{display:grid!important}#tab-jornada .bc7-month-nav{display:grid;grid-template-columns:auto minmax(120px,1fr) auto auto;align-items:end;gap:5px}#tab-jornada .bc7-month-nav .bc7-btn{min-height:34px;padding:5px 8px;font-size:10px}#tab-jornada .bc7-month-picker{min-width:0}#tab-jornada .bc7-month-picker input{min-height:34px;width:100%;font-size:10px}#tab-jornada .bc7-month-label{grid-column:1/-1;grid-row:2;margin:2px 0 0;font-size:12px}#tab-jornada .bc7-month-day{min-height:0}}",
         "@media(max-width:420px){#tab-jornada .bc7-month-nav{grid-template-columns:auto minmax(110px,1fr) auto}#tab-jornada .bc7-month-nav [data-bc7-month-next]{grid-column:3;grid-row:1}#tab-jornada .bc7-month-nav [data-bc7-month-today]{grid-column:1;grid-row:2}#tab-jornada .bc7-month-nav [data-bc7-refresh]{grid-column:3;grid-row:2}}"
       ].join('\n');
@@ -712,11 +760,19 @@
        '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej. 5" inputmode="numeric"></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
        '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+'<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar una jornada atrasada · Entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Prepara una sucesora cuya fecha de inicio ya pasó, aunque el período siga en curso, usando el inventario final del turno ya cerrado. Conserva la duración del período anterior. No se modifica el stock global ni se inventa un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>'+
       '</section></details>'+
-      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Calendario mensual</h3><span class="bc7-muted">Selecciona un día para revisar sus jornadas y acciones.</span></div><button class="bc7-btn primary" type="button" data-bc7-open-planner hidden>+ Programar jornada</button></div>'+
+      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Jornadas programadas</h3><span class="bc7-muted">Tu vista habitual se mantiene aquí. El tablero visual avanzado se abre aparte en computadora.</span></div><button class="bc7-btn primary bc7-visual-calendar-open" type="button" data-bc7-open-visual-calendar aria-haspopup="dialog" aria-controls="bc7-visual-calendar-modal">✦ Abrir tablero visual</button></div>'+
+      '<div id="bc7-visual-calendar-modal" class="bc7-visual-calendar-modal" hidden>'+
+      '<button type="button" class="bc7-visual-calendar-backdrop" data-bc7-close-visual-calendar aria-label="Cerrar calendario visual"></button>'+
+      '<section class="bc7-visual-calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-visual-calendar-title">'+
+      '<header class="bc7-visual-calendar-header"><div><span class="bc7-visual-calendar-kicker">PLANIFICADOR OPERATIVO · BATTLECRUISER</span><h2 id="bc7-visual-calendar-title">Calendario de jornadas</h2><p>Organiza períodos futuros, revisa responsables y mueve jornadas completas con una vista previa segura.</p></div><button type="button" class="bc7-visual-calendar-close" data-bc7-close-visual-calendar aria-label="Cerrar">×</button></header>'+
+      '<div class="bc7-visual-calendar-layout"><section class="bc7-visual-calendar-main">'+
       '<div class="bc7-month-nav" aria-label="Navegación del calendario"><button class="bc7-btn" type="button" data-bc7-month-prev aria-label="Mes anterior">‹</button><label class="bc7-month-picker"><span>Mes</span><input id="bc7-calendar-month" type="month" aria-label="Mes del calendario"></label><button class="bc7-btn" type="button" data-bc7-month-next aria-label="Mes siguiente">›</button><button class="bc7-btn" type="button" data-bc7-month-today>Hoy</button><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar</button><strong id="bc7-month-label" class="bc7-month-label"></strong></div>'+
       '<input type="date" id="bc7-list-from" hidden><input type="number" id="bc7-list-days" min="1" max="31" value="31" hidden>'+
       '<div id="bc7-month-board" class="bc7-month-board" aria-label="Calendario de jornadas"><div class="bc7-empty">Cargando calendario…</div></div>'+
+      '</section><aside class="bc7-visual-calendar-side"><div class="bc7-visual-calendar-side-title"><span>INSPECTOR</span><h3>Jornada seleccionada</h3><p>Selecciona un día para ver sus jornadas y acciones.</p></div>'+
       '<section id="bc7-calendar-detail" class="bc7-calendar-detail" aria-live="polite"><div class="bc7-empty">Selecciona un día del calendario para ver sus detalles.</div></section>'+
+      '<div class="bc7-visual-calendar-legend"><div class="bc7-visual-calendar-side-title"><span>ESTADOS</span><h3>Leyenda</h3></div><div class="bc7-visual-calendar-legend-row"><i class="is-running"></i><span>En curso</span></div><div class="bc7-visual-calendar-legend-row"><i class="is-scheduled"></i><span>Programada</span></div><div class="bc7-visual-calendar-legend-row"><i class="is-closed"></i><span>Cerrada</span></div></div>'+
+      '<button class="bc7-btn primary bc7-visual-calendar-create" type="button" data-bc7-open-planner>+ Programar jornada</button></aside></div></section></div>'+
       '<div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><p class="bc7-msg" id="bc7-list-msg" role="status" aria-live="polite"></p></section>'+
       '<section id="bc7-workspace" class="bc7-card" hidden><div class="bc7-workspace-head"><div class="bc7-workspace-title-wrap"><button type="button" class="bc7-btn bc7-back" data-bc7-back-calendar>← Calendario</button><h3 id="bc7-workspace-title">Jornada</h3></div></div><div id="bc7-workspace-body"></div></section>'+
       '</div>';
@@ -1079,9 +1135,14 @@
   }
   function cashDaysManagerShellHtml(detail,isAssigned,status){
     if(!detail||detail.sesion?.es_minorista!==true)return '';
-    return '<section class="bc7-jornada" id="bc7-cash-days-manager"><h4>Dinero recogido · todos los días</h4>'+
-      '<p class="bc7-muted">Registra aquí el dinero de cada fecha, incluido el último día. Escribe 0 cuando no se haya recogido efectivo. No necesitas salir de esta jornada.</p>'+
-      '<div id="bc7-cash-days-list"><div class="bc7-empty">Consultando los importes del período…</div></div>'+
+    const sessionId=String(detail.sesion.id||'');
+    const closed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
+    const canBackfill=closed&&!!detail.tramo_registrable&&(!!isAssigned||!!detail.is_admin);
+    const wrapper=canBackfill?'<div data-bc7-close-form="'+esc(sessionId)+'" data-bc7-cash-mode="daily">':'';
+    const save=canBackfill?'<div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-save-cash-days>Guardar entregas diarias</button></div>':'';
+    return '<section class="bc7-jornada" id="bc7-cash-days-manager"><h4>Dinero recogido · por fecha</h4>'+
+      '<p class="bc7-muted">Cada entrega diaria conserva su fecha. La declaración final del período se registra aparte; no la uses para introducir el importe de un día anterior.</p>'+
+      wrapper+'<div id="bc7-cash-days-list"><div class="bc7-empty">Consultando los importes del período…</div></div>'+save+(canBackfill?'</div>':'')+
       '<p class="bc7-msg" id="bc7-cash-days-msg"></p></section>';
   }
   function renderCashDaysWorkspace(detail){
@@ -1097,47 +1158,68 @@
       host.innerHTML='<div class="bc7-empty">No se pudo determinar el período de la jornada. Actualiza el detalle antes de registrar el dinero.</div>';return;
     }
     const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));
-    const editable=String(detail.sesion.estado||'').toUpperCase()==='EN_CURSO'&&!!detail.tramo_activo;
+    const sessionState=String(detail.sesion.estado||'').toUpperCase();
+    const currentUserId=String(currentUser()?.id||'');
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const isAssigned=currentUserId===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const tranche=detail.tramo_registrable||detail.tramo_activo||null;
+    const editable=(sessionState==='EN_CURSO'&&!!detail.tramo_activo&&isAssigned)||(sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail.tramo_registrable&&(isAssigned||!!detail.is_admin));
     const rows=arr(state.dailyCashData.entregas);
     const declaration=detail.declaracion_dinero||null;
-    const tramoId=detail.tramo_activo?.id;
-    const finalSaved=!!declaration&&(!tramoId||String(declaration.turno_tramo_id)===String(tramoId));
+    const trancheId=tranche?.id||'';
+    const declarationState=String(declaration?.estado_aprobacion||'').toUpperCase();
+    const declarationMatches=!!declaration&&!!trancheId&&String(declaration.turno_tramo_id)===String(trancheId);
+    const rectified=declarationMatches&&declarationState==='RECTIFICADA';
+    const finalSaved=declarationMatches&&!rectified&&declarationState!=='RECHAZADA';
     const today=dateHavana();
     let html='<div class="bc7-list">';
-    if(detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&!declaration){
-      html+='<div class="bc7-note"><b>Transcribir declaración de efectivo de la responsable</b><p>Registra el importe que la responsable comunicó o dejó documentado. Esto no es el conteo físico del Dueño. El conteo real se registra en un paso separado.</p><form data-bc7-admin-cash-declaration="'+esc(sessionId)+'"><label class="bc7-field">Importe declarado por la responsable (CUP)<input data-bc7-admin-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></label><label class="bc7-field">Fuente / observación obligatoria<input data-bc7-admin-cash-note maxlength="1000" required placeholder="Ej.: importe comunicado por la responsable al entregar el efectivo"></label><div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar declaración transcrita</button></div><p class="bc7-msg" data-bc7-admin-cash-msg></p></form></div>';
+    if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&(!declaration||rectified)){
+      html+='<div class="bc7-note"><b>Declaración final del período · última fecha</b><p>Este importe corresponde al total declarado al finalizar el período ('+esc(fmtDateHuman(lastDate))+'). Para registrar dinero recogido el 18 o 19, utiliza la fila de esa fecha.</p>'+
+        (rectified?'<p class="bc7-muted">La declaración anterior de '+esc(money(declaration.monto))+' CUP fue rectificada y convertida en entrega diaria del '+esc(fmtDateHuman(declaration.rectificacion_diaria?.fecha||firstDate))+'. Su evidencia original permanece conservada.</p>':'')+
+        '<form data-bc7-admin-cash-declaration="'+esc(sessionId)+'"><label class="bc7-field">Total declarado al finalizar el período (CUP)<input data-bc7-admin-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></label><label class="bc7-field">Fuente / observación obligatoria<input data-bc7-admin-cash-note maxlength="1000" required placeholder="Fuente del total entregado al cierre del período"></label><div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar declaración final</button></div><p class="bc7-msg" data-bc7-admin-cash-msg></p></form></div>';
+    }
+    if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&declarationMatches&&!rectified&&declaration.monto_contado==null&&['PENDIENTE','ESPERANDO_APROBACION'].includes(declarationState)){
+      html+='<div class="bc7-note bc7-cash-rectify"><b>Rectificar la declaración asociada al último día</b><p>Importe conservado: <b>'+esc(money(declaration.monto))+' CUP</b>. Fuente registrada: “'+esc(declaration.observacion_transcripcion||'sin observación recuperada')+'”. Si este importe era del primer o segundo día, conviértelo en una entrega con fecha sin borrar la declaración original.</p>'+
+        '<form data-bc7-rectify-cash-declaration="'+esc(declaration.id)+'" data-bc7-rectify-cash-session="'+esc(sessionId)+'"><label class="bc7-field">Fecha real de la entrega<input data-bc7-rectify-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(lastDate)+'" value="'+esc(firstDate)+'" required></label><label class="bc7-field">Motivo de rectificación (obligatorio)<input data-bc7-rectify-cash-note maxlength="1000" required placeholder="El importe corresponde al dinero recogido el primer día, no al cierre final"></label><div class="bc7-actions"><button class="bc7-btn danger" type="submit">Rectificar y asignar a esta fecha</button></div><p class="bc7-msg" data-bc7-rectify-cash-msg></p></form></div>';
+    }
+    if(rectified){
+      html+='<div class="bc7-note"><b>Declaración final rectificada</b><p>Los '+esc(money(declaration.monto))+' CUP se conservan como evidencia original y se trasladaron a la entrega diaria del '+esc(fmtDateHuman(declaration.rectificacion_diaria?.fecha||firstDate))+'. La declaración final verdadera queda pendiente.</p></div>';
     }
     for(let index=0;index<totalDays;index++){
       const date=addDays(firstDate,index),isFinal=date===lastDate;
       const row=rows.find(item=>String(item.fecha||'').slice(0,10)===date);
-      const rejected=isFinal?String(declaration?.estado_aprobacion||'').toUpperCase()==='RECHAZADA':!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
+      const rejected=!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
       html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><div><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong></div>';
-      if(isFinal&&finalSaved){
-        const finalCashState=String(declaration.estado_aprobacion||'ESPERANDO_APROBACION').toUpperCase();
-        html+='<span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Estado: '+esc(humanStatus(finalCashState))+'. El importe declarado no sustituye el conteo físico.</p>';
-        if(detail.is_admin&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase())&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
-          html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el dinero que contaste realmente; no copies el importe declarado si no coincide con el efectivo físico.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
-        }else if(detail.is_admin&&!['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(detail.sesion.estado||'').toUpperCase())&&declaration.monto_contado==null){
-          html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
-        }else if(declaration.monto_contado!=null){
-          html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
-        }
-      }else if(!isFinal&&row&&!rejected){
-        const status=String(row.estado||'PENDIENTE').toUpperCase();
-        const amount=status==='APROBADA'&&row.monto_aprobado!=null?row.monto_aprobado:row.monto_declarado;
-        html+='<span class="bc7-pill '+(status==='APROBADA'?'ok':'')+'">'+esc(humanStatus(status))+'</span></div><p><b>'+esc(money(amount))+' CUP</b>'+(row.creado_nombre?' · '+esc(row.creado_nombre):'')+'</p>'+(row.observacion?'<p class="bc7-muted">'+esc(row.observacion)+'</p>':'')+(row.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(row.comentario_revision)+'</p>':'');
-      }else if(editable&&(isFinal||date<=today)){
-        html+='<span class="bc7-pill '+(rejected?'warn':'')+'">'+(rejected?'Rechazada · corregir':'Pendiente')+'</span></div><div class="bc7-grid"><label class="bc7-field">Dinero recogido (CUP)<input '+(isFinal?'id="bc7-cash"':'data-bc7-cash-day-amount')+' type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="'+(rejected?esc(isFinal?declaration?.monto:row.monto_declarado):'')+'"></label>';
+      if(row&&!rejected){
+        const dailyState=String(row.estado||'PENDIENTE').toUpperCase();
+        const amount=dailyState==='APROBADA'&&row.monto_aprobado!=null?row.monto_aprobado:row.monto_declarado;
+        html+='<span class="bc7-pill '+(dailyState==='APROBADA'?'ok':'warn')+'">'+esc(humanStatus(dailyState))+'</span></div><p><b>'+esc(money(amount))+' CUP</b>'+(row.creado_nombre?' · '+esc(row.creado_nombre):'')+'</p>'+(row.observacion?'<p class="bc7-muted">'+esc(row.observacion)+'</p>':'')+(row.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(row.comentario_revision)+'</p>':'');
+      }else if(editable&&date<=today&&(!isFinal||!finalSaved)&&!(isFinal&&detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE')){
+        html+='<span class="bc7-pill '+(rejected?'warn':'')+'">'+(rejected?'Rechazada · corregir':'Pendiente')+'</span></div><div class="bc7-grid"><label class="bc7-field">'+(isFinal?'Declaración final del período (CUP)':'Dinero recogido este día (CUP)')+'<input '+(isFinal?'id="bc7-cash"':'data-bc7-cash-day-amount')+' type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="'+(rejected?esc(row.monto_declarado):'')+'"></label>';
         if(!isFinal)html+='<label class="bc7-field">Observación (opcional)<input data-bc7-cash-day-note maxlength="500" value="'+(rejected?esc(row.observacion||''):'')+'" placeholder="Aclaración de la entrega"></label><input type="hidden" data-bc7-cash-day-key value="">';
-        html+='</div>';
+        html+='</div>'+(isFinal?'<p class="bc7-muted">Este importe es el total final, no el dinero de un día anterior.</p>':'');
+      }else if(isFinal&&detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&!finalSaved){
+        html+='<span class="bc7-pill warn">Declaración final pendiente</span></div><p class="bc7-muted">El total final se registra en el formulario administrativo separado.</p>';
       }else{
         html+='<span class="bc7-pill">No registrado</span></div><p class="bc7-muted">'+(date>today?'Este día todavía no se puede declarar.':'No hay importe registrado para esta fecha.')+'</p>';
       }
       html+='</article>';
     }
+    if(finalSaved){
+      const finalCashState=declarationState||'ESPERANDO_APROBACION';
+      html+='<article class="bc7-jornada bc7-cash-final-summary"><div class="bc7-jornada-top"><strong>Declaración final del período · '+esc(fmtDateHuman(lastDate))+'</strong><span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">El conteo físico del Dueño es independiente de las entregas diarias.</p>';
+      if(detail.is_admin&&sessionState==='COMPLETADA'&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
+        html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. No copies el importe declarado como importe contado; introduce únicamente el dinero que contaste físicamente.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
+      }else if(declaration.monto_contado!=null){
+        html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
+      }else if(detail.is_admin&&sessionState!=='COMPLETADA'){
+        html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la jornada esté completada.</p>';
+      }
+      html+='</article>';
+    }
     host.innerHTML=html;
     const saveButton=document.querySelector('[data-bc7-save-cash-days]');
-    if(saveButton)saveButton.disabled=!editable;
+    if(saveButton)saveButton.disabled=!editable||!navigator.onLine;
   }
   async function loadCashDaysWorkspace(detail){
     const host=$('bc7-cash-days-list');
@@ -1164,107 +1246,63 @@
     const detail=state.detail,sessionId=String(form.dataset.bc7CloseForm||detail.sesion?.id||'');
     const message=form.querySelector('#bc7-cash-days-msg')||$('bc7-cash-days-msg');
     const saveButton=form.querySelector('[data-bc7-save-cash-days]');
-    const firstDate=String(detail.sesion?.fecha||'').slice(0,10);
     const lastDate=String(detail.sesion?.fecha_fin||state.dailyCashData?.fecha_fin||detail.sesion?.fecha||'').slice(0,10);
     const entries=arr(state.dailyCashData?.entregas);
     const declaration=detail.declaracion_dinero||null;
-    const trancheId=detail.tramo_activo?.id;
-    const finalSaved=!!declaration&&(!trancheId||String(declaration.turno_tramo_id)===String(trancheId))&&String(declaration.estado_aprobacion||'').toUpperCase()!=='RECHAZADA';
+    const tranche=detail.tramo_registrable||detail.tramo_activo;
+    const trancheId=tranche?.id||'';
+    const declarationState=String(declaration?.estado_aprobacion||'').toUpperCase();
+    const finalSaved=!!declaration&&!!trancheId&&String(declaration.turno_tramo_id)===String(trancheId)&&!['RECHAZADA','RECTIFICADA'].includes(declarationState);
     const days=Array.from(form.querySelectorAll('[data-bc7-cash-day-row]'));
     const operations=[],missing=[];
     for(const day of days){
-      const date=String(day.dataset.bc7CashDate||'');
-      const isFinal=date===lastDate;
+      const date=String(day.dataset.bc7CashDate||''),isFinal=date===lastDate;
       if(isFinal&&finalSaved)continue;
       const old=entries.find(item=>String(item.fecha||'').slice(0,10)===date);
       const oldRejected=old&&String(old.estado||'').toUpperCase()==='RECHAZADA';
       if(!isFinal&&old&&!oldRejected)continue;
+      if(isFinal&&detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE')continue;
       const amountInput=isFinal?day.querySelector('#bc7-cash'):day.querySelector('[data-bc7-cash-day-amount]');
       const raw=amountInput?.value.trim()??'';
-      if(raw===''){
-        if(options.requireComplete)missing.push(fmtDateHuman(date));
-        continue;
-      }
+      if(raw===''){if(options.requireComplete)missing.push(fmtDateHuman(date));continue;}
       const amount=Number(raw);
-      if(!Number.isFinite(amount)||amount<0){
-        msg(message,'Revisa los importes: todos deben ser números iguales o mayores que cero.','error');return false;
-      }
-      if(!isFinal&&date>dateHavana()){
-        msg(message,'No puedes declarar efectivo para una fecha futura.','error');return false;
-      }
-      operations.push({
-        date,isFinal,amount,
-        note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,
-        keyField:day.querySelector('[data-bc7-cash-day-key]')
-      });
+      if(!Number.isFinite(amount)||amount<0){msg(message,'Revisa los importes: todos deben ser números iguales o mayores que cero.','error');return false;}
+      if(date>dateHavana()){msg(message,'No puedes declarar efectivo para una fecha futura.','error');return false;}
+      operations.push({date,isFinal,amount,note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,keyField:day.querySelector('[data-bc7-cash-day-key]')});
     }
-    if(options.requireComplete&&missing.length){
-      msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Escribe 0 cuando no se haya recogido dinero.','error');return false;
-    }
-    if(!operations.length){
-      if(options.requireComplete&&finalSaved&&days.every(day=>{
-        const date=String(day.dataset.bc7CashDate||'');
-        if(date===lastDate)return true;
-        const old=entries.find(item=>String(item.fecha||'').slice(0,10)===date);
-        return !!old&&String(old.estado||'').toUpperCase()!=='RECHAZADA';
-      })){
-        msg(message,'Todos los importes diarios ya están guardados y confirmados.','ok');return true;
-      }
-      // A normal Save click can be a no-op. Never report a false validation
-      // error when all existing declarations are already saved; closeSession
-      // still enforces requireComplete and missing dates above.
-      if(!options.requireComplete){
-        msg(message,'No hay importes nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');
-        return true;
-      }
-      msg(message,'No hay importes nuevos para guardar. No se modificó ningún dato.','error');return false;
-    }
-    if(!navigator.onLine){
-      msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;
-    }
+    if(options.requireComplete&&missing.length){msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Escribe 0 cuando no se haya recogido dinero.','error');return false;}
+    if(!operations.length){if(!options.requireComplete){msg(message,'No hay importes nuevos que guardar. Los registros existentes se conservaron sin cambios.','ok');return true;}msg(message,'No hay importes nuevos que guardar. No se modificó ningún dato.','error');return false;}
+    if(!navigator.onLine){msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;}
     if(!options.skipConfirm&&!confirm('Se guardarán los importes introducidos para cada fecha. Las entregas quedarán registradas para revisión del Dueño y no modificarán caja automáticamente. ¿Confirmas?'))return false;
     if(!busy(saveButton,true))return false;
     const dailySubmitted=[];
     try{
       for(const operation of operations.filter(item=>!item.isFinal)){
-        let key=operation.keyField?.value.trim()||'';
-        if(!key){key=freshIdempotencyKey();if(operation.keyField)operation.keyField.value=key;}
-        const id=await rpc('bc7_registrar_entrega_diaria_jornada',{
-          p_turno_sesion_id:sessionId,p_fecha:operation.date,p_monto:operation.amount,
-          p_observacion:operation.note,p_idempotency_key:key
-        });
+        let key=operation.keyField?.value.trim()||'';if(!key){key=freshIdempotencyKey();if(operation.keyField)operation.keyField.value=key;}
+        const postClosedAdmin=!!detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
+        const rpcArgs={p_turno_sesion_id:sessionId,p_fecha:operation.date,p_monto:operation.amount,p_observacion:operation.note,p_idempotency_key:key};
+        let id;
+        if(postClosedAdmin){
+          id=await rpc('bc7_admin_registrar_entrega_diaria_jornada',rpcArgs);
+        }else{
+          id=await rpc('bc7_registrar_entrega_diaria_jornada',rpcArgs);
+        }
         dailySubmitted.push({date:operation.date,amount:operation.amount,id:id?String(id):''});
       }
       if(dailySubmitted.length){
         const reread=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
         const readRows=arr(reread.entregas);
-        const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>
-          String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)
-        ));
+        const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)));
         if(missingRows.length)throw new Error('El servidor no confirmó la lectura de '+missingRows.map(x=>fmtDateHuman(x.date)).join(', ')+'. Conservé las claves para evitar duplicados.');
-        state.dailyCashData=reread;
-        state.dailyCashSessionId=sessionId;
+        state.dailyCashData=reread;state.dailyCashSessionId=sessionId;
       }
       const finalOperation=operations.find(item=>item.isFinal);
-      if(finalOperation){
-        const finalInput=form.querySelector('#bc7-cash');
-        if(finalInput)finalInput.value=String(finalOperation.amount);
-        const saved=await saveCashDeclaration(form,true,true);
-        if(!saved)throw new Error('No se confirmó la declaración del último día. Conservé los importes anteriores y no repetí la escritura.');
-        await loadCashDaysWorkspace(state.detail);
-      }else if(dailySubmitted.length){
-        renderCashDaysWorkspace(state.detail);
-      }
-      msg($('bc7-cash-days-msg')||message,'Importes guardados y confirmados desde el servidor. Cada día conserva su registro y estado de revisión.','ok');
-      setStatus('Dinero diario actualizado para '+operations.length+' día(s).','ok');
-      return true;
-    }catch(e){
-      msg($('bc7-cash-days-msg')||message,friendlyError(e,'create')+' '+String(e&&e.message||'')+' Las claves de idempotencia se conservaron para evitar duplicados.','error');
-      setStatus('No se pudo confirmar todos los importes diarios.','error');
-      return false;
-    }finally{
-      busy(saveButton,false);
-    }
+      if(finalOperation){const finalInput=form.querySelector('#bc7-cash');if(finalInput)finalInput.value=String(finalOperation.amount);const saved=await saveCashDeclaration(form,true,true);if(!saved)throw new Error('No se confirmó la declaración final del período. Los importes diarios anteriores se conservaron.');await loadCashDaysWorkspace(state.detail);}
+      else if(dailySubmitted.length)renderCashDaysWorkspace(state.detail);
+      msg($('bc7-cash-days-msg')||message,'Importes guardados y confirmados por fecha. La declaración final sigue separada.','ok');
+      setStatus('Dinero diario actualizado para '+operations.length+' día(s).','ok');return true;
+    }catch(e){msg($('bc7-cash-days-msg')||message,friendlyError(e,'create')+' '+String(e&&e.message||'')+' Las claves de idempotencia se conservaron para evitar duplicados.','error');setStatus('No se pudo confirmar todos los importes diarios.','error');return false;}
+    finally{busy(saveButton,false);}
   }
   async function saveAdminCashDeclaration(form){
     const sessionId=String(form?.dataset?.bc7AdminCashDeclaration||'');
@@ -1293,6 +1331,31 @@
     }catch(error){
       msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');
       return false;
+    }finally{busy(button,false);}
+  }
+  async function rectifyAdminCashDeclaration(form){
+    const declarationId=String(form?.dataset?.bc7RectifyCashDeclaration||'');
+    const sessionId=String(form?.dataset?.bc7RectifyCashSession||'');
+    const date=String(form?.querySelector('[data-bc7-rectify-cash-date]')?.value||'');
+    const note=String(form?.querySelector('[data-bc7-rectify-cash-note]')?.value||'').trim();
+    const message=form?.querySelector('[data-bc7-rectify-cash-msg]');
+    const button=form?.querySelector('button[type="submit"]');
+    const declaration=state.detail?.declaracion_dinero,session=state.detail?.sesion;
+    if(!state.admin||!declarationId||!sessionId||String(session?.estado||'').toUpperCase()!=='CERRADA_OPERATIVAMENTE'||!declaration||String(declaration.id)!==declarationId||declaration.monto_contado!=null||!['PENDIENTE','ESPERANDO_APROBACION'].includes(String(declaration.estado_aprobacion||'').toUpperCase())){
+      msg(message,'La declaración ya cambió o no está disponible para rectificación. Actualiza la Jornada.','error');return false;
+    }
+    if(!date||date<String(session.fecha||'').slice(0,10)||date>String(session.fecha_fin||session.fecha||'').slice(0,10)||note.length<5){
+      msg(message,'Selecciona una fecha dentro del período y escribe un motivo de al menos 5 caracteres.','error');return false;
+    }
+    if(!confirm('Se conservará la declaración original de '+money(declaration.monto)+' CUP como RECTIFICADA y se creará una entrega diaria por el mismo importe para el '+fmtDateHuman(date)+'. El conteo físico final quedará pendiente hasta registrar la declaración final correcta. ¿Confirmas?'))return false;
+    if(!busy(button,true))return false;
+    try{
+      await rpc('bc5_admin_rectificar_declaracion_a_entrega_diaria',{p_declaracion_id:declarationId,p_fecha:date,p_observacion:note});
+      const loaded=await openWorkspace(sessionId);
+      if(!loaded)throw new Error('La rectificación se envió, pero no se pudo recargar la Jornada.');
+      setStatus('Declaración rectificada: importe diario y fecha guardados con auditoría.','ok');return true;
+    }catch(error){
+      msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');return false;
     }finally{busy(button,false);}
   }
   async function countFinalCash(form){
@@ -2272,7 +2335,7 @@
     }else if(status==='COMPLETADA'){
       actionArea='<div class="bc7-note">Jornada completada. Conteos y movimientos conservados como evidencia.</div>';
     }else if(status==='CERRADA_OPERATIVAMENTE'&&s.es_minorista===true){
-      actionArea='<div class="bc7-note"><b>Sellado operativo · pendiente de conciliación.</b><p>La operación terminó a las '+esc(String(s.corte_operativo_at||s.cierre_operativo_at||'').slice(11,16)||'hora registrada')+'. No se inventó inventario final, declaración de efectivo ni aprobación. El Dueño completará los cinco controles y el conteo físico cuando revise la Jornada.</p>'+cashDaysManagerShellHtml(detail,false,status)+'</div>';
+      actionArea='<div class="bc7-note"><b>Sellado operativo · pendiente de conciliación.</b><p>La operación terminó a las '+esc(String(s.corte_operativo_at||s.cierre_operativo_at||'').slice(11,16)||'hora registrada')+'. La responsable puede completar registros diarios mientras el turno maestro siga abierto. La revisión final y el conteo físico permanecen separados.</p>'+cashDaysManagerShellHtml(detail,isAssigned,status)+'</div>';
     }else{
       actionArea='<div class="bc7-note">Estado: '+esc(humanStatus(status))+'. Las acciones disponibles dependen de esta jornada.</div>';
     }
@@ -2601,13 +2664,15 @@
   }
   async function saveCashDeclaration(form,skipConfirm,alreadyBusy){
     if(!form)return false;
-    const sessionId=form.dataset.bc7CloseForm;
-    const tramo=state.detail&&state.detail.tramo_activo;
+    const sessionId=form.dataset.bc7CloseForm||String(state.detail?.sesion?.id||'');
+    const tramo=state.detail&&(state.detail.tramo_registrable||state.detail.tramo_activo);
     const tramoId=tramo&&tramo.id;
     const input=$('bc7-cash');
     const raw=input?input.value.trim():'';
     const amount=Number(raw);
-    const saved=state.detail?.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId)&&String(state.detail.declaracion_dinero.estado_aprobacion||'').toUpperCase()!=='RECHAZADA';
+    const declaration=state.detail?.declaracion_dinero;
+    const declarationState=String(declaration?.estado_aprobacion||'').toUpperCase();
+    const saved=declaration&&String(declaration.turno_tramo_id)===String(tramoId)&&String(declaration.estado_aprobacion||'').toUpperCase()!=='RECHAZADA'&&declarationState!=='RECTIFICADA';
     const message=form.querySelector('[data-bc7-close-msg]')||$('bc7-cash-days-msg');
     if(saved){msg(message,'El dinero del último día ya está guardado.','ok');return true;}
     if(!sessionId||!tramoId){msg(message,'No se encontró el tramo activo para guardar la declaración.','error');return false;}
@@ -3269,6 +3334,22 @@
     if(t.id==='bc7-warehouse-retry'){e.preventDefault();ensureWarehouseCatalog();return;}
     if(t.matches&&t.matches('.tab-btn[data-tab="jornada"]')){setTimeout(()=>{ensureWarehouseCatalog();},0);}
   });
+  function openVisualCalendar(){
+    const modal=$('bc7-visual-calendar-modal');
+    const trigger=document.querySelector('[data-bc7-open-visual-calendar]');
+    const supported=window.matchMedia&&window.matchMedia('(min-width:761px) and (hover:hover) and (pointer:fine)').matches;
+    if(!modal||!supported)return;
+    modal.hidden=false;document.body.classList.add('bc7-visual-calendar-open');
+    if(trigger)trigger.setAttribute('aria-expanded','true');
+    modal.querySelector('.bc7-visual-calendar-close')?.focus();loadCalendar();
+  }
+  function closeVisualCalendar(){
+    const modal=$('bc7-visual-calendar-modal');if(!modal)return;
+    modal.hidden=true;document.body.classList.remove('bc7-visual-calendar-open');
+    const trigger=document.querySelector('[data-bc7-open-visual-calendar]');
+    if(trigger){trigger.setAttribute('aria-expanded','false');trigger.focus();}
+  }
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('bc7-visual-calendar-modal')?.hidden)closeVisualCalendar();});
   document.addEventListener('click',async function(e){
     const modeBtn=e.target&&e.target.closest?e.target.closest('[data-bc7-receive-mode]'):null;
     if(modeBtn){
@@ -3336,18 +3417,20 @@
       return;
     }
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
+    if(t.hasAttribute('data-bc7-open-visual-calendar')){openVisualCalendar();return;}
+    if(t.hasAttribute('data-bc7-close-visual-calendar')){closeVisualCalendar();return;}
     if(t.hasAttribute('data-bc7-period-move')){try{await openPeriodMovePreview(t.getAttribute('data-bc7-period-move'));}catch(error){const detail=error&&!error.code&&error.message?error.message:friendlyError(error,'calendar');msg($('bc7-list-msg'),'No se pudo preparar el traslado. '+detail,'error');}return;}
     if(t.hasAttribute('data-bc7-period-cancel')){state.periodMoveDraft=null;renderCalendarDetail(state.calendarSelectedDate||dateHavana(),state.rows);return;}
         if(t.hasAttribute('data-bc7-calendar-select')){selectCalendarDate(t.getAttribute('data-bc7-calendar-select'));return;}
     if(t.hasAttribute('data-bc7-month-prev')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,-1);state.calendarSelectedDate=null;await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-month-next')){const input=$('bc7-calendar-month');if(input)input.value=shiftMonth(input.value,1);state.calendarSelectedDate=null;await loadCalendar();return;}
     if(t.hasAttribute('data-bc7-month-today')){const input=$('bc7-calendar-month');if(input)input.value=dateHavana().slice(0,7);state.calendarSelectedDate=dateHavana();await loadCalendar();return;}
-    if(t.hasAttribute('data-bc7-open-planner')){const panel=$('bc7-admin-details');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});$('bc7-start-date')?.focus();}return;}
+    if(t.hasAttribute('data-bc7-open-planner')){closeVisualCalendar();const panel=$('bc7-admin-details');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});$('bc7-start-date')?.focus();}return;}
     if(t.hasAttribute('data-bc7-adjustment-add')){const form=t.closest('[data-bc7-adjust-form]');if(form)addAdjustmentRow(form);return;}
     if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
-    if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
+    if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}
     if(t.hasAttribute('data-bc7-refresh')){await loadCalendar();return;}
@@ -3379,6 +3462,7 @@
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
     else if(f.matches('[data-bc7-admin-cash-declaration]')){e.preventDefault();await saveAdminCashDeclaration(f);}
+    else if(f.matches('[data-bc7-rectify-cash-declaration]')){e.preventDefault();await rectifyAdminCashDeclaration(f);}
     else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
   });
   document.addEventListener('change',function(e){

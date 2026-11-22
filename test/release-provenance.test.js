@@ -216,6 +216,8 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(liveOfflineE2e, /BC_EXPECTED_DEPLOY_RUN_ID/);
   assert.ok(liveOfflineE2e.includes('cache: "no-store"'), "LIVE E2E core asset reads must bypass stale CDN/browser caches like the deploy smoke");
   assert.match(liveOfflineE2e, /const maxAttempts = isProductionBase \? 30 : 4/);
+  assert.match(liveOfflineE2e, /edgeCheck: live\.edgeCheck/);
+  assert.match(liveOfflineE2e, /actualAsset && actualAsset\.edgeCheck/);
   assert.match(liveOfflineE2e, /timeoutMs = 20000/);
   assert.match(liveOfflineE2e, /isProductionBase \? 20000 : 35000/);
   const suiteStep = quality.indexOf("- name: Full automated suite");

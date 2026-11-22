@@ -474,6 +474,7 @@ async function main() {
     liveAssetEvidence[assetPath] = {
       httpStatus: live.status,
       contentType: live.contentType,
+      edgeCheck: live.edgeCheck,
       sha256: sha256(live.body),
       sha256Raw: crypto.createHash("sha256").update(liveBytes).digest("hex"),
       bytesRaw: liveBytes.length,
