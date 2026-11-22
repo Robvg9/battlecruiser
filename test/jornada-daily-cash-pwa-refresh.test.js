@@ -37,14 +37,17 @@ test("PWA update banner waits for the user-approved worker activation before rel
   assert.doesNotMatch(APP, /waiting\.state === "activated"/);
 });
 
-test("finance and operation refresh recognize the authenticated active jornada as assigned", () => {
+test("retail access and daily cash use the server-verified assigned identity, not a local user-id comparison", () => {
   assert.match(UI, /const activeSessionId=String\(state\.currentSession\?\.turno_sesion_id\|\|''\);/);
-  assert.match(UI,/activeSessionId===sessionId/);
+  assert.match(UI,/const localAssignment=.*activeSessionId===sessionId/);
+  assert.match(UI,/const isAssigned=isRetail\?\(!!state\.admin\|\|detail\.server_responsible_access===true\):localAssignment/);
+  assert.match(UI,/serverAccessPromise=isRetail&&!state\.admin\s*\?rpc\('bc7_entregas_diarias_jornada'/);
+  assert.match(UI,/detail\.server_responsible_access=true/);
   assert.match(UI,/if\(tab==='operacion'&&state\.detail\)\{\s*ensureWorkspaceOperationData\(state\.detail\);\s*if\(state\.workspaceOperationLoaded\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}\s*\}/);
-  assert.match(UI,/const sessionId=String\(detail\.sesion\.id\)/);
   assert.match(UI,/state\.workspaceOperationLoaded=true;\s*state\.workspaceOperationPromise=null;\s*renderWorkspace\(detail\)/);
   assert.match(UI,/activateWorkspaceTab\(state\.workspaceTab\)/);
-  assert.match(UI,/const isAssigned=.*activeSessionId===sessionId/);
+  assert.doesNotMatch(UI,/No tienes acceso a los importes de esta jornada\./);
+  assert.match(UI,/El servidor no autorizó la consulta/);
 });
 
 test("cash, expenses, reinvestments, adjustments and reconciliation share the same compact operation panel", () => {
