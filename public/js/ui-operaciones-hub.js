@@ -507,6 +507,10 @@
         if (label && label.textContent !== card.title) label.textContent = card.title;
       }
 
+      // Revalidar el callback también en nodos reutilizados: otro render puede dejar
+      // el objetivo conectado y visible, pero sin su acción de apertura actual.
+      button.onclick = card.fn;
+
       desired.add(key);
       // No mover un nodo que ya está en la posición correcta: conserva foco y objetivo del clic.
       var atPosition = grid.children[index];
