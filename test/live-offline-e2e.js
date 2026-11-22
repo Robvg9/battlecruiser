@@ -75,6 +75,7 @@ async function fetchText(url, timeoutMs = 20000) {
       headers["Cloudflare-Workers-Version-Key"] = LIVE_VERSION_AFFINITY_KEY;
     }
     const response = await fetch(url, {
+      cache: "no-store",
       headers,
       signal: controller.signal,
       redirect: "follow",
@@ -403,10 +404,9 @@ async function main() {
   }
 
   for (const assetPath of assetPaths) {
-    const isMainJs = assetPath === "/app.js" || assetPath === "/service-worker.js";
-    // Preview workers can cold-start or briefly stall even after the preview smoke passes.
-    // Retry each asset instead of failing the whole PR E2E on one fetch timeout.
-    const maxAttempts = isProductionBase && isMainJs ? 30 : 4;
+    // Match the deploy smoke: pin the exact Worker version, bypass browser/CDN caches,
+    // and retry every production core asset while Cloudflare propagates the release.
+    const maxAttempts = isProductionBase ? 30 : 4;
     const sourceReference = assetPath === "/app.js" ? appSource
       : assetPath === "/service-worker.js" ? swSource
       : assetPath === "/index.html" ? sourceIndex : sourceCss;
