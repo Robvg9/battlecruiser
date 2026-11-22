@@ -537,7 +537,8 @@ BEGIN
     'public.bc7_obtener_inventario_jornada(uuid)'::regprocedure
   ) INTO v_definition;
 
-  v_old := $old$    'tramo_activo',(
+  IF position('tramo_registrable' in v_definition)=0 THEN
+    v_old := $old$    'tramo_activo',(
       SELECT jsonb_build_object('id',t.id,'usuario_id',t.usuario_id,'inicio_at',t.inicio_at)
       FROM public.turno_tramos t
       WHERE t.turno_sesion_id=v_s.id AND t.estado='ACTIVO'
@@ -545,7 +546,7 @@ BEGIN
     ),
     'declaracion_dinero',($old$;
 
-  v_new := $new$    'tramo_activo',(
+    v_new := $new$    'tramo_activo',(
       SELECT jsonb_build_object('id',t.id,'usuario_id',t.usuario_id,'inicio_at',t.inicio_at)
       FROM public.turno_tramos t
       WHERE t.turno_sesion_id=v_s.id AND t.estado='ACTIVO'
@@ -576,15 +577,17 @@ BEGIN
     ),
     'declaracion_dinero',($new$;
 
-  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
-    RAISE EXCEPTION 'The expected Jornada tranche JSON block was not found exactly once.';
+    IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+      RAISE EXCEPTION 'The expected Jornada tranche JSON block was not found exactly once.';
+    END IF;
+    v_definition:=replace(v_definition,v_old,v_new);
   END IF;
-  v_definition:=replace(v_definition,v_old,v_new);
 
-  v_old := $old$        'estado_aprobacion',d.estado_aprobacion,
+  IF position('observacion_transcripcion' in v_definition)=0 THEN
+    v_old := $old$        'estado_aprobacion',d.estado_aprobacion,
         'declarado_at',d.declarado_at,
         'monto_contado',d.monto_contado,$old$;
-  v_new := $new$        'estado_aprobacion',d.estado_aprobacion,
+    v_new := $new$        'estado_aprobacion',d.estado_aprobacion,
         'declarado_at',d.declarado_at,
         'observacion_transcripcion',(
           SELECT e.payload->>'fuente_observacion'
@@ -610,10 +613,12 @@ BEGIN
         ),
         'monto_contado',d.monto_contado,$new$;
 
-  IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
-    RAISE EXCEPTION 'The expected cash declaration JSON fields were not found exactly once.';
+    IF length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+      RAISE EXCEPTION 'The expected cash declaration JSON fields were not found exactly once.';
+    END IF;
+    v_definition:=replace(v_definition,v_old,v_new);
   END IF;
-  v_definition:=replace(v_definition,v_old,v_new);
+
   EXECUTE v_definition;
 END
 $migration$;
