@@ -1299,7 +1299,7 @@
       const finalOperation=operations.find(item=>item.isFinal);
       if(finalOperation){const finalInput=form.querySelector('#bc7-cash');if(finalInput)finalInput.value=String(finalOperation.amount);const saved=await saveCashDeclaration(form,true,true);if(!saved)throw new Error('No se confirmó la declaración final del período. Los importes diarios anteriores se conservaron.');await loadCashDaysWorkspace(state.detail);}
       else if(dailySubmitted.length)renderCashDaysWorkspace(state.detail);
-      msg($('bc7-cash-days-msg')||message,'Importes diarios guardados y confirmados por fecha. La declaración final sigue separada.','ok');
+      msg($('bc7-cash-days-msg')||message,'Importes guardados y confirmados por fecha. La declaración final sigue separada.','ok');
       setStatus('Dinero diario actualizado para '+operations.length+' día(s).','ok');return true;
     }catch(e){msg($('bc7-cash-days-msg')||message,friendlyError(e,'create')+' '+String(e&&e.message||'')+' Las claves de idempotencia se conservaron para evitar duplicados.','error');setStatus('No se pudo confirmar todos los importes diarios.','error');return false;}
     finally{busy(saveButton,false);}
