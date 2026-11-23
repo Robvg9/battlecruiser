@@ -115,7 +115,8 @@ test("handover requires every date and does not create a second final-period cas
   const dailyBranch=block.slice(0,block.indexOf("}else{"));
   assert.match(dailyBranch,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
   assert.doesNotMatch(dailyBranch,/bc_declarar_dinero/);
-  assert.doesNotMatch(dailyBranch,/declaracion_dinero/);
+  assert.match(dailyBranch,/checklist\?\.declaracion_dinero\?\.completado===true/);
+  assert.doesNotMatch(dailyBranch,/declaracion_dinero\.monto/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
