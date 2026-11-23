@@ -415,6 +415,34 @@ $new$;
 END;
 $migration$;
 
+-- Include the warehouse type in the Owner review payload so its UI can
+-- suppress legacy worker declarations for retail sessions without losing audit data.
+DO $patch_owner_review_session_type$
+DECLARE
+  v_def text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef('public.bc7_obtener_revision_jornada(uuid)'::regprocedure)
+    INTO v_def;
+  v_old := $old$
+      'estado',v_s.estado,'responsable_id',v_p.responsable_id,
+      'hora_inicio',v_p.hora_inicio_prevista,'hora_fin',v_p.hora_fin_prevista,
+$old$;
+  v_new := $new$
+      'estado',v_s.estado,'responsable_id',v_p.responsable_id,
+      'es_minorista',coalesce((SELECT a.tipo='minorista' FROM public.almacenes a WHERE a.id=v_s.almacen_id),false),
+      'hora_inicio',v_p.hora_inicio_prevista,'hora_fin',v_p.hora_fin_prevista,
+$new$;
+  IF strpos(v_def,v_old)>0 THEN
+    v_def := replace(v_def,v_old,v_new);
+  ELSIF strpos(v_def,'''es_minorista''')=0 THEN
+    RAISE EXCEPTION 'No se reconoce la estructura de sesión en bc7_obtener_revision_jornada.';
+  END IF;
+  EXECUTE v_def;
+END;
+$patch_owner_review_session_type$;
+
 -- Retail Jornada no longer has a separate final-declaration approval item.
 -- Keep legacy turno_declaraciones rows intact for audit and non-retail sessions.
 DO $patch_retail_declaration_queue$
