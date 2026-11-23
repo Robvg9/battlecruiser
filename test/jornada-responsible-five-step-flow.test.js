@@ -117,10 +117,12 @@ test("sealed transfer attribution surfaces the real server rejection and keeps a
   assert.match(ui,/friendlyError\(error,'transfer'\)/);
   assert.match(ui,/context==='transfer'&&\(code==='23514'\|\|code==='23505'\)\) message=raw/);
   assert.match(cashMigration,/v_s\.estado NOT IN \(''PROGRAMADA'',''EN_CURSO'',''COMPLETADA'',''CERRADA_OPERATIVAMENTE''\)/);
-  assert.match(transferMigration,/v_t\.fecha<=v_period_end/);
-  assert.match(transferMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
-  assert.match(transferMigration,/v_existing\.turno_sesion_id=v_s\.id/);
-  assert.match(transferMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
+  assert.match(cashMigration,/v_t\.fecha<=v_period_end/);
+  assert.match(cashMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
+  assert.match(cashMigration,/v_existing\.turno_sesion_id=v_s\.id/);
+  assert.match(cashMigration,/t\.estado=''ABIERTO''/);
+  assert.match(cashMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
+  assert.match(cashMigration,/La función de atribución histórica no conserva las guardas/);
 });
 
 
