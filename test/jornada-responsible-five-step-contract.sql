@@ -10,6 +10,11 @@ DECLARE
   v_reinversion text:=pg_get_functiondef('public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)'::regprocedure);
   v_bajas text:=pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure);
   v_ajuste text:=pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure);
+  v_liquidacion text:=pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure);
+  v_close text:=pg_get_functiondef('public.bc5_cerrar_jornada(uuid,text)'::regprocedure);
+  v_transfer text:=pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure);
+  v_count text:=pg_get_functiondef('public.bc7_contar_efectivo_dueno_jornada(uuid,numeric,text)'::regprocedure);
+  v_read_count text:=pg_get_functiondef('public.bc7_estado_conteo_efectivo_jornada(uuid)'::regprocedure);
   v_acl boolean;
 BEGIN
   IF v_confirm NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -20,11 +25,42 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the assigned worker must be able to confirm completeness after seal, independently of Owner approvals.';
   END IF;
 
-  IF v_state NOT LIKE '%DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION%'
+  IF v_state NOT LIKE '%turno_jornada_entregas_diarias%'
      OR v_state NOT LIKE '%v_daily_registered=v_daily_expected%'
      OR v_state NOT LIKE '%declaracion_registrada%'
-     OR v_state NOT LIKE '%entregas_diarias_esperadas%' THEN
-    RAISE EXCEPTION 'FAIL: Step 5 must require a worker-authored final declaration and every date-specific cash entry.';
+     OR v_state NOT LIKE '%entregas_diarias_esperadas%'
+     OR v_state LIKE '%public.turno_declaraciones%'
+     OR v_state LIKE '%DINERO_DECLARADO%' THEN
+    RAISE EXCEPTION 'FAIL: Step 5 must be completed by exactly one daily entry for each calendar date, without a separate worker final declaration.';
+  END IF;
+
+  IF v_liquidacion NOT LIKE '%turno_jornada_conteos_caja%'
+     OR v_liquidacion NOT LIKE '%v_daily_cash%'
+     OR v_liquidacion NOT LIKE '%THEN v_final_counted ELSE NULL END%'
+     OR v_liquidacion LIKE '%v_daily_cash+v_final_counted%'
+     OR v_liquidacion NOT LIKE '%coalesce(v_p.fecha_fin,v_p.fecha)-v_p.fecha+1%' THEN
+    RAISE EXCEPTION 'FAIL: settlement must use inclusive daily dates and the Owner physical count exactly once.';
+  END IF;
+
+  IF v_close NOT LIKE '%turno_jornada_entregas_diarias%'
+     OR v_close NOT LIKE '%a.tipo=''minorista''%'
+     OR v_close NOT LIKE '%Antes de entregar la Jornada debes registrar una entrega de dinero por cada fecha%'
+     OR v_close NOT LIKE '%turno_declaraciones%' THEN
+    RAISE EXCEPTION 'FAIL: retail close must require daily entries only while legacy non-retail declaration handling remains isolated.';
+  END IF;
+
+  IF to_regclass('public.turno_jornada_conteos_caja') IS NULL
+     OR v_count NOT LIKE '%turno_jornada_conteos_caja%'
+     OR v_count NOT LIKE '%v_daily_total%'
+     OR v_read_count NOT LIKE '%turno_jornada_conteos_caja%' THEN
+    RAISE EXCEPTION 'FAIL: the Owner count must be stored and read in its own protected table.';
+  END IF;
+
+  IF v_transfer NOT LIKE '%CERRADA_OPERATIVAMENTE%'
+     OR v_transfer NOT LIKE '%v_turno.estado%'
+     OR v_transfer NOT LIKE '%fecha%'
+     OR v_transfer NOT LIKE '%almacen_destino_id%' THEN
+    RAISE EXCEPTION 'FAIL: historical transfer attribution must allow sealed sessions without removing master-turn, date or destination guards.';
   END IF;
 
   IF v_cash NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -68,6 +104,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: new responsible-only RPC grants must be limited to authenticated callers.';
   END IF;
 
-  RAISE NOTICE 'PASS responsible five-step contract: worker completion, server-side block locks, idempotent retries, approval separation, date-specific cash, auditable declaration and final physical inventory.';
+  RAISE NOTICE 'PASS Jornada contract: five-step completion, daily-only cash handover, independent Owner cash count, non-duplicated settlement, sealed transfer attribution and legacy isolation.';
 END
 $responsible_five_step_contract$;
