@@ -15,6 +15,7 @@ DECLARE
   v_transfer text:=pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure);
   v_count text:=pg_get_functiondef('public.bc7_contar_efectivo_dueno_jornada(uuid,numeric,text)'::regprocedure);
   v_read_count text:=pg_get_functiondef('public.bc7_estado_conteo_efectivo_jornada(uuid)'::regprocedure);
+  v_approvals text:=pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure);
   v_acl boolean;
 BEGIN
   IF v_confirm NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -54,6 +55,12 @@ BEGIN
      OR v_count NOT LIKE '%v_daily_total%'
      OR v_read_count NOT LIKE '%turno_jornada_conteos_caja%' THEN
     RAISE EXCEPTION 'FAIL: the Owner count must be stored and read in its own protected table.';
+  END IF;
+
+  IF v_approvals NOT LIKE '%coalesce(a.tipo,'''')<>''minorista''%'
+     OR v_approvals NOT LIKE '%''entrega_diaria''::text%'
+     OR v_approvals NOT LIKE '%''declaracion_jornada''::text%' THEN
+    RAISE EXCEPTION 'FAIL: daily retail deliveries remain reviewable, but legacy final-declaration rows must stay out of retail approvals without being deleted.';
   END IF;
 
   IF v_transfer NOT LIKE '%CERRADA_OPERATIVAMENTE%'
