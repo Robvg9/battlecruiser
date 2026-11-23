@@ -184,8 +184,8 @@ test("PWA release loads and precaches the dashboard and cash handover UI", () =>
   assert.ok(appVersion, "app.js must expose its release version");
   assert.ok(swVersion, "Service Worker must expose its release version");
   assert.equal(swVersion[1], appVersion[1], "app and Service Worker release versions must match");
-  assert.match(APP, /\["turno-cash-handover-ui\.js","1\.3"\]/);
-  assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.3/);
+  assert.match(APP, /\["turno-cash-handover-ui\.js","1\.4"\]/);
+  assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.4/);
   assert.ok(INDEX.includes("app.js?v=" + appVersion[1]));
   assert.ok(INDEX.includes("style.css?v=" + appVersion[1]));
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);
