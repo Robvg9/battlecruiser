@@ -335,6 +335,7 @@ BEGIN
     v_old_state:=v_d.estado_aprobacion;
     UPDATE public.turno_declaraciones
     SET monto=p_monto,
+        declarado_at=now(),
         estado_aprobacion='ESPERANDO_APROBACION',
         aprobado_por=NULL,aprobado_at=NULL,
         monto_contado=NULL,contado_por=NULL,contado_at=NULL,
