@@ -1,5 +1,6 @@
 // BattleCruiser · conciliación de dinero entregado por responsable y contado por ADMIN.
 // El backend es la fuente de verdad; este módulo solo consume RPCs autenticadas.
+// ADMIN ve aquí tanto las entregas legacy como las diferencias del conteo físico de Jornada.
 (function () {
   'use strict';
   if (window.__BC5_CASH_HANDOVER_UI__) return;
