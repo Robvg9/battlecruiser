@@ -72,3 +72,37 @@ test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
   assert.match(app,/9\.5\.151/);
   assert.match(sw,/9\.5\.151/);
 });
+
+
+test("sending a Bajas review request returns the worker to Bajas and keeps final confirmation explicit",()=>{
+  const start=ui.indexOf("async function submitAdjustment(form){");
+  const end=ui.indexOf("async function openRetroSuccessorPanel",start);
+  assert.ok(start>=0&&end>start,"adjustment submission handler exists");
+  const submit=ui.slice(start,end);
+  assert.match(submit,/const reopenBajas=storageType==='baja'&&checklistModalContext\?\.key==='bajas'/);
+  assert.match(submit,/if\(reopenBajas\)closeChecklistModal\(\{restore:true\}\)/);
+  assert.match(submit,/const refreshed=await openWorkspace\(sessionId\)/);
+  assert.match(submit,/if\(refreshed&&reopenBajas\)\{openChecklistSection\('bajas'\)/);
+  assert.doesNotMatch(submit,/bc7_confirmar_bloque_jornada/,
+    "sending the list must never auto-confirm that there are no more Bajas");
+  const modalStart=ui.indexOf("function openChecklistSection(key){");
+  const modalEnd=ui.indexOf("document.addEventListener('keydown'",modalStart);
+  assert.ok(modalStart>=0&&modalEnd>modalStart);
+  const modal=ui.slice(modalStart,modalEnd);
+  assert.match(modal,/Confirmar que no faltan más bajas/);
+  assert.match(modal,/Hay bajas preparadas que todavía no se han enviado/);
+  assert.match(modal,/p_bloque:key/);
+  assert.match(modal,/p_completado:true/);
+});
+
+test("sealed transfer attribution surfaces the real server rejection and keeps all safety guards",()=>{
+  assert.match(ui,/bc7_vincular_transferencia_jornada/);
+  assert.match(ui,/reason\.trim\(\)\.length<10/);
+  assert.match(ui,/friendlyError\(error,'transfer'\)/);
+  assert.match(ui,/else if\(context==='transfer'&&code==='23514'\) message=raw/);
+  assert.match(cashMigration,/v_s\.estado NOT IN \(''PROGRAMADA'',''EN_CURSO'',''COMPLETADA'',''CERRADA_OPERATIVAMENTE''\)/);
+  assert.match(cashMigration,/v_t\.fecha<=v_period_end/);
+  assert.match(cashMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
+  assert.match(cashMigration,/v_existing\.turno_sesion_id=v_s\.id/);
+  assert.match(cashMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
+});
