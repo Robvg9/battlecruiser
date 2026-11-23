@@ -6,6 +6,8 @@ const path=require("node:path");
 
 const root=path.join(__dirname,"..");
 const migration=fs.readFileSync(path.join(root,"supabase/migrations/20261123030000_jornada_sealed_operational_balance.sql"),"utf8");
+const runner=fs.readFileSync(path.join(root,"test/step7-jornada-postgres-windows-ci.js"),"utf8");
+const contract=fs.readFileSync(path.join(root,"test/jornada-sealed-baja-balance-contract.sql"),"utf8");
 
 test("sealed Jornada keeps general warehouse movements behind the immutable cutoff",()=>{
   assert.match(migration,/s\.corte_operativo_at/);
@@ -27,7 +29,15 @@ test("sealed adjustment picker and grouped Baja share the operational ledger",()
   assert.match(migration,/v_stock:=v_group\.stock_disponible/);
 });
 
-test("Baja validation remains atomic and retry-safe, with targeted lookup indexes",()=>{
+test("PostgreSQL 17 CI applies the post-close migration and verifies actual database definitions",()=>{
+  assert.match(runner,/20261121193906_jornada_operational_close_and_transfer_attribution\.sql/);
+  assert.match(runner,/20261123030000_jornada_sealed_operational_balance\.sql/);
+  assert.match(runner,/jornada-sealed-baja-balance-contract\.sql/);
+  assert.match(contract,/pg_get_functiondef/);
+  assert.match(contract,/CERRADA_OPERATIVAMENTE/);
+});
+
+test("Baja validation remains retry-safe, with targeted lookup indexes",()=>{
   assert.match(migration,/p_idempotency_key/);
   assert.match(migration,/bajas_pending_jornada_product_idx/);
   assert.match(migration,/bajas_approved_jornada_time_idx/);

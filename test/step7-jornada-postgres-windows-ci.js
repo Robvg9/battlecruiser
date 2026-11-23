@@ -386,6 +386,10 @@ function applySql(file) {
     log("\\r\\n=== Apply atomic future Jornada period movement and verify its PostgreSQL 17 contract ===");
     applySql("supabase/migrations/20261122031500_jornada_period_rescheduling_atomic.sql");
     applySql("supabase/migrations/20261122034600_jornada_period_rescheduling_fk_index.sql");
+    log("\\r\\n=== Apply post-close operational attribution and sealed-Baja balance regression ===");
+    applySql("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
+    applySql("supabase/migrations/20261123030000_jornada_sealed_operational_balance.sql");
+    applySql("test/jornada-sealed-baja-balance-contract.sql");
     applySql("test/jornada-period-reprogramming-contract.sql");
     log("\\r\\nPASS Jornada period rescheduling: overlapping shifts, conflicts, inventory/activity freeze, audit, idempotency and RBAC.");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with mandatory physical count and effective-dated price/cost history.");
