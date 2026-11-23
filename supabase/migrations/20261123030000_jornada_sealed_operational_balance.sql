@@ -77,7 +77,7 @@ BEGIN
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
 
-  v_old := $old$      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) <= v_end_at$new$;
+  v_old := $old$      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) <= v_end_at$old$;
   v_new := $new$      AND COALESCE(b.fecha_revision, b.actualizado_en, b.creado_en) <= v_linked_end_at$new$;
   IF position(v_old IN v_definition)=0 THEN
     RAISE EXCEPTION 'Unexpected bajas timestamp guard; migration stopped safely.';
