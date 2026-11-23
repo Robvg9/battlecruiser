@@ -112,3 +112,12 @@ test("retail approvals use daily cash rows, not a second legacy final declaratio
   assert.match(ADMIN,/x\.tipo==='entrega_diaria'/);
   assert.match(ADMIN,/resolverOperativaDirecta\(x,'APROBAR'\)/);
 });
+
+
+test("Owner review uses the new independent physical count for retail and hides legacy final totals",()=>{
+  assert.match(OWNER_REVIEW,/const isRetail=s\.es_minorista===true/);
+  assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
+  assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?l\.dinero_final_contado:s\.efectivo\?\.contado/);
+  assert.match(OWNER_REVIEW,/El registro legado de declaración final no participa ni se suma/);
+  assert.match(DAILY_ONLY,/es_minorista/);
+});
