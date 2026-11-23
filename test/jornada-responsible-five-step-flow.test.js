@@ -106,3 +106,17 @@ test("sealed transfer attribution surfaces the real server rejection and keeps a
   assert.match(cashMigration,/v_existing\.turno_sesion_id=v_s\.id/);
   assert.match(cashMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
 });
+
+
+test("final Jornada handover form reads the exact daily rows entered in Step 5",()=>{
+  const start=ui.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const end=ui.indexOf("async function saveAdminCashDeclaration",start);
+  const save=ui.slice(start,end);
+  assert.match(save,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
+  assert.match(save,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
+  const closeStart=ui.indexOf("async function closeSession(form){");
+  const closeEnd=ui.indexOf("let checklistModalContext=null",closeStart);
+  const close=ui.slice(closeStart,closeEnd);
+  assert.match(close,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.doesNotMatch(close,/declaracion_dinero\.monto\)\);/);
+});
