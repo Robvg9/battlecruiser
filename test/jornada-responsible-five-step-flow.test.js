@@ -8,6 +8,7 @@ const read=file=>fs.readFileSync(path.join(root,file),"utf8");
 const ui=read("public/js/bc7-jornada-ui.js");
 const migration=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
 const cashMigration=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
+const transferMigration=read("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
 const app=read("public/app.js");
 const sw=read("public/service-worker.js");
 
@@ -116,10 +117,10 @@ test("sealed transfer attribution surfaces the real server rejection and keeps a
   assert.match(ui,/friendlyError\(error,'transfer'\)/);
   assert.match(ui,/context==='transfer'&&\(code==='23514'\|\|code==='23505'\)\) message=raw/);
   assert.match(cashMigration,/v_s\.estado NOT IN \(''PROGRAMADA'',''EN_CURSO'',''COMPLETADA'',''CERRADA_OPERATIVAMENTE''\)/);
-  assert.match(cashMigration,/v_t\.fecha<=v_period_end/);
-  assert.match(cashMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
-  assert.match(cashMigration,/v_existing\.turno_sesion_id=v_s\.id/);
-  assert.match(cashMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
+  assert.match(transferMigration,/v_t\.fecha<=v_period_end/);
+  assert.match(transferMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
+  assert.match(transferMigration,/v_existing\.turno_sesion_id=v_s\.id/);
+  assert.match(transferMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
 });
 
 
