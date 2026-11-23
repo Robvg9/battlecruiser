@@ -701,22 +701,27 @@ BEGIN
   v_def := replace(v_def,v_old,
     'IF v_s.estado IN (''COMPLETADA'',''CERRADA_OPERATIVAMENTE'') THEN');
 
-  v_old := '      IF coalesce((v_liq->>''calculable'')::boolean,false) IS NOT TRUE THEN' || E'\n' ||
-           '        RAISE EXCEPTION ''La liquidación del día % no está completa. Revisa precios, movimientos, inventario, salario y efectivo. Detalle: %'',' || E'\n' ||
-           '          v_s.numero_dia,v_liq USING ERRCODE=''23514'';' || E'\n' ||
-           '      END IF;';
   IF strpos(v_def,'JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO')=0 THEN
+    -- Match the calculability guard's final statement rather than copying
+    -- its full localized error string from pg_get_functiondef.
+    v_old := 'v_s.numero_dia,v_liq USING ERRCODE=''23514'';';
     IF strpos(v_def,v_old)=0 THEN
-      RAISE EXCEPTION 'No se pudo localizar el cierre de liquidación en bc7_resolver_revision_jornada.';
+      RAISE EXCEPTION 'No se pudo localizar el control calculable de bc7_resolver_revision_jornada.';
     END IF;
-    v_def := replace(v_def,v_old,
-      v_old || E'\n' ||
-      '      IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || E'\n' ||
-      '        UPDATE public.turno_sesiones SET estado=''COMPLETADA'',updated_at=now() WHERE id=v_s.id;' || E'\n' ||
-      '        INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,actor_user_id,tipo,payload)' || E'\n' ||
-      '        VALUES(v_s.turno_id,v_s.id,auth.uid(),''JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO'',' || E'\n' ||
-      '          jsonb_build_object(''corte_operativo_at'',v_s.corte_operativo_at,''conciliado_at'',now()));' || E'\n' ||
-      '      END IF;');
+    v_def := regexp_replace(v_def,
+      'v_s[.]numero_dia[[:space:]]*,[[:space:]]*v_liq[[:space:]]+USING[[:space:]]+ERRCODE[[:space:]]*=[[:space:]]*''23514''[[:space:]]*;[[:space:]]*END[[:space:]]+IF;',
+      'v_s.numero_dia,v_liq USING ERRCODE=''23514'';' || chr(10) ||
+      '      END IF;' || chr(10) ||
+      '      IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || chr(10) ||
+      '        UPDATE public.turno_sesiones SET estado=''COMPLETADA'',updated_at=now() WHERE id=v_s.id;' || chr(10) ||
+      '        INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,actor_user_id,tipo,payload)' || chr(10) ||
+      '        VALUES(v_s.turno_id,v_s.id,auth.uid(),''JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO'',' || chr(10) ||
+      '          jsonb_build_object(''corte_operativo_at'',v_s.corte_operativo_at,''conciliado_at'',now()));' || chr(10) ||
+      '      END IF;',
+      'i');
+    IF strpos(v_def,'JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO')=0 THEN
+      RAISE EXCEPTION 'No se pudo instalar la conciliación después del sello operativo.';
+    END IF;
   END IF;
 
   EXECUTE v_def;
