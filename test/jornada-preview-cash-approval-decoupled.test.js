@@ -17,7 +17,7 @@ const INDEX=read("public/index.html");
 test("Jornada closure checklist is five steps and includes the saved final cash declaration",()=>{
   assert.match(RESPONSIBLE_MIGRATION,/v_cash_declared boolean/);
   assert.match(RESPONSIBLE_MIGRATION,/v_lista_conteo:=v_gastos AND v_reinversiones AND v_bajas AND v_final AND v_cash_declared/);
-  assert.match(RESPONSIBLE_MIGRATION,/'declaracion_dinero',jsonb_build_object\('completado',v_cash_declared/);
+  assert.match(RESPONSIBLE_MIGRATION,/'declaracion_dinero',jsonb_build_object\(\s*'completado',v_cash_declared/);
   assert.match(UI,/data-bc7-checklist-open="declaracion_dinero"/);
   assert.match(UI,/cashDone\?1:0/,"the five-step progress counter includes the cash declaration");
   assert.match(UI,/Declaración de dinero/);
@@ -53,10 +53,10 @@ test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable fr
   assert.match(UI,/No se dividirá entre días ni se aplicará a otra jornada/);
 });
 test("A rejected final declaration can be corrected without erasing the earlier amount from audit history",()=>{
-  assert.match(MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
-  assert.match(MIGRATION,/monto_anterior/);
-  assert.match(MIGRATION,/declaracion_responsable_previa_conservada/);
-  assert.match(MIGRATION,/monto_contado IS NOT NULL/);
+  assert.match(RESPONSIBLE_MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
+  assert.match(RESPONSIBLE_MIGRATION,/monto_anterior/);
+  assert.match(RESPONSIBLE_MIGRATION,/declaracion_responsable_previa_conservada/);
+  assert.match(RESPONSIBLE_MIGRATION,/monto_contado IS NOT NULL/);
 });
 test("Workbook preview is read-only and includes movements, adjustments, finance and cash",()=>{
   const start=UI.indexOf("async function openJornadaPreview");
