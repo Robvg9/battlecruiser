@@ -39,8 +39,8 @@ test("Transferencia keeps only the modern multi-product picker visible", () => {
     "the legacy single-product add editor must stay hidden despite the hidden attribute/CSS cascade");
   assert.match(transfer, /legacyForm\.style\.display = 'none'/,
     "the old one-product transfer form must also remain hidden");
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.53"]'));
-  assert.ok(serviceWorker.includes("./js/bc7-jornada-ui.js?v=7.53"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.54"]'));
+  assert.ok(serviceWorker.includes("./js/bc7-jornada-ui.js?v=7.54"));
 });
 
 test("PWA release and offline module cache are aligned for the transfer UI update", () => {
