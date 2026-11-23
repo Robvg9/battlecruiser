@@ -66,9 +66,9 @@ BEGIN
   END IF;
 
   v_expected := greatest(0,(coalesce(v_p.fecha_fin,v_p.fecha)-v_p.fecha+1)::integer);
-  SELECT count(DISTINCT e.fecha) FILTER (WHERE e.estado<>'RECHAZADA')::integer,
-         count(DISTINCT e.fecha) FILTER (WHERE e.estado='APROBADA')::integer,
-         count(*) FILTER (WHERE e.estado<>'APROBADA')::integer,
+  SELECT (count(DISTINCT e.fecha) FILTER (WHERE e.estado<>'RECHAZADA'))::integer,
+         (count(DISTINCT e.fecha) FILTER (WHERE e.estado='APROBADA'))::integer,
+         (count(*) FILTER (WHERE e.estado<>'APROBADA'))::integer,
          coalesce(sum(e.monto_aprobado) FILTER (WHERE e.estado='APROBADA'),0)::numeric(14,2)
     INTO v_registered,v_approved,v_not_approved,v_daily_total
   FROM public.turno_jornada_entregas_diarias e
@@ -273,7 +273,7 @@ $old$;
   WHERE c.turno_sesion_id=p_turno_sesion_id
   ORDER BY c.contado_at DESC
   LIMIT 1;
-$ new$;
+$new$;
   IF strpos(v_def,v_old)>0 THEN
     v_def := replace(v_def,v_old,v_new);
   ELSIF strpos(v_def,'FROM public.turno_jornada_conteos_caja c')=0 THEN
