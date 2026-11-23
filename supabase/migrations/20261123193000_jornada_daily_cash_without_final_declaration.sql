@@ -454,10 +454,8 @@ BEGIN
   SELECT pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure)
     INTO v_def;
   v_old := $old$WHERE s.bloque='JORNADA'
-      AND s.estado='COMPLETADA'
       AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$old$;
   v_new := $new$WHERE s.bloque='JORNADA'
-      AND s.estado='COMPLETADA'
       AND coalesce(a.tipo,'')<>'minorista'
       AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$new$;
   IF strpos(v_def,v_old)>0 THEN
