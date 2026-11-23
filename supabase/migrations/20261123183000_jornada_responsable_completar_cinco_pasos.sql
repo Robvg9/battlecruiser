@@ -197,7 +197,8 @@ BEGIN
         AND e.tipo IN (
           'DINERO_DECLARADO',
           'DINERO_REDECLARADO',
-          'DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION'
+          'DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION',
+          'DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO'
         )
     );
 
@@ -316,19 +317,25 @@ BEGIN
       SELECT 1 FROM public.turno_eventos e
       WHERE e.turno_sesion_id=v_s.id
         AND e.turno_tramo_id=v_t.id
-        AND e.tipo='DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION'
+        AND e.tipo IN (
+          'DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION',
+          'DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO'
+        )
         AND e.payload->>'declaracion_id'=v_d.id::text
     ) INTO v_existing_worker_event;
 
-    IF v_existing_worker_event AND v_d.monto IS NOT DISTINCT FROM p_monto
+    IF v_existing_worker_event
        AND v_d.estado_aprobacion IN ('ESPERANDO_APROBACION','PENDIENTE') THEN
-      RETURN v_d;
+      IF v_d.monto IS NOT DISTINCT FROM p_monto THEN
+        RETURN v_d;
+      END IF;
+      RAISE EXCEPTION 'Tu declaración ya está enviada y pendiente de revisión. No se puede cambiar hasta que Administración la rechace o rectifique.' USING ERRCODE='23514';
     END IF;
 
-    IF NOT v_existing_admin_event OR v_existing_worker_event
-       OR v_d.estado_aprobacion NOT IN ('ESPERANDO_APROBACION','PENDIENTE')
-       OR v_d.monto_contado IS NOT NULL THEN
-      RAISE EXCEPTION 'Ya existe una declaración de la responsable o una declaración que requiere revisión administrativa; no se sobrescribió.' USING ERRCODE='23505';
+    IF v_d.monto_contado IS NOT NULL
+       OR v_d.estado_aprobacion NOT IN ('ESPERANDO_APROBACION','PENDIENTE','RECHAZADA','RECTIFICADA')
+       OR (NOT v_existing_admin_event AND NOT v_existing_worker_event) THEN
+      RAISE EXCEPTION 'La declaración no está disponible para rectificación por la responsable o ya tiene un conteo físico.' USING ERRCODE='23505';
     END IF;
 
     v_old_amount:=v_d.monto;
@@ -348,13 +355,17 @@ BEGIN
     )
     VALUES(
       v_s.turno_id,v_s.id,v_t.id,auth.uid(),
-      'DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION',
+      CASE WHEN v_existing_worker_event
+        THEN 'DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO'
+        ELSE 'DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION'
+      END,
       jsonb_build_object(
         'declaracion_id',v_d.id,
-        'monto_anterior_transcripcion_admin',v_old_amount,
+        'monto_anterior',v_old_amount,
         'monto_declarado_responsable',p_monto,
         'estado_anterior',v_old_state,
-        'transcripcion_original_conservada',true,
+        'transcripcion_original_conservada',v_existing_admin_event,
+        'declaracion_responsable_previa_conservada',v_existing_worker_event,
         'conteo_fisico',false
       )
     );
