@@ -83,7 +83,7 @@ test("retail cash entry and final-day declaration share the same operation/close
 
 test("previous days use daily RPC with idempotency and server readback before success", () => {
   const start = UI.indexOf("async function saveCashDaysWorkspace(form,options){");
-  const end = UI.indexOf("function cashDeclarationHtml(detail){", start);
+  const end = UI.indexOf("async function saveAdminCashDeclaration", start);
   assert.ok(start >= 0 && end > start, "unified cash saver exists");
   const block = UI.slice(start, end);
   assert.match(block, /freshIdempotencyKey\(\)/);
@@ -92,7 +92,7 @@ test("previous days use daily RPC with idempotency and server readback before su
   assert.match(block, /missingRows/);
   assert.match(block, /Conservé las claves para evitar duplicados/);
   assert.match(block, /saveCashDeclaration\(form,true,true\)/);
-  assert.ok(block.indexOf("missingRows.length") < block.indexOf("Importes guardados y confirmados"));
+  assert.ok(block.indexOf("missingRows.length") < block.indexOf("Paso 5 enviado y confirmado"));
   assert.match(block, /Dinero diario actualizado para '\+operations\.length\+'/);
 });
 
@@ -103,11 +103,11 @@ test("closing requires every date and confirms the final day before closing the 
   const block = UI.slice(start, end);
   assert.match(block, /saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
   const cashSaveStart=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
-  const cashSaveEnd=UI.indexOf("function cashDeclarationHtml(detail){",cashSaveStart);
+  const cashSaveEnd=UI.indexOf("async function saveAdminCashDeclaration",cashSaveStart);
   assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
   assert.match(cashSave,/Faltan importes de estos días/);
-  assert.match(block, /bc_declarar_dinero/);
+  assert.match(UI, /async function saveCashDeclaration/);\n  assert.match(UI, /rpc\\('bc_declarar_dinero'/);\n  assert.match(UI, /rpc\\('bc5_responsable_declarar_dinero_jornada'/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
@@ -148,7 +148,7 @@ test("Owner can count the declared final cash only after session completion with
   assert.match(UI, /p_declaracion_id:declarationId,p_monto_contado:amount/);
   assert.ok(UI.includes("['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(state.detail?.sesion?.estado||'').toUpperCase())"));
   assert.match(UI, /declaration\.monto_contado==null/);
-  assert.match(UI, /No copies el importe declarado|no copies el importe declarado/i);
+  assert.match(UI, /Introduce únicamente el efectivo que contaste físicamente/);
   assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
 });
 
