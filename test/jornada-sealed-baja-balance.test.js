@@ -6,6 +6,7 @@ const path=require("node:path");
 
 const root=path.join(__dirname,"..");
 const migration=fs.readFileSync(path.join(root,"supabase/migrations/20261123030000_jornada_sealed_operational_balance.sql"),"utf8");
+const bajaSource=fs.readFileSync(path.join(root,"supabase/migrations/20261113130000_bc7_jornada_baja_bulk.sql"),"utf8");
 const runner=fs.readFileSync(path.join(root,"test/step7-jornada-postgres-windows-ci.js"),"utf8");
 const contract=fs.readFileSync(path.join(root,"test/jornada-sealed-baja-balance-contract.sql"),"utf8");
 const functional=fs.readFileSync(path.join(root,"test/jornada-sealed-baja-balance-functional.sql"),"utf8");
@@ -50,7 +51,9 @@ test("sealed late Bajas prove cutoff, real saldo, retry, reservation and master-
 });
 
 test("Baja validation remains retry-safe, with targeted lookup indexes",()=>{
-  assert.match(migration,/p_idempotency_key/);
+  assert.match(bajaSource,/p_idempotency_key/);
+  assert.match(bajaSource,/v_payload_hash/);
+  assert.match(migration,/bc7_registrar_bajas_multiple_jornada\\(uuid,jsonb,text,uuid\\)/);
   assert.match(migration,/bajas_pending_jornada_product_idx/);
   assert.match(migration,/bajas_approved_jornada_time_idx/);
   assert.match(migration,/mermas_approved_jornada_time_idx/);
