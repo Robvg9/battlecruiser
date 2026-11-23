@@ -14,7 +14,7 @@ DECLARE
   v_session uuid:='a9300000-0000-0000-0000-000000000001';
   v_tranche uuid:='a9400000-0000-0000-0000-000000000001';
   v_initial_cut uuid:='a9500000-0000-0000-0000-000000000001';
-  v_late uuid:=now()-interval '20 minutes';
+  v_late timestamptz:=now()-interval '20 minutes';
   v_cutoff timestamptz:=now()-interval '60 minutes';
   v_start timestamptz:=now()-interval '8 hours';
   v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
