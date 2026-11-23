@@ -244,4 +244,111 @@ BEGIN
 END;
 $patch_sealed_liquidation_end$;
 
+DO $patch_owner_checklist$
+DECLARE
+  v_def text;
+  v_pattern text;
+  v_replacement text;
+  v_insert_pattern text;
+  v_insert_replacement text;
+BEGIN
+  SELECT pg_get_functiondef('public.bc7_confirmar_bloque_jornada(uuid,text,boolean)'::regprocedure) INTO v_def;
+
+  -- pg_get_functiondef can normalize whitespace differently by PostgreSQL version.
+  -- Match the two PL/pgSQL statements semantically, then install the sealed path.
+  IF strpos(v_def,'BC7_SEALED_OWNER_BLOCK_GATE_V1')=0 THEN
+    v_pattern := 'v_tramo[[:space:]]*:=[[:space:]]*public[.]bc7_validar_tramo_responsable_jornada[[:space:]]*[(]p_turno_sesion_id[)][[:space:]]*;[[:space:]]*SELECT[[:space:]]+[*][[:space:]]+INTO[[:space:]]+v_s[[:space:]]+FROM[[:space:]]+public[.]turno_sesiones[[:space:]]+WHERE[[:space:]]+id[[:space:]]*=[[:space:]]*p_turno_sesion_id;';
+    IF v_def !~* v_pattern THEN
+      RAISE EXCEPTION 'No se pudo adaptar bc7_confirmar_bloque_jornada al sello operativo.';
+    END IF;
+
+    v_replacement :=
+      'SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;' || chr(10) ||
+      '  IF NOT FOUND OR v_s.bloque<>''JORNADA'' THEN RAISE EXCEPTION ''La Jornada no existe.'' USING ERRCODE=''23503''; END IF;' || chr(10) ||
+      '  IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || chr(10) ||
+      '    IF NOT public.bc_actor_is_admin() THEN RAISE EXCEPTION ''Solo ADMIN puede confirmar bloques después del sello operativo.'' USING ERRCODE=''42501''; END IF;' || chr(10) ||
+      '    IF NOT EXISTS (SELECT 1 FROM public.turnos t WHERE t.id=v_s.turno_id AND t.estado=''ABIERTO'') THEN RAISE EXCEPTION ''El Turno maestro ya está cerrado; no se admiten cambios de checklist.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '    SELECT * INTO v_tramo FROM public.turno_tramos WHERE turno_sesion_id=v_s.id AND estado=''COMPLETADO'' AND fin_at=v_s.corte_operativo_at ORDER BY fin_at DESC NULLS LAST LIMIT 1;' || chr(10) ||
+      '    IF v_tramo.id IS NULL THEN RAISE EXCEPTION ''No se encontró el tramo de la Jornada sellada.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '  ELSE' || chr(10) ||
+      '    v_tramo:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);' || chr(10) ||
+      '  END IF;' || chr(10) ||
+      '  -- BC7_SEALED_OWNER_BLOCK_GATE_V1';
+    v_def := regexp_replace(v_def,v_pattern,v_replacement,'i');
+
+    v_insert_pattern := 'INSERT[[:space:]]+INTO[[:space:]]+public[.]turno_jornada_confirmaciones[[:space:]]*[(]turno_sesion_id[)][[:space:]]*VALUES[[:space:]]*[(]p_turno_sesion_id[)][[:space:]]*ON[[:space:]]+CONFLICT[[:space:]]*[(]turno_sesion_id[)][[:space:]]+DO[[:space:]]+NOTHING;';
+    IF v_def !~* v_insert_pattern THEN
+      RAISE EXCEPTION 'No se pudo localizar el alta de confirmaciones para proteger el checklist sellado.';
+    END IF;
+    v_insert_replacement :=
+      'IF p_completado AND v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || chr(10) ||
+      '    IF v_tipo=''gastos'' AND EXISTS(SELECT 1 FROM public.gastos g WHERE g.turno_sesion_id=v_s.id AND g.estado=''PENDIENTE'') THEN RAISE EXCEPTION ''Todavía hay gastos pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '    IF v_tipo=''reinversiones'' AND EXISTS(SELECT 1 FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado=''PENDIENTE'') THEN RAISE EXCEPTION ''Todavía hay reinversiones pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '    IF v_tipo=''bajas'' AND (EXISTS(SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado=''PENDIENTE'') OR EXISTS(SELECT 1 FROM public.mermas m WHERE m.turno_sesion_id=v_s.id AND m.estado=''PENDIENTE'')) THEN RAISE EXCEPTION ''Todavía hay bajas o mermas pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '  END IF;' || chr(10) ||
+      '  INSERT INTO public.turno_jornada_confirmaciones(turno_sesion_id)' || chr(10) ||
+      '  VALUES(p_turno_sesion_id)' || chr(10) ||
+      '  ON CONFLICT(turno_sesion_id) DO NOTHING;';
+    v_def := regexp_replace(v_def,v_insert_pattern,v_insert_replacement,'i');
+  END IF;
+
+  EXECUTE v_def;
+END;
+$patch_owner_checklist$;
+
+DO $patch_sealed_owner_checklist_gate_v2$
+DECLARE
+  v_def text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_confirmar_bloque_jornada(uuid,text,boolean)'::regprocedure
+  ) INTO v_def;
+
+  IF position('BC7_SEALED_OWNER_BLOCK_GATE_V1' IN v_def)=0 THEN
+    RAISE EXCEPTION 'The sealed ADMIN checklist gate V1 must exist before applying its concurrency-safe V2 guard.';
+  END IF;
+
+  v_old := $old$  v_tramo public.turno_tramos;$old$;
+  v_new := $new$  v_tramo public.turno_tramos;
+  v_master_turn public.turnos;$new$;
+  IF position(v_old IN v_def)=0 OR
+     length(v_def)-length(replace(v_def,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'Unexpected bc7_confirmar_bloque_jornada tranche declaration; checklist V2 stopped safely.';
+  END IF;
+  v_def:=replace(v_def,v_old,v_new);
+
+  v_old := $old$  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;$old$;
+  v_new := $new$  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;$new$;
+  IF position(v_old IN v_def)=0 OR
+     length(v_def)-length(replace(v_def,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'Unexpected bc7_confirmar_bloque_jornada session lookup; checklist V2 stopped safely.';
+  END IF;
+  v_def:=replace(v_def,v_old,v_new);
+
+  v_old := $old$    SELECT * INTO v_tramo FROM public.turno_tramos WHERE turno_sesion_id=v_s.id AND estado='COMPLETADO' AND fin_at=v_s.corte_operativo_at ORDER BY fin_at DESC NULLS LAST LIMIT 1;$old$;
+  v_new := $new$    IF v_s.corte_operativo_at IS NULL THEN
+      RAISE EXCEPTION 'La Jornada sellada no conserva un corte operativo verificable.' USING ERRCODE='23514';
+    END IF;
+    SELECT * INTO v_master_turn FROM public.turnos WHERE id=v_s.turno_id FOR UPDATE;
+    IF NOT FOUND OR v_master_turn.estado<>'ABIERTO'
+       OR COALESCE(v_master_turn.estado_maestro,v_master_turn.estado)<>'EN_CURSO' THEN
+      RAISE EXCEPTION 'El Turno maestro ya está cerrado; no se admiten cambios de checklist.' USING ERRCODE='23514';
+    END IF;
+    SELECT * INTO v_tramo FROM public.turno_tramos
+    WHERE turno_sesion_id=v_s.id AND estado='COMPLETADO'
+      AND fin_at=v_s.corte_operativo_at
+    ORDER BY fin_at DESC NULLS LAST LIMIT 1;
+    -- BC7_SEALED_OWNER_BLOCK_GATE_V2$new$;
+  IF position(v_old IN v_def)=0 OR
+     length(v_def)-length(replace(v_def,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'Unexpected bc7_confirmar_bloque_jornada sealed tranche lookup; checklist V2 stopped safely.';
+  END IF;
+  v_def:=replace(v_def,v_old,v_new);
+
+  EXECUTE v_def;
+END;
+$patch_sealed_owner_checklist_gate_v2$;
+
 COMMIT;
