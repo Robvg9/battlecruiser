@@ -1953,9 +1953,17 @@
     if(type==='INICIAL'&&String(session.estado).toUpperCase()==='EN_CURSO'&&detail.is_admin)
       return legacyInitialFormHtml(detail);
 
-    const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(String(session.estado).toUpperCase()):String(session.estado).toUpperCase()==='EN_CURSO';
+    const sessionStatus=String(session.estado||'').toUpperCase();
+    const sealedFinalCapture=type==='FINAL'&&sessionStatus==='CERRADA_OPERATIVAMENTE'&&detail.is_admin===true;
+    const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(sessionStatus):(sessionStatus==='EN_CURSO'||sealedFinalCapture);
     if(!allowed)return '<div class="bc7-empty">El conteo '+(type==='INICIAL'?'inicial':'final')+' no se puede modificar en el estado actual ('+esc(humanStatus(session.estado))+').</div>';
-    const products=arr(detail.productos);
+    const allProducts=arr(detail.productos);
+    const initialCutLines=arr(detail.cortes&&detail.cortes.INICIAL&&detail.cortes.INICIAL.lineas);
+    const products=sealedFinalCapture
+      ?initialCutLines.map(line=>allProducts.find(product=>String(product.producto_id)===String(line.producto_id))).filter(Boolean)
+      :allProducts;
+    if(sealedFinalCapture&&products.length!==initialCutLines.length)
+      return '<div class="bc7-empty">El catálogo ya no contiene todas las familias del corte inicial. No se habilita un conteo parcial; requiere recuperación de catálogo.</div>';
     const opening=type==='INICIAL'?detail.apertura_previa:null;
     const openingLines=new Map(arr(opening&&opening.lineas).map(x=>[String(x.producto_id),x]));
     const openingNote=type==='INICIAL'
@@ -1971,7 +1979,13 @@
           return '<tr><td data-label="Producto">'+esc(p.nombre)+'</td><td data-label="Unidad">'+esc(p.unidad||'ud')+'</td><td data-label="Stock actual">'+esc(qty(p.stock_actual))+'</td><td data-label="Referencia anterior">'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td data-label="Conteo físico actual"><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
         }).join('')+'</tbody></table></div>')
       :empty;
-    return openingNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'">'+table+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
+    const sealedCaptureNote=sealedFinalCapture
+      ?'<div class="bc7-note"><b>Captura histórica ADMIN · sin reabrir la Jornada</b><p>Exporta la hoja «Inventario final» de la plantilla como CSV UTF-8 y súbela aquí. Debe incluir exactamente las familias del corte inicial y las cantidades físicas al 20/11/2026 23:00, hora de Cuba. No uses el stock actual ni incluyas las transferencias del 21/11.</p></div>'
+      :'';
+    const sealedCaptureFile=sealedFinalCapture
+      ?'<label class="bc7-field">Archivo CSV del inventario final<input type="file" accept=".csv,text/csv" data-bc7-sealed-final-file required><small class="bc7-muted">Columnas requeridas: «Producto ID» y «Final físico al corte». El nombre y SHA-256 del archivo quedarán auditados.</small></label><input type="hidden" data-bc7-count-idempotency value=""><input type="hidden" data-bc7-count-source-sha value="">'
+      :'';
+    return openingNote+sealedCaptureNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'" '+(sealedFinalCapture?'data-bc7-sealed-final-capture="true"':'')+'>'+table+sealedCaptureFile+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
   function renderMovementRows(rows,session){
     const day=Number(session&&session.numero_dia||0);
@@ -2055,12 +2069,13 @@
     const finalDone=checks.inventario_final?.completado===true;
     const sealed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
     const finalLocked=sealed&&!finalDone;
-    const finalDescription=finalDone?'Conteo físico final confirmado':(finalLocked?'Bloqueado tras el sello · el inventario final exige el flujo de conciliación y no admite conteo retroactivo':'¿Ya pusiste el inventario final?');
+    const adminSealedCapture=finalLocked&&detail.is_admin===true;
+    const finalDescription=finalDone?'Conteo físico final confirmado':(adminSealedCapture?'ADMIN puede cargar el CSV del conteo físico correspondiente al corte inmutable; el Turno maestro debe seguir abierto.':(finalLocked?'Bloqueado tras el sello · requiere registro administrativo auditado':'¿Ya pusiste el inventario final?'));
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
       '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+finalDescription+'</small></div>'+
-      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final" '+(finalLocked?'disabled':'')+'>Abrir sección</button>'+
-      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned||finalLocked?'disabled':'')+'>'+(finalDone?'Ver conteo':(finalLocked?'Bloqueado':'Ir a ponerlo'))+'</button>'+
+      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final" '+(finalLocked&&!adminSealedCapture?'disabled':'')+'>'+(adminSealedCapture?'Cargar conteo ADMIN':'Abrir sección')+'</button>'+
+      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned||(finalLocked&&!adminSealedCapture)?'disabled':'')+'>'+(finalDone?'Ver conteo':(adminSealedCapture?'Ir a cargar CSV':(finalLocked?'Bloqueado':'Ir a ponerlo')))+'</button>'+
     '</div>';
     const cashDeclared=checks.declaracion_dinero?.completado===true;
     const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
@@ -2417,20 +2432,114 @@
       return false;
     }
   }
+  function parseSealedInventoryCsv(text,form){
+    const source=String(text||'').replace(/^\uFEFF/,'');
+    const firstLine=source.split(/\r?\n/).find(line=>line.trim())||'';
+    let comma=0,semicolon=0,inQuotes=false;
+    for(let i=0;i<firstLine.length;i++){
+      const ch=firstLine[i];
+      if(ch==='"'){if(inQuotes&&firstLine[i+1]==='"'){i++;continue;}inQuotes=!inQuotes;continue;}
+      if(!inQuotes){if(ch===',')comma++;else if(ch===';')semicolon++;}
+    }
+    const delimiter=semicolon>comma?';':',';
+    const rows=[];let row=[],field='',quoted=false;
+    for(let i=0;i<source.length;i++){
+      const ch=source[i];
+      if(ch==='"'){
+        if(quoted&&source[i+1]==='"'){field+='"';i++;}
+        else quoted=!quoted;
+      }else if(ch===delimiter&&!quoted){row.push(field);field='';}
+      else if((ch==='\n'||ch==='\r')&&!quoted){
+        if(ch==='\r'&&source[i+1]==='\n')i++;
+        row.push(field);field='';
+        if(row.some(value=>String(value).trim()!==''))rows.push(row);
+        row=[];
+      }else field+=ch;
+    }
+    row.push(field);if(row.some(value=>String(value).trim()!==''))rows.push(row);
+    if(rows.length<2)throw new Error('El CSV está vacío o solo contiene encabezados.');
+    const norm=value=>String(value||'').replace(/^\uFEFF/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]+/g,' ').trim().replace(/\s+/g,' ');
+    const headers=rows[0].map(norm);
+    const idIndex=headers.findIndex(value=>['producto id','id producto','product id','product_id'].includes(value));
+    const qtyIndex=headers.findIndex(value=>['final fisico al corte','cantidad final','inventario final','final'].includes(value));
+    if(idIndex<0||qtyIndex<0)throw new Error('No encuentro las columnas «Producto ID» y «Final físico al corte». Exporta la hoja correcta de la plantilla.');
+    const inputs=Array.from(form.querySelectorAll('[data-bc7-count]'));
+    const expected=new Map(inputs.map(input=>[String(input.dataset.bc7Count),input]));
+    const seen=new Set(),lines=[];
+    for(let i=1;i<rows.length;i++){
+      const cells=rows[i];if(!cells.some(value=>String(value).trim()!==''))continue;
+      const id=String(cells[idIndex]||'').trim().replace(/^"|"$/g,'');
+      let raw=String(cells[qtyIndex]||'').trim();
+      if(delimiter===';')raw=raw.replace(',','.');
+      if(!id||!expected.has(id))throw new Error('La fila '+(i+1)+' contiene un producto que no pertenece al corte inicial: '+(id||'(sin ID)')+'.');
+      if(seen.has(id))throw new Error('El producto '+id+' aparece más de una vez en el CSV.');
+      if(raw===''||!/^\d+(?:\.\d{1,3})?$/.test(raw)||!Number.isFinite(Number(raw))||Number(raw)<0)
+        throw new Error('Cantidad inválida para el producto '+id+' en la fila '+(i+1)+'.');
+      seen.add(id);lines.push({producto_id:id,cantidad:Number(raw)});
+    }
+    if(seen.size!==expected.size){
+      const missing=Array.from(expected.keys()).filter(id=>!seen.has(id));
+      throw new Error('El CSV está incompleto: faltan '+missing.length+' productos del corte inicial.');
+    }
+    lines.forEach(line=>{const input=expected.get(String(line.producto_id));if(input)input.value=String(line.cantidad);});
+    return lines;
+  }
+  async function sha256File(file){
+    if(!window.crypto||!window.crypto.subtle||!file||typeof file.arrayBuffer!=='function')
+      throw new Error('Este navegador no permite calcular la huella SHA-256 del archivo.');
+    const digest=await window.crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+    return Array.from(new Uint8Array(digest)).map(value=>value.toString(16).padStart(2,'0')).join('');
+  }
   async function saveCount(form){
     const type=form.dataset.bc7CountForm;
     const sessionId=state.selected;
-    const inputs=Array.from(form.querySelectorAll('[data-bc7-count]'));
-    const lines=inputs.map(i=>({producto_id:i.dataset.bc7Count,cantidad:i.value.trim()}));
-    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
+    const sealedAdmin=form.dataset.bc7SealedFinalCapture==='true';
+    let lines=[];
+    let sourceFile=null,sourceSha='';
+    if(sealedAdmin){
+      sourceFile=form.querySelector('[data-bc7-sealed-final-file]')?.files?.[0]||null;
+      if(!sourceFile){msg(form.querySelector('[data-bc7-count-msg]'),'Selecciona el CSV completo del inventario final.','error');return;}
+      try{
+        lines=parseSealedInventoryCsv(await sourceFile.text(),form);
+        sourceSha=await sha256File(sourceFile);
+      }catch(error){
+        msg(form.querySelector('[data-bc7-count-msg]'),String(error&&error.message||error),'error');return;
+      }
+    }else{
+      const inputs=Array.from(form.querySelectorAll('[data-bc7-count]'));
+      lines=inputs.map(i=>({producto_id:i.dataset.bc7Count,cantidad:i.value.trim()}));
+    }
+    const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(String(x.cantidad)));
     if(bad){msg(form.querySelector('[data-bc7-count-msg]'),'Cuenta todos los productos e introduce cantidades válidas con hasta 3 decimales.','error');return;}
     const note=form.querySelector('[data-bc7-count-note]')?.value||null;
     const label=type==='INICIAL'?'inventario inicial':'inventario final';
-    if(!confirm('Vas a confirmar el '+label+' físico. Después no podrás editar este conteo; quedará guardado quién lo hizo, cuándo y qué cantidades mostraba la aplicación para comparar. ¿Confirmas que contaste todos los productos?'))return;
+    if(!confirm(sealedAdmin
+      ?'Vas a guardar un inventario FINAL histórico para el corte operativo original. Se conservarán el archivo, su SHA-256, el responsable ADMIN y la fecha real de registro. No se modificarán el corte operativo ni el stock global. ¿Confirmas?'
+      :'Vas a confirmar el '+label+' físico. Después no podrás editar este conteo; quedará guardado quién lo hizo, cuándo y qué cantidades mostraba la aplicación para comparar. ¿Confirmas que contaste todos los productos?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{await rpc('bc7_guardar_inventario_jornada',{p_turno_sesion_id:sessionId,p_tipo:type,p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),p_observacion:note});await openWorkspace(sessionId);setStatus('Conteo confirmado y actualizado desde el servidor.','ok');}
-    catch(e){msg(form.querySelector('[data-bc7-count-msg]'),'No se confirmó el conteo. '+friendlyError(e,'inventory'),'error');}
-    finally{busy(btn,false);}
+    try{
+      if(sealedAdmin){
+        const keyInput=form.querySelector('[data-bc7-count-idempotency]');
+        const shaInput=form.querySelector('[data-bc7-count-source-sha]');
+        if(!keyInput.value||shaInput.value!==sourceSha)keyInput.value=freshIdempotencyKey();
+        shaInput.value=sourceSha;
+        const result=await rpc('bc7_admin_registrar_inventario_final_sellado_jornada',{
+          p_turno_sesion_id:sessionId,
+          p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),
+          p_observacion:note||'Conteo histórico cargado por ADMIN al corte operativo original.',
+          p_fuente_documental:sourceFile.name,
+          p_fuente_sha256:sourceSha,
+          p_idempotency_key:keyInput.value
+        });
+        await openWorkspace(sessionId);
+        setStatus(result&&result.idempotente?'El mismo CSV ya estaba registrado; no se duplicó el inventario final.':'Inventario final histórico registrado y auditado.','ok');
+      }else{
+        await rpc('bc7_guardar_inventario_jornada',{p_turno_sesion_id:sessionId,p_tipo:type,p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),p_observacion:note});
+        await openWorkspace(sessionId);setStatus('Conteo confirmado y actualizado desde el servidor.','ok');
+      }
+    }catch(e){
+      msg(form.querySelector('[data-bc7-count-msg]'),(sealedAdmin?'No se confirmó el inventario final histórico. ':'No se confirmó el conteo. ')+friendlyError(e,'inventory')+(sealedAdmin?' Conserva el mismo CSV y vuelve a consultar el estado; no uses otra clave manual.':''),'error');
+    }finally{busy(btn,false);}
   }
   async function saveReceipt(form){
     const sessionId=form.dataset.bc7ReceiveForm;
