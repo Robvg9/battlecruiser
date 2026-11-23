@@ -1953,7 +1953,9 @@
     if(type==='INICIAL'&&String(session.estado).toUpperCase()==='EN_CURSO'&&detail.is_admin)
       return legacyInitialFormHtml(detail);
 
-    const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(String(session.estado).toUpperCase()):String(session.estado).toUpperCase()==='EN_CURSO';
+    const sessionState=String(session.estado||'').toUpperCase();
+    const postSealFinal=type==='FINAL'&&sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail.tramo_registrable;
+    const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(sessionState):(sessionState==='EN_CURSO'||postSealFinal);
     if(!allowed)return '<div class="bc7-empty">El conteo '+(type==='INICIAL'?'inicial':'final')+' no se puede modificar en el estado actual ('+esc(humanStatus(session.estado))+').</div>';
     const products=arr(detail.productos);
     const opening=type==='INICIAL'?detail.apertura_previa:null;
@@ -1971,7 +1973,12 @@
           return '<tr><td data-label="Producto">'+esc(p.nombre)+'</td><td data-label="Unidad">'+esc(p.unidad||'ud')+'</td><td data-label="Stock actual">'+esc(qty(p.stock_actual))+'</td><td data-label="Referencia anterior">'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td data-label="Conteo físico actual"><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
         }).join('')+'</tbody></table></div>')
       :empty;
-    return openingNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'">'+table+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
+    const postSealEvidence=postSealFinal
+      ?'<div class="bc7-note"><b>Conteo histórico posterior al sello</b><p>Este inventario debe reflejar exactamente el físico existente al corte operativo original de la Jornada. No uses el stock actual ni incluyas transferencias posteriores al corte. Adjunta el documento fuente al expediente y registra su nombre/referencia y SHA-256.</p></div>'+
+        '<label class="bc7-field">Documento fuente / referencia<input data-bc7-count-source required maxlength="300" placeholder="Ej. conteo físico firmado 20-11-2026.pdf"></label>'+
+        '<label class="bc7-field">SHA-256 del documento fuente<input data-bc7-count-source-hash required minlength="64" maxlength="64" pattern="[0-9a-fA-F]{64}" placeholder="64 caracteres hexadecimales"></label>'
+      :'';
+    return openingNote+(postSealFinal?'': '<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p>')+'<form data-bc7-count-form="'+type+'"'+(postSealFinal?' data-bc7-count-postseal="true"':'')+'>'+table+postSealEvidence+'<label class="bc7-field">Observación'+(postSealFinal?' obligatoria para la trazabilidad':' (opcional)')+'<input data-bc7-count-note maxlength="1000" '+(postSealFinal?'required ':'')+'placeholder="Procedencia, fecha del conteo y aclaraciones"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
   function renderMovementRows(rows,session){
     const day=Number(session&&session.numero_dia||0);
@@ -2054,8 +2061,9 @@
     }).join('');
     const finalDone=checks.inventario_final?.completado===true;
     const sealed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
-    const finalLocked=sealed&&!finalDone;
-    const finalDescription=finalDone?'Conteo físico final confirmado':(finalLocked?'Bloqueado tras el sello · el inventario final exige el flujo de conciliación y no admite conteo retroactivo':'¿Ya pusiste el inventario final?');
+    const postSealFinalAllowed=sealed&&!!detail.tramo_registrable;
+    const finalLocked=sealed&&!finalDone&&!postSealFinalAllowed;
+    const finalDescription=finalDone?'Conteo físico final confirmado':(postSealFinalAllowed?'Puedes registrar el conteo histórico documentado del corte operativo original. No uses el stock actual.':(finalLocked?'Bloqueado tras el sello · requiere el tramo exacto de la responsable y el Turno maestro abierto':'¿Ya pusiste el inventario final?'));
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
       '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+finalDescription+'</small></div>'+
@@ -2425,10 +2433,28 @@
     const bad=lines.find(x=>x.cantidad===''||!Number.isFinite(Number(x.cantidad))||Number(x.cantidad)<0||!/^\d+(?:\.\d{1,3})?$/.test(x.cantidad));
     if(bad){msg(form.querySelector('[data-bc7-count-msg]'),'Cuenta todos los productos e introduce cantidades válidas con hasta 3 decimales.','error');return;}
     const note=form.querySelector('[data-bc7-count-note]')?.value||null;
+    const postSeal=form.dataset.bc7CountPostseal==='true';
+    const source=String(form.querySelector('[data-bc7-count-source]')?.value||'').trim();
+    const sourceHash=String(form.querySelector('[data-bc7-count-source-hash]')?.value||'').trim().toLowerCase();
+    if(postSeal&&(!note||!note.trim()||!source||!/^[0-9a-f]{64}$/.test(sourceHash))){
+      msg(form.querySelector('[data-bc7-count-msg]'),'Para el conteo histórico debes indicar observación, documento fuente y SHA-256 válido de 64 caracteres.','error');return;
+    }
     const label=type==='INICIAL'?'inventario inicial':'inventario final';
-    if(!confirm('Vas a confirmar el '+label+' físico. Después no podrás editar este conteo; quedará guardado quién lo hizo, cuándo y qué cantidades mostraba la aplicación para comparar. ¿Confirmas que contaste todos los productos?'))return;
+    const confirmation=postSeal
+      ?'Vas a registrar un conteo FINAL histórico al corte operativo original. No se guardará el stock actual como inventario físico. Verifica que cada cantidad proviene del documento fuente indicado. ¿Confirmas?'
+      :'Vas a confirmar el '+label+' físico. Después no podrás editar este conteo; quedará guardado quién lo hizo, cuándo y qué cantidades mostraba la aplicación para comparar. ¿Confirmas que contaste todos los productos?';
+    if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{await rpc('bc7_guardar_inventario_jornada',{p_turno_sesion_id:sessionId,p_tipo:type,p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),p_observacion:note});await openWorkspace(sessionId);setStatus('Conteo confirmado y actualizado desde el servidor.','ok');}
+    try{
+      const payload={p_turno_sesion_id:sessionId,p_lineas:lines.map(x=>({producto_id:x.producto_id,cantidad:Number(x.cantidad)})),p_observacion:note};
+      if(postSeal){
+        await rpc('bc7_guardar_inventario_final_post_sello_jornada',{...payload,p_fuente_documental:source,p_fuente_content_hash:sourceHash});
+      }else{
+        await rpc('bc7_guardar_inventario_jornada',{...payload,p_tipo:type});
+      }
+      await openWorkspace(sessionId);
+      setStatus(postSeal?'Inventario final histórico guardado con corte original y evidencia.':'Conteo confirmado y actualizado desde el servidor.','ok');
+    }
     catch(e){msg(form.querySelector('[data-bc7-count-msg]'),'No se confirmó el conteo. '+friendlyError(e,'inventory'),'error');}
     finally{busy(btn,false);}
   }
