@@ -478,7 +478,7 @@ BEGIN
         'diferencia_id',r.id,'diferencia',r.diferencia,'comentario',r.comentario)
     );
   END IF;
-$new$;
+$old$;
   v_new := $new$
   IF r.declaracion_dinero_id IS NOT NULL THEN
     UPDATE public.turno_declaraciones
