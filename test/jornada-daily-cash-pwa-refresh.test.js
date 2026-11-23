@@ -108,8 +108,8 @@ test("closing requires every date and confirms the final day before closing the 
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
   assert.match(cashSave,/Faltan importes de estos días/);
   assert.match(UI, /async function saveCashDeclaration/);
-  assert.match(UI, /rpc\\('bc_declarar_dinero'/);
-  assert.match(UI, /rpc\\('bc5_responsable_declarar_dinero_jornada'/);
+  assert.match(UI, /rpc\('bc_declarar_dinero'/);
+  assert.match(UI, /rpc\('bc5_responsable_declarar_dinero_jornada'/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
