@@ -34,7 +34,7 @@ test("sealed final physical inventory is entered directly by the assigned worker
 test("Step 5 lives inside the checklist and requires all date deliveries plus the worker final declaration",()=>{
   assert.match(ui,/openChecklistSection\('declaracion_dinero'\)/);
   assert.match(ui,/data-bc7-checklist-open="declaracion_dinero"/);
-  assert.match(ui,/data-bc7-require-complete="true"/);
+  assert.match(ui,/requireComplete:true/);
   assert.match(ui,/declaracion_registrada===true/);
   assert.match(ui,/bc5_responsable_declarar_dinero_jornada/);
   assert.match(ui,/finalSaved=declarationMatches&&detail\.checklist/);
