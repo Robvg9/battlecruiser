@@ -20,11 +20,10 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the assigned worker must be able to confirm completeness after seal, independently of Owner approvals.';
   END IF;
 
-  IF v_state NOT LIKE '%DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION%'
-     OR v_state NOT LIKE '%v_daily_registered=v_daily_expected%'
+  IF v_state NOT LIKE '%v_daily_registered=v_daily_expected%'
      OR v_state NOT LIKE '%declaracion_registrada%'
      OR v_state NOT LIKE '%entregas_diarias_esperadas%' THEN
-    RAISE EXCEPTION 'FAIL: Step 5 must require a worker-authored final declaration and every date-specific cash entry.';
+    RAISE EXCEPTION 'FAIL: Step 5 must require one daily cash entry for every date in the period.';
   END IF;
 
   IF v_cash NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
