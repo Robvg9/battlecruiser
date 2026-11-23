@@ -126,8 +126,8 @@ test("Empty dashboard queues disappear, but live approval, cash and communicatio
   assert.match(humanOperations, /function construirAlertasB7\(\)/);
 });
 
-test("All revised modules use matching online/offline cache keys in release 9.5.149", () => {
-  assert.equal(assertPwaReleaseAligned(assert, { app, serviceWorker, index }).appVersion, "9.5.149");
+test("All revised modules use matching online/offline cache keys in release 9.5.150", () => {
+  assert.equal(assertPwaReleaseAligned(assert, { app, serviceWorker, index }).appVersion, "9.5.150);
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "ui-operaciones-hub.js" });
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "bc-owner-quick-actions.js" });
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "jornada-price-changes.js" });
