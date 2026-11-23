@@ -107,7 +107,9 @@ test("closing requires every date and confirms the final day before closing the 
   assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
   assert.match(cashSave,/Faltan importes de estos días/);
-  assert.match(UI, /async function saveCashDeclaration/);\n  assert.match(UI, /rpc\\('bc_declarar_dinero'/);\n  assert.match(UI, /rpc\\('bc5_responsable_declarar_dinero_jornada'/);
+  assert.match(UI, /async function saveCashDeclaration/);
+  assert.match(UI, /rpc\\('bc_declarar_dinero'/);
+  assert.match(UI, /rpc\\('bc5_responsable_declarar_dinero_jornada'/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
@@ -159,8 +161,8 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.ok(start>=0&&end>start);
   const block=UI.slice(start,end);
   assert.match(block,/if\(!operations\.length\)/);
-  assert.match(block,/if\(!options\.requireComplete\)/);
-  assert.match(block,/No hay importes nuevos que guardar\. Los registros existentes se conservaron sin cambios\./);
+  assert.match(block,/const alreadyDone=detail\.checklist\?\.declaracion_dinero\?\.completado===true/);
+  assert.match(block,/El paso 5 ya está completo y confirmado por el servidor/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
   assert.match(block,/Faltan importes de estos días/);
 });
