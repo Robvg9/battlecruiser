@@ -57,10 +57,14 @@ BEGIN
   END IF;
 
   IF v_transfer NOT LIKE '%CERRADA_OPERATIVAMENTE%'
-     OR v_transfer NOT LIKE '%v_turno.estado%'
-     OR v_transfer NOT LIKE '%fecha%'
-     OR v_transfer NOT LIKE '%almacen_destino_id%' THEN
-    RAISE EXCEPTION 'FAIL: historical transfer attribution must allow sealed sessions without removing master-turn, date or destination guards.';
+     OR v_transfer NOT LIKE '%v_s.estado NOT IN%'
+     OR v_transfer NOT LIKE '%v_s.turno_id%'
+     OR v_transfer NOT LIKE '%t.estado=''ABIERTO''%'
+     OR v_transfer NOT LIKE '%v_t.fecha<=v_period_end%'
+     OR v_transfer NOT LIKE '%v_t.almacen_destino_id<>v_s.almacen_id%'
+     OR v_transfer NOT LIKE '%v_existing.turno_sesion_id=v_s.id%'
+     OR v_transfer NOT LIKE '%TRANSFERENCIA_RETROACTIVA_VINCULADA%' THEN
+    RAISE EXCEPTION 'FAIL: historical transfer attribution must allow sealed sessions without removing master-turn, period, date, destination, one-link idempotency or audit guards.';
   END IF;
 
   IF v_cash NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
