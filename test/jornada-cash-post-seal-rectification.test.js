@@ -43,7 +43,8 @@ test("advanced monthly calendar is an isolated desktop modal, not the default Jo
 });
 
 test("sealed retail Jornada captures only the actual date-specific cash entries", () => {
-  assert.match(ui, /detail\.tramo_registrable\|\|detail\.tramo_activo/);
+  assert.match(ui, /sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail\.tramo_registrable/);
+  assert.match(ui,/detail\.server_responsible_access===true/);
   assert.match(ui, /sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail\.tramo_registrable/);
   assert.match(ui, /bc7_registrar_entrega_diaria_jornada/);
   assert.match(ui, /bc7_admin_registrar_entrega_diaria_jornada/);
@@ -56,7 +57,8 @@ test("sealed retail Jornada captures only the actual date-specific cash entries"
   assert.match(ui, /bc7_estado_conteo_efectivo_jornada/);
   assert.match(ui, /bc7_contar_efectivo_dueno_jornada/);
   assert.match(ui, /data-bc7-save-cash-days/);
-  assert.match(ui, /closest\('\[data-bc7-close-form\]'\)/);
+  assert.match(ui,/document\.querySelector\('#bc7-cash-days-manager \\[data-bc7-close-form\\]'\)/);
+  assert.match(ui,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
   // Historical transcription/rectification RPCs remain available for audit repair,
   // but their forms are no longer mounted in the retail Step 5 renderer.
   assert.match(ui, /async function rectifyAdminCashDeclaration/);
@@ -87,7 +89,9 @@ test("Owner physical count is independent and cannot duplicate the daily declare
   assert.match(block,/p_monto_contado:amount/);
   assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
   assert.match(cashMigration,/THEN v_final_counted ELSE NULL END/);
-  assert.doesNotMatch(cashMigration,/v_daily_cash\+v_final_counted/);
+  const singleCashBlock=cashMigration.slice(cashMigration.indexOf("v_new := $new$",cashMigration.indexOf("INTO v_final_declared,v_final_counted,v_final_cash_state")),cashMigration.indexOf("$new$;",cashMigration.indexOf("INTO v_final_declared,v_final_counted,v_final_cash_state"))+6);
+  assert.match(singleCashBlock,/THEN v_final_counted ELSE NULL END/);
+  assert.doesNotMatch(singleCashBlock,/v_daily_cash\+v_final_counted/);
   assert.match(ui, /El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos/);
 });
 
