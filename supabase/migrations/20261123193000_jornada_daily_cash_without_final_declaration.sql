@@ -613,15 +613,28 @@ DECLARE
 BEGIN
   SELECT pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure)
     INTO v_def;
+  -- Production can retain the explicit completed-session predicate; the disposable
+  -- fixture also exercises the historical form without that intermediate clause.
   v_old := $old$WHERE s.bloque='JORNADA'
+      AND s.estado='COMPLETADA'
       AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$old$;
   v_new := $new$WHERE s.bloque='JORNADA'
+      AND s.estado='COMPLETADA'
       AND coalesce(a.tipo,'')<>'minorista'
       AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$new$;
   IF strpos(v_def,v_old)>0 THEN
     v_def := replace(v_def,v_old,v_new);
-  ELSIF strpos(v_def,'coalesce(a.tipo,'''')<>''minorista''')=0 THEN
-    RAISE EXCEPTION 'No se reconoce el filtro de declaración histórica en listar_aprobaciones_admin.';
+  ELSE
+    v_old := $old$WHERE s.bloque='JORNADA'
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$old$;
+    v_new := $new$WHERE s.bloque='JORNADA'
+      AND coalesce(a.tipo,'')<>'minorista'
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$new$;
+    IF strpos(v_def,v_old)>0 THEN
+      v_def := replace(v_def,v_old,v_new);
+    ELSIF strpos(v_def,'coalesce(a.tipo,'''')<>''minorista''')=0 THEN
+      RAISE EXCEPTION 'No se reconoce el filtro de declaración histórica en listar_aprobaciones_admin.';
+    END IF;
   END IF;
   EXECUTE v_def;
 END;
