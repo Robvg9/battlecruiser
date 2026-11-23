@@ -104,6 +104,10 @@ test("cash exception inbox cache key is refreshed with the new UI contract",()=>
 
 test("retail approvals use daily cash rows, not a second legacy final declaration",()=>{
   assert.match(DAILY_ONLY,/coalesce\(a\.tipo,''\)<>'minorista'/);
+  assert.match(DAILY_ONLY,/AND s\.estado='COMPLETADA'[\s\S]*AND coalesce\(a\.tipo,''\)<>'minorista'/,
+    "the LIVE queue variant keeps its completed-session guard while excluding retail declarations");
+  assert.match(DAILY_ONLY,/historical form without that intermediate clause/,
+    "the migration also supports the compact disposable-fixture variant");
   assert.match(DAILY_ONLY,/listar_aprobaciones_admin\(\)/);
   assert.match(DAILY_ONLY,/turno_jornada_conteos_caja/);
   assert.match(DAILY_ONLY,/bc7_contar_efectivo_dueno_jornada/);
