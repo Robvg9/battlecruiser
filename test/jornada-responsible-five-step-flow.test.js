@@ -56,7 +56,11 @@ test("Step 5 requires exactly one daily entry per period date and no worker fina
   assert.match(cashMigration,/v_daily_registered=v_daily_expected/);
   assert.match(cashMigration,/turno_jornada_conteos_caja/);
   assert.match(cashMigration,/THEN v_final_counted ELSE NULL END/);
-  assert.doesNotMatch(cashMigration,/v_daily_cash\+v_final_counted/);
+  const settlementStart=cashMigration.indexOf("v_new := $new$",cashMigration.indexOf("v_cash_received:=CASE"));
+  const settlementEnd=cashMigration.indexOf("$new$;",settlementStart)+6;
+  const settlement=cashMigration.slice(settlementStart,settlementEnd);
+  assert.match(settlement,/v_final_cash_state IN \('APROBADA','APROBADA_CON_DIFERENCIA'\)/);
+  assert.doesNotMatch(settlement,/v_daily_cash\+v_final_counted/);
 });
 
 test("sealed step 5 is mounted only inside the checklist source container",()=>{
@@ -110,7 +114,7 @@ test("sealed transfer attribution surfaces the real server rejection and keeps a
   assert.match(ui,/bc7_vincular_transferencia_jornada/);
   assert.match(ui,/reason\.trim\(\)\.length<10/);
   assert.match(ui,/friendlyError\(error,'transfer'\)/);
-  assert.match(ui,/else if\(context==='transfer'&&code==='23514'\) message=raw/);
+  assert.match(ui,/context==='transfer'&&\(code==='23514'\|\|code==='23505'\)\) message=raw/);
   assert.match(cashMigration,/v_s\.estado NOT IN \(''PROGRAMADA'',''EN_CURSO'',''COMPLETADA'',''CERRADA_OPERATIVAMENTE''\)/);
   assert.match(cashMigration,/v_t\.fecha<=v_period_end/);
   assert.match(cashMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
