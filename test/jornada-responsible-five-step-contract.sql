@@ -65,6 +65,10 @@ BEGIN
     v_read_count LIKE '%resolucion%',
     pg_get_functiondef('public.bc7_listar_diferencias_conteo_efectivo_jornada()'::regprocedure) LIKE '%CON_DIFERENCIA%',
     pg_get_functiondef('public.bc_aprobar_diferencia(uuid,text)'::regprocedure) LIKE '%APROBADA_CON_DIFERENCIA%';
+  IF to_regclass('public.turno_jornada_conteos_caja_diferencia_id_idx') IS NULL THEN
+    RAISE EXCEPTION 'FAIL: Owner cash discrepancy FK must have a supporting index.';
+  END IF;
+
   IF to_regclass('public.turno_diferencias') IS NULL
      OR v_count NOT LIKE '%turno_diferencias%'
      OR v_count NOT LIKE '%diferencia_id%'
