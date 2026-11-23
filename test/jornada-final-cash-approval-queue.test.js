@@ -91,7 +91,7 @@ test("Owner review shows declared final cash separately from physical cash count
   assert.ok(OWNER_REVIEW.includes("s.efectivo?.declarado"));
   assert.ok(OWNER_REVIEW.includes("Declaración final"));
   assert.ok(OWNER_REVIEW.includes("No se suma al efectivo total recogido"));
-  assert.ok(OWNER_REVIEW.includes("Conteo final de caja"));
+  assert.ok(OWNER_REVIEW.includes("Conteo físico del Dueño"));
 });
 
 test("cash exception inbox cache key is refreshed with the new UI contract",()=>{
