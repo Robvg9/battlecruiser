@@ -1222,7 +1222,9 @@
     const sessionId=String(detail.sesion.id||'');
     const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
     const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
-    const isAssigned=detail.server_responsible_access===true||localAssignment;
+    const isAssigned=detail.sesion.es_minorista===true
+      ?detail.server_responsible_access===true
+      :localAssignment;
     if(!state.admin&&!isAssigned){
       host.innerHTML='<div class="bc7-empty">El servidor aún no ha confirmado tu asignación a esta jornada. No se mostraron importes.</div>';
       return;
