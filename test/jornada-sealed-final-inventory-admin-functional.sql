@@ -35,8 +35,8 @@ BEGIN
   INSERT INTO auth.users(id) VALUES(v_admin) ON CONFLICT(id) DO NOTHING;
 
   SELECT id INTO v_admin_role FROM public.roles
-  WHERE lower(btrim(nombre)) IN ('dueño','admin')
-  ORDER BY CASE WHEN lower(btrim(nombre))='dueño' THEN 0 ELSE 1 END
+  WHERE id='30000000-0000-0000-0000-000000000001'::uuid
+    AND nombre='Dueño'
   LIMIT 1;
   IF v_admin_role IS NULL THEN
     RAISE EXCEPTION 'The PostgreSQL 17 fixture must seed an owner/admin role.';
@@ -175,8 +175,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: reused idempotency key with a different payload was accepted.';
   END IF;
 
-  -- A distinct session with two initial products rejects an incomplete file.
-  -- Reuse the same warehouse and product by adding a second root family.
+  -- The same upload is locked out once the master Turn closes.
   UPDATE public.turnos SET estado='CERRADO',estado_maestro='CERRADO',cierre_real=now()
   WHERE id=v_turn;
   v_error:=false;
