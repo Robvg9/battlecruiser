@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.151 — Daily-only Jornada cash handover, independent Owner count and sealed attribution.
+// v9.5.151 — Daily-only Jornada cash handover, independent Owner count and safe sealed-transfer attribution.
 (function hotfixV9475(){
   const VERSION="9.5.151";
   window.__BC_VERSION__=VERSION;
