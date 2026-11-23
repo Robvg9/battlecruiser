@@ -36,7 +36,7 @@ test("reintentar el cierre reutiliza la declaración guardada sin intentar regis
   const close = JOURNADA_UI.slice(start, end);
   assert.match(close, /let amount=\$\('bc7-cash'\)\?\.value\.trim\(\)/);
   assert.match(close, /if\(saved\)\{amount=String\(state\.detail\.declaracion_dinero\.monto\);\}/);
-  assert.match(close, /if\(!saved\) await rpc\('bc_declarar_dinero'/);
+  assert.match(close, /cashMode!=='daily'&&!saved\) await rpc\('bc_declarar_dinero'/);
   assert.match(close, /await rpc\('bc5_cerrar_jornada'/);
 });
 
