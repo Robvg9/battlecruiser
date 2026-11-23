@@ -45,14 +45,13 @@ test("Step 5 lives inside the checklist and requires all date deliveries plus th
   assert.match(migration,/DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION/);
 });
 
-test("sealed step 5 is not rendered as a separate action-area panel",()=>{
+test("sealed step 5 is mounted only inside the checklist source container",()=>{
   const start=ui.indexOf("else if(status==='CERRADA_OPERATIVAMENTE'&&s.es_minorista===true)");
   const end=ui.indexOf("}else{",start);
   const sealedBranch=ui.slice(start,end);
-  assert.match(ui,/const op=.*bc7-checklist-section-source.*cashDaysManagerShellHtml\\(detail,isAssigned,status\\)/);
-  assert.match(ui,/cashDaysManagerShellHtml\(detail,isAssigned,status\).*bc7-checklist-section-source/);
+  assert.doesNotMatch(sealedBranch,/cashDaysManagerShellHtml/);
+  assert.match(ui,/const op=.*bc7-checklist-section-source.*cashDaysManagerShellHtml/);
 });
-
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
   assert.match(app,/\["bc7-jornada-ui\.js","7\.54"\]/);
   assert.match(sw,/bc7-jornada-ui\.js\?v=7\.54/);
