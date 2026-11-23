@@ -650,6 +650,17 @@ DECLARE
 BEGIN
   SELECT pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure)
     INTO v_def;
+
+  -- Fail closed if a future definition no longer carries the historical-attribution
+  -- safeguards. This patch changes only the eligible session state.
+  IF strpos(v_def,'v_t.fecha<=v_period_end')=0
+     OR strpos(v_def,'v_t.almacen_destino_id<>v_s.almacen_id')=0
+     OR strpos(v_def,'v_existing.turno_sesion_id=v_s.id')=0
+     OR strpos(v_def,'t.estado=''ABIERTO''')=0
+     OR strpos(v_def,'TRANSFERENCIA_RETROACTIVA_VINCULADA')=0 THEN
+    RAISE EXCEPTION 'La función de atribución histórica no conserva las guardas de período, almacén, idempotencia, Turno maestro y auditoría.';
+  END IF;
+
   IF strpos(v_def,v_new)>0 THEN
     NULL;
   ELSIF strpos(v_def,v_old)>0 THEN
