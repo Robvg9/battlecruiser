@@ -73,11 +73,12 @@ test("closed retail Jornada keeps the five-step checklist visible while preservi
   assert.match(checklist,/Reabrir sección/);
 });
 
-test("Owner physical cash count stays locked until Jornada is completed", () => {
-  assert.match(ui, /if\(detail\.is_admin&&sessionState==='COMPLETADA'&&declaration\.monto_contado==null/);
-  assert.match(ui, /else if\(detail\.is_admin&&sessionState!=='COMPLETADA'\)/);
-  assert.match(ui, /El conteo físico del Dueño se habilitará cuando la jornada esté completada\./);
-  assert.doesNotMatch(ui, /if\(detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)/);
+test("Owner cash count unlocks once the responsible completes all five steps, while the master Turn remains open", () => {
+  assert.match(ui, /const ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
+  assert.match(ui, /data-bc7-final-cash-count/);
+  assert.match(ui, /bc5_contar_dinero_entregado/);
+  assert.match(ui, /El conteo físico se habilitará cuando la responsable complete los cinco pasos/);
+  assert.match(ui, /el Turno maestro permanece abierto/);
 });
 
 test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent and audited", () => {
