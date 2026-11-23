@@ -588,26 +588,30 @@ DECLARE
   v_pattern text:='v_t[[:space:]]*:=[[:space:]]*public[.]bc7_validar_tramo_responsable_jornada[[:space:]]*[(]p_turno_sesion_id[)][[:space:]]*;';
   v_replacement text;
 BEGIN
+  -- Preserve the matched tranche-validation assignment, then insert a second
+  -- server-side guard immediately after it. quote_literal keeps the category
+  -- literal safe while pg_get_functiondef is rewritten on the target server.
   v_replacement:=$replace$\&$replace$||chr(10)||
     '  PERFORM public.bc7_validar_bloque_abierto_jornada(p_turno_sesion_id,';
+
   SELECT pg_get_functiondef('public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install expenses checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''gastos'');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('gastos')||');','i');
   EXECUTE v_def;
 
   SELECT pg_get_functiondef('public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install reinvestment checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''reinversiones'');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('reinversiones')||');','i');
   EXECUTE v_def;
 
   SELECT pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install Bajas checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''bajas'');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('bajas')||');','i');
   EXECUTE v_def;
 
   SELECT pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install Merma/Baja checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''bajas'');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('bajas')||');','i');
   EXECUTE v_def;
 END;
 $patch_operational_block_write_locks$;
