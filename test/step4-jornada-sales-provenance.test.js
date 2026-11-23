@@ -106,7 +106,9 @@ test("Jornada finance shows actual cash declaration/count separately from paymen
   assert.match(JOURNEY_UI, /bc7_ventas_jornada/);
   assert.match(JOURNEY_UI, /Ventas por forma de pago/);
   assert.match(JOURNEY_UI, /Método no declarado/);
-  assert.match(JOURNEY_UI, /El conteo físico del efectivo es independiente del total de ventas/);
+  assert.match(JOURNEY_UI, /data-bc7-final-cash-count/);
+  assert.match(JOURNEY_UI, /Total diario aprobado/);
+  assert.match(JOURNEY_UI, /Conteo físico del Dueño · independiente/);
   assert.match(INDEX, /id="venta-metodo-pago"/);
   assert.match(INDEX, /id="venta-jornada-payment-wrap"/);
   assert.match(APP, /\["venta-turno-ui\.js","9\.4\.46"\]/);
