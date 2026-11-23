@@ -191,13 +191,16 @@ BEGIN
 
   -- The tranche validator has already checked the exact completed tranche,
   -- current assignee and open master Turn for a sealed Jornada.
-  v_old := 'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado<>''EN_CURSO'' THEN';
-  v_new := 'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado NOT IN (''EN_CURSO'',''CERRADA_OPERATIVAMENTE'') THEN';
-  IF position(v_old IN v_definition)=0 OR
-     length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
-    RAISE EXCEPTION 'Unexpected grouped Baja session-state guard; migration stopped safely.';
+  IF strpos(v_definition,'SEALED_BAJA_SESSION_STATE_V1')=0 THEN
+    v_old := 'IF[[:space:]]+NOT[[:space:]]+FOUND[[:space:]]+OR[[:space:]]+v_s[.]bloque[[:space:]]*<>[[:space:]]*''JORNADA''[[:space:]]+OR[[:space:]]+v_s[.]estado[[:space:]]*<>[[:space:]]*''EN_CURSO''[[:space:]]+THEN';
+    IF v_definition !~* v_old THEN
+      RAISE EXCEPTION 'Unexpected grouped Baja session-state guard; migration stopped safely.';
+    END IF;
+    v_definition:=regexp_replace(v_definition,v_old,
+      'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado NOT IN (''EN_CURSO'',''CERRADA_OPERATIVAMENTE'') THEN' || chr(10) ||
+      '  -- SEALED_BAJA_SESSION_STATE_V1',
+      'i');
   END IF;
-  v_definition:=replace(v_definition,v_old,v_new);
 
   EXECUTE v_definition;
 END;
