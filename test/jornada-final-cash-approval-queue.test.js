@@ -7,6 +7,7 @@ const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const QUEUE=read("supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql");
+const DAILY_ONLY=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
 const PHASE=read("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
 const MOVEMENTS=read("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
@@ -98,4 +99,16 @@ test("cash exception inbox cache key is refreshed with the new UI contract",()=>
   const SW=read("public/service-worker.js");
   assert.ok(APP.includes('"turno-cash-handover-ui.js","1.2"'));
   assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
+});
+
+
+test("retail approvals use daily cash rows, not a second legacy final declaration",()=>{
+  assert.match(DAILY_ONLY,/coalesce\(a\.tipo,''\)<>'minorista'/);
+  assert.match(DAILY_ONLY,/listar_aprobaciones_admin\(\)/);
+  assert.match(DAILY_ONLY,/turno_jornada_conteos_caja/);
+  assert.match(DAILY_ONLY,/bc7_contar_efectivo_dueno_jornada/);
+  assert.match(DAILY_ONLY,/No se reconoce el filtro de declaración histórica/);
+  assert.match(DAILY_ONLY,/Keep legacy turno_declaraciones rows intact/);
+  assert.match(ADMIN,/x\.tipo==='entrega_diaria'/);
+  assert.match(ADMIN,/resolverOperativaDirecta\(x,'APROBAR'\)/);
 });
