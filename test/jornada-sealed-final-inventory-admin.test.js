@@ -14,8 +14,8 @@ const runner=read("test/step7-jornada-postgres-windows-ci.js");
 test("forward migration recognizes the checklist function shape left by the already-applied LIVE historical migration",()=>{
   assert.match(migration,/patch_live_sealed_owner_checklist_shape/);
   assert.match(migration,/BC7_SEALED_OWNER_BLOCK_GATE_V1/);
-  assert.match(migration,/AND fin_at=v_s\\.corte_operativo_at/);
-  assert.match(migration,/v_master_turn public\\.turnos/);
+  assert.match(migration,/AND fin_at=v_s\.corte_operativo_at/);
+  assert.match(migration,/v_master_turn public\.turnos/);
   assert.match(migration,/FOR UPDATE/);
 });
 
