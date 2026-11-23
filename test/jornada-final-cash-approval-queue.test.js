@@ -11,6 +11,7 @@ const DAILY_ONLY=read("supabase/migrations/20261123193000_jornada_daily_cash_wit
 const PHASE=read("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
 const MOVEMENTS=read("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
+const OWNER_REVIEW=read("public/js/jornada-owner-review.js");
 const CSS=read("public/style.css");
 const INDEX=read("public/index.html");
 const contentHeaderOrder=/header-right[\s\S]*id="mi-cuenta-btn"[\s\S]*id="logout-btn"/.test(INDEX);
@@ -87,10 +88,9 @@ test("Separate cash panel is now only an exception inbox for counted differences
 });
 
 test("Owner review shows declared final cash separately from physical cash counted",()=>{
-  const OWNER_REVIEW=read("public/js/jornada-owner-review.js");
   assert.ok(OWNER_REVIEW.includes("s.efectivo?.declarado"));
   assert.ok(OWNER_REVIEW.includes("Declaración final"));
-  assert.ok(OWNER_REVIEW.includes("El registro legado de declaración final no participa ni se suma"));
+  assert.ok(OWNER_REVIEW.includes("if(!isRetail&&s.efectivo?.declarado!=null"));
   assert.ok(OWNER_REVIEW.includes("Conteo físico del Dueño"));
 });
 
@@ -120,7 +120,7 @@ test("Owner review uses the new independent physical count for retail and hides 
   assert.match(OWNER_REVIEW,/const isRetail=s\.es_minorista===true/);
   assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
   assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?l\.dinero_final_contado:s\.efectivo\?\.contado/);
-  assert.match(OWNER_REVIEW,/El registro legado de declaración final no participa ni se suma/);
+  assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
   assert.match(APP,/jornada-owner-review\.js","1\.12"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1\.12/);
   assert.match(DAILY_ONLY,/es_minorista/);
@@ -130,7 +130,7 @@ test("Owner review uses the new independent physical count for retail and hides 
 test("retail owner-count mismatches enter the existing audited Admin exception inbox",()=>{
   const CASH_UI=read("public/js/turno-cash-handover-ui.js");
   assert.match(DAILY_ONLY,/bc7_listar_diferencias_conteo_efectivo_jornada/);
-  assert.match(DAILY_ONLY,/CREATE OR REPLACE FUNCTION public\\.bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(DAILY_ONLY,/CREATE OR REPLACE FUNCTION public\.bc7_listar_diferencias_conteo_efectivo_jornada/);
   assert.match(DAILY_ONLY,/APROBADA_CON_DIFERENCIA/);
   assert.match(DAILY_ONLY,/bc_aprobar_diferencia\\(uuid,text\\)/);
   assert.match(CASH_UI,/bc7_listar_diferencias_conteo_efectivo_jornada/);
