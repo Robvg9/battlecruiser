@@ -390,6 +390,7 @@ function applySql(file) {
     applySql("supabase/migrations/20261122034600_jornada_period_rescheduling_fk_index.sql");
     applySql("supabase/migrations/20261123030000_jornada_sealed_operational_balance.sql");
     applySql("test/jornada-sealed-baja-balance-contract.sql");
+    log("\\r\\n=== Verify sealed Jornada late-Baja functional behavior (saldo, retry, reservations and master-Turn gate) ===");
     applySql("test/jornada-sealed-baja-balance-functional.sql");
     applySql("test/jornada-period-reprogramming-contract.sql");
     log("\\r\\nPASS Jornada period rescheduling: overlapping shifts, conflicts, inventory/activity freeze, audit, idempotency and RBAC.");
