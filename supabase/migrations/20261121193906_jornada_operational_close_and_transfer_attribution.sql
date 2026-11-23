@@ -551,14 +551,15 @@ DECLARE
 BEGIN
   SELECT pg_get_functiondef('public.bc5_iniciar_jornada(uuid,text)'::regprocedure) INTO v_def;
 
-  v_old := '  SELECT * INTO v_sesion FROM public.turno_sesiones' || E'\n' ||
-           '  WHERE id=p_turno_sesion_id FOR UPDATE;';
+  v_old := 'SELECT * INTO v_sesion FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;';
   IF strpos(v_def,'PERFORM public.bc5_cerrar_jornadas_operativas_vencidas();')=0 THEN
-    IF strpos(v_def,v_old)=0 THEN
+    IF v_def !~* 'SELECT[[:space:]]+\\*[[:space:]]+INTO[[:space:]]+v_sesion[[:space:]]+FROM[[:space:]]+public\\.turno_sesiones[[:space:]]+WHERE[[:space:]]+id[[:space:]]*=[[:space:]]*p_turno_sesion_id[[:space:]]+FOR[[:space:]]+UPDATE;' THEN
       RAISE EXCEPTION 'No se pudo localizar el inicio de bc5_iniciar_jornada para instalar el fallback.';
     END IF;
-    v_def := replace(v_def,v_old,
-      '  PERFORM public.bc5_cerrar_jornadas_operativas_vencidas();' || E'\n' || v_old);
+    v_def := regexp_replace(v_def,
+      '(SELECT[[:space:]]+\\*[[:space:]]+INTO[[:space:]]+v_sesion[[:space:]]+FROM[[:space:]]+public\\.turno_sesiones[[:space:]]+WHERE[[:space:]]+id[[:space:]]*=[[:space:]]*p_turno_sesion_id[[:space:]]+FOR[[:space:]]+UPDATE;)',
+      'PERFORM public.bc5_cerrar_jornadas_operativas_vencidas();' || chr(10) || '  \\1',
+      'i');
   END IF;
 
   v_old := 'AND s.estado NOT IN (''COMPLETADA'',''CANCELADA'')';
