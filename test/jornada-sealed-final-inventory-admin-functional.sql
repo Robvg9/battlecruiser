@@ -6,6 +6,8 @@ DECLARE
   v_admin uuid:='20000000-0000-0000-0000-000000000011';
   v_warehouse uuid:='10000000-0000-0000-0000-000000000111';
   v_product uuid:='31000000-0000-0000-0000-000000000011';
+  v_product2 uuid:='31000000-0000-0000-0000-000000000012';
+  v_admin_role uuid;
   v_turn uuid:='a9100000-0000-0000-0000-000000000011';
   v_program uuid:='a9200000-0000-0000-0000-000000000011';
   v_session uuid:='a9300000-0000-0000-0000-000000000011';
@@ -21,16 +23,27 @@ DECLARE
   v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
   v_cutoff timestamptz:=now()-interval '60 minutes';
   v_start timestamptz:=now()-interval '8 hours';
-  v_lines jsonb:=jsonb_build_array(jsonb_build_object(
+  v_lines jsonb:=jsonb_build_array(
+    jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000011','cantidad',7),
+    jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000012','cantidad',3)
+  );
+  v_incomplete jsonb:=jsonb_build_array(jsonb_build_object(
     'producto_id','31000000-0000-0000-0000-000000000011','cantidad',7
   ));
   v_hash text:=repeat('a',64);
 BEGIN
   INSERT INTO auth.users(id) VALUES(v_admin) ON CONFLICT(id) DO NOTHING;
 
-  INSERT INTO public.usuarios(id,activo,nombre)
-  VALUES(v_admin,true,'ADMIN sealed inventory fixture')
-  ON CONFLICT(id) DO UPDATE SET activo=true,nombre=EXCLUDED.nombre;
+  SELECT id INTO v_admin_role FROM public.roles
+  WHERE lower(btrim(nombre)) IN ('dueño','admin')
+  ORDER BY CASE WHEN lower(btrim(nombre))='dueño' THEN 0 ELSE 1 END
+  LIMIT 1;
+  IF v_admin_role IS NULL THEN
+    RAISE EXCEPTION 'The PostgreSQL 17 fixture must seed an owner/admin role.';
+  END IF;
+  INSERT INTO public.usuarios(id,activo,role_id,nombre)
+  VALUES(v_admin,true,v_admin_role,'ADMIN sealed inventory fixture')
+  ON CONFLICT(id) DO UPDATE SET activo=true,role_id=EXCLUDED.role_id,nombre=EXCLUDED.nombre;
 
   INSERT INTO public.almacenes(id,nombre,tipo,activo)
   VALUES(v_warehouse,'Sealed final inventory fixture','minorista',true)
@@ -40,9 +53,13 @@ BEGIN
   VALUES(v_product,'Producto fixture sellado','unidad',true,10)
   ON CONFLICT(id) DO UPDATE SET nombre=EXCLUDED.nombre,activo=true,producto_padre_id=NULL,archivado_at=NULL;
 
+  INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
+  VALUES(v_product2,'Producto fixture sellado 2','unidad',true,10)
+  ON CONFLICT(id) DO UPDATE SET nombre=EXCLUDED.nombre,activo=true,producto_padre_id=NULL,archivado_at=NULL;
+
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
-  VALUES(v_product,v_warehouse,10,0)
-  ON CONFLICT(producto_id,almacen_id) DO UPDATE SET cantidad=10,minimo=0;
+  VALUES(v_product,v_warehouse,10,0),(v_product2,v_warehouse,5,0)
+  ON CONFLICT(producto_id,almacen_id) DO UPDATE SET cantidad=EXCLUDED.cantidad,minimo=0;
 
   INSERT INTO public.turnos(
     id,usuario_id,usuario_nombre,almacen_id,fecha,estado,creado_por,created_by,
@@ -76,11 +93,27 @@ BEGIN
     'Opening physical count'
   );
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
-  VALUES(v_initial_cut,v_product,10,10);
+  VALUES(v_initial_cut,v_product,10,10),(v_initial_cut,v_product2,5,5);
 
   PERFORM set_config('request.jwt.claim.sub',v_admin::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
+
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_admin_registrar_inventario_final_sellado_jornada(
+      v_session,v_incomplete,'Archivo histórico incompleto.',
+      'Sheyla-inventario-final.csv',v_hash,v_key
+    );
+  EXCEPTION WHEN SQLSTATE '23514' THEN
+    v_error:=true;
+  END;
+  IF NOT v_error OR EXISTS (
+    SELECT 1 FROM public.turno_jornada_inventario_cortes
+    WHERE turno_sesion_id=v_session AND tipo='FINAL'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: incomplete product set was not rejected before creating the final cut.';
+  END IF;
 
   v_result:=public.bc7_admin_registrar_inventario_final_sellado_jornada(
     v_session,v_lines,'Conteo físico del 20/11 a las 23:00, fuente firmada.',
@@ -95,8 +128,10 @@ BEGIN
   END IF;
 
   IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas
-      WHERE corte_id=v_cut AND producto_id=v_product) IS DISTINCT FROM 7::numeric THEN
-    RAISE EXCEPTION 'FAIL: final physical quantity was not stored.';
+      WHERE corte_id=v_cut AND producto_id=v_product) IS DISTINCT FROM 7::numeric
+     OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas
+      WHERE corte_id=v_cut AND producto_id=v_product2) IS DISTINCT FROM 3::numeric THEN
+    RAISE EXCEPTION 'FAIL: complete physical quantities were not stored.';
   END IF;
   IF (SELECT stock_sistema FROM public.turno_jornada_inventario_lineas
       WHERE corte_id=v_cut AND producto_id=v_product) IS DISTINCT FROM 10::numeric THEN
@@ -142,10 +177,6 @@ BEGIN
 
   -- A distinct session with two initial products rejects an incomplete file.
   -- Reuse the same warehouse and product by adding a second root family.
-  INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
-  VALUES('31000000-0000-0000-0000-000000000012','Producto fixture sellado 2','unidad',true,10)
-  ON CONFLICT(id) DO UPDATE SET nombre=EXCLUDED.nombre,activo=true,producto_padre_id=NULL,archivado_at=NULL;
-
   UPDATE public.turnos SET estado='CERRADO',estado_maestro='CERRADO',cierre_real=now()
   WHERE id=v_turn;
   v_error:=false;
