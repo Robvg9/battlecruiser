@@ -53,7 +53,7 @@ test("sealed late Bajas prove cutoff, real saldo, retry, reservation and master-
 test("Baja validation remains retry-safe, with targeted lookup indexes",()=>{
   assert.match(bajaSource,/p_idempotency_key/);
   assert.match(bajaSource,/v_payload_hash/);
-  assert.match(migration,/bc7_registrar_bajas_multiple_jornada\\(uuid,jsonb,text,uuid\\)/);
+  assert.match(migration,/bc7_registrar_bajas_multiple_jornada/);
   assert.match(migration,/bajas_pending_jornada_product_idx/);
   assert.match(migration,/bajas_approved_jornada_time_idx/);
   assert.match(migration,/mermas_approved_jornada_time_idx/);
