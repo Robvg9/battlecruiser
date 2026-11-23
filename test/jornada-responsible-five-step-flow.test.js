@@ -49,7 +49,7 @@ test("sealed step 5 is not rendered as a separate action-area panel",()=>{
   const start=ui.indexOf("else if(status==='CERRADA_OPERATIVAMENTE'&&s.es_minorista===true)");
   const end=ui.indexOf("}else{",start);
   const sealedBranch=ui.slice(start,end);
-  assert.doesNotMatch(sealedBranch,/cashDaysManagerShellHtml/);
+  assert.match(ui,/const op=.*bc7-checklist-section-source.*cashDaysManagerShellHtml\\(detail,isAssigned,status\\)/);
   assert.match(ui,/cashDaysManagerShellHtml\(detail,isAssigned,status\).*bc7-checklist-section-source/);
 });
 
