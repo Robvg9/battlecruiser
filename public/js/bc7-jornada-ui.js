@@ -1974,9 +1974,8 @@
         }).join('')+'</tbody></table></div>')
       :empty;
     const postSealEvidence=postSealFinal
-      ?'<div class="bc7-note"><b>Conteo histórico posterior al sello</b><p>Este inventario debe reflejar exactamente el físico existente al corte operativo original de la Jornada. No uses el stock actual ni incluyas transferencias posteriores al corte. Adjunta el documento fuente al expediente y registra su nombre/referencia y SHA-256.</p></div>'+
-        '<label class="bc7-field">Documento fuente / referencia<input data-bc7-count-source required maxlength="300" placeholder="Ej. conteo físico firmado 20-11-2026.pdf"></label>'+
-        '<label class="bc7-field">SHA-256 del documento fuente<input data-bc7-count-source-hash required minlength="64" maxlength="64" pattern="[0-9a-fA-F]{64}" placeholder="64 caracteres hexadecimales"></label>'
+      ?'<div class="bc7-note"><b>Conteo histórico posterior al sello</b><p>Este inventario debe reflejar exactamente el físico existente al corte operativo original de la Jornada. No uses el stock actual ni incluyas transferencias posteriores al corte. Selecciona el documento fuente para calcular su SHA-256; conserva el original y adjúntalo al expediente documental.</p></div>'+
+        '<label class="bc7-field">Documento fuente del conteo físico<input type="file" data-bc7-count-source-file required accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"></label>'
       :'';
     return openingNote+(postSealFinal?'': '<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p>')+'<form data-bc7-count-form="'+type+'"'+(postSealFinal?' data-bc7-count-postseal="true"':'')+'>'+table+postSealEvidence+'<label class="bc7-field">Observación'+(postSealFinal?' obligatoria para la trazabilidad':' (opcional)')+'<input data-bc7-count-note maxlength="1000" '+(postSealFinal?'required ':'')+'placeholder="Procedencia, fecha del conteo y aclaraciones"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
@@ -2434,10 +2433,29 @@
     if(bad){msg(form.querySelector('[data-bc7-count-msg]'),'Cuenta todos los productos e introduce cantidades válidas con hasta 3 decimales.','error');return;}
     const note=form.querySelector('[data-bc7-count-note]')?.value||null;
     const postSeal=form.dataset.bc7CountPostseal==='true';
-    const source=String(form.querySelector('[data-bc7-count-source]')?.value||'').trim();
-    const sourceHash=String(form.querySelector('[data-bc7-count-source-hash]')?.value||'').trim().toLowerCase();
-    if(postSeal&&(!note||!note.trim()||!source||!/^[0-9a-f]{64}$/.test(sourceHash))){
-      msg(form.querySelector('[data-bc7-count-msg]'),'Para el conteo histórico debes indicar observación, documento fuente y SHA-256 válido de 64 caracteres.','error');return;
+    let source='';
+    let sourceHash='';
+    if(postSeal){
+      const sourceFile=form.querySelector('[data-bc7-count-source-file]')?.files?.[0]||null;
+      if(!note||!note.trim()||!sourceFile){
+        msg(form.querySelector('[data-bc7-count-msg]'),'Para el conteo histórico debes indicar observación y seleccionar el documento fuente original.','error');return;
+      }
+      if(sourceFile.size>20*1024*1024){
+        msg(form.querySelector('[data-bc7-count-msg]'),'El documento fuente supera el límite de 20 MiB. Utiliza una copia comprimida o un PDF más pequeño.','error');return;
+      }
+      if(!window.crypto?.subtle){
+        msg(form.querySelector('[data-bc7-count-msg]'),'Este navegador no permite calcular SHA-256 de forma segura. Actualiza la aplicación y vuelve a intentarlo.','error');return;
+      }
+      try{
+        const digest=await window.crypto.subtle.digest('SHA-256',await sourceFile.arrayBuffer());
+        sourceHash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+        source=sourceFile.name.slice(0,300);
+      }catch(_){
+        msg(form.querySelector('[data-bc7-count-msg]'),'No se pudo leer ni calcular la huella SHA-256 del documento fuente.','error');return;
+      }
+      if(!/^[0-9a-f]{64}$/.test(sourceHash)){
+        msg(form.querySelector('[data-bc7-count-msg]'),'No se pudo calcular una huella SHA-256 válida del documento fuente.','error');return;
+      }
     }
     const label=type==='INICIAL'?'inventario inicial':'inventario final';
     const confirmation=postSeal
