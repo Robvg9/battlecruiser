@@ -1149,7 +1149,7 @@
     if(!/^\d{4}-\d{2}-\d{2}$/.test(firstDate)||!/^\d{4}-\d{2}-\d{2}$/.test(lastDate)||lastDate<firstDate){
       host.innerHTML='<div class="bc7-empty">No se pudo determinar el período de la jornada. Actualiza el detalle antes de registrar el dinero.</div>';return;
     }
-    const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));
+    const totalDays=Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1);
     const sessionState=String(detail.sesion.estado||'').toUpperCase();
     const isAssigned=!!detail.is_admin||detail.server_responsible_access===true;
     const editable=(sessionState==='EN_CURSO'&&!!detail.tramo_activo&&isAssigned)||
@@ -2156,7 +2156,7 @@
     const cashState=String(checks.estado_efectivo_final||'').toUpperCase();
     const fifthCheck='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(cashDone?'✓':'↻')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Conteo físico independiente</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo del efectivo declarado por el Dueño')+'</small></div>'+
+      '<div class="bc7-checklist-copy"><b>Conteo físico independiente</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo físico del efectivo recibido por el Dueño')+'</small></div>'+
       '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
     '</div>';
     if(!checks.lista_para_calcular){
@@ -2165,7 +2165,7 @@
       }
       if(phase==='PENDIENTE_CONTEO_DUENO'){
         return '<section class="bc7-calculation-phase is-waiting"><h4>Conteo físico · paso posterior</h4>'+
-          fifthCheck+'<p>Los cinco pasos de la jornada están completos. El Dueño debe contar y aprobar el efectivo declarado antes de iniciar los cálculos.</p></section>';
+          fifthCheck+'<p>Los cinco pasos de la jornada están completos. El Dueño debe registrar el conteo físico independiente del total de entregas diarias aprobadas antes de iniciar los cálculos.</p></section>';
       }
       const pending=settlement.pendientes||{};
       const reasons=[];
@@ -2178,7 +2178,7 @@
       if(Number(settlement.familias_sin_precio||0)>0)reasons.push('hay productos sin precio');
       if(Number(settlement.familias_con_vendidas_negativas||0)>0)reasons.push('hay diferencias negativas de inventario');
       return '<section class="bc7-calculation-phase is-waiting"><h4>Fase 2 · Preparando cálculos</h4>'+
-        fifthCheck+'<p>La declaración de efectivo ya quedó registrada en el check 5. El conteo físico se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
+        fifthCheck+'<p>Las entregas diarias de efectivo ya quedaron registradas en el paso 5. El conteo físico independiente se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
         (reasons.length?'<small>'+esc(reasons.join(' · '))+'</small>':'')+'</section>';
     }
     if(settlement.calculable!==true)return '';
