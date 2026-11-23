@@ -57,7 +57,7 @@ test("sealed retail Jornada captures only the actual date-specific cash entries"
   assert.match(ui, /bc7_estado_conteo_efectivo_jornada/);
   assert.match(ui, /bc7_contar_efectivo_dueno_jornada/);
   assert.match(ui, /data-bc7-save-cash-days/);
-  assert.match(ui,/document\.querySelector\('#bc7-cash-days-manager \\[data-bc7-close-form\\]'\)/);
+  assert.match(ui,/document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]data-bc7-close-form\\]'\)/);
   assert.match(ui,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
   // Historical transcription/rectification RPCs remain available for audit repair,
   // but their forms are no longer mounted in the retail Step 5 renderer.
