@@ -9,10 +9,14 @@ CREATE TABLE IF NOT EXISTS public.turno_jornada_conteos_caja (
   monto_entregas_aprobadas numeric(14,2) NOT NULL CHECK (monto_entregas_aprobadas >= 0),
   monto_contado numeric(14,2) NOT NULL CHECK (monto_contado >= 0),
   diferencia numeric(14,2) NOT NULL,
-  estado text NOT NULL CHECK (estado IN ('APROBADA','CON_DIFERENCIA')),
+  estado text NOT NULL CHECK (estado IN ('APROBADA','CON_DIFERENCIA','APROBADA_CON_DIFERENCIA')),
   contado_por uuid NOT NULL,
   contado_at timestamptz NOT NULL DEFAULT now(),
   observacion text,
+  diferencia_id uuid REFERENCES public.turno_diferencias(id) ON DELETE RESTRICT,
+  resuelto_por uuid,
+  resuelto_at timestamptz,
+  resolucion text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE public.turno_jornada_conteos_caja ENABLE ROW LEVEL SECURITY;
@@ -126,6 +130,7 @@ DECLARE
   v_daily_total numeric(14,2) := 0;
   v_counted numeric(14,2);
   v_difference numeric(14,2);
+  v_difference_id uuid;
   v_observation text;
   v_checklist jsonb;
   v_saved public.turno_jornada_conteos_caja;
@@ -165,6 +170,8 @@ BEGIN
       'monto_contado',v_existing.monto_contado,
       'diferencia',v_existing.diferencia,
       'estado',v_existing.estado,
+      'diferencia_id',v_existing.diferencia_id,
+      'resolucion',v_existing.resolucion,
       'contado_por',v_existing.contado_por,
       'contado_at',v_existing.contado_at,
       'idempotente',true
@@ -201,14 +208,28 @@ BEGIN
   END IF;
 
   v_difference := round(v_counted-coalesce(v_daily_total,0),2);
+  IF v_difference<>0 THEN
+    INSERT INTO public.turno_diferencias(
+      turno_id,turno_sesion_id,categoria,referencia,esperado,declarado,diferencia,
+      usuario_responsable,aprobado,comentario,declaracion_dinero_id
+    )
+    VALUES(
+      v_s.turno_id,v_s.id,'DINERO',
+      'Conteo físico de Jornada · sesión '||v_s.id::text,
+      coalesce(v_daily_total,0),v_counted,v_difference,
+      v_p.responsable_id,false,v_observation,NULL
+    )
+    RETURNING id INTO v_difference_id;
+  END IF;
+
   INSERT INTO public.turno_jornada_conteos_caja(
     turno_sesion_id,monto_entregas_aprobadas,monto_contado,diferencia,
-    estado,contado_por,contado_at,observacion
+    estado,contado_por,contado_at,observacion,diferencia_id
   )
   VALUES(
     v_s.id,coalesce(v_daily_total,0),v_counted,v_difference,
     CASE WHEN v_difference=0 THEN 'APROBADA' ELSE 'CON_DIFERENCIA' END,
-    auth.uid(),now(),v_observation
+    auth.uid(),now(),v_observation,v_difference_id
   )
   RETURNING * INTO v_saved;
 
@@ -219,12 +240,74 @@ BEGIN
     'monto_contado',v_saved.monto_contado,
     'diferencia',v_saved.diferencia,
     'estado',v_saved.estado,
+    'diferencia_id',v_saved.diferencia_id,
+    'resolucion',v_saved.resolucion,
     'contado_por',v_saved.contado_por,
     'contado_at',v_saved.contado_at,
     'idempotente',false
   );
 END;
 $function$;
+
+
+CREATE OR REPLACE FUNCTION public.bc7_listar_diferencias_conteo_efectivo_jornada()
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
+    RAISE EXCEPTION 'Solo ADMIN puede consultar las diferencias del conteo físico.' USING ERRCODE='42501';
+  END IF;
+
+  SELECT coalesce(jsonb_agg(jsonb_build_object(
+    'declaracion_id',c.id,
+    'turno_id',s.turno_id,
+    'turno_sesion_id',s.id,
+    'turno_tramo_id',NULL,
+    'almacen_id',s.almacen_id,
+    'almacen_nombre',al.nombre,
+    'fecha',p.fecha,
+    'numero_dia',p.numero_dia,
+    'bloque','JORNADA',
+    'estado_sesion',s.estado,
+    'responsable_id',p.responsable_id,
+    'responsable_nombre',coalesce(u.nombre,'Responsable'),
+    'monto_declarado',c.monto_entregas_aprobadas,
+    'moneda','CUP',
+    'declarado_at',c.contado_at,
+    'monto_contado',c.monto_contado,
+    'diferencia',c.diferencia,
+    'estado_aprobacion',c.estado,
+    'contado_por',c.contado_por,
+    'contador_nombre',coalesce(cu.nombre,''),
+    'contado_at',c.contado_at,
+    'observacion_conteo',c.observacion,
+    'diferencia_id',d.id,
+    'diferencia_aprobada',coalesce(d.aprobado,false),
+    'comentario_diferencia',d.comentario
+  ) ORDER BY c.contado_at DESC), '[]'::jsonb)
+  INTO v_result
+  FROM public.turno_jornada_conteos_caja c
+  JOIN public.turno_sesiones s ON s.id=c.turno_sesion_id
+  JOIN public.turno_jornada_programacion p ON p.id=s.jornada_programacion_id
+  JOIN public.turnos t ON t.id=s.turno_id
+  JOIN public.almacenes al ON al.id=s.almacen_id
+  LEFT JOIN public.usuarios u ON u.id=p.responsable_id
+  LEFT JOIN public.usuarios cu ON cu.id=c.contado_por
+  JOIN public.turno_diferencias d ON d.id=c.diferencia_id
+  WHERE c.estado='CON_DIFERENCIA' AND d.aprobado=false;
+
+  RETURN coalesce(v_result,'[]'::jsonb);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.bc7_listar_diferencias_conteo_efectivo_jornada() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.bc7_listar_diferencias_conteo_efectivo_jornada() TO authenticated;
 
 REVOKE ALL ON FUNCTION public.bc7_estado_conteo_efectivo_jornada(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.bc7_estado_conteo_efectivo_jornada(uuid) TO authenticated;
@@ -355,7 +438,8 @@ $new$;
     THEN v_daily_cash+v_final_counted ELSE NULL END;
 $old$;
   v_new := $new$
-  v_cash_received:=CASE WHEN v_final_counted IS NOT NULL AND v_final_cash_state='APROBADA'
+  v_cash_received:=CASE WHEN v_final_counted IS NOT NULL
+    AND v_final_cash_state IN ('APROBADA','APROBADA_CON_DIFERENCIA')
     THEN v_final_counted ELSE NULL END;
 $new$;
   IF strpos(v_def,v_old)>0 THEN
@@ -366,6 +450,79 @@ $new$;
   EXECUTE v_def;
 END;
 $migration$;
+
+
+-- Route new retail Owner-count differences through the existing ADMIN exception inbox.
+DO $patch_owner_count_difference_resolution$
+DECLARE
+  v_def text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef('public.bc_aprobar_diferencia(uuid,text)'::regprocedure)
+    INTO v_def;
+  v_old := $old$
+  IF r.declaracion_dinero_id IS NOT NULL THEN
+    UPDATE public.turno_declaraciones
+    SET estado_aprobacion='APROBADA',
+        aprobado_por=auth.uid(),
+        aprobado_at=now()
+    WHERE id=r.declaracion_dinero_id
+      AND estado_aprobacion='CON_DIFERENCIA';
+    INSERT INTO public.turno_eventos(
+      turno_id,turno_sesion_id,actor_user_id,tipo,payload
+    )
+    VALUES(
+      r.turno_id,r.turno_sesion_id,auth.uid(),'DINERO_DIFERENCIA_RESUELTA',
+      jsonb_build_object('declaracion_id',r.declaracion_dinero_id,
+        'diferencia_id',r.id,'diferencia',r.diferencia,'comentario',r.comentario)
+    );
+  END IF;
+$new$;
+  v_new := $new$
+  IF r.declaracion_dinero_id IS NOT NULL THEN
+    UPDATE public.turno_declaraciones
+    SET estado_aprobacion='APROBADA',
+        aprobado_por=auth.uid(),
+        aprobado_at=now()
+    WHERE id=r.declaracion_dinero_id
+      AND estado_aprobacion='CON_DIFERENCIA';
+    INSERT INTO public.turno_eventos(
+      turno_id,turno_sesion_id,actor_user_id,tipo,payload
+    )
+    VALUES(
+      r.turno_id,r.turno_sesion_id,auth.uid(),'DINERO_DIFERENCIA_RESUELTA',
+      jsonb_build_object('declaracion_id',r.declaracion_dinero_id,
+        'diferencia_id',r.id,'diferencia',r.diferencia,'comentario',r.comentario)
+    );
+  END IF;
+
+  UPDATE public.turno_jornada_conteos_caja
+  SET estado='APROBADA_CON_DIFERENCIA',
+      resuelto_por=auth.uid(),
+      resuelto_at=now(),
+      resolucion=coalesce(nullif(btrim(p_comentario),''),'Diferencia revisada y aprobada por ADMIN.')
+  WHERE diferencia_id=r.id AND estado='CON_DIFERENCIA';
+
+  IF FOUND THEN
+    INSERT INTO public.turno_eventos(
+      turno_id,turno_sesion_id,actor_user_id,tipo,payload
+    )
+    VALUES(
+      r.turno_id,r.turno_sesion_id,auth.uid(),'DINERO_CONTEO_DUENO_DIFERENCIA_RESUELTA',
+      jsonb_build_object('diferencia_id',r.id,'diferencia',r.diferencia,
+        'comentario',coalesce(nullif(btrim(p_comentario),''),r.comentario))
+    );
+  END IF;
+$new$;
+  IF strpos(v_def,v_old)>0 THEN
+    v_def := replace(v_def,v_old,v_new);
+  ELSIF strpos(v_def,'APROBADA_CON_DIFERENCIA')=0 THEN
+    RAISE EXCEPTION 'No se reconoce la función ADMIN para aprobar diferencias de efectivo.';
+  END IF;
+  EXECUTE v_def;
+END;
+$patch_owner_count_difference_resolution$;
 
 -- The retail close requires date-specific submissions, not a worker final-total declaration.
 -- Non-retail legacy sessions retain their original declaration gate.
