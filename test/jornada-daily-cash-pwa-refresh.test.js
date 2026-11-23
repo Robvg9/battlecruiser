@@ -77,6 +77,8 @@ test("retail Step 5 renders exactly the daily date rows and no additional total 
   const daily=UI.slice(start,end);
   assert.match(daily, /for\(let index=0;index<totalDays;index\+\+\)/);
   assert.match(daily, /data-bc7-cash-day-amount/);
+  assert.match(daily, /index<totalDays/);
+  assert.doesNotMatch(daily, /Math\.min\(31/);
   assert.doesNotMatch(daily, /id="bc7-cash"|data-bc7-admin-cash-declaration|Declaración final del período/);
   assert.match(UI, /data-bc7-save-cash-days/);
   assert.match(UI, /data-bc7-close-form/);
