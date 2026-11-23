@@ -1130,10 +1130,10 @@
     const sessionId=String(detail.sesion.id||'');
     const closed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
     const canBackfill=closed&&!!detail.tramo_registrable&&(!!isAssigned||!!detail.is_admin);
-    const wrapper=canBackfill?'<div data-bc7-close-form="'+esc(sessionId)+'" data-bc7-cash-mode="daily">':'';
+    const wrapper='<div data-bc7-close-form="'+esc(sessionId)+'" data-bc7-cash-mode="daily">';
     return '<section class="bc7-jornada" id="bc7-cash-days-manager"><h4>Dinero del período · por fecha</h4>'+
       '<p class="bc7-muted">Introduce una entrega por cada día, incluso 0 CUP cuando no se recogió dinero. La declaración final del período es otro importe independiente.</p>'+
-      wrapper+'<div id="bc7-cash-days-list"><div class="bc7-empty">Consultando los importes del período…</div></div>'+(canBackfill?'</div>':'')+
+      wrapper+'<div id="bc7-cash-days-list"><div class="bc7-empty">Consultando los importes del período…</div></div></div>'+
       '<p class="bc7-msg" id="bc7-cash-days-msg"></p></section>';
   }
 
