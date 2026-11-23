@@ -24,6 +24,10 @@ DECLARE
   v_lines jsonb;
   v_result jsonb;
   v_retry jsonb;
+  v_final_result jsonb;
+  v_final_retry jsonb;
+  v_final_cut uuid;
+  v_owner_error boolean:=false;
   v_error boolean:=false;
   v_request_key uuid:='a9600000-0000-0000-0000-000000000001';
   v_short_key uuid:='a9600000-0000-0000-0000-000000000002';
@@ -190,6 +194,62 @@ BEGIN
     RAISE EXCEPTION 'FAIL: sealed Jornada pending Bajas must not decrement global warehouse stock; stock=%',v_global_stock;
   END IF;
 
+  -- A historical final count can be submitted after the operational seal only
+  -- with the responsible's exact completed tranche, an open master Turn and a
+  -- source-document SHA-256. It is physically dated at the old immutable cutoff.
+  v_final_result:=public.bc7_guardar_inventario_final_post_sello_jornada(
+    v_session,
+    jsonb_build_array(jsonb_build_object('producto_id',v_product,'cantidad',7)),
+    'Physical final count from the fixture source at the original operational cutoff.',
+    'fixture-final-count.txt',
+    repeat('a',64)
+  );
+  v_final_cut:=NULLIF(v_final_result->>'id','')::uuid;
+  IF v_final_cut IS NULL
+     OR v_final_result->>'registrado_post_sello'<>'true'
+     OR v_final_result->>'corte_fisico_at' IS NULL THEN
+    RAISE EXCEPTION 'FAIL: evidenced post-seal final inventory was not recorded at its original cutoff; result=%',v_final_result;
+  END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_jornada_inventario_cortes c
+    WHERE c.id=v_final_cut
+      AND c.turno_sesion_id=v_session
+      AND c.tipo='FINAL'
+      AND c.registrado_post_sello
+      AND c.corte_fisico_at=v_cutoff
+      AND c.fuente_content_hash=repeat('a',64)
+      AND c.fuente_documental='fixture-final-count.txt'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: historical final count did not persist its physical cutoff and source evidence.';
+  END IF;
+  v_final_retry:=public.bc7_guardar_inventario_final_post_sello_jornada(
+    v_session,
+    jsonb_build_array(jsonb_build_object('producto_id',v_product,'cantidad',7)),
+    'Physical final count from the fixture source at the original operational cutoff.',
+    'fixture-final-count.txt',
+    repeat('a',64)
+  );
+  IF v_final_retry->>'idempotente'<>'true'
+     OR v_final_retry->>'id' IS DISTINCT FROM v_final_cut::text
+     OR (SELECT count(*) FROM public.turno_jornada_inventario_cortes
+         WHERE turno_sesion_id=v_session AND tipo='FINAL')<>1 THEN
+    RAISE EXCEPTION 'FAIL: an identical post-seal final-count retry did not reuse the immutable cut.';
+  END IF;
+
+  -- ADMIN can finish a documentary block only while the master Turn is open
+  -- and the responsible's exact completed tranche is retained.
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'gastos',true);
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_jornada_confirmaciones
+    WHERE turno_sesion_id=v_session AND gastos_completado
+  ) THEN
+    RAISE EXCEPTION 'FAIL: ADMIN could not complete the sealed Jornada checklist while the master Turn remained open.';
+  END IF;
+  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
+  PERFORM set_config('test.bc_admin','false',false);
+  
   -- Once the master Turn closes, a new late request must be rejected by the
   -- responsible-tranche guard and leave no parent or child rows behind.
   UPDATE public.turnos
@@ -215,6 +275,18 @@ BEGIN
     RAISE EXCEPTION 'FAIL: late Baja remained writable after the master Turn closed.';
   END IF;
 
-  RAISE NOTICE 'PASS sealed Jornada functional: cutoff, linked late approvals, general movement exclusion, picker balance, grouped Baja, idempotency, reservations, atomic stock rejection, no global stock mutation and closed-Turn write gate.';
+  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
+  PERFORM set_config('test.bc_admin','true',false);
+  v_owner_error:=false;
+  BEGIN
+    PERFORM public.bc7_confirmar_bloque_jornada(v_session,'reinversiones',true);
+  EXCEPTION WHEN SQLSTATE '23514' THEN
+    v_owner_error:=true;
+  END;
+  IF NOT v_owner_error THEN
+    RAISE EXCEPTION 'FAIL: ADMIN checklist remained writable after the master Turn closed.';
+  END IF;
+
+  RAISE NOTICE 'PASS sealed Jornada functional: cutoff, linked late approvals, general movement exclusion, picker balance, grouped Baja, idempotency, reservations, atomic stock rejection, no global stock mutation, evidence-bound post-seal final cut, Owner checklist open-Turn gate and closed-Turn write gate.';
 END
 $sealed_baja_functional$;
