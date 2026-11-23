@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.53 — reprogramación visual y segura de períodos completos desde el calendario.
+// v7.54 — checklist de cinco pasos y captura responsable de jornada sellada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1216,6 +1216,32 @@
     host.innerHTML=html;
   }
 
+  async function loadCashDaysWorkspace(detail){
+    const host=$('bc7-cash-days-list');
+    if(!host||!detail||detail.sesion?.es_minorista!==true)return;
+    const sessionId=String(detail.sesion.id||'');
+    const activeSessionId=String(state.currentSession?.turno_sesion_id||'');
+    const localAssignment=String(currentUser()?.id||'')===String(detail.sesion.responsable_id||'')||activeSessionId===sessionId;
+    const isAssigned=detail.server_responsible_access===true||localAssignment;
+    if(!state.admin&&!isAssigned){
+      host.innerHTML='<div class="bc7-empty">El servidor aún no ha confirmado tu asignación a esta jornada. No se mostraron importes.</div>';
+      return;
+    }
+    if(state.dailyCashSessionId===sessionId&&state.dailyCashData){
+      renderCashDaysWorkspace(detail);
+      return;
+    }
+    host.innerHTML='<div class="bc7-empty">Consultando los importes del período…</div>';
+    try{
+      const data=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
+      state.dailyCashData=data;
+      state.dailyCashSessionId=sessionId;
+      renderCashDaysWorkspace(detail);
+    }catch(e){
+      host.innerHTML='<div class="bc7-empty">'+esc(friendlyError(e,'calendar'))+' No se modificó ningún importe.</div>';
+    }
+  }
+
   async function saveCashDaysWorkspace(form,options){
     options=options||{};
     if(!form||!state.detail)return false;
@@ -1256,7 +1282,7 @@
       }
     }
     if(options.requireComplete&&missing.length){
-      msg(message,'Faltan datos: '+missing.join(', ')+'. Escribe 0 CUP en los días sin entrega.','error');return false;
+      msg(message,''Faltan importes de estos días: '+missing.join(', ')+'. Indica la declaración final del período y escribe 0 CUP cuando un día no tuvo entrega.','error');return false;
     }
     if(!operations.length){
       const alreadyDone=detail.checklist?.declaracion_dinero?.completado===true;
@@ -2135,14 +2161,14 @@
         :'<button type="button" class="bc7-btn primary" data-bc7-checklist-open="declaracion_dinero">Completar paso 5</button>';
     const cashRow='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(cashDone?'✓':'5')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Dinero del período</b><small>'+cashDescription+'</small></div>'+
+      '<div class="bc7-checklist-copy"><b>Declaración de dinero</b><small>'+cashDescription+'</small></div>'+
       cashAction+
       '<span class="bc7-checklist-state">'+(cashDone?'✓ Enviado':'Pendiente')+'</span>'+
     '</div>';
 
     const count=manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0)+(cashDone?1:0);
     return '<section class="bc7-checklist" aria-label="Checklist de cinco pasos de la jornada">'+
-      '<div class="bc7-checklist-head"><div><h4>Completa tu jornada · 5 pasos</h4><p>Registra y envía cada bloque desde esta cuenta. Al enviarlo, queda bloqueado para evitar altas posteriores. El Dueño aprueba los registros por separado.</p></div>'+
+      '<div class="bc7-checklist-head"><div><h4>Checklist de la jornada · 5 pasos</h4><p>Registra y envía cada bloque desde esta cuenta. Al enviarlo, queda bloqueado para evitar altas posteriores. El Dueño aprueba los registros por separado.</p></div>'+
       '<span class="bc7-checklist-count">'+count+'/5</span></div>'+
       rows+finalRow+cashRow+
       '<p class="bc7-muted">Las aprobaciones del Dueño no impiden que declares terminada tu captura. Si necesitas añadir algo después, reabre el bloque de forma explícita.</p>'+
