@@ -12,6 +12,8 @@ DECLARE
   v_program uuid:='a9200000-0000-0000-0000-000000000011';
   v_session uuid:='a9300000-0000-0000-0000-000000000011';
   v_initial_cut uuid:='a9500000-0000-0000-0000-000000000011';
+  v_tranche uuid:='a9400000-0000-0000-0000-000000000011';
+  v_future_tranche uuid:='a9400000-0000-0000-0000-000000000012';
   v_key uuid:='a9600000-0000-0000-0000-000000000011';
   v_closed_key uuid:='a9600000-0000-0000-0000-000000000012';
   v_cut uuid;
@@ -86,6 +88,13 @@ BEGIN
     true,v_cutoff+interval '1 hour',v_cutoff,'AUTO_HORA_FIN',v_admin
   );
 
+  INSERT INTO public.turno_tramos(
+    id,turno_id,turno_sesion_id,usuario_id,tipo,estado,inicio_at,fin_at
+  ) VALUES(
+    v_future_tranche,v_turn,v_session,v_admin,'NORMAL','COMPLETADO',
+    v_start,v_cutoff+interval '5 minutes'
+  );
+
   INSERT INTO public.turno_jornada_inventario_cortes(
     id,turno_sesion_id,tipo,estado,creado_por,confirmado_por,creado_en,confirmado_en,observacion
   ) VALUES(
@@ -98,6 +107,38 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_admin::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
+
+  -- A completed tranche after the operational cutoff must not be mistaken for
+  -- the sealed Jornada tranche. The checklist must remain untouched.
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_confirmar_bloque_jornada(v_session,'gastos',true);
+  EXCEPTION WHEN SQLSTATE '23514' THEN
+    v_error:=true;
+  END;
+  IF NOT v_error OR EXISTS(
+    SELECT 1 FROM public.turno_jornada_confirmaciones
+    WHERE turno_sesion_id=v_session
+  ) THEN
+    RAISE EXCEPTION 'FAIL: owner checklist accepted a non-matching completed tranche.';
+  END IF;
+
+  INSERT INTO public.turno_tramos(
+    id,turno_id,turno_sesion_id,usuario_id,tipo,estado,inicio_at,fin_at
+  ) VALUES(
+    v_tranche,v_turn,v_session,v_admin,'NORMAL','COMPLETADO',v_start,v_cutoff
+  );
+
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'gastos',true);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'reinversiones',true);
+  PERFORM public.bc7_confirmar_bloque_jornada(v_session,'bajas',true);
+  IF NOT EXISTS(
+    SELECT 1 FROM public.turno_jornada_confirmaciones
+    WHERE turno_sesion_id=v_session
+      AND gastos_completado AND reinversiones_completado AND bajas_completado
+  ) THEN
+    RAISE EXCEPTION 'FAIL: owner checklist did not confirm all sealed blocks while master Turn remained open.';
+  END IF;
 
   v_error:=false;
   BEGIN
@@ -189,6 +230,19 @@ BEGIN
   END;
   IF NOT v_error THEN
     RAISE EXCEPTION 'FAIL: sealed inventory capture remained writable after master Turn closure.';
+  END IF;
+
+  v_error:=false;
+  BEGIN
+    PERFORM public.bc7_confirmar_bloque_jornada(v_session,'gastos',false);
+  EXCEPTION WHEN SQLSTATE '23514' THEN
+    v_error:=true;
+  END;
+  IF NOT v_error OR NOT EXISTS(
+    SELECT 1 FROM public.turno_jornada_confirmaciones
+    WHERE turno_sesion_id=v_session AND gastos_completado
+  ) THEN
+    RAISE EXCEPTION 'FAIL: sealed owner checklist remained writable or changed after master Turn closure.';
   END IF;
 
   IF pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure)
