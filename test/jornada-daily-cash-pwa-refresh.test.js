@@ -95,7 +95,7 @@ test("daily Step 5 saves each date idempotently and verifies server readback wit
   assert.match(block, /freshIdempotencyKey\(\)/);
   assert.match(block, /rpc\('bc7_registrar_entrega_diaria_jornada'/);
   assert.match(block, /rpc\('bc7_entregas_diarias_jornada'/);
-  assert.match(block,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]data-bc7-close-form\\]'\)\|\|form/);
+  assert.match(block,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
   assert.match(block,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
   assert.match(block, /missingRows/);
   assert.match(block, /Conservé las claves para evitar duplicados/);
