@@ -25,7 +25,7 @@ test("sealed final inventory capture is ADMIN-only, cutoff-bound and restricted 
 });
 
 test("sealed historic inventory upload keeps post-cutoff warehouse movements out of liquidation",()=>{
-  assert.match(migration,/WHEN v_s\.estado='CERRADA_OPERATIVAMENTE'' AND v_s\.corte_operativo_at IS NOT NULL/);
+  assert.match(migration,/WHEN v_s\.estado=''CERRADA_OPERATIVAMENTE'' AND v_s\.corte_operativo_at IS NOT NULL/);
   assert.match(migration,/THEN v_s\.corte_operativo_at/);
 });
 
