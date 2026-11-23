@@ -86,7 +86,7 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   assert.match(block,/detail\.liquidacion=null/,"the preview recalculates settlement from the refreshed state");
   assert.match(block,/Dinero recogido por día/,"the cash table is labelled by the daily amounts, not only the delivery mechanism");
   assert.doesNotMatch(block,/bajas\/mermas|baja\(s\)\/merma\(s\)/,"the preview uses only the Bajas terminology");
-  assert.match(block,/const finalDeclaration=detail\.declaracion_dinero/,"the final cash declaration is included separately from daily entries");
+  assert.match(block,/const finalDeclaration=detail\.sesion\.es_minorista===true\?null:detail\.declaracion_dinero/,"retail preview excludes the legacy final declaration while non-retail retains it");
   assert.match(block,/finalState==='DECLARACION_APROBADA'\?money\(finalDeclaration\.monto\)/,"approved final declared amount is shown without inventing a daily cash row");
   assert.doesNotMatch(block,/previewTable\(\['Producto','Inicial','Entradas','Salidas','Bajas','Mermas'/,"inventory presents one combined Bajas column");
   assert.doesNotMatch(block,/rpc\('(bc7_guardar|bc7_registrar|bc5_cerrar|bc_declarar)/,
