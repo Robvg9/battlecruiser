@@ -177,7 +177,7 @@ test("Dependienta can open her active jornada without searching a future-only ca
 
 
 test("Jornada handover precedes Owner cash count and automatic calculation",()=>{
-  for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc5_contar_dinero_entregado"]) {
+  for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc7_estado_conteo_efectivo_jornada","bc7_contar_efectivo_dueno_jornada"]) {
     assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
   }
   assert.match(ui,/Checklist de la jornada/);
