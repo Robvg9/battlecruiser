@@ -114,7 +114,7 @@ test("closing requires all daily dates and does not create a worker final declar
   const cashSaveEnd=UI.indexOf("async function saveAdminCashDeclaration",cashSaveStart);
   assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
-  assert.match(cashSave,/Faltan importes de estos días/);
+  assert.match(cashSave,/Faltan importes de estas fechas/);
   assert.match(block,/cashMode!=='daily'&&!saved/);
   assert.doesNotMatch(block,/bc5_responsable_declarar_dinero_jornada/);
   assert.match(block, /bc5_cerrar_jornada/);
@@ -173,5 +173,5 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.match(block,/const alreadyDone=detail\.checklist\?\.declaracion_dinero\?\.completado===true/);
   assert.match(block,/El paso 5 ya está completo y confirmado por el servidor/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
-  assert.match(block,/Faltan importes de estos días/);
+  assert.match(block,/Faltan importes de estas fechas/);
 });
