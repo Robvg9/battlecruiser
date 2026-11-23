@@ -1132,7 +1132,7 @@
     const canBackfill=closed&&!!detail.tramo_registrable&&(!!isAssigned||!!detail.is_admin);
     const wrapper='<div data-bc7-close-form="'+esc(sessionId)+'" data-bc7-cash-mode="daily">';
     return '<section class="bc7-jornada" id="bc7-cash-days-manager"><h4>Dinero del período · por fecha</h4>'+
-      '<p class="bc7-muted">Introduce una entrega por cada día, incluso 0 CUP cuando no se recogió dinero. La declaración final del período es otro importe independiente.</p>'+
+      '<p class="bc7-muted">Registra el importe de cada fecha del período. Cada día se revisa por separado; cuando no se recogió dinero, introduce 0 CUP. No existe un importe final adicional.</p>'+
       wrapper+'<div id="bc7-cash-days-list"><div class="bc7-empty">Consultando los importes del período…</div></div></div>'+
       '<p class="bc7-msg" id="bc7-cash-days-msg"></p></section>';
   }
@@ -1146,41 +1146,26 @@
     }
     const firstDate=String(detail.sesion.fecha||'').slice(0,10);
     const lastDate=String(detail.sesion.fecha_fin||state.dailyCashData.fecha_fin||detail.sesion.fecha||'').slice(0,10);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(firstDate)||!/^\d{4}-\d{2}-\d{2}$/.test(lastDate)||lastDate<firstDate){
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(firstDate)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(lastDate)||lastDate<firstDate){
       host.innerHTML='<div class="bc7-empty">No se pudo determinar el período de la jornada. Actualiza el detalle antes de registrar el dinero.</div>';return;
     }
     const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));
     const sessionState=String(detail.sesion.estado||'').toUpperCase();
     const isAssigned=!!detail.is_admin||detail.server_responsible_access===true;
-    const tranche=detail.tramo_registrable||detail.tramo_activo||null;
     const editable=(sessionState==='EN_CURSO'&&!!detail.tramo_activo&&isAssigned)||(sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail.tramo_registrable&&(isAssigned||!!detail.is_admin));
     const rows=arr(state.dailyCashData.entregas);
-    const declaration=detail.declaracion_dinero||null;
-    const trancheId=tranche?.id||'';
-    const declarationState=String(declaration?.estado_aprobacion||'').toUpperCase();
-    const declarationMatches=!!declaration&&!!trancheId&&String(declaration.turno_tramo_id)===String(trancheId);
-    const rectified=declarationMatches&&declarationState==='RECTIFICADA';
-    const finalSaved=declarationMatches&&!rectified&&detail.checklist?.declaracion_dinero?.declaracion_registrada===true;
     const today=dateHavana();
     let html='<div class="bc7-list">';
-
-    if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&(!declaration||rectified)){
-      html+='<div class="bc7-note"><b>Declaración final del período · última fecha</b><p>Este importe corresponde al total declarado al finalizar el período ('+esc(fmtDateHuman(lastDate))+'). Es distinto de las entregas registradas para los días 18, 19 y 20.</p>'+
-        (rectified?'<p class="bc7-muted">La declaración anterior de '+esc(money(declaration.monto))+' CUP fue rectificada y su evidencia original permanece conservada.</p>':'')+
-        '<form data-bc7-admin-cash-declaration="'+esc(sessionId)+'"><label class="bc7-field">Total declarado al finalizar el período (CUP)<input data-bc7-admin-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="0.00"></label><label class="bc7-field">Fuente / observación obligatoria<input data-bc7-admin-cash-note maxlength="1000" required placeholder="Fuente del total entregado al cierre del período"></label><div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar declaración final</button></div><p class="bc7-msg" data-bc7-admin-cash-msg></p></form></div>';
-    }
-    if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&declarationMatches&&!rectified&&declaration.monto_contado==null&&['PENDIENTE','ESPERANDO_APROBACION'].includes(declarationState)){
-      html+='<div class="bc7-note bc7-cash-rectify"><b>Declaración transcrita anteriormente</b><p>Importe conservado: <b>'+esc(money(declaration.monto))+' CUP</b>. Si pertenecía a un día concreto, rectifícalo con la fecha real. No lo apruebes como declaración final sin verificarlo.</p>'+
-        '<form data-bc7-rectify-cash-declaration="'+esc(declaration.id)+'" data-bc7-rectify-cash-session="'+esc(sessionId)+'"><label class="bc7-field">Fecha real de la entrega<input data-bc7-rectify-cash-date type="date" min="'+esc(firstDate)+'" max="'+esc(lastDate)+'" value="'+esc(firstDate)+'" required></label><label class="bc7-field">Motivo de rectificación (obligatorio)<input data-bc7-rectify-cash-note maxlength="1000" required placeholder="La transcripción corresponde a una entrega diaria, no al total final"></label><div class="bc7-actions"><button class="bc7-btn danger" type="submit">Rectificar transcripción</button></div><p class="bc7-msg" data-bc7-rectify-cash-msg></p></form></div>';
-    }
-    if(rectified){
-      html+='<div class="bc7-note"><b>Transcripción anterior rectificada</b><p>Los '+esc(money(declaration.monto))+' CUP permanecen en el historial de auditoría. La responsable debe registrar ahora la declaración final correcta.</p></div>';
-    }
-
+    let registered=0,approved=0,pending=0;
     for(let index=0;index<totalDays;index++){
       const date=addDays(firstDate,index);
       const row=rows.find(item=>String(item.fecha||'').slice(0,10)===date);
       const rejected=!!row&&String(row.estado||'').toUpperCase()==='RECHAZADA';
+      if(row&&!rejected){
+        registered++;
+        if(String(row.estado||'').toUpperCase()==='APROBADA')approved++;
+        else pending++;
+      }
       html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><div><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong></div>';
       if(row&&!rejected){
         const dailyState=String(row.estado||'PENDIENTE').toUpperCase();
@@ -1194,25 +1179,7 @@
       }
       html+='</article>';
     }
-
-    if(finalSaved){
-      const finalCashState=declarationState||'ESPERANDO_APROBACION';
-      html+='<article class="bc7-jornada bc7-cash-final-summary"><div class="bc7-jornada-top"><strong>Declaración final del período · '+esc(fmtDateHuman(lastDate))+'</strong><span class="bc7-pill '+(declaration.monto_contado==null?'warn':'ok')+'">'+esc(humanStatus(finalCashState))+'</span></div><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Declarado por responsable</small><b>'+esc(money(declaration.monto))+' CUP</b></div><div class="bc7-overview-item"><small>Contado por Dueño</small><b>'+(declaration.monto_contado==null?'Pendiente':esc(money(declaration.monto_contado))+' CUP')+'</b></div><div class="bc7-overview-item"><small>Diferencia</small><b>'+(declaration.diferencia==null?'Pendiente':esc(money(declaration.diferencia))+' CUP')+'</b></div></div><p class="bc7-muted">Declaración final separada de las tres entregas diarias. El conteo físico del Dueño es independiente.</p>';
-      const ownerMayCount=detail.is_admin&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)&&detail.checklist?.lista_para_conteo===true;
-      if(ownerMayCount&&declaration.monto_contado==null&&!['APROBADA','CON_DIFERENCIA'].includes(finalCashState)){
-        html+='<form data-bc7-final-cash-count="'+esc(declaration.id)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note"><b>Conteo físico independiente del Dueño</b><br>Declarado: '+esc(money(declaration.monto))+' CUP. Introduce únicamente el efectivo que contaste físicamente. La jornada sigue sellada y el Turno maestro permanece abierto.</p><label class="bc7-field">Dinero contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Escribe el total contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>';
-      }else if(declaration.monto_contado!=null){
-        html+='<p class="bc7-muted">'+(finalCashState==='CON_DIFERENCIA'?'Hay una diferencia de efectivo pendiente de revisión administrativa.':'Conteo físico guardado por el Dueño.')+'</p>';
-      }else if(detail.is_admin&&sessionState==='CERRADA_OPERATIVAMENTE'&&!ownerMayCount){
-        html+='<p class="bc7-muted">El conteo físico se habilitará cuando la responsable complete los cinco pasos. No es necesario cerrar el Turno maestro antes de ese conteo.</p>';
-      }else if(detail.is_admin&&sessionState!=='COMPLETADA'&&!ownerMayCount){
-        html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará después de completar los cinco pasos.</p>';
-      }
-      html+='</article>';
-    }else if(editable&&!detail.is_admin){
-      html+='<article class="bc7-jornada bc7-cash-final-entry"><div class="bc7-jornada-top"><strong>Declaración final del período · '+esc(fmtDateHuman(lastDate))+'</strong><span class="bc7-pill warn">Pendiente</span></div><label class="bc7-field">Total de dinero entregado al cierre del período (CUP)<input id="bc7-cash" type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Total final, no una entrega diaria"></label><p class="bc7-muted">Este importe es independiente del dinero recogido cada día. Al enviarlo, Administración podrá revisarlo y el Dueño lo contará físicamente después.</p></article>';
-    }
-
+    html+='<div class="bc7-note"><b>Resumen del Paso 5</b><p>'+registered+' de '+totalDays+' fechas registradas · '+approved+' aprobadas · '+pending+' pendientes de revisión.</p><p class="bc7-muted">El paso se completa al registrar una entrega para cada fecha. La aprobación de cada día corresponde al Dueño y no requiere una declaración global adicional.</p></div>';
     host.innerHTML=html;
   }
 
@@ -1250,14 +1217,7 @@
     const detail=state.detail,sessionId=String(form.dataset.bc7CloseForm||detail.sesion?.id||'');
     const message=form.querySelector('#bc7-cash-days-msg')||$('bc7-cash-days-msg');
     const saveButton=options.button||form.querySelector('[data-bc7-save-cash-days]');
-    const lastDate=String(detail.sesion?.fecha_fin||state.dailyCashData?.fecha_fin||detail.sesion?.fecha||'').slice(0,10);
     const entries=arr(state.dailyCashData?.entregas);
-    const declaration=detail.declaracion_dinero||null;
-    const tranche=detail.tramo_registrable||detail.tramo_activo;
-    const trancheId=tranche?.id||'';
-    const declarationState=String(declaration?.estado_aprobacion||'').toUpperCase();
-    const declarationMatches=!!declaration&&!!trancheId&&String(declaration.turno_tramo_id)===String(trancheId);
-    const finalSaved=declarationMatches&&!['RECHAZADA','RECTIFICADA'].includes(declarationState)&&detail.checklist?.declaracion_dinero?.declaracion_registrada===true;
     const days=Array.from(form.querySelectorAll('[data-bc7-cash-day-row]'));
     const operations=[],missing=[];
     for(const day of days){
@@ -1266,38 +1226,35 @@
       const oldRejected=old&&String(old.estado||'').toUpperCase()==='RECHAZADA';
       if(old&&!oldRejected)continue;
       const raw=day.querySelector('[data-bc7-cash-day-amount]')?.value.trim()??'';
-      if(raw===''){if(options.requireComplete)missing.push(fmtDateHuman(date));continue;}
-      const amount=Number(raw);
-      if(!Number.isFinite(amount)||amount<0){msg(message,'Revisa los importes diarios: todos deben ser números iguales o mayores que cero.','error');return false;}
-      if(date>dateHavana()){msg(message,'No puedes declarar efectivo para una fecha futura.','error');return false;}
-      operations.push({date,isFinal:false,amount,note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,keyField:day.querySelector('[data-bc7-cash-day-key]')});
-    }
-
-    if(!finalSaved){
-      const finalRaw=form.querySelector('#bc7-cash')?.value.trim()??'';
-      if(finalRaw===''){
-        if(options.requireComplete)missing.push('declaración final del período');
-      }else{
-        const finalAmount=Number(finalRaw);
-        if(!Number.isFinite(finalAmount)||finalAmount<0){msg(message,'El total final debe ser un número igual o mayor que cero.','error');return false;}
-        operations.push({date:lastDate,isFinal:true,amount:finalAmount,note:null,keyField:null});
+      if(raw===''){
+        if(options.requireComplete)missing.push(fmtDateHuman(date));
+        continue;
       }
+      const amount=Number(raw);
+      if(!Number.isFinite(amount)||amount<0){
+        msg(message,'Revisa los importes diarios: todos deben ser números iguales o mayores que cero.','error');return false;
+      }
+      if(date>dateHavana()){
+        msg(message,'No puedes declarar efectivo para una fecha futura.','error');return false;
+      }
+      operations.push({date,amount,note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,keyField:day.querySelector('[data-bc7-cash-day-key]')});
     }
     if(options.requireComplete&&missing.length){
-      msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Indica la declaración final del período y escribe 0 CUP cuando un día no tuvo entrega.','error');return false;
+      msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Escribe 0 CUP en las fechas sin entrega. No hace falta declarar un total final.','error');
+      return false;
     }
-    if(!operations.length){
-      const alreadyDone=detail.checklist?.declaracion_dinero?.completado===true;
-      if(alreadyDone){msg(message,'El paso 5 ya está completo y confirmado por el servidor.','ok');return true;}
-      msg(message,'No hay datos nuevos que enviar. No se modificó ningún registro.','error');return false;
+    if(!operations.length&&!options.requireComplete){
+      msg(message,'No hay importes diarios nuevos que enviar. No se modificó ningún registro.','ok');
+      return true;
     }
-    if(!navigator.onLine){msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;}
-    if(!options.skipConfirm&&!confirm('Se enviarán las entregas de cada día y, por separado, la declaración final del período. Las entregas y la declaración quedarán pendientes de revisión del Dueño. ¿Confirmas?'))return false;
+    if(!navigator.onLine){
+      msg(message,'Conecta el dispositivo antes de registrar los importes. No se modificó ningún dato.','error');return false;
+    }
+    if(!options.skipConfirm&&!confirm('Se enviarán únicamente las entregas de cada fecha del período. Cada día quedará pendiente de revisión independiente; no se enviará una declaración global. ¿Confirmas?'))return false;
     if(saveButton&&!busy(saveButton,true))return false;
-
     const dailySubmitted=[];
     try{
-      for(const operation of operations.filter(item=>!item.isFinal)){
+      for(const operation of operations){
         let key=operation.keyField?.value.trim()||'';
         if(!key){key=freshIdempotencyKey();if(operation.keyField)operation.keyField.value=key;}
         const postClosedAdmin=!!detail.is_admin&&String(detail.sesion.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
@@ -1307,41 +1264,29 @@
           :await rpc('bc7_registrar_entrega_diaria_jornada',rpcArgs);
         dailySubmitted.push({date:operation.date,amount:operation.amount,id:id?String(id):''});
       }
-
-      if(dailySubmitted.length){
-        const reread=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
-        const readRows=arr(reread.entregas);
-        const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)));
-        if(missingRows.length)throw new Error('El servidor no confirmó la lectura de '+missingRows.map(x=>fmtDateHuman(x.date)).join(', ')+'. Conservé las claves para evitar duplicados.');
-        state.dailyCashData=reread;state.dailyCashSessionId=sessionId;
-      }
-
-      const finalOperation=operations.find(item=>item.isFinal);
-      if(finalOperation){
-        const finalInput=form.querySelector('#bc7-cash');
-        if(finalInput)finalInput.value=String(finalOperation.amount);
-        const saved=await saveCashDeclaration(form,true,true);
-        if(!saved)throw new Error('No se confirmó la declaración final del período. Las entregas diarias anteriores se conservaron.');
-      }else if(dailySubmitted.length){
-        renderCashDaysWorkspace(state.detail);
-      }
-
+      const reread=await rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:sessionId})||{};
+      const readRows=arr(reread.entregas);
+      const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)));
+      if(missingRows.length)throw new Error('El servidor no confirmó la lectura de '+missingRows.map(x=>fmtDateHuman(x.date)).join(', ')+'. Conservé las claves para evitar duplicados.');
+      state.dailyCashData=reread;
+      state.dailyCashSessionId=sessionId;
       if(options.requireComplete){
         const ok=await openWorkspace(sessionId);
-        if(!ok)throw new Error('Los registros se enviaron, pero no se pudo volver a leer el checklist.');
+        if(!ok)throw new Error('Los importes se enviaron, pero no se pudo volver a leer el checklist.');
         if(state.detail)await ensureWorkspaceOperationData(state.detail);
         if(state.detail?.checklist?.declaracion_dinero?.completado!==true){
-          throw new Error('El servidor recibió los datos, pero el paso 5 aún no cumple todos sus requisitos. Actualiza y revisa las fechas.');
+          throw new Error('El servidor recibió las entregas, pero el Paso 5 todavía no tiene un importe para cada fecha. Actualiza y revisa el período.');
         }
-        setStatus('Paso 5 enviado y confirmado: entregas diarias y declaración final registradas.','ok');
+        setStatus('Paso 5 enviado y confirmado: los importes diarios de todas las fechas quedaron registrados.','ok');
       }else{
-        msg($('bc7-cash-days-msg')||message,'Importes diarios y declaración guardados y confirmados por el servidor.','ok');
-        setStatus('Dinero del período actualizado.','ok');
+        renderCashDaysWorkspace(state.detail);
+        msg($('bc7-cash-days-msg')||message,'Entregas diarias guardadas y confirmadas por el servidor.','ok');
+        setStatus('Dinero del período actualizado mediante importes diarios.','ok');
       }
       return true;
     }catch(e){
       msg($('bc7-cash-days-msg')||message,friendlyError(e,'create')+' '+String(e&&e.message||'')+' Las claves de idempotencia se conservaron para evitar duplicados.','error');
-      setStatus('No se pudo confirmar el paso 5 completo.','error');
+      setStatus('No se pudo confirmar el Paso 5 completo.','error');
       return false;
     }finally{if(saveButton)busy(saveButton,false);}
   }
@@ -2957,74 +2902,56 @@
     let amount=$('bc7-cash')?.value.trim();
     let msgEl=form.querySelector('[data-bc7-close-msg]');
     const cashMode=form.dataset.bc7CashMode||'single';
-    if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
+    const dailyCashOnly=cashMode==='daily'&&state.detail?.sesion?.es_minorista===true;
+    if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para entregar esta jornada.','error');return;}
     if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
-    if(cashMode==='daily'){
+    if(dailyCashOnly){
       const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true});
       if(!savedAllDays)return;
       form=document.querySelector('form[data-bc7-close-form]')||form;
       msgEl=form.querySelector('[data-bc7-close-msg]')||msgEl;
-      if(!state.detail?.tramo_activo?.id){msg(msgEl,'No se encontró el tramo activo después de verificar los importes. La jornada no se ha cerrado.','error');return;}
-      const declaration=state.detail.declaracion_dinero;
-      if(!declaration||String(declaration.turno_tramo_id)!==String(state.detail.tramo_activo.id)){
-        msg(msgEl,'El importe del último día todavía no está confirmado por el servidor. La jornada no se ha cerrado.','error');return;
-      }
-      amount=String(declaration.monto);
+      if(!state.detail?.tramo_activo?.id){msg(msgEl,'No se encontró el tramo activo después de verificar las entregas diarias. La jornada no se ha cerrado.','error');return;}
+      if(state.detail?.checklist?.declaracion_dinero?.completado!==true){msg(msgEl,'Falta registrar el importe de alguna fecha. La jornada no se ha cerrado.','error');return;}
     }else{
       amount=$('bc7-cash')?.value.trim();
       const tramoId=state.detail.tramo_activo.id;
-      const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-      if(saved){amount=String(state.detail.declaracion_dinero.monto);}
+      const existing=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+      if(existing)amount=String(state.detail.declaracion_dinero.monto);
       if(amount===''||amount==null||!Number.isFinite(Number(amount))||Number(amount)<0){msg(msgEl,'Introduce un importe real igual o mayor que cero.','error');return;}
     }
     if(state.detail?.sesion?.es_minorista===true){
       let checklist;
-      try{
-        checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
-      }catch(e){
-        msg(msgEl,'No se pudieron verificar los cinco pasos en el servidor. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');
-        return;
-      }
+      try{checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});}
+      catch(e){msg(msgEl,'No se pudieron verificar los cinco pasos en el servidor. '+friendlyError(e,'calendar')+' La jornada sigue abierta.','error');return;}
       if(checklist?.lista_para_conteo!==true){
-        msg(msgEl,'No se puede entregar todavía: la responsable debe completar gastos, reinversiones, bajas, inventario final y declaración de dinero. La jornada sigue abierta.','error');
-        return;
+        msg(msgEl,'No se puede entregar todavía: la responsable debe completar gastos, reinversiones, bajas, inventario final y dinero de todas las fechas. La jornada sigue abierta.','error');return;
       }
     }
     const tramoId=state.detail.tramo_activo.id;
-    const saved=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
-    const confirmation=saved?'Los cinco pasos están completos y el importe quedó declarado. ¿Entregas la jornada al Dueño? Después del traspaso podrá contar el efectivo y resolver las pendientes; el Turno seguirá abierto para la revisión final.':'Se guardará el importe declarado y se entregará la jornada. Después del traspaso, el Dueño podrá contar el efectivo y resolver las pendientes. ¿Confirmas?';
+    const legacyDeclaration=state.detail.declaracion_dinero&&String(state.detail.declaracion_dinero.turno_tramo_id)===String(tramoId);
+    const cashReady=dailyCashOnly||!!legacyDeclaration;
+    const confirmation=cashReady
+      ?'Los cinco pasos están completos y cada día tiene su importe registrado. ¿Entregas la jornada al Dueño? El Turno seguirá abierto para la revisión final.'
+      :'Se guardará el importe declarado y se entregará la jornada. Después del traspaso, el Dueño podrá revisar las pendientes. ¿Confirmas?';
     if(!confirm(confirmation))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
     try{
-      if(!saved) await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:Number(amount)});
+      if(!cashReady)await rpc('bc_declarar_dinero',{p_turno_tramo_id:tramoId,p_monto:Number(amount)});
       await rpc('bc5_cerrar_jornada',{p_turno_sesion_id:sessionId,p_motivo_excepcion:$('bc7-close-reason')?.value||null});
-      await loadCalendar();
-      await loadCurrentSession();
+      await loadCalendar();await loadCurrentSession();
       const reread=await openWorkspace(sessionId);
-      if(!reread){
-        setStatus('La solicitud de cierre fue aceptada, pero no se pudo releer el resumen. Actualiza antes de repetir cualquier operación.','error');
-        return;
-      }
+      if(!reread){setStatus('La solicitud de cierre fue aceptada, pero no se pudo releer el resumen. Actualiza antes de repetir cualquier operación.','error');return;}
       const finalState=String(state.detail?.sesion?.estado||'').toUpperCase();
-      if(finalState!=='COMPLETADA'){
-        setStatus('La jornada todavía no aparece como finalizada. Estado: '+humanStatus(finalState)+'. Actualiza antes de volver a intentarlo.','error');
-        return;
-      }
-      setStatus('Jornada entregada al Dueño. La sesión quedó completada y el Turno maestro sigue abierto. El Dueño ya puede contar el efectivo y resolver las pendientes.','ok');
+      if(finalState!=='COMPLETADA'){setStatus('La jornada todavía no aparece como finalizada. Estado: '+humanStatus(finalState)+'. Actualiza antes de volver a intentarlo.','error');return;}
+      setStatus('Jornada entregada al Dueño. La sesión quedó completada y el Turno maestro sigue abierto. Las entregas diarias quedan disponibles para revisión.','ok');
     }catch(e){
       const errorText='No se pudo confirmar todavía el cierre. '+friendlyError(e,'create')+' Se comprobará el estado antes de permitir otro intento.';
       try{
         const d=await rpc('bc7_obtener_inventario_jornada',{p_turno_sesion_id:sessionId});
         renderWorkspace(d);
         const rereadState=String(d?.sesion?.estado||'').toUpperCase();
-        if(rereadState==='COMPLETADA'){
-          await loadCalendar();
-          setStatus('Cierre confirmado al volver a consultar la jornada. No se repitió la escritura.','ok');
-        }else{
-          setStatus('El servidor todavía no confirma el cierre. Estado actual: '+humanStatus(rereadState)+'.','error');
-          const currentMsg=document.querySelector('[data-bc7-close-msg]')||msgEl;
-          msg(currentMsg,errorText,'error');
-        }
+        if(rereadState==='COMPLETADA'){await loadCalendar();setStatus('Cierre confirmado al volver a consultar la jornada. No se repitió la escritura.','ok');}
+        else{setStatus('El servidor todavía no confirma el cierre. Estado actual: '+humanStatus(rereadState)+'.','error');msg(document.querySelector('[data-bc7-close-msg]')||msgEl,errorText,'error');}
       }catch(x){
         setStatus('No se pudo confirmar el estado del cierre por falta de lectura del servidor. No repitas la escritura todavía.','error');
         msg(form.querySelector('[data-bc7-close-msg]')||msgEl,errorText+' Tampoco se pudo consultar el estado actual. '+friendlyError(x,'calendar'),'error');
@@ -3082,7 +3009,7 @@
     root.setAttribute('aria-modal','true');
     root.setAttribute('aria-label',labels[key]);
     const headerNote=key==='declaracion_dinero'
-      ?'Registra por separado el dinero de cada día y el total final del período. Escribe 0 CUP cuando ese día no hubo entrega.'
+      ?'Registra el dinero de cada fecha del período. Cada entrega se revisa por separado; escribe 0 CUP cuando no hubo entrega.'
       :(key==='bajas'?'Envía primero la lista completa de bajas o mermas. Después confirma que no faltan más registros.':'Completa este apartado y envía su evidencia a Administración.');
     const actionLabel=key==='inventario_final'
       ?'Guardar inventario final'
@@ -3116,7 +3043,7 @@
         if(!cashForm){setStatus('No se encontró el formulario de dinero del período. No se envió nada.','error');return;}
         const saved=await saveCashDaysWorkspace(cashForm,{requireComplete:true,skipConfirm:true,button});
         if(!saved)return;
-        setStatus('Paso 5 enviado y confirmado: entregas diarias y declaración final registradas.','ok');
+        setStatus('Paso 5 enviado y confirmado: los importes diarios de todas las fechas quedaron registrados.','ok');
         return;
       }
       if(key==='bajas'){
@@ -3252,6 +3179,7 @@
   }
   async function submitAdjustment(form){
     const sessionId=form.dataset.bc7AdjustForm;
+    const reopenBajasChecklist=checklistModalContext?.key==='bajas';
     const storageType=form.querySelector('[data-bc7-ajust-type]').value;
     const cause=form.querySelector('[data-bc7-ajust-cause]').value.trim();
     const detail=form.querySelector('[data-bc7-ajust-reason]').value.trim();
@@ -3319,8 +3247,16 @@
           :'Lista de '+lines.length+' producto(s) enviada como un solo expediente. Está pendiente de una única aprobación administrativa.'
         :'Solicitud de merma guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.';
       msg(msgEl,successMessage,'ok');
-      setStatus(successMessage,'ok');
-      keyField.value='';form.reset();await openWorkspace(sessionId);
+      keyField.value='';form.reset();
+      await openWorkspace(sessionId);
+      if(reopenBajasChecklist){
+        openChecklistSection('bajas');
+        const resumedForm=document.querySelector('[data-bc7-adjust-form]');
+        if(resumedForm)msg(resumedForm.querySelector('[data-bc7-ajust-msg]'),successMessage,'ok');
+        setStatus('Solicitud enviada a revisión. La sección de Bajas permanece abierta para que confirmes si no faltan más.','ok');
+      }else{
+        setStatus(successMessage,'ok');
+      }
     }catch(e){msg(msgEl,'No se registró el ajuste. '+friendlyError(e,'adjustment')+' No repitas el envío con otra referencia hasta revisar el estado.','error');}
     finally{busy(btn,false);}
   }
