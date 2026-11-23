@@ -415,6 +415,32 @@ $new$;
 END;
 $migration$;
 
+-- Retail Jornada no longer has a separate final-declaration approval item.
+-- Keep legacy turno_declaraciones rows intact for audit and non-retail sessions.
+DO $patch_retail_declaration_queue$
+DECLARE
+  v_def text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure)
+    INTO v_def;
+  v_old := $old$WHERE s.bloque='JORNADA'
+      AND s.estado='COMPLETADA'
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$old$;
+  v_new := $new$WHERE s.bloque='JORNADA'
+      AND s.estado='COMPLETADA'
+      AND coalesce(a.tipo,'')<>'minorista'
+      AND d.estado_aprobacion IN ('PENDIENTE','ESPERANDO_APROBACION')$new$;
+  IF strpos(v_def,v_old)>0 THEN
+    v_def := replace(v_def,v_old,v_new);
+  ELSIF strpos(v_def,'coalesce(a.tipo,'''')<>''minorista''')=0 THEN
+    RAISE EXCEPTION 'No se reconoce el filtro de declaración histórica en listar_aprobaciones_admin.';
+  END IF;
+  EXECUTE v_def;
+END;
+$patch_retail_declaration_queue$;
+
 -- Keep the existing operational-close and attribution guards; permit the
 -- already sealed operational session only while its master Turn remains open.
 DO $migration$
