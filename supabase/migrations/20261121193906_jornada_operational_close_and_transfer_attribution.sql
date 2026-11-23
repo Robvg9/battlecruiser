@@ -551,14 +551,15 @@ DECLARE
 BEGIN
   SELECT pg_get_functiondef('public.bc5_iniciar_jornada(uuid,text)'::regprocedure) INTO v_def;
 
-  v_old := '  SELECT * INTO v_sesion FROM public.turno_sesiones' || E'\n' ||
-           '  WHERE id=p_turno_sesion_id FOR UPDATE;';
+  v_old := 'SELECT * INTO v_sesion FROM public.turno_sesiones WHERE id=p_turno_sesion_id FOR UPDATE;';
   IF strpos(v_def,'PERFORM public.bc5_cerrar_jornadas_operativas_vencidas();')=0 THEN
-    IF strpos(v_def,v_old)=0 THEN
+    IF v_def !~* 'SELECT[[:space:]]+[*][[:space:]]+INTO[[:space:]]+v_sesion[[:space:]]+FROM[[:space:]]+public[.]turno_sesiones[[:space:]]+WHERE[[:space:]]+id[[:space:]]*=[[:space:]]*p_turno_sesion_id[[:space:]]+FOR[[:space:]]+UPDATE;' THEN
       RAISE EXCEPTION 'No se pudo localizar el inicio de bc5_iniciar_jornada para instalar el fallback.';
     END IF;
-    v_def := replace(v_def,v_old,
-      '  PERFORM public.bc5_cerrar_jornadas_operativas_vencidas();' || E'\n' || v_old);
+    v_def := regexp_replace(v_def,
+      '(SELECT[[:space:]]+[*][[:space:]]+INTO[[:space:]]+v_sesion[[:space:]]+FROM[[:space:]]+public[.]turno_sesiones[[:space:]]+WHERE[[:space:]]+id[[:space:]]*=[[:space:]]*p_turno_sesion_id[[:space:]]+FOR[[:space:]]+UPDATE;)',
+      'PERFORM public.bc5_cerrar_jornadas_operativas_vencidas();' || chr(10) || '  \1',
+      'i');
   END IF;
 
   v_old := 'AND s.estado NOT IN (''COMPLETADA'',''CANCELADA'')';
@@ -594,36 +595,49 @@ $patch_start$;
 DO $patch_owner_checklist$
 DECLARE
   v_def text;
-  v_old text;
+  v_pattern text;
+  v_replacement text;
+  v_insert_pattern text;
+  v_insert_replacement text;
 BEGIN
   SELECT pg_get_functiondef('public.bc7_confirmar_bloque_jornada(uuid,text,boolean)'::regprocedure) INTO v_def;
 
-  v_old := '  v_tramo:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);' || E'\n' ||
-           '  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;';
-  IF strpos(v_def,'Owner ADMIN confirms sealed Jornada blocks')=0 THEN
-    IF strpos(v_def,v_old)=0 THEN
+  -- pg_get_functiondef can normalize whitespace differently by PostgreSQL version.
+  -- Match the two PL/pgSQL statements semantically, then install the sealed path.
+  IF strpos(v_def,'BC7_SEALED_OWNER_BLOCK_GATE_V1')=0 THEN
+    v_pattern := 'v_tramo[[:space:]]*:=[[:space:]]*public[.]bc7_validar_tramo_responsable_jornada[[:space:]]*[(]p_turno_sesion_id[)][[:space:]]*;[[:space:]]*SELECT[[:space:]]+[*][[:space:]]+INTO[[:space:]]+v_s[[:space:]]+FROM[[:space:]]+public[.]turno_sesiones[[:space:]]+WHERE[[:space:]]+id[[:space:]]*=[[:space:]]*p_turno_sesion_id;';
+    IF v_def !~* v_pattern THEN
       RAISE EXCEPTION 'No se pudo adaptar bc7_confirmar_bloque_jornada al sello operativo.';
     END IF;
-    v_def := replace(v_def,v_old,
-      '  SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;' || E'\n' ||
-      '  IF NOT FOUND THEN RAISE EXCEPTION ''La Jornada no existe.'' USING ERRCODE=''23503''; END IF;' || E'\n' ||
-      '  IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || E'\n' ||
-      '    IF NOT public.bc_actor_is_admin() THEN RAISE EXCEPTION ''Solo ADMIN puede confirmar bloques después del sello operativo.'' USING ERRCODE=''42501''; END IF;' || E'\n' ||
-      '    SELECT * INTO v_tramo FROM public.turno_tramos WHERE turno_sesion_id=v_s.id AND estado=''COMPLETADO'' ORDER BY fin_at DESC NULLS LAST LIMIT 1;' || E'\n' ||
-      '    IF v_tramo.id IS NULL THEN RAISE EXCEPTION ''No se encontró el tramo de la Jornada sellada.'' USING ERRCODE=''23514''; END IF;' || E'\n' ||
-      '  ELSE' || E'\n' ||
-      '    v_tramo:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);' || E'\n' ||
-      '  END IF;');
-    v_def := replace(v_def,
-      '  INSERT INTO public.turno_jornada_confirmaciones(turno_sesion_id)' || E'\n' ||
-      '  VALUES(p_turno_sesion_id)',
-      '  IF p_completado AND v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || E'\n' ||
-      '    IF v_tipo=''gastos'' AND EXISTS(SELECT 1 FROM public.gastos g WHERE g.turno_sesion_id=v_s.id AND g.estado=''PENDIENTE'') THEN RAISE EXCEPTION ''Todavía hay gastos pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || E'\n' ||
-      '    IF v_tipo=''reinversiones'' AND EXISTS(SELECT 1 FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado=''PENDIENTE'') THEN RAISE EXCEPTION ''Todavía hay reinversiones pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || E'\n' ||
-      '    IF v_tipo=''bajas'' AND (EXISTS(SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado=''PENDIENTE'') OR EXISTS(SELECT 1 FROM public.mermas m WHERE m.turno_sesion_id=v_s.id AND m.estado=''PENDIENTE'')) THEN RAISE EXCEPTION ''Todavía hay bajas o mermas pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || E'\n' ||
-      '  END IF;' || E'\n' ||
-      '  INSERT INTO public.turno_jornada_confirmaciones(turno_sesion_id)' || E'\n' ||
-      '  VALUES(p_turno_sesion_id)');
+
+    v_replacement :=
+      'SELECT * INTO v_s FROM public.turno_sesiones WHERE id=p_turno_sesion_id;' || chr(10) ||
+      '  IF NOT FOUND OR v_s.bloque<>''JORNADA'' THEN RAISE EXCEPTION ''La Jornada no existe.'' USING ERRCODE=''23503''; END IF;' || chr(10) ||
+      '  IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || chr(10) ||
+      '    IF NOT public.bc_actor_is_admin() THEN RAISE EXCEPTION ''Solo ADMIN puede confirmar bloques después del sello operativo.'' USING ERRCODE=''42501''; END IF;' || chr(10) ||
+      '    IF NOT EXISTS (SELECT 1 FROM public.turnos t WHERE t.id=v_s.turno_id AND t.estado=''ABIERTO'') THEN RAISE EXCEPTION ''El Turno maestro ya está cerrado; no se admiten cambios de checklist.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '    SELECT * INTO v_tramo FROM public.turno_tramos WHERE turno_sesion_id=v_s.id AND estado=''COMPLETADO'' AND fin_at=v_s.corte_operativo_at ORDER BY fin_at DESC NULLS LAST LIMIT 1;' || chr(10) ||
+      '    IF v_tramo.id IS NULL THEN RAISE EXCEPTION ''No se encontró el tramo de la Jornada sellada.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '  ELSE' || chr(10) ||
+      '    v_tramo:=public.bc7_validar_tramo_responsable_jornada(p_turno_sesion_id);' || chr(10) ||
+      '  END IF;' || chr(10) ||
+      '  -- BC7_SEALED_OWNER_BLOCK_GATE_V1';
+    v_def := regexp_replace(v_def,v_pattern,v_replacement,'i');
+
+    v_insert_pattern := 'INSERT[[:space:]]+INTO[[:space:]]+public[.]turno_jornada_confirmaciones[[:space:]]*[(]turno_sesion_id[)][[:space:]]*VALUES[[:space:]]*[(]p_turno_sesion_id[)][[:space:]]*ON[[:space:]]+CONFLICT[[:space:]]*[(]turno_sesion_id[)][[:space:]]+DO[[:space:]]+NOTHING;';
+    IF v_def !~* v_insert_pattern THEN
+      RAISE EXCEPTION 'No se pudo localizar el alta de confirmaciones para proteger el checklist sellado.';
+    END IF;
+    v_insert_replacement :=
+      'IF p_completado AND v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || chr(10) ||
+      '    IF v_tipo=''gastos'' AND EXISTS(SELECT 1 FROM public.gastos g WHERE g.turno_sesion_id=v_s.id AND g.estado=''PENDIENTE'') THEN RAISE EXCEPTION ''Todavía hay gastos pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '    IF v_tipo=''reinversiones'' AND EXISTS(SELECT 1 FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado=''PENDIENTE'') THEN RAISE EXCEPTION ''Todavía hay reinversiones pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '    IF v_tipo=''bajas'' AND (EXISTS(SELECT 1 FROM public.bajas b WHERE b.turno_sesion_id=v_s.id AND b.estado=''PENDIENTE'') OR EXISTS(SELECT 1 FROM public.mermas m WHERE m.turno_sesion_id=v_s.id AND m.estado=''PENDIENTE'')) THEN RAISE EXCEPTION ''Todavía hay bajas o mermas pendientes de revisión.'' USING ERRCODE=''23514''; END IF;' || chr(10) ||
+      '  END IF;' || chr(10) ||
+      '  INSERT INTO public.turno_jornada_confirmaciones(turno_sesion_id)' || chr(10) ||
+      '  VALUES(p_turno_sesion_id)' || chr(10) ||
+      '  ON CONFLICT(turno_sesion_id) DO NOTHING;';
+    v_def := regexp_replace(v_def,v_insert_pattern,v_insert_replacement,'i');
   END IF;
 
   EXECUTE v_def;
@@ -687,22 +701,27 @@ BEGIN
   v_def := replace(v_def,v_old,
     'IF v_s.estado IN (''COMPLETADA'',''CERRADA_OPERATIVAMENTE'') THEN');
 
-  v_old := '      IF coalesce((v_liq->>''calculable'')::boolean,false) IS NOT TRUE THEN' || E'\n' ||
-           '        RAISE EXCEPTION ''La liquidación del día % no está completa. Revisa precios, movimientos, inventario, salario y efectivo. Detalle: %'',' || E'\n' ||
-           '          v_s.numero_dia,v_liq USING ERRCODE=''23514'';' || E'\n' ||
-           '      END IF;';
   IF strpos(v_def,'JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO')=0 THEN
+    -- Match the calculability guard's final statement rather than copying
+    -- its full localized error string from pg_get_functiondef.
+    v_old := 'v_s.numero_dia,v_liq USING ERRCODE=''23514'';';
     IF strpos(v_def,v_old)=0 THEN
-      RAISE EXCEPTION 'No se pudo localizar el cierre de liquidación en bc7_resolver_revision_jornada.';
+      RAISE EXCEPTION 'No se pudo localizar el control calculable de bc7_resolver_revision_jornada.';
     END IF;
-    v_def := replace(v_def,v_old,
-      v_old || E'\n' ||
-      '      IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || E'\n' ||
-      '        UPDATE public.turno_sesiones SET estado=''COMPLETADA'',updated_at=now() WHERE id=v_s.id;' || E'\n' ||
-      '        INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,actor_user_id,tipo,payload)' || E'\n' ||
-      '        VALUES(v_s.turno_id,v_s.id,auth.uid(),''JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO'',' || E'\n' ||
-      '          jsonb_build_object(''corte_operativo_at'',v_s.corte_operativo_at,''conciliado_at'',now()));' || E'\n' ||
-      '      END IF;');
+    v_def := regexp_replace(v_def,
+      'v_s[.]numero_dia[[:space:]]*,[[:space:]]*v_liq[[:space:]]+USING[[:space:]]+ERRCODE[[:space:]]*=[[:space:]]*''23514''[[:space:]]*;[[:space:]]*END[[:space:]]+IF;',
+      'v_s.numero_dia,v_liq USING ERRCODE=''23514'';' || chr(10) ||
+      '      END IF;' || chr(10) ||
+      '      IF v_s.estado=''CERRADA_OPERATIVAMENTE'' THEN' || chr(10) ||
+      '        UPDATE public.turno_sesiones SET estado=''COMPLETADA'',updated_at=now() WHERE id=v_s.id;' || chr(10) ||
+      '        INSERT INTO public.turno_eventos(turno_id,turno_sesion_id,actor_user_id,tipo,payload)' || chr(10) ||
+      '        VALUES(v_s.turno_id,v_s.id,auth.uid(),''JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO'',' || chr(10) ||
+      '          jsonb_build_object(''corte_operativo_at'',v_s.corte_operativo_at,''conciliado_at'',now()));' || chr(10) ||
+      '      END IF;',
+      'i');
+    IF strpos(v_def,'JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO')=0 THEN
+      RAISE EXCEPTION 'No se pudo instalar la conciliación después del sello operativo.';
+    END IF;
   END IF;
 
   EXECUTE v_def;

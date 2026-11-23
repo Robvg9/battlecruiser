@@ -6,6 +6,7 @@ const path=require("node:path");
 const ROOT=path.join(__dirname,"..");
 const read=file=>fs.readFileSync(path.join(ROOT,file),"utf8");
 const migration=read("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
+const ownerReviewSource=read("supabase/migrations/20261113230500_jornada_owner_review_continuity.sql");
 const ui=read("public/js/bc7-jornada-ui.js");
 const owner=read("public/js/jornada-owner-review.js");
 
@@ -39,8 +40,8 @@ test("Owner may later count cash and reconcile, but final approval still require
   assert.match(migration,/bc7_estado_confirmaciones_jornada/);
   assert.match(migration,/bc7_resolver_revision_jornada/);
   assert.match(migration,/JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO/);
-  assert.match(migration,/v_liq->>''calculable''/);
-  assert.match(migration,/La liquidación del día % no está completa\. Revisa precios, movimientos, inventario, salario y efectivo\. Detalle: %/);
+  assert.match(ownerReviewSource,/v_liq->>'calculable'/);
+  assert.ok(ownerReviewSource.includes("La liquidación del día % no está completa. Revisa precios, movimientos, inventario, salario y efectivo. Detalle: %"));
 });
 
 test("transfer attribution links only the destination when that warehouse is retail",()=>{
