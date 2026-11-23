@@ -89,7 +89,11 @@ test("Owner physical count is independent and cannot duplicate the daily declare
   assert.match(block,/p_monto_contado:amount/);
   assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
   assert.match(cashMigration,/THEN v_final_counted ELSE NULL END/);
-  const singleCashBlock=cashMigration.slice(cashMigration.indexOf("v_new := $new$",cashMigration.indexOf("INTO v_final_declared,v_final_counted,v_final_cash_state")),cashMigration.indexOf("$new$;",cashMigration.indexOf("INTO v_final_declared,v_final_counted,v_final_cash_state"))+6);
+  const settlementAnchor=cashMigration.indexOf("v_cash_received:=CASE");
+  const singleCashStart=cashMigration.indexOf("v_new := $new$",settlementAnchor);
+  const singleCashEnd=cashMigration.indexOf("$new$;",singleCashStart)+6;
+  const singleCashBlock=cashMigration.slice(singleCashStart,singleCashEnd);
+  assert.match(singleCashBlock,/v_final_cash_state IN \('APROBADA','APROBADA_CON_DIFERENCIA'\)/);
   assert.match(singleCashBlock,/THEN v_final_counted ELSE NULL END/);
   assert.doesNotMatch(singleCashBlock,/v_daily_cash\+v_final_counted/);
   assert.match(ui, /El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos/);
