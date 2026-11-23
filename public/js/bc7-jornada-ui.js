@@ -2242,7 +2242,7 @@
         await openJornadaPreview(null);
       }catch(error){
         linkButton.disabled=false;
-        alert(friendlyError(error,'calendar')+' No se modificó la transferencia.');
+        alert(friendlyError(error,'transfer')+' No se modificó la transferencia.');
       }
     });
     try{
@@ -2256,12 +2256,13 @@
       detail.is_admin=!!state.admin;
       detail.liquidacion=null;
       state.detail=detail;
-      const [settlement,movements,finance,cash,unlinkedTransfers]=await Promise.all([
+      const [settlement,movements,finance,cash,unlinkedTransfers,cashCount]=await Promise.all([
         rpc('bc7_liquidacion_inventario_jornada',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_movimientos_sesion',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_finanzas_jornada',{p_turno_sesion_id:detail.sesion.id}),
         rpc('bc7_entregas_diarias_jornada',{p_turno_sesion_id:detail.sesion.id}),
-        rpc('bc7_transferencias_pendientes_vinculo_jornada',{p_turno_sesion_id:detail.sesion.id})
+        rpc('bc7_transferencias_pendientes_vinculo_jornada',{p_turno_sesion_id:detail.sesion.id}),
+        rpc('bc7_estado_conteo_efectivo_jornada',{p_turno_sesion_id:detail.sesion.id})
       ]);
       detail.liquidacion=settlement||detail.liquidacion;
       const lines=arr(settlement?.lineas).map(x=>[
@@ -2288,7 +2289,7 @@
         x.monto_aprobado==null?'Pendiente':money(x.monto_aprobado)+' CUP',
         'Entrega diaria',x.observacion||'—'
       ]);
-      const finalDeclaration=detail.declaracion_dinero;
+      const finalDeclaration=detail.sesion.es_minorista===true?null:detail.declaracion_dinero;
       if(finalDeclaration){
         const finalState=String(finalDeclaration.estado_aprobacion||'').toUpperCase();
         cashRows.push([
@@ -2335,14 +2336,29 @@
         ['Dinero recogido',settlement?.dinero_recogido_total==null?'Pendiente':money(settlement.dinero_recogido_total)+' CUP'],
         ['Efectivo esperado',(settlement?.efectivo_esperado_despues_de_gastos_reinversiones??settlement?.efectivo_esperado_despues_de_gastos_reinversiones_salario)==null?'Pendiente':money(settlement.efectivo_esperado_despues_de_gastos_reinversiones??settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP'],
         ['Diferencia de caja',settlement?.diferencia==null?'Pendiente':money(settlement.diferencia)+' CUP'],
-        ['Efectivo declarado',declaration?.monto==null?'Pendiente':money(declaration.monto)+' CUP'],
-        ['Conteo físico',declaration?.monto_contado==null?'Pendiente':money(declaration.monto_contado)+' CUP']
       ];
+      if(session.es_minorista===true){
+        summary.push(
+          ['Entregas diarias',Number(cashCount?.entregas_diarias_registradas||0)+'/'+Number(cashCount?.entregas_diarias_esperadas||0)+' fechas'],
+          ['Conteo físico del Dueño',cashCount?.monto_contado==null?'Pendiente':money(cashCount.monto_contado)+' CUP'],
+          ['Diferencia del conteo',cashCount?.diferencia==null?'Pendiente':money(cashCount.diferencia)+' CUP']
+        );
+      }else{
+        summary.push(
+          ['Efectivo declarado',declaration?.monto==null?'Pendiente':money(declaration.monto)+' CUP'],
+          ['Conteo físico',declaration?.monto_contado==null?'Pendiente':money(declaration.monto_contado)+' CUP']
+        );
+      }
       const summaryHtml='<div class="bc7-workspace-overview">'+summary.map(([k,v])=>'<div class="bc7-overview-item"><small>'+esc(k)+'</small><b>'+esc(v)+'</b></div>').join('')+'</div>';
       const missing=[];
       if(!detail.cortes?.INICIAL)missing.push('Inventario inicial sin confirmar');
       if(!detail.cortes?.FINAL)missing.push('Inventario final sin confirmar');
-      if(!declaration)missing.push('Declaración final de efectivo pendiente');
+      if(session.es_minorista===true){
+        const dailyRegistered=Number(cashCount?.entregas_diarias_registradas||0);
+        const dailyExpected=Number(cashCount?.entregas_diarias_esperadas||0);
+        if(dailyExpected>0&&dailyRegistered!==dailyExpected)missing.push('Entregas diarias de efectivo incompletas ('+dailyRegistered+'/'+dailyExpected+').');
+        if(complete&&cashCount?.monto_contado==null)missing.push('Conteo físico del Dueño pendiente.');
+      }else if(!declaration)missing.push('Declaración de efectivo pendiente');
       if(settlement?.calculable!==true)missing.push('Liquidación todavía no calculable o con datos pendientes');
       const body=root.querySelector('.bc7-checklist-modal-body');
       body.innerHTML='<style>'+
@@ -2372,7 +2388,7 @@
         '<section class="bc7-card"><h4>Gastos</h4>'+previewTable(['Concepto','Importe','Estado','Responsable'],expenseRows,3)+'</section>'+
         '<section class="bc7-card"><h4>Reinversiones</h4>'+previewTable(['Producto','Importe','Estado','Proveedor'],reinvestmentRows,3)+'</section>'+
         '<section class="bc7-card"><h4>Dinero recogido por día</h4>'+previewTable(['Fecha','Declarado','Estado','Aprobado','Tipo','Detalle'],cashRows,4)+'</section>'+
-        '<p class="bc7-muted">La declaración final aparece separada de las entregas diarias: su aprobación no sustituye el conteo físico independiente. Esta vista es de solo lectura; las transferencias históricas requieren un vínculo explícito con la jornada.</p>';
+        '<p class="bc7-muted">'+(session.es_minorista===true?'Las entregas diarias son la única declaración de efectivo de la responsable. El Dueño realiza un conteo físico independiente; ese conteo no se suma dos veces. ':'La declaración de efectivo y su conteo se muestran por separado.')+'Esta vista es de solo lectura; las transferencias históricas requieren un vínculo explícito con la jornada.</p>';
     }catch(error){
       root.querySelector('.bc7-checklist-modal-body').innerHTML='<div class="bc7-empty">'+esc(friendlyError(error,'calendar'))+' No se modificó ningún dato.</div>';
     }finally{if(button)button.disabled=false;}
