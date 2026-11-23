@@ -5,6 +5,11 @@ DECLARE
   v_state text:=pg_get_functiondef('public.bc7_estado_confirmaciones_jornada(uuid)'::regprocedure);
   v_cash text:=pg_get_functiondef('public.bc5_responsable_declarar_dinero_jornada(uuid,numeric)'::regprocedure);
   v_inventory text:=pg_get_functiondef('public.bc7_responsable_registrar_inventario_final_sellado_jornada(uuid,jsonb,text,uuid)'::regprocedure);
+  v_helper text:=pg_get_functiondef('public.bc7_validar_bloque_abierto_jornada(uuid,text,uuid)'::regprocedure);
+  v_gasto text:=pg_get_functiondef('public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)'::regprocedure);
+  v_reinversion text:=pg_get_functiondef('public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)'::regprocedure);
+  v_bajas text:=pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure);
+  v_ajuste text:=pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure);
   v_acl boolean;
 BEGIN
   IF v_confirm NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -39,6 +44,15 @@ BEGIN
     RAISE EXCEPTION 'FAIL: sealed final inventory must be assigned-worker-only, anchored to the opening product set and immutable cutoff, audited and idempotent.';
   END IF;
 
+  IF v_helper NOT LIKE '%turno_jornada_confirmaciones%'
+     OR v_helper NOT LIKE '%idempotency_key%'
+     OR v_gasto NOT LIKE '%bc7_validar_bloque_abierto_jornada%'
+     OR v_reinversion NOT LIKE '%bc7_validar_bloque_abierto_jornada%'
+     OR v_bajas NOT LIKE '%bc7_validar_bloque_abierto_jornada%'
+     OR v_ajuste NOT LIKE '%bc7_validar_bloque_abierto_jornada%' THEN
+    RAISE EXCEPTION 'FAIL: closed expense, reinvestment, Baja and merma blocks must be protected by server-side locks while exact idempotent retries remain valid.';
+  END IF;
+
   SELECT has_function_privilege('authenticated',
       'public.bc5_responsable_declarar_dinero_jornada(uuid,numeric)','EXECUTE')
      AND NOT has_function_privilege('anon',
@@ -52,6 +66,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: new responsible-only RPC grants must be limited to authenticated callers.';
   END IF;
 
-  RAISE NOTICE 'PASS responsible five-step contract: sealed completion, approval separation, date-specific cash, auditable worker declaration and final physical inventory.';
+  RAISE NOTICE 'PASS responsible five-step contract: worker completion, server-side block locks, idempotent retries, approval separation, date-specific cash, auditable declaration and final physical inventory.';
 END
 $responsible_five_step_contract$;
