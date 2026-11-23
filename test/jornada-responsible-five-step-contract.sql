@@ -137,7 +137,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: new responsible-only RPC grants must be limited to authenticated callers.';
   END IF;
 
-  -- Regression gate: daily cash is the only worker handover; Owner count remains independent.
+  -- Regression gate: daily cash is the only worker handover; Owner count remains independent and exposes its resolution.
   RAISE NOTICE 'PASS Jornada contract: five-step completion, daily-only cash handover, independent Owner cash count, non-duplicated settlement, sealed transfer attribution and legacy isolation.';
 END
 $responsible_five_step_contract$;
