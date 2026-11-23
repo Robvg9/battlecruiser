@@ -2156,11 +2156,14 @@
     const cashDescription=cashDone
       ?'Declaración final y '+cashDaily+'/'+cashExpected+' entregas diarias enviadas.'
       :(cashRegistered?'Declaración final guardada; faltan entregas diarias ('+cashDaily+'/'+cashExpected+').': 'Completa las entregas de cada día y declara el total final del período.');
-    const cashAction=!isAssigned
-      ?'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>'
-      :cashDone
-        ?'<span class="bc7-pill ok">Enviado</span>'
-        :'<button type="button" class="bc7-btn primary" data-bc7-checklist-open="declaracion_dinero">Completar paso 5</button>';
+    const ownerCashReview=detail.is_admin===true&&cashDone&&detail.declaracion_dinero?.monto_contado==null&&checks.lista_para_conteo===true;
+    const cashAction=ownerCashReview
+      ?'<button type="button" class="bc7-btn primary" data-bc7-checklist-open="declaracion_dinero">Revisar y contar efectivo</button>'
+      :!isAssigned
+        ?'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>'
+        :cashDone
+          ?'<span class="bc7-pill ok">Enviado</span>'
+          :'<button type="button" class="bc7-btn primary" data-bc7-checklist-open="declaracion_dinero">Completar paso 5</button>';
     const cashRow='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(cashDone?'✓':'5')+'</span>'+
       '<div class="bc7-checklist-copy"><b>Declaración de dinero</b><small>'+cashDescription+'</small></div>'+
