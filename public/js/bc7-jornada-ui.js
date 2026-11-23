@@ -1064,7 +1064,7 @@
     return opened;
   }
   function checklistConfirmButtonHtml(detail,key,isAssigned){
-    if(!isAssigned||String(detail?.sesion?.estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE')return '';
+    if(!isAssigned)return '';
     const done=detail?.checklist?.[key]?.completado===true;
     const label=key==='gastos'?'gastos':key==='reinversiones'?'reinversiones':'bajas';
     return '<div class="bc7-checklist-confirm"><p class="bc7-muted">'+(done?'Este bloque ya está confirmado. Si agregas otro registro, se reabrirá automáticamente.':'Cuando termines de registrar '+label+', confirma aquí que no falta nada.')+'</p><button type="button" class="bc7-btn '+(done?'':'primary')+'" data-bc7-checklist-toggle="'+key+'" data-completed="'+(done?'true':'false')+'">'+(done?'Reabrir bloque':'Sí, ya terminé de agregar '+label)+'</button></div>';
@@ -1082,8 +1082,8 @@
     const showSettlement=isRetail&&(state.admin||isAssigned);
     const acceptsPendingOps=['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(status||'').toUpperCase());
     const hasWritableTranche=status==='EN_CURSO'?!!detail.tramo_activo:true;
-    const createExpenses=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('gastos','crear');
-    const createReinvestments=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('reinversiones','crear');
+    const createExpenses=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('gastos','crear')&&detail.checklist?.gastos?.completado!==true;
+    const createReinvestments=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('reinversiones','crear')&&detail.checklist?.reinversiones?.completado!==true;
     const manageSalary=isRetail&&isOwner;
     if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments&&!manageSalary)return '';
     let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
@@ -1954,9 +1954,13 @@
       return legacyInitialFormHtml(detail);
 
     const sessionStatus=String(session.estado||'').toUpperCase();
-    const sealedFinalCapture=type==='FINAL'&&sessionStatus==='CERRADA_OPERATIVAMENTE'&&detail.is_admin===true;
+    const sealed= sessionStatus==='CERRADA_OPERATIVAMENTE';
+    const sealedResponsibleCapture=type==='FINAL'&&sealed&&detail.is_admin!==true&&detail.server_responsible_access===true;
+    const sealedAdminCapture=type==='FINAL'&&sealed&&detail.is_admin===true;
+    const sealedFinalCapture=sealedResponsibleCapture||sealedAdminCapture;
     const allowed=type==='INICIAL'?['PENDIENTE','PROGRAMADA'].includes(sessionStatus):(sessionStatus==='EN_CURSO'||sealedFinalCapture);
     if(!allowed)return '<div class="bc7-empty">El conteo '+(type==='INICIAL'?'inicial':'final')+' no se puede modificar en el estado actual ('+esc(humanStatus(session.estado))+').</div>';
+
     const allProducts=arr(detail.productos);
     const initialCutLines=arr(detail.cortes&&detail.cortes.INICIAL&&detail.cortes.INICIAL.lineas);
     const products=sealedFinalCapture
@@ -1964,6 +1968,7 @@
       :allProducts;
     if(sealedFinalCapture&&products.length!==initialCutLines.length)
       return '<div class="bc7-empty">El catálogo ya no contiene todas las familias del corte inicial. No se habilita un conteo parcial; requiere recuperación de catálogo.</div>';
+
     const opening=type==='INICIAL'?detail.apertura_previa:null;
     const openingLines=new Map(arr(opening&&opening.lineas).map(x=>[String(x.producto_id),x]));
     const openingNote=type==='INICIAL'
@@ -1979,13 +1984,17 @@
           return '<tr><td data-label="Producto">'+esc(p.nombre)+'</td><td data-label="Unidad">'+esc(p.unidad||'ud')+'</td><td data-label="Stock actual">'+esc(qty(p.stock_actual))+'</td><td data-label="Referencia anterior">'+esc(prior?qty(prior.cantidad_contada):'—')+'</td><td data-label="Conteo físico actual"><input type="number" min="0" step="0.001" inputmode="decimal" required data-bc7-count="'+esc(p.producto_id)+'" aria-label="Conteo físico de '+esc(p.nombre)+'" value="'+(prior?esc(prior.cantidad_contada):'')+'" placeholder="Contar"></td></tr>';
         }).join('')+'</tbody></table></div>')
       :empty;
-    const sealedCaptureNote=sealedFinalCapture
-      ?'<div class="bc7-note"><b>Captura histórica ADMIN · sin reabrir la Jornada</b><p>Exporta la hoja «Inventario final» de la plantilla como CSV UTF-8 y súbela aquí. Debe incluir exactamente las familias del corte inicial y las cantidades físicas al 20/11/2026 23:00, hora de Cuba. No uses el stock actual ni incluyas las transferencias del 21/11.</p></div>'
-      :'';
-    const sealedCaptureFile=sealedFinalCapture
+
+    const sealedCaptureNote=sealedResponsibleCapture
+      ?'<div class="bc7-note"><b>Tu inventario final · corte del 20/11/2026 a las 23:00</b><p>Cuenta físicamente todos los productos de esta lista desde tu cuenta de responsable. Se guarda con tu usuario y representa el corte original; no reabre la operación ni modifica el stock global.</p></div>'
+      :sealedAdminCapture
+        ?'<div class="bc7-note"><b>Captura histórica ADMIN · sin reabrir la Jornada</b><p>Exporta la hoja «Inventario final» de la plantilla como CSV UTF-8 y súbela aquí. Debe incluir exactamente las familias del corte inicial y las cantidades físicas al 20/11/2026 23:00, hora de Cuba. No uses el stock actual ni incluyas las transferencias del 21/11.</p></div>'
+        :'';
+    const sealedCaptureFile=sealedAdminCapture
       ?'<label class="bc7-field">Archivo CSV del inventario final<input type="file" accept=".csv,text/csv" data-bc7-sealed-final-file required><small class="bc7-muted">Columnas requeridas: «Producto ID» y «Final físico al corte». El nombre y SHA-256 del archivo quedarán auditados.</small></label><input type="hidden" data-bc7-count-idempotency value=""><input type="hidden" data-bc7-count-source-sha value="">'
-      :'';
-    return openingNote+sealedCaptureNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'" '+(sealedFinalCapture?'data-bc7-sealed-final-capture="true"':'')+'>'+table+sealedCaptureFile+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
+      :sealedResponsibleCapture?'<input type="hidden" data-bc7-count-idempotency value="">':'';
+    const captureAttribute=sealedAdminCapture?'data-bc7-sealed-final-capture="true"':(sealedResponsibleCapture?'data-bc7-sealed-final-capture="responsible"':'');
+    return openingNote+sealedCaptureNote+'<p class="bc7-muted">Cuenta físicamente cada producto del listado. La referencia del día anterior es solo una ayuda; el nuevo corte requiere confirmación física explícita. El stock del sistema solo sirve como comparación y no se copia como conteo físico.</p><form data-bc7-count-form="'+type+'" '+captureAttribute+'>'+table+sealedCaptureFile+'<label class="bc7-field">Observación (opcional)<input data-bc7-count-note maxlength="1000" placeholder="Incidencia o aclaración del conteo"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar y confirmar '+(type==='INICIAL'?'inventario inicial':'inventario final')+'</button></div><p class="bc7-msg" data-bc7-count-msg></p></form>';
   }
   function renderMovementRows(rows,session){
     const day=Number(session&&session.numero_dia||0);
@@ -2051,44 +2060,74 @@
     if(!['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(status||'').toUpperCase())||detail.sesion?.es_minorista!==true)return '';
     const checks=detail.checklist||{};
     const manual=[
-      {key:'gastos',label:'Gastos',question:'¿Ya pusiste todos los gastos?'},
-      {key:'reinversiones',label:'Reinversiones',question:'¿Ya pusiste todas las reinversiones?'},
-      {key:'bajas',label:'Bajas',question:'¿Ya pusiste todas las bajas?'}
+      {key:'gastos',label:'Gastos',question:'Registra todos los gastos reales de este período.'},
+      {key:'reinversiones',label:'Reinversiones',question:'Registra todas las reinversiones reales de este período.'},
+      {key:'bajas',label:'Bajas',question:'Registra todas las bajas y mermas reales de este período.'}
     ];
     const rows=manual.map((item,index)=>{
       const done=checks[item.key]?.completado===true;
-      const action=isAssigned?'<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Abrir sección</button>':'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>';
-      const description=done?'Confirmado · no tienes que registrar más en este bloque':(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'?'Puedes completar este registro tardío mientras el Turno maestro siga abierto.':item.question);
+      const action=!isAssigned
+        ?'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>'
+        :done
+          ?'<button type="button" class="bc7-btn" data-bc7-checklist-toggle="'+item.key+'" data-completed="true">Reabrir sección</button>'
+          :'<button type="button" class="bc7-btn" data-bc7-checklist-open="'+item.key+'">Completar sección</button>';
+      const description=done
+        ?'Enviado y bloqueado · no admite más registros. Administración revisa las aprobaciones por separado.'
+        :(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'?'Completa el registro tardío desde tu cuenta; luego el bloque quedará cerrado.':item.question);
       return '<div class="bc7-checklist-row '+(done?'is-done':'is-pending')+'">'+
         '<span class="bc7-checklist-mark">'+(done?'✓':String(index+1))+'</span>'+
         '<div class="bc7-checklist-copy"><b>'+esc(item.label)+'</b><small>'+description+'</small></div>'+
         action+
-        '<span class="bc7-checklist-state">'+(done?'✓ Confirmado':'Pendiente de confirmación')+'</span>'+
+        '<span class="bc7-checklist-state">'+(done?'✓ Enviado':'Pendiente')+'</span>'+
       '</div>';
     }).join('');
+
     const finalDone=checks.inventario_final?.completado===true;
     const sealed=String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE';
-    const finalLocked=sealed&&!finalDone;
-    const adminSealedCapture=finalLocked&&detail.is_admin===true;
-    const finalDescription=finalDone?'Conteo físico final confirmado':(adminSealedCapture?'ADMIN puede cargar el CSV del conteo físico correspondiente al corte inmutable; el Turno maestro debe seguir abierto.':(finalLocked?'Bloqueado tras el sello · requiere registro administrativo auditado':'¿Ya pusiste el inventario final?'));
+    const sealedWorkerCapture=sealed&&detail.is_admin!==true&&detail.server_responsible_access===true;
+    const sealedAdminCapture=sealed&&detail.is_admin===true;
+    const finalAllowed=!sealed||sealedWorkerCapture||sealedAdminCapture;
+    const finalDescription=finalDone
+      ?'Conteo físico final registrado y auditado.'
+      :(sealedWorkerCapture?'Regístralo tú desde esta PWA. El conteo corresponde al corte operativo original.':(sealedAdminCapture?'ADMIN puede registrar el conteo histórico si la responsable no puede hacerlo.':'Cuenta físicamente todos los productos antes de terminar.'));
+    const finalAction=!finalAllowed||(!isAssigned&&!detail.is_admin)
+      ?'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>'
+      :finalDone
+        ?'<button type="button" class="bc7-btn" data-bc7-checklist-inventory>Ver conteo</button>'
+        :'<button type="button" class="bc7-btn primary" data-bc7-checklist-open="inventario_final">'+(sealedAdminCapture?'Cargar conteo ADMIN':'Registrar inventario final')+'</button>';
     const finalRow='<div class="bc7-checklist-row '+(finalDone?'is-done':'is-pending')+'">'+
       '<span class="bc7-checklist-mark">'+(finalDone?'✓':'4')+'</span>'+
       '<div class="bc7-checklist-copy"><b>Inventario final</b><small>'+finalDescription+'</small></div>'+
-      '<button type="button" class="bc7-btn" data-bc7-checklist-open="inventario_final" '+(finalLocked&&!adminSealedCapture?'disabled':'')+'>'+(adminSealedCapture?'Cargar conteo ADMIN':'Abrir sección')+'</button>'+
-      '<button type="button" class="bc7-btn '+(finalDone?'':'primary')+'" data-bc7-checklist-inventory '+(!isAssigned||(finalLocked&&!adminSealedCapture)?'disabled':'')+'>'+(finalDone?'Ver conteo':(adminSealedCapture?'Ir a cargar CSV':(finalLocked?'Bloqueado':'Ir a ponerlo')))+'</button>'+
+      finalAction+
+      '<span class="bc7-checklist-state">'+(finalDone?'✓ Enviado':'Pendiente')+'</span>'+
     '</div>';
-    const cashDeclared=checks.declaracion_dinero?.completado===true;
-    const cashRow='<div class="bc7-checklist-row '+(cashDeclared?'is-done':'is-pending')+'">'+
-      '<span class="bc7-checklist-mark">'+(cashDeclared?'✓':'5')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Declaración de dinero</b><small>'+(cashDeclared?'Importe final guardado · pendiente de conteo físico independiente':'Falta guardar la declaración final de efectivo')+'</small></div>'+
-      '<button type="button" class="bc7-btn" data-bc7-checklist-cash>Ir a declaraciones</button>'+
-      '<span class="bc7-checklist-state">'+(cashDeclared?'✓ Registrada':'Pendiente')+'</span>'+
+
+    const cash=checks.declaracion_dinero||{};
+    const cashDone=cash.completado===true;
+    const cashRegistered=cash.declaracion_registrada===true;
+    const cashDaily=Number(cash.entregas_diarias_registradas||0);
+    const cashExpected=Number(cash.entregas_diarias_esperadas||0);
+    const cashDescription=cashDone
+      ?'Declaración final y '+cashDaily+'/'+cashExpected+' entregas diarias enviadas.'
+      :(cashRegistered?'Declaración final guardada; faltan entregas diarias ('+cashDaily+'/'+cashExpected+').': 'Completa las entregas de cada día y declara el total final del período.');
+    const cashAction=!isAssigned
+      ?'<button type="button" class="bc7-btn" disabled>Acceso pendiente</button>'
+      :cashDone
+        ?'<span class="bc7-pill ok">Enviado</span>'
+        :'<button type="button" class="bc7-btn primary" data-bc7-checklist-open="declaracion_dinero">Completar paso 5</button>';
+    const cashRow='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
+      '<span class="bc7-checklist-mark">'+(cashDone?'✓':'5')+'</span>'+
+      '<div class="bc7-checklist-copy"><b>Dinero del período</b><small>'+cashDescription+'</small></div>'+
+      cashAction+
+      '<span class="bc7-checklist-state">'+(cashDone?'✓ Enviado':'Pendiente')+'</span>'+
     '</div>';
-    return '<section class="bc7-checklist" aria-label="Checklist de cierre de la dependienta">'+
-      '<div class="bc7-checklist-head"><div><h4>Checklist de la jornada</h4><p>Completa los cinco pasos. Las entradas/transferencias las registra el Dueño y se muestran en la vista previa del cuadro.</p></div>'+
-      '<span class="bc7-checklist-count">'+(manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0)+(cashDeclared?1:0))+'/5</span></div>'+
+
+    const count=manual.filter(x=>checks[x.key]?.completado===true).length+(finalDone?1:0)+(cashDone?1:0);
+    return '<section class="bc7-checklist" aria-label="Checklist de cinco pasos de la jornada">'+
+      '<div class="bc7-checklist-head"><div><h4>Completa tu jornada · 5 pasos</h4><p>Registra y envía cada bloque desde esta cuenta. Al enviarlo, queda bloqueado para evitar altas posteriores. El Dueño aprueba los registros por separado.</p></div>'+
+      '<span class="bc7-checklist-count">'+count+'/5</span></div>'+
       rows+finalRow+cashRow+
-      '<p class="bc7-muted">Si registras un nuevo gasto, reinversión o baja después de confirmar, el sistema reabre automáticamente ese check.</p>'+
+      '<p class="bc7-muted">Las aprobaciones del Dueño no impiden que declares terminada tu captura. Si necesitas añadir algo después, reabre el bloque de forma explícita.</p>'+
     '</section>';
   }
   function calculationPhaseHtml(detail){
@@ -2365,7 +2404,7 @@
       actionArea+='<div class="bc7-note"><b>Revisión del Dueño</b><p>Abre el expediente completo de esta jornada: inventario, ventas estimadas, costos documentados, efectivo, diferencias y movimientos por validar.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" data-bc7-open-owner-review="'+esc(ownerTurnId)+'">Abrir revisión integral del turno</button></div></div>';
     }
     let adjustment='';
-    if(['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status)&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))){
+    if(['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(status)&&isAssigned&&(can('mermas','crear')||can('bajas','crear'))&&detail.checklist?.bajas?.completado!==true){
       const products=arr(detail.productos_ajuste);
       const canCreateBaja=can('bajas','crear'),canCreateMerma=can('mermas','crear');
       const adjustmentStorageType=canCreateBaja?'baja':'merma';
