@@ -2970,7 +2970,7 @@
         return;
       }
       if(checklist?.lista_para_conteo!==true){
-        msg(msgEl,'No se puede entregar todavía: la responsable debe completar gastos, reinversiones, bajas, inventario final y declaración de dinero. La jornada sigue abierta.','error');
+        msg(msgEl,'No se puede entregar todavía: la responsable debe completar gastos, reinversiones, bajas, inventario final y entregas diarias de efectivo. La jornada sigue abierta.','error');
         return;
       }
     }
