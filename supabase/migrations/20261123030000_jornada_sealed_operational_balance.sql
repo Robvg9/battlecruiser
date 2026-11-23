@@ -189,17 +189,11 @@ BEGIN
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
 
-  -- The tranche validator has already checked the exact completed tranche,
-  -- current assignee and open master Turn for a sealed Jornada.
-  IF strpos(v_definition,'SEALED_BAJA_SESSION_STATE_V1')=0 THEN
-    v_old := 'IF[[:space:]]+NOT[[:space:]]+FOUND[[:space:]]+OR[[:space:]]+v_s[.]bloque[[:space:]]*<>[[:space:]]*''JORNADA''[[:space:]]+OR[[:space:]]+v_s[.]estado[[:space:]]*<>[[:space:]]*''EN_CURSO''[[:space:]]+THEN';
-    IF v_definition !~* v_old THEN
-      RAISE EXCEPTION 'Unexpected grouped Baja session-state guard; migration stopped safely.';
-    END IF;
-    v_definition:=regexp_replace(v_definition,v_old,
-      'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado NOT IN (''EN_CURSO'',''CERRADA_OPERATIVAMENTE'') THEN' || chr(10) ||
-      '  -- SEALED_BAJA_SESSION_STATE_V1',
-      'i');
+  -- The preceding operational-close migration already widened this guard
+  -- after installing the helper that verifies the completed tranche, current
+  -- assignee and still-open master Turn. Fail closed if that prerequisite is absent.
+  IF strpos(v_definition,'CERRADA_OPERATIVAMENTE')=0 THEN
+    RAISE EXCEPTION 'The sealed-Baja master-Turn/tranche guard was not installed before the balance migration.';
   END IF;
 
   EXECUTE v_definition;
