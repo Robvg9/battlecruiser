@@ -99,6 +99,9 @@ BEGIN
     'contado_por',v_count.contado_por,
     'contado_at',v_count.contado_at,
     'observacion',v_count.observacion,
+    'resolucion',v_count.resolucion,
+    'resuelto_por',v_count.resuelto_por,
+    'resuelto_at',v_count.resuelto_at,
     'puede_contar',
       v_s.estado IN ('COMPLETADA','CERRADA_OPERATIVAMENTE')
       AND coalesce((v_checklist->>'lista_para_conteo')::boolean,false)
