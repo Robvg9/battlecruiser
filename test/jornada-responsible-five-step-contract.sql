@@ -16,6 +16,7 @@ DECLARE
   v_count text:=pg_get_functiondef('public.bc7_contar_efectivo_dueno_jornada(uuid,numeric,text)'::regprocedure);
   v_read_count text:=pg_get_functiondef('public.bc7_estado_conteo_efectivo_jornada(uuid)'::regprocedure);
   v_approvals text:=pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure);
+  v_owner_review text:=pg_get_functiondef('public.bc7_obtener_revision_jornada(uuid)'::regprocedure);
   v_acl boolean;
 BEGIN
   IF v_confirm NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -61,6 +62,11 @@ BEGIN
      OR v_approvals NOT LIKE '%''entrega_diaria''::text%'
      OR v_approvals NOT LIKE '%''declaracion_jornada''::text%' THEN
     RAISE EXCEPTION 'FAIL: daily retail deliveries remain reviewable, but legacy final-declaration rows must stay out of retail approvals without being deleted.';
+  END IF;
+
+  IF v_owner_review NOT LIKE '%''es_minorista''%'
+     OR v_owner_review NOT LIKE '%a.tipo=''minorista''%' THEN
+    RAISE EXCEPTION 'FAIL: Owner review must know whether each session is retail so historical declarations can be hidden from its active cash flow.';
   END IF;
 
   IF v_transfer NOT LIKE '%CERRADA_OPERATIVAMENTE%'
