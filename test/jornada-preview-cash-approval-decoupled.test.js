@@ -30,33 +30,33 @@ test("The worker declares final cash in Step 5; the Owner counts it separately a
   assert.match(UI,/ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
   assert.match(UI,/data-bc7-final-cash-count/);
   assert.match(UI,/rpc\('bc5_contar_dinero_entregado'/);
-  assert.match(UI,/El Turno maestro permanece abierto/);
+  assert.match(UI,/el Turno maestro permanece abierto/i);
   assert.match(ADMIN,/rpc\('bc5_contar_dinero_entregado'/);
   assert.doesNotMatch(UI,/una sola acción/);
 });
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
-  assert.match(RESPONSIBLE_MIGRATION,/fecha_programada_fin/);
-  assert.match(RESPONSIBLE_MIGRATION,/BETWEEN v_session\.fecha_programada AND COALESCE\(v_session\.fecha_programada_fin,v_session\.fecha_programada\)/);
-  assert.match(RESPONSIBLE_MIGRATION,/BETWEEN v_p\.fecha AND coalesce\(v_p\.fecha_fin,v_p\.fecha\)/);
-  assert.match(RESPONSIBLE_MIGRATION,/linked\.transferencia_id = t\.id/);
+  assert.match(MIGRATION,/fecha_programada_fin/);
+  assert.match(MIGRATION,/BETWEEN v_session\.fecha_programada AND COALESCE\(v_session\.fecha_programada_fin,v_session\.fecha_programada\)/);
+  assert.match(MIGRATION,/BETWEEN v_p\.fecha AND coalesce\(v_p\.fecha_fin,v_p\.fecha\)/);
+  assert.match(MIGRATION,/linked\.transferencia_id = t\.id/);
 });
 test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable from the preview",()=>{
-  assert.match(RESPONSIBLE_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_vincular_transferencia_jornada/);
-  assert.match(RESPONSIBLE_MIGRATION,/Solo ADMIN puede atribuir una transferencia histórica/);
-  assert.match(RESPONSIBLE_MIGRATION,/El Turno maestro debe seguir ABIERTO/);
-  assert.match(RESPONSIBLE_MIGRATION,/turno_jornada_entradas_vinculadas/);
-  assert.match(RESPONSIBLE_MIGRATION,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
-  assert.match(RESPONSIBLE_MIGRATION,/aplicacion_unica',true/);
-  assert.match(RESPONSIBLE_MIGRATION,/Esta transferencia ya está vinculada a otra Jornada/);
+  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_vincular_transferencia_jornada/);
+  assert.match(MIGRATION,/Solo ADMIN puede atribuir una transferencia histórica/);
+  assert.match(MIGRATION,/El Turno maestro debe seguir ABIERTO/);
+  assert.match(MIGRATION,/turno_jornada_entradas_vinculadas/);
+  assert.match(MIGRATION,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
+  assert.match(MIGRATION,/aplicacion_unica',true/);
+  assert.match(MIGRATION,/Esta transferencia ya está vinculada a otra Jornada/);
   assert.match(UI,/data-bc7-link-transfer/);
   assert.match(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
   assert.match(UI,/No se dividirá entre días ni se aplicará a otra jornada/);
 });
 test("A rejected final declaration can be corrected without erasing the earlier amount from audit history",()=>{
-  assert.match(RESPONSIBLE_MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
-  assert.match(RESPONSIBLE_MIGRATION,/monto_anterior/);
-  assert.match(RESPONSIBLE_MIGRATION,/declaracion_responsable_previa_conservada/);
-  assert.match(RESPONSIBLE_MIGRATION,/monto_contado IS NOT NULL/);
+  assert.match(MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
+  assert.match(MIGRATION,/monto_anterior/);
+  assert.match(MIGRATION,/declaracion_responsable_previa_conservada/);
+  assert.match(MIGRATION,/monto_contado IS NOT NULL/);
 });
 test("Workbook preview is read-only and includes movements, adjustments, finance and cash",()=>{
   const start=UI.indexOf("async function openJornadaPreview");
