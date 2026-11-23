@@ -634,7 +634,7 @@ BEGIN
 
   SELECT pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install Merma/Baja checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('bajas')||');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('bajas')||',p_idempotency_key);','i');
   EXECUTE v_def;
 END;
 $patch_operational_block_write_locks$;
