@@ -383,11 +383,11 @@ function applySql(file) {
     applySql("test/jornada-persistent-historical-values-contract.sql");
     applySql("supabase/migrations/20261119193000_jornada_price_change_optional_cost.sql");
     applySql("test/jornada-price-changes-contract.sql");
+    log("\\r\\n=== Apply post-close operational attribution in migration timestamp order ===");
+    applySql("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
     log("\\r\\n=== Apply atomic future Jornada period movement and verify its PostgreSQL 17 contract ===");
     applySql("supabase/migrations/20261122031500_jornada_period_rescheduling_atomic.sql");
     applySql("supabase/migrations/20261122034600_jornada_period_rescheduling_fk_index.sql");
-    log("\\r\\n=== Apply post-close operational attribution and sealed-Baja balance regression ===");
-    applySql("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
     applySql("supabase/migrations/20261123030000_jornada_sealed_operational_balance.sql");
     applySql("test/jornada-sealed-baja-balance-contract.sql");
     applySql("test/jornada-period-reprogramming-contract.sql");
