@@ -1284,7 +1284,7 @@
       }
     }
     if(options.requireComplete&&missing.length){
-      msg(message,''Faltan importes de estos días: '+missing.join(', ')+'. Indica la declaración final del período y escribe 0 CUP cuando un día no tuvo entrega.','error');return false;
+      msg(message,'Faltan importes de estos días: '+missing.join(', ')+'. Indica la declaración final del período y escribe 0 CUP cuando un día no tuvo entrega.','error');return false;
     }
     if(!operations.length){
       const alreadyDone=detail.checklist?.declaracion_dinero?.completado===true;
