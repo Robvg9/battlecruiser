@@ -244,6 +244,33 @@ BEGIN
 END;
 $patch_sealed_liquidation_end$;
 
+-- Production applied the historical migration before its later repository edit.
+-- Its LIVE function therefore has the sealed ADMIN branch but still chooses the
+-- latest completed tranche, and has no V1 marker. Normalize that exact shape so
+-- the V2 block below can add locks and require the immutable operational cutoff.
+DO $patch_live_sealed_owner_checklist_shape$
+DECLARE
+  v_def text;
+  v_old text := $old$    SELECT * INTO v_tramo FROM public.turno_tramos WHERE turno_sesion_id=v_s.id AND estado='COMPLETADO' ORDER BY fin_at DESC NULLS LAST LIMIT 1;$old$;
+  v_new text := $new$    SELECT * INTO v_tramo FROM public.turno_tramos WHERE turno_sesion_id=v_s.id AND estado='COMPLETADO' AND fin_at=v_s.corte_operativo_at ORDER BY fin_at DESC NULLS LAST LIMIT 1;
+    -- BC7_SEALED_OWNER_BLOCK_GATE_V1$new$;
+BEGIN
+  SELECT pg_get_functiondef(
+    'public.bc7_confirmar_bloque_jornada(uuid,text,boolean)'::regprocedure
+  ) INTO v_def;
+
+  IF position('BC7_SEALED_OWNER_BLOCK_GATE_V1' IN v_def)=0
+     AND position('CERRADA_OPERATIVAMENTE' IN v_def)>0
+     AND position(v_old IN v_def)>0 THEN
+    IF length(v_def)-length(replace(v_def,v_old,''))<>length(v_old) THEN
+      RAISE EXCEPTION 'Unexpected duplicate sealed-checklist tranche lookup; refusing ambiguous migration.';
+    END IF;
+    v_def:=replace(v_def,v_old,v_new);
+    EXECUTE v_def;
+  END IF;
+END;
+$patch_live_sealed_owner_checklist_shape$;
+
 DO $patch_owner_checklist$
 DECLARE
   v_def text;
