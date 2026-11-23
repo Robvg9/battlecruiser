@@ -3114,9 +3114,8 @@
       if(key==='declaracion_dinero'){
         const cashForm=root.querySelector('[data-bc7-close-form]');
         if(!cashForm){setStatus('No se encontró el formulario de dinero del período. No se envió nada.','error');return;}
-        button.disabled=true;
         const saved=await saveCashDaysWorkspace(cashForm,{requireComplete:true,skipConfirm:true,button});
-        if(!saved){button.disabled=false;return;}
+        if(!saved)return;
         setStatus('Paso 5 enviado y confirmado: entregas diarias y declaración final registradas.','ok');
         return;
       }
