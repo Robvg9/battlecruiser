@@ -398,6 +398,9 @@ function applySql(file) {
     log("\\r\\n=== Apply and verify assigned-worker five-step sealed Jornada completion ===");
     applySql("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
+    log("\\r\\n=== Apply daily-only Step 5 cash and sealed historical transfer attribution ===");
+    applySql("supabase/migrations/20261123210000_jornada_cash_per_day_and_transfer_attribution.sql");
+    applySql("test/jornada-cash-per-day-transfer-sealed-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
     log("\\r\\n=== Verify sealed Jornada late-Baja functional behavior (saldo, retry, reservations and master-Turn gate) ===");
     applySql("test/jornada-sealed-baja-balance-functional.sql");
