@@ -101,7 +101,7 @@ test("daily Step 5 saves each date idempotently and verifies server readback wit
   assert.match(block, /Conservé las claves para evitar duplicados/);
   assert.doesNotMatch(block, /saveCashDeclaration|finalOperation|declaración final/);
   assert.ok(block.indexOf("missingRows.length") < block.indexOf("Paso 5 confirmado"));
-  assert.match(block, /entregas diarias guardadas y confirmadas por el servidor/);
+  assert.match(block, /Entregas diarias guardadas y confirmadas por el servidor/);
 });
 
 test("closing requires all daily dates and does not create a worker final declaration", () => {
