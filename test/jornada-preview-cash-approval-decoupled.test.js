@@ -5,8 +5,8 @@ const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
-const MIGRATION=read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
-const FIX=read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
+const MIGRATION=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
+const FIX=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
 const UI=read("public/js/bc7-jornada-ui.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const APP=read("public/app.js");
@@ -17,24 +17,22 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
   assert.match(MIGRATION,/v_cash_declared boolean/);
   assert.match(MIGRATION,/v_lista_conteo:=v_gastos AND v_reinversiones AND v_bajas AND v_final AND v_cash_declared/);
   assert.match(MIGRATION,/'declaracion_dinero',jsonb_build_object\('completado',v_cash_declared/);
-  assert.match(UI,/data-bc7-checklist-cash/);
-  assert.ok(UI.includes("+(cashDeclared?1:0))+'/5</span></div>'"), "the five-step progress counter includes the cash declaration");
+  assert.match(UI,/data-bc7-checklist-open="declaracion_dinero"/);
+  assert.match(UI,/cashDone\?1:0/,"the five-step progress counter includes the cash declaration");
   assert.match(UI,/Declaración de dinero/);
 });
 
-test("Final declaration and physical cash count are one Owner action in Centro de Control",()=>{
-  assert.ok(FIX.includes("bc5_contar_dinero_entregado"));
-  assert.ok(FIX.includes("La declaración final debe confirmarse con el conteo físico en una sola acción."));
-  assert.ok(FIX.includes("NOT IN ('PENDIENTE','ESPERANDO_APROBACION','DECLARACION_APROBADA')"));
-  assert.ok(ADMIN.includes("Confirmar conteo físico"));
-  assert.ok(ADMIN.includes("rpc('bc5_contar_dinero_entregado'"));
-  assert.ok(ADMIN.includes("rpc('bc7_resolver_declaracion_jornada'"),"rejection remains available to request correction");
-  assert.ok(!ADMIN.includes("Aprobar declaración"));
-  assert.ok(ADMIN.includes("Registra aquí el efectivo contado físicamente"));
-  assert.ok(MIGRATION.includes("IF v_s.estado<>'COMPLETADA' THEN"),"physical count remains blocked until handover");
-  assert.ok(MIGRATION.includes("lista_para_conteo"),"the employee checklist remains required");
+test("The worker declares final cash in Step 5; the Owner counts it separately after handover",()=>{
+  assert.match(MIGRATION,/bc5_responsable_declarar_dinero_jornada/);
+  assert.match(MIGRATION,/DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION/);
+  assert.match(MIGRATION,/lista_para_conteo/);
+  assert.match(UI,/ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
+  assert.match(UI,/data-bc7-final-cash-count/);
+  assert.match(UI,/rpc\('bc5_contar_dinero_entregado'/);
+  assert.match(UI,/El Turno maestro permanece abierto/);
+  assert.match(ADMIN,/rpc\('bc5_contar_dinero_entregado'/);
+  assert.doesNotMatch(UI,/una sola acción/);
 });
-
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
   assert.match(MIGRATION,/fecha_programada_fin/);
   assert.match(MIGRATION,/BETWEEN v_session\.fecha_programada AND COALESCE\(v_session\.fecha_programada_fin,v_session\.fecha_programada\)/);
@@ -53,13 +51,12 @@ test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable fr
   assert.match(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
   assert.match(UI,/No se dividirá entre días ni se aplicará a otra jornada/);
 });
-test("A rejected declaration can be corrected without erasing the prior value from audit history",()=>{
-  assert.match(MIGRATION,/DINERO_REDECLARADO/);
-  assert.match(MIGRATION,/monto_anterior',v_old_amount/);
-  assert.match(MIGRATION,/monto_nuevo',p_monto/);
-  assert.match(UI,/String\(declaration\.estado_aprobacion\|\|''\)\.toUpperCase\(\)!=='RECHAZADA'/);
+test("A rejected final declaration can be corrected without erasing the earlier amount from audit history",()=>{
+  assert.match(MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
+  assert.match(MIGRATION,/monto_anterior/);
+  assert.match(MIGRATION,/declaracion_responsable_previa_conservada/);
+  assert.match(MIGRATION,/monto_contado IS NOT NULL/);
 });
-
 test("Workbook preview is read-only and includes movements, adjustments, finance and cash",()=>{
   const start=UI.indexOf("async function openJornadaPreview");
   const end=UI.indexOf("function renderWorkspace(detail)",start);
