@@ -1298,6 +1298,7 @@
       if(options.requireComplete){
         const ok=await openWorkspace(sessionId);
         if(!ok)throw new Error('Los registros se enviaron, pero no se pudo volver a leer el checklist.');
+        if(state.detail)await ensureWorkspaceOperationData(state.detail);
         if(state.detail?.checklist?.declaracion_dinero?.completado!==true){
           throw new Error('El servidor recibió los datos, pero el paso 5 aún no cumple todos sus requisitos. Actualiza y revisa las fechas.');
         }
