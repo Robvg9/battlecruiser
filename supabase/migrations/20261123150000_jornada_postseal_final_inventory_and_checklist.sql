@@ -169,15 +169,6 @@ BEGIN
       USING ERRCODE='23514';
   END IF;
 
-  SELECT * INTO v_turno
-  FROM public.turnos
-  WHERE id=v_s.turno_id
-  FOR UPDATE;
-  IF NOT FOUND OR v_turno.estado IS DISTINCT FROM 'ABIERTO' THEN
-    RAISE EXCEPTION 'El Turno maestro debe continuar abierto para recibir el inventario final histórico.'
-      USING ERRCODE='23514';
-  END IF;
-
   SELECT * INTO v_p
   FROM public.turno_jornada_programacion
   WHERE id=v_s.jornada_programacion_id
@@ -243,6 +234,18 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'Ya existe un inventario final para esta Jornada. No se sobrescribirá; requiere una rectificación auditada.'
       USING ERRCODE='23505';
+  END IF;
+
+  -- A byte-for-byte retry returns the already committed cut even if the master
+  -- Turn was closed after the first successful request. New writes still need
+  -- the locked OPEN Turn below.
+  SELECT * INTO v_turno
+  FROM public.turnos
+  WHERE id=v_s.turno_id
+  FOR UPDATE;
+  IF NOT FOUND OR v_turno.estado IS DISTINCT FROM 'ABIERTO' THEN
+    RAISE EXCEPTION 'El Turno maestro debe continuar abierto para recibir el inventario final histórico.'
+      USING ERRCODE='23514';
   END IF;
 
   PERFORM set_config('bc7.postseal_inventory_session',v_s.id::text,true);
