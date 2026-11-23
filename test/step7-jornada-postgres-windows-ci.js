@@ -390,6 +390,10 @@ function applySql(file) {
     applySql("supabase/migrations/20261122034600_jornada_period_rescheduling_fk_index.sql");
     applySql("supabase/migrations/20261123030000_jornada_sealed_operational_balance.sql");
     applySql("test/jornada-sealed-baja-balance-contract.sql");
+    log("\\r\\n=== Apply audited ADMIN capture of the historical final inventory after operational seal ===");
+    applySql("supabase/migrations/20261123150600_jornada_sealed_final_inventory_admin_capture.sql");
+    applySql("test/jornada-sealed-final-inventory-admin-contract.sql");
+    applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
     log("\\r\\n=== Verify sealed Jornada late-Baja functional behavior (saldo, retry, reservations and master-Turn gate) ===");
     applySql("test/jornada-sealed-baja-balance-functional.sql");
     applySql("test/jornada-period-reprogramming-contract.sql");
