@@ -58,6 +58,15 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the Owner count must be stored and read in its own protected table.';
   END IF;
 
+  IF to_regclass('public.turno_diferencias') IS NULL
+     OR v_count NOT LIKE '%turno_diferencias%'
+     OR v_count NOT LIKE '%diferencia_id%'
+     OR v_read_count NOT LIKE '%resolucion%'
+     OR pg_get_functiondef('public.bc7_listar_diferencias_conteo_efectivo_jornada()'::regprocedure) NOT LIKE '%CON_DIFERENCIA%'
+     OR pg_get_functiondef('public.bc_aprobar_diferencia(uuid,text)'::regprocedure) NOT LIKE '%APROBADA_CON_DIFERENCIA%' THEN
+    RAISE EXCEPTION 'FAIL: a mismatched Owner count must enter the Admin exception inbox and be resolvable without changing the physical count.';
+  END IF;
+
   IF v_approvals NOT LIKE '%coalesce(a.tipo,'''')<>''minorista''%'
      OR v_approvals NOT LIKE '%''entrega_diaria''::text%'
      OR v_approvals NOT LIKE '%''declaracion_jornada''::text%' THEN
