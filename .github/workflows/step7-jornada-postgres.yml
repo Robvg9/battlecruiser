@@ -17,6 +17,7 @@ on:
       - 'supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql'
       - 'supabase/migrations/20261123210000_jornada_cash_per_day_and_transfer_attribution.sql'
       - 'test/jornada-cash-per-day-transfer-sealed-contract.sql'
+      - 'test/jornada-baja-checklist-continuity.test.js'
       - 'test/jornada-responsible-five-step-flow.test.js'
       - 'test/jornada-daily-cash-pwa-refresh.test.js'
       - 'test/jornada-status-transfer-modern-picker.test.js'
