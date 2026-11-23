@@ -17,8 +17,9 @@ const functional=read("test/jornada-sealed-baja-balance-functional.sql");
 test("sealed final count is exposed only with the server-verified exact tranche",()=>{
   assert.match(ui,/const postSealFinal=type==='FINAL'&&sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail\.tramo_registrable/);
   assert.match(ui,/data-bc7-count-postseal="true"/);
-  assert.match(ui,/data-bc7-count-source/);
-  assert.match(ui,/data-bc7-count-source-hash/);
+  assert.match(ui,/data-bc7-count-source-file/);
+  assert.match(ui,/window\.crypto\?\.subtle/);
+  assert.match(ui,/SHA-256/);
   assert.match(ui,/No uses el stock actual/);
   assert.match(ui,/bc7_guardar_inventario_final_post_sello_jornada/);
   assert.match(ui,/bc7_guardar_inventario_jornada/);
