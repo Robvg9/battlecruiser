@@ -547,6 +547,75 @@ BEGIN
 END;
 $function$;
 
+-- Lock each operational category at the RPC boundary after the worker submits it.
+-- Reopening the checklist step is the only way to accept another late record.
+CREATE OR REPLACE FUNCTION public.bc7_validar_bloque_abierto_jornada(
+  p_turno_sesion_id uuid,
+  p_bloque text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_block text:=lower(coalesce(p_bloque,''));
+  v_done boolean:=false;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
+  END IF;
+  IF v_block NOT IN ('gastos','reinversiones','bajas') THEN
+    RAISE EXCEPTION 'El bloque operativo indicado no es válido.' USING ERRCODE='22023';
+  END IF;
+  SELECT CASE v_block
+    WHEN 'gastos' THEN c.gastos_completado
+    WHEN 'reinversiones' THEN c.reinversiones_completado
+    ELSE c.bajas_completado
+  END INTO v_done
+  FROM public.turno_jornada_confirmaciones c
+  WHERE c.turno_sesion_id=p_turno_sesion_id;
+  IF coalesce(v_done,false) THEN
+    RAISE EXCEPTION 'Ya enviaste este bloque. Reábrelo desde el checklist antes de registrar otro elemento.' USING ERRCODE='23514';
+  END IF;
+END;
+$function$;
+
+-- Add the block lock after the existing server-side worker/session validation.
+DO $patch_operational_block_write_locks$
+DECLARE
+  v_def text;
+  v_pattern text:='v_t[[:space:]]*:=[[:space:]]*public[.]bc7_validar_tramo_responsable_jornada[[:space:]]*[(]p_turno_sesion_id[)][[:space:]]*;';
+  v_replacement text;
+BEGIN
+  v_replacement:=$replace$\&$replace$||chr(10)||
+    '  PERFORM public.bc7_validar_bloque_abierto_jornada(p_turno_sesion_id,';
+  SELECT pg_get_functiondef('public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)'::regprocedure) INTO v_def;
+  IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install expenses checklist write lock.'; END IF;
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''gastos'');','i');
+  EXECUTE v_def;
+
+  SELECT pg_get_functiondef('public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)'::regprocedure) INTO v_def;
+  IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install reinvestment checklist write lock.'; END IF;
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''reinversiones'');','i');
+  EXECUTE v_def;
+
+  SELECT pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure) INTO v_def;
+  IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install Bajas checklist write lock.'; END IF;
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''bajas'');','i');
+  EXECUTE v_def;
+
+  SELECT pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure) INTO v_def;
+  IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install Merma/Baja checklist write lock.'; END IF;
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||'''bajas'');','i');
+  EXECUTE v_def;
+END;
+$patch_operational_block_write_locks$;
+
+REVOKE ALL ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text) TO authenticated;
+
 REVOKE ALL ON FUNCTION public.bc5_responsable_declarar_dinero_jornada(uuid,numeric) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.bc5_responsable_declarar_dinero_jornada(uuid,numeric) FROM anon;
 GRANT EXECUTE ON FUNCTION public.bc5_responsable_declarar_dinero_jornada(uuid,numeric) TO authenticated;
