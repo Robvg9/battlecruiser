@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.54 — checklist de cinco pasos y captura responsable de jornada sellada.
+// v7.55 — paso 5 diario, conteo físico independiente y jornada sellada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
