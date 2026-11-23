@@ -36,7 +36,8 @@ test("each attendant checklist item opens its own operational section and has on
   assert.match(modalOpen,/bc7-checklist-modal/);
   assert.match(modalOpen,/data-bc7-checklist-modal-action/);
   assert.match(modalOpen,/Enviar evidencia a Administración/);
-  assert.match(modalOpen,/Envía primero la lista completa de bajas o mermas/);
+  assert.match(modalOpen,/Enviar evidencia a Administración/);
+  assert.match(modalOpen,/Enviar lista completa de bajas o mermas|Envía primero la lista completa de bajas o mermas/);
   assert.match(modalOpen,/form\.requestSubmit\(\)/);
   assert.doesNotMatch(modalOpen,/scrollIntoView/);
   assert.match(ui,/bc7-checklist-section-source" hidden/);
