@@ -4,6 +4,7 @@ DECLARE
   v_balance text := pg_get_functiondef('public.bc7_jornada_saldos_operativos(uuid)'::regprocedure);
   v_catalog text := pg_get_functiondef('public.bc7_productos_ajuste_jornada(uuid)'::regprocedure);
   v_baja text := pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure);
+  v_tranche_guard text := pg_get_functiondef('public.bc7_validar_tramo_responsable_jornada(uuid)'::regprocedure);
 BEGIN
   IF v_balance NOT LIKE '%CERRADA_OPERATIVAMENTE%'
      OR v_balance NOT LIKE '%corte_operativo_at%'
@@ -20,8 +21,15 @@ BEGIN
 
   IF v_baja NOT LIKE '%saldo AS MATERIALIZED%'
      OR v_baja NOT LIKE '%reservado AS MATERIALIZED%'
-     OR v_baja NOT LIKE '%v_group.stock_disponible%' THEN
-    RAISE EXCEPTION 'FAIL: grouped Baja does not materialize one operational balance and pending reservations.';
+     OR v_baja NOT LIKE '%v_group.stock_disponible%'
+     OR v_baja NOT LIKE '%CERRADA_OPERATIVAMENTE%' THEN
+    RAISE EXCEPTION 'FAIL: grouped Baja does not materialize one balance, pending reservations and sealed-session support.';
+  END IF;
+
+  IF v_tranche_guard NOT LIKE '%CERRADA_OPERATIVAMENTE%'
+     OR v_tranche_guard NOT LIKE '%fin_at=v_s.corte_operativo_at%'
+     OR v_tranche_guard NOT LIKE '%El Turno maestro ya no está abierto%' THEN
+    RAISE EXCEPTION 'FAIL: sealed late Baja is missing the exact completed-tranche or open master-Turn gate.';
   END IF;
 
   IF NOT EXISTS (
