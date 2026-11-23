@@ -95,6 +95,17 @@ test("sending a Bajas review request returns the worker to Bajas and keeps final
   assert.match(modal,/p_completado:true/);
 });
 
+test("transfer attribution never disguises server errors as schedule conflicts",()=>{
+  const start=ui.indexOf("function friendlyError(error,context){");
+  const end=ui.indexOf("function ",start+20);
+  const helper=ui.slice(start,end);
+  const transferBranch=helper.indexOf("context==='transfer'&&(code==='23514'||code==='23505')");
+  const duplicateBranch=helper.indexOf("else if(code==='23505')");
+  assert.ok(transferBranch>=0&&duplicateBranch>transferBranch,
+    "transfer-specific 23514/23505 messages must take precedence over generic schedule errors");
+  assert.match(helper,/context==='transfer'&&\(code==='23514'\|\|code==='23505'\)\) message=raw/);
+});
+
 test("sealed transfer attribution surfaces the real server rejection and keeps all safety guards",()=>{
   assert.match(ui,/bc7_vincular_transferencia_jornada/);
   assert.match(ui,/reason\.trim\(\)\.length<10/);
