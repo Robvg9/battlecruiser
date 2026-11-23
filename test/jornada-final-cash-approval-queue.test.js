@@ -115,6 +115,8 @@ test("retail approvals use daily cash rows, not a second legacy final declaratio
 
 
 test("Owner review uses the new independent physical count for retail and hides legacy final totals",()=>{
+  const APP=read("public/app.js");
+  const SW=read("public/service-worker.js");
   assert.match(OWNER_REVIEW,/const isRetail=s\.es_minorista===true/);
   assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
   assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?l\.dinero_final_contado:s\.efectivo\?\.contado/);
