@@ -67,7 +67,7 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
   assert.match(ui,/data-bc7-adjust-form/,"baja/merma form is composed in the same operation panel");
   assert.match(ui,/Hay bajas preparadas que todavía no se han enviado/,"checklist evidence cannot silently discard unsent Baja form input");
   assert.match(ui,/Confirmar que no faltan más bajas/,"the checklist action is explicit that it only confirms no more requests remain");
-  assert.match(ui,/El botón inferior solo confirma que no faltan más registros/,"the modal explains that evidence confirmation does not save incomplete Baja rows");
+  assert.match(ui,/Envía primero la lista completa de bajas o mermas/,"the modal requires a complete Bajas request before final checklist submission");
   assert.match(multiDayCashMigration,/COALESCE\(t\.dias_turno,s\.numero_dia\)::text/,"final cash declaration uses the final day of the master multi-day Turno");
   assert.match(multiDayCashMigration,/JOIN public\.turnos t ON t\.id=s\.turno_id/,"the administrative queue resolves the master Turno day count");
 
@@ -159,7 +159,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.53");
+  assert.equal(moduleVersion,"7.54");
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
   assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261116.2"));
@@ -181,10 +181,10 @@ test("Jornada handover precedes Owner cash count and automatic calculation",()=>
     assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
   }
   assert.match(ui,/Checklist de la jornada/);
-  assert.match(ui,/¿Ya pusiste todos los gastos\?/);
-  assert.match(ui,/¿Ya pusiste todas las reinversiones\?/);
-  assert.match(ui,/¿Ya pusiste todas las bajas\?/);
-  assert.match(ui,/Las entradas\/transferencias las registra el Dueño/);
+  assert.match(ui,/Registra todos los gastos reales de este período/);
+  assert.match(ui,/Registra todas las reinversiones reales de este período/);
+  assert.match(ui,/Registra todas las bajas y mermas reales de este período/);
+  assert.match(ui,/El Dueño aprueba los registros por separado/);
   assert.match(ui,/lista_para_conteo/);
   assert.match(ui,/lista_para_calcular/);
   assert.doesNotMatch(ui,/detail\.checklist\?\.lista_para_calcular!==true/);

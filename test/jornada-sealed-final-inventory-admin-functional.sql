@@ -88,6 +88,14 @@ BEGIN
     true,v_cutoff+interval '1 hour',v_cutoff,'AUTO_HORA_FIN',v_admin
   );
 
+  -- The fixture's owner account is also the assigned responsible for
+  -- this scenario; the sealed worker checklist must verify a real assignment.
+  INSERT INTO public.turno_asignaciones(
+    turno_sesion_id,turno_id,usuario_id,asignado_por,motivo
+  ) VALUES(
+    v_session,v_turn,v_admin,v_admin,'Assigned responsible for sealed checklist fixture'
+  );
+
   INSERT INTO public.turno_tramos(
     id,turno_id,turno_sesion_id,usuario_id,tipo,estado,inicio_at,fin_at
   ) VALUES(

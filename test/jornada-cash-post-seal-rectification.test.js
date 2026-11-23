@@ -46,7 +46,8 @@ test("sealed Jornada keeps date-specific cash entries separate from the final-pe
   assert.match(ui, /sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail\.tramo_registrable/);
   assert.match(ui, /bc7_registrar_entrega_diaria_jornada/);
   assert.match(ui, /bc7_admin_registrar_entrega_diaria_jornada/);
-  assert.match(ui, /Guardar entregas diarias/);
+  assert.match(ui, /data-bc7-cash-day-amount/);
+  assert.match(ui, /bc5_responsable_declarar_dinero_jornada/);
   assert.match(ui, /Dinero recogido este día \(CUP\)/);
   assert.match(ui, /Declaración final del período/);
   assert.match(ui, /data-bc7-admin-cash-declaration/);
@@ -67,15 +68,17 @@ test("closed retail Jornada keeps the five-step checklist visible while preservi
   const checklist=ui.slice(start,end);
   assert.match(checklist,/CERRADA_OPERATIVAMENTE/);
   for (const step of ["Gastos","Reinversiones","Bajas","Inventario final","Declaración de dinero"]) assert.ok(checklist.includes(step), "missing "+step);
-  assert.match(checklist,/Puedes completar este registro tardío mientras el Turno maestro siga abierto/);
-  assert.match(checklist,/Bloqueado tras el sello/);
+  assert.match(checklist,/Completa el registro tardío desde tu cuenta/);
+  assert.doesNotMatch(checklist,/Bloqueado tras el sello/);
+  assert.match(checklist,/Reabrir sección/);
 });
 
-test("Owner physical cash count stays locked until Jornada is completed", () => {
-  assert.match(ui, /if\(detail\.is_admin&&sessionState==='COMPLETADA'&&declaration\.monto_contado==null/);
-  assert.match(ui, /else if\(detail\.is_admin&&sessionState!=='COMPLETADA'\)/);
-  assert.match(ui, /El conteo físico del Dueño se habilitará cuando la jornada esté completada\./);
-  assert.doesNotMatch(ui, /if\(detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)/);
+test("Owner cash count unlocks once the responsible completes all five steps, while the master Turn remains open", () => {
+  assert.match(ui, /const ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
+  assert.match(ui, /data-bc7-final-cash-count/);
+  assert.match(ui, /bc5_contar_dinero_entregado/);
+  assert.match(ui, /El conteo físico se habilitará cuando la responsable complete los cinco pasos/);
+  assert.match(ui, /el Turno maestro permanece abierto/);
 });
 
 test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent and audited", () => {

@@ -37,8 +37,11 @@ test("sealed historic inventory upload keeps post-cutoff warehouse movements out
   assert.match(migration,/THEN v_s\.corte_operativo_at/);
 });
 
-test("Jornada UI only exposes the late final CSV capture to ADMIN and validates exact source rows",()=>{
+test("Jornada UI supports responsible physical count with audited ADMIN CSV fallback",()=>{
   assert.match(ui,/data-bc7-sealed-final-capture/);
+  assert.match(ui,/data-bc7-sealed-final-capture="responsible"/);
+  assert.match(ui,/sealedResponsibleCapture/);
+  assert.match(ui,/bc7_responsable_registrar_inventario_final_sellado_jornada/);
   assert.match(ui,/bc7_admin_registrar_inventario_final_sellado_jornada/);
   assert.match(ui,/parseSealedInventoryCsv/);
   assert.match(ui,/Producto ID/);
@@ -48,8 +51,8 @@ test("Jornada UI only exposes the late final CSV capture to ADMIN and validates 
 });
 
 test("PWA loader and offline shell request the current Jornada module",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.53"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.53/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.54"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.54/);
 });
 
 test("PostgreSQL 17 runner exercises sealed admin capture and its real database contract",()=>{

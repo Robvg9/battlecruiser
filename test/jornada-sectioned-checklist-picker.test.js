@@ -16,32 +16,32 @@ test("new multi-product Baja rows reinitialize the searchable picker after cloni
   assert.match(ui, /data-bc7-adjustment-add/);
 });
 
-test("each attendant checklist item opens its own operational section", () => {
+test("each attendant checklist item opens its own operational section and has one explicit send action", () => {
   const ui = read("public/js/bc7-jornada-ui.js");
   for (const section of ["gastos", "reinversiones", "bajas"]) assert.ok(ui.includes("key:'"+section+"'"), "missing checklist item: " + section);
   assert.ok(ui.includes("data-bc7-checklist-open=\"'+item.key+'\">"));
-  assert.match(ui, /data-bc7-checklist-open="inventario_final"/);
-  assert.match(ui, /function openChecklistSection\(key\)/);
-  assert.match(ui, /data-bc7-finance-form="gasto"/);
-  assert.match(ui, /data-bc7-finance-form="reinversion"/);
-  assert.match(ui, /data-bc7-adjust-form/);
-  assert.match(ui, /function checklistConfirmButtonHtml\(detail,key,isAssigned\)/);
-  assert.match(ui, /checklistConfirmButtonHtml\(detail,'gastos',isAssigned\)/);
-  assert.match(ui, /checklistConfirmButtonHtml\(detail,'reinversiones',isAssigned\)/);
-  assert.match(ui, /checklistConfirmButtonHtml\(detail,'bajas',isAssigned\)/);
-  assert.doesNotMatch(ui, /data-bc7-checklist-toggle="'\+item\.key\+'/);
+  assert.match(ui,/data-bc7-checklist-open="inventario_final"/);
+  assert.match(ui,/data-bc7-checklist-open="declaracion_dinero"/);
+  assert.match(ui,/function openChecklistSection\(key\)/);
+  assert.match(ui,/data-bc7-finance-form="gasto"/);
+  assert.match(ui,/data-bc7-finance-form="reinversion"/);
+  assert.match(ui,/data-bc7-adjust-form/);
+  assert.match(ui,/data-bc7-checklist-toggle/);
+  assert.doesNotMatch(ui,/checklistConfirmButtonHtml\(detail,'gastos',isAssigned\)/);
+  assert.doesNotMatch(ui,/checklistConfirmButtonHtml\(detail,'reinversiones',isAssigned\)/);
+  assert.doesNotMatch(ui,/checklistConfirmButtonHtml\(detail,'bajas',isAssigned\)/);
   const openStart=ui.indexOf("function openChecklistSection(key)");
   const openEnd=ui.indexOf("document.addEventListener('keydown'",openStart);
   const modalOpen=openStart>=0&&openEnd>openStart?ui.slice(openStart,openEnd):"";
-  assert.match(modalOpen, /bc7-checklist-modal/);
-  assert.match(modalOpen, /data-bc7-checklist-modal-action/);
-  assert.match(modalOpen, /Enviar evidencia a Administración/);
-  assert.match(modalOpen, /form\.requestSubmit\(\)/);
-  assert.doesNotMatch(modalOpen, /scrollIntoView/);
-  assert.match(ui, /bc7-checklist-section-source" hidden/);
-  assert.match(ui, /Cerrar jornada y enviar a Administración/);
+  assert.match(modalOpen,/bc7-checklist-modal/);
+  assert.match(modalOpen,/data-bc7-checklist-modal-action/);
+  assert.match(modalOpen,/Enviar evidencia a Administración/);
+  assert.match(modalOpen,/Envía primero la lista completa de bajas o mermas/);
+  assert.match(modalOpen,/form\.requestSubmit\(\)/);
+  assert.doesNotMatch(modalOpen,/scrollIntoView/);
+  assert.match(ui,/bc7-checklist-section-source" hidden/);
+  assert.match(ui,/Reabrir sección/);
 });
-
 test("final cash declaration and physical count are resolved in one Owner action", () => {
   const admin = read("public/js/aprobaciones-admin.js");
   const migration = read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
@@ -59,7 +59,7 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
-  assert.match(app, /bc7-jornada-ui\.js","7\.53"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.53/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.54"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.54/);
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
 });
