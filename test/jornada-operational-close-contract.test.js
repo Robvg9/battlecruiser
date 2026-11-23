@@ -41,7 +41,7 @@ test("Owner may later count cash and reconcile, but final approval still require
   assert.match(migration,/bc7_resolver_revision_jornada/);
   assert.match(migration,/JORNADA_CONCILIADA_POST_CIERRE_OPERATIVO/);
   assert.match(ownerReviewSource,/v_liq->>'calculable'/);
-  assert.match(migration,/La liquidación del día % no está completa\. Revisa precios, movimientos, inventario, salario y efectivo\. Detalle: %/);
+  assert.match(ownerReviewSource,/La liquidación del día % no está completa\\. Revisa precios, movimientos, inventario, salario y efectivo\\. Detalle: %/);
 });
 
 test("transfer attribution links only the destination when that warehouse is retail",()=>{
