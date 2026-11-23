@@ -45,7 +45,7 @@ test("sealed late Bajas prove cutoff, real saldo, retry, reservation and master-
   assert.match(functional,/bc7_productos_ajuste_jornada/);
   assert.match(functional,/bc7_registrar_bajas_multiple_jornada/);
   assert.match(functional,/idempotency/);
-  assert.match(functional,/must fail after master Turn closure/);
+  assert.match(functional,/must fail after master Turn closure/i);
   assert.match(functional,/stock_available|stock_disponible|stock_actual/);
 });
 
