@@ -21,7 +21,7 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
  assert.match(ui,/if\(tab==='operacion'&&state\.detail\)\{\s*ensureWorkspaceOperationData\(state\.detail\);\s*if\(state\.workspaceOperationLoaded\)\{\s*loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\);\s*\}/);
  assert.match(ui,/if\(tab==='movimientos'&&state\.detail\)loadMovements\(state\.detail\)/);
  assert.doesNotMatch(ui,/if\(tab==='finanzas'&&state\.detail\)loadFinances/);
-  assert.ok(ui.includes("const op='<div class=\"bc7-panel-stack\">'+checks+actionArea+'<div class=\"bc7-checklist-section-source\" hidden>'+fin+adjustment+(status==='CERRADA_OPERATIVAMENTE'?cashDaysManagerShellHtml(detail,isAssigned,status):'')+'</div>'+calculation"));
+  assert.ok(ui.includes("const op='<div class=\"bc7-panel-stack\">'+checks+actionArea+'<div class=\"bc7-checklist-section-source\" hidden>'+fin+adjustment+(s.es_minorista===true?cashDaysManagerShellHtml(detail,isAssigned,status):'')+'</div>'+calculation"));
  assert.match(ui,/!initial\?'open'/);
 });
 test("compact Step 7 updates app loader and offline cache",()=>{
