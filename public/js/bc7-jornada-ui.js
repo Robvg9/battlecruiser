@@ -1110,7 +1110,7 @@
         '<label class="bc7-field">Concepto<input data-bc7-expense-concept maxlength="160" required placeholder="Motivo del gasto"></label>'+
         '<label class="bc7-field">Monto<input data-bc7-expense-amount type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="0.00"></label>'+
         '<label class="bc7-field">Descripción (opcional)<input data-bc7-expense-description maxlength="1000" placeholder="Detalle o referencia"></label>'+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar gasto a aprobación</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>'+checklistConfirmButtonHtml(detail,'gastos',isAssigned)+'</details>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Enviar gasto a aprobación</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
     }
     if(createReinvestments){
       const options='<option value="">Selecciona producto</option>'+products.map(p=>'<option value="'+esc(p.producto_id)+'">'+esc(p.nombre)+' · stock '+esc(qty(p.stock_actual))+'</option>').join('');
@@ -1121,7 +1121,7 @@
         '<label class="bc7-field">Costo unitario (CUP)<input data-bc7-reinvestment-unit-cost type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="Ej. 60.00"></label></div>'+
         '<p class="bc7-muted" data-bc7-reinvestment-estimate>Total calculado: introduce la cantidad y el costo unitario.</p>'+
         '<label class="bc7-field">Proveedor (opcional)<input data-bc7-reinvestment-provider maxlength="180"></label><p class="bc7-muted">El sistema multiplica cantidad × costo unitario y envía el costo total calculado. La solicitud queda pendiente: no modifica stock ni caja hasta tu aprobación administrativa.</p>'+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form>'+checklistConfirmButtonHtml(detail,'reinversiones',isAssigned)+'</details>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit">Registrar reinversión</button></div><p class="bc7-msg" data-bc7-finance-msg></p></form></details>';
     }
     return html+'</section>';
   }
@@ -2444,7 +2444,7 @@
         '<input type="hidden" data-bc7-adjust-key value="">'+
         '<p class="bc7-muted" data-bc7-adjustment-hint>'+(canCreateBaja?'Puedes incluir varios productos; Administración recibirá un único expediente para aprobar la lista completa.':'La merma se envía como una sola solicitud y no modifica stock hasta su aprobación.')+'</p>'+
         (availableAdjustmentProducts.length?'':'<p class="bc7-msg error">El catálogo está completo, pero no hay existencias positivas para registrar una baja o merma.</p>')+
-        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!availableAdjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form>'+(canCreateBaja?checklistConfirmButtonHtml(detail,'bajas',isAssigned):'')+'</div></details>';
+        '<div class="bc7-actions"><button class="bc7-btn" type="submit" '+(!availableAdjustmentProducts.length?'disabled':'')+'>Enviar '+(canCreateBaja?'solicitud':'merma')+' a revisión</button></div><p class="bc7-msg" data-bc7-ajust-msg></p></form></div></details>';
     }
     const inv='<div class="bc7-panel-stack"><div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Inventario inicial</small><b>'+(initial?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Inventario final</small><b>'+(final?'Confirmado':'Pendiente')+'</b></div><div class="bc7-overview-item"><small>Productos</small><b>'+arr(detail.productos).length+'</b></div></div>'+sharedApprovalHtml(detail)+'<details class="bc7-detail" '+(!initial?'open':'')+'><summary><span>1 · Inventario inicial</span><small>'+(initial?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('INICIAL',detail)+'</div></details><div class="bc7-checklist-section-source" hidden><details class="bc7-detail" '+(initial&&!final?'open':'')+'><summary><span>2 · Inventario final</span><small>'+(final?'Confirmado':'Pendiente')+'</small></summary><div class="bc7-detail-body">'+countFormHtml('FINAL',detail)+'</div></details></div></div>';
     const fin=financeFormHtml(detail,isAssigned,status);
