@@ -1239,10 +1239,13 @@
     options=options||{};
     if(!form||!state.detail)return false;
     const detail=state.detail,sessionId=String(form.dataset.bc7CloseForm||detail.sesion?.id||'');
-    const message=form.querySelector('#bc7-cash-days-msg')||$('bc7-cash-days-msg');
-    const saveButton=options.button||form.querySelector('[data-bc7-save-cash-days]');
+    // Step 5 rows are mounted in the cash workspace; the final handover button
+    // lives in a separate form. Both entry points must read the same daily rows.
+    const dayRoot=document.querySelector('#bc7-cash-days-manager [data-bc7-close-form]')||form;
+    const message=dayRoot.querySelector('#bc7-cash-days-msg')||$('bc7-cash-days-msg')||form.querySelector('[data-bc7-close-msg]');
+    const saveButton=options.button||dayRoot.querySelector('[data-bc7-save-cash-days]')||form.querySelector('[data-bc7-save-cash-days]');
     const entries=arr(state.dailyCashData?.entregas);
-    const days=Array.from(form.querySelectorAll('[data-bc7-cash-day-row]'));
+    const days=Array.from(dayRoot.querySelectorAll('[data-bc7-cash-day-row]'));
     const operations=[],missing=[];
     for(const day of days){
       const date=String(day.dataset.bc7CashDate||'');
