@@ -125,8 +125,8 @@ test("Owner review uses the new independent physical count for retail and hides 
   assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
   assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?l\.dinero_final_contado:s\.efectivo\?\.contado/);
   assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
-  assert.match(APP,/jornada-owner-review\.js","1\.12"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.12/);
+  assert.match(APP,/jornada-owner-review\.js","1\.13"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.13/);
   assert.match(DAILY_ONLY,/es_minorista/);
 });
 
