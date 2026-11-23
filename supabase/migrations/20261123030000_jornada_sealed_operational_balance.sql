@@ -187,7 +187,19 @@ BEGIN
      length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
     RAISE EXCEPTION 'Unexpected grouped Baja validation loop; migration stopped safely.';
   END IF;
-  EXECUTE replace(v_definition,v_old,v_new);
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  -- The tranche validator has already checked the exact completed tranche,
+  -- current assignee and open master Turn for a sealed Jornada.
+  v_old := 'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado<>''EN_CURSO'' THEN';
+  v_new := 'IF NOT FOUND OR v_s.bloque<>''JORNADA'' OR v_s.estado NOT IN (''EN_CURSO'',''CERRADA_OPERATIVAMENTE'') THEN';
+  IF position(v_old IN v_definition)=0 OR
+     length(v_definition)-length(replace(v_definition,v_old,''))<>length(v_old) THEN
+    RAISE EXCEPTION 'Unexpected grouped Baja session-state guard; migration stopped safely.';
+  END IF;
+  v_definition:=replace(v_definition,v_old,v_new);
+
+  EXECUTE v_definition;
 END;
 $patch_bulk_baja_balance$;
 
