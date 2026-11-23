@@ -90,15 +90,15 @@ test("Owner review shows declared final cash separately from physical cash count
   const OWNER_REVIEW=read("public/js/jornada-owner-review.js");
   assert.ok(OWNER_REVIEW.includes("s.efectivo?.declarado"));
   assert.ok(OWNER_REVIEW.includes("Declaración final"));
-  assert.ok(OWNER_REVIEW.includes("No se suma al efectivo total recogido"));
+  assert.ok(OWNER_REVIEW.includes("El registro legado de declaración final no participa ni se suma"));
   assert.ok(OWNER_REVIEW.includes("Conteo físico del Dueño"));
 });
 
 test("cash exception inbox cache key is refreshed with the new UI contract",()=>{
   const APP=read("public/app.js");
   const SW=read("public/service-worker.js");
-  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.2"'));
-  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
+  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.3"'));
+  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.3"));
 });
 
 
@@ -124,4 +124,16 @@ test("Owner review uses the new independent physical count for retail and hides 
   assert.match(APP,/jornada-owner-review\.js","1\.12"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1\.12/);
   assert.match(DAILY_ONLY,/es_minorista/);
+});
+
+
+test("retail owner-count mismatches enter the existing audited Admin exception inbox",()=>{
+  const CASH_UI=read("public/js/turno-cash-handover-ui.js");
+  assert.match(DAILY_ONLY,/bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(DAILY_ONLY,/CREATE OR REPLACE FUNCTION public\\.bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(DAILY_ONLY,/APROBADA_CON_DIFERENCIA/);
+  assert.match(DAILY_ONLY,/bc_aprobar_diferencia\\(uuid,text\\)/);
+  assert.match(CASH_UI,/bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(CASH_UI,/bc_aprobar_diferencia/);
+  assert.match(CASH_UI,/legacyRows,jornadaRows/);
 });
