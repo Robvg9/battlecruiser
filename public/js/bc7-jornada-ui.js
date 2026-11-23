@@ -430,12 +430,12 @@
     else if(code==='42501'&&/permission denied for function/.test(value)) message='El servidor rechazó la llamada de jornada antes de consultar los datos. Vuelve a validar la sesión; no concedas permisos administrativos para resolverlo.';
     else if(code==='42501'||/solo admin|sin permiso|not authorized|no autorizado/.test(value)) message='Tu cuenta no tiene permiso para hacer este cambio. Pide al administrador que revise tu acceso.';
     else if(code==='55P03') message='La jornada se está abriendo o editando en este momento. No se cambió ninguna fecha; vuelve a intentarlo en unos instantes.';
+    else if(context==='transfer'&&(code==='23514'||code==='23505')) message=raw||'El servidor rechazó la atribución histórica. No se modificó la transferencia.';
     else if(code==='23505') message='Hay una jornada o asignación que se repite. Revisa las fechas y los responsables antes de volver a intentarlo.';
     else if(context==='inventory'&&code==='22023'&&/(\d+)\s+esperadas;\s*(\d+)\s+recibidas/i.test(raw)){const counts=raw.match(/(\d+)\s+esperadas;\s*(\d+)\s+recibidas/i);message='El conteo llegó incompleto: el servidor espera '+counts[1]+' productos/familias y recibió '+counts[2]+'. Actualiza la Jornada y revisa el listado antes de volver a guardar.';}
     else if(context==='inventory'&&code==='22023') message='El servidor rechazó el inventario porque faltan productos o hay líneas que no pertenecen a esta jornada. Actualiza la pantalla y revisa que estén todos los productos del listado.';
     else if(context==='inventory'&&code==='23514') message='El servidor no pudo confirmar el corte físico por el estado actual de la jornada. Actualiza la pantalla y revisa el estado del inventario.';
     else if(code==='22023'||/rango.*invalido|patron incompleto|entrada invalida|debe tener una entrada/.test(value)) message='Hay algún dato de la programación que debemos corregir. Revisa las fechas, la duración y que cada día de trabajo tenga una persona asignada.';
-    else if(context==='transfer'&&code==='23514') message=raw||'El servidor rechazó la atribución histórica por una regla de la transferencia. No se modificó la transferencia.';
     else if(context==='transfer'&&/motivo/.test(value)) message=raw;
     else if(code==='23514'||/no puede|no se puede|conflicto/.test(value)) message='La programación no cumple una regla de trabajo. Revisa los días de descanso, los responsables y las fechas repetidas.';
     else if(/offline|sin conexion|failed to fetch|network|timeout|fetch failed|load failed|cliente supabase no disponible/.test(value)) message='No se pudo conectar con el servicio. Comprueba internet y vuelve a intentarlo.';
