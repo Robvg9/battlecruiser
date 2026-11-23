@@ -63,14 +63,14 @@ BEGIN
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
 
-  v_old := $old$      AND r.fecha_revision <= v_end_at$new$;
+  v_old := $old$      AND r.fecha_revision <= v_end_at$old$;
   v_new := $new$      AND r.fecha_revision <= v_linked_end_at$new$;
   IF position(v_old IN v_definition)=0 THEN
     RAISE EXCEPTION 'Unexpected reinvestment timestamp guard; migration stopped safely.';
   END IF;
   v_definition:=replace(v_definition,v_old,v_new);
 
-  v_old := $old$      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) <= v_end_at$new$;
+  v_old := $old$      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) <= v_end_at$old$;
   v_new := $new$      AND COALESCE(m.fecha_revision, m.actualizado_en, m.creado_en) <= v_linked_end_at$new$;
   IF position(v_old IN v_definition)=0 THEN
     RAISE EXCEPTION 'Unexpected mermas timestamp guard; migration stopped safely.';
