@@ -97,8 +97,8 @@ test("Owner review shows declared final cash separately from physical cash count
 test("cash exception inbox cache key is refreshed with the new UI contract",()=>{
   const APP=read("public/app.js");
   const SW=read("public/service-worker.js");
-  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.3"'));
-  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.3"));
+  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.4"'));
+  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.4"));
 });
 
 
