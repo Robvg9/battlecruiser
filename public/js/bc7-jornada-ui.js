@@ -1127,6 +1127,7 @@
     }
     return html+'</section>';
   }
+  // Retail Jornada Step 5 is date-based: never mount a second period-total declaration.
   function cashDaysManagerShellHtml(detail,isAssigned,status){
     if(!detail||detail.sesion?.es_minorista!==true)return '';
     const sessionId=String(detail.sesion.id||'');
