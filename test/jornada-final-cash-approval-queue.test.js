@@ -132,7 +132,7 @@ test("retail owner-count mismatches enter the existing audited Admin exception i
   assert.match(DAILY_ONLY,/bc7_listar_diferencias_conteo_efectivo_jornada/);
   assert.match(DAILY_ONLY,/CREATE OR REPLACE FUNCTION public\.bc7_listar_diferencias_conteo_efectivo_jornada/);
   assert.match(DAILY_ONLY,/APROBADA_CON_DIFERENCIA/);
-  assert.match(DAILY_ONLY,/bc_aprobar_diferencia\\(uuid,text\\)/);
+  assert.match(DAILY_ONLY,/bc_aprobar_diferencia\(uuid,text\)/);
   assert.match(CASH_UI,/bc7_listar_diferencias_conteo_efectivo_jornada/);
   assert.match(CASH_UI,/bc_aprobar_diferencia/);
   assert.match(CASH_UI,/legacyRows,jornadaRows/);
