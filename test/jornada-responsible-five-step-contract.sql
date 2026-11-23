@@ -58,6 +58,13 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the Owner count must be stored and read in its own protected table.';
   END IF;
 
+  RAISE NOTICE 'Owner count diagnostics: table=%, count_table_ref=%, count_difference_id=%, read_resolution=%, list_con_diferencia=%, approve_aprobada_con_diferencia=%',
+    to_regclass('public.turno_diferencias') IS NOT NULL,
+    v_count LIKE '%turno_diferencias%',
+    v_count LIKE '%diferencia_id%',
+    v_read_count LIKE '%resolucion%',
+    pg_get_functiondef('public.bc7_listar_diferencias_conteo_efectivo_jornada()'::regprocedure) LIKE '%CON_DIFERENCIA%',
+    pg_get_functiondef('public.bc_aprobar_diferencia(uuid,text)'::regprocedure) LIKE '%APROBADA_CON_DIFERENCIA%';
   IF to_regclass('public.turno_diferencias') IS NULL
      OR v_count NOT LIKE '%turno_diferencias%'
      OR v_count NOT LIKE '%diferencia_id%'
