@@ -29,6 +29,9 @@ test("sealed final physical inventory is entered directly by the assigned worker
   assert.match(migration,/initial_line|il\.corte_id=v_initial_cut/);
   assert.match(migration,/v_s\.corte_operativo_at/);
   assert.match(migration,/stock_global_modificado',false/);
+  assert.match(migration,/bc7_validar_bloque_abierto_jornada/);
+  assert.match(migration,/quote_literal\('reinversiones'\)/);
+  assert.match(migration,/p_idempotency_key\);/);
 });
 
 test("Step 5 lives inside the checklist and requires all date deliveries plus the worker final declaration",()=>{
