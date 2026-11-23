@@ -551,7 +551,8 @@ $function$;
 -- Reopening the checklist step is the only way to accept another late record.
 CREATE OR REPLACE FUNCTION public.bc7_validar_bloque_abierto_jornada(
   p_turno_sesion_id uuid,
-  p_bloque text
+  p_bloque text,
+  p_idempotency_key uuid
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -561,6 +562,7 @@ AS $function$
 DECLARE
   v_block text:=lower(coalesce(p_bloque,''));
   v_done boolean:=false;
+  v_existing boolean:=false;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Debes iniciar sesión.' USING ERRCODE='42501';
@@ -568,6 +570,27 @@ BEGIN
   IF v_block NOT IN ('gastos','reinversiones','bajas') THEN
     RAISE EXCEPTION 'El bloque operativo indicado no es válido.' USING ERRCODE='22023';
   END IF;
+
+  -- Exact idempotent retries are allowed after submission; each underlying
+  -- RPC still validates that the retry key matches the original payload.
+  SELECT EXISTS(
+    SELECT 1 FROM public.gastos g
+    WHERE v_block='gastos' AND g.idempotency_key=p_idempotency_key AND g.creado_por=auth.uid()
+    UNION ALL
+    SELECT 1 FROM public.reinversiones r
+    WHERE v_block='reinversiones' AND r.idempotency_key=p_idempotency_key AND r.usuario_id=auth.uid()
+    UNION ALL
+    SELECT 1 FROM public.bajas_solicitudes s
+    WHERE v_block='bajas' AND s.idempotency_key=p_idempotency_key AND s.creado_por=auth.uid()
+    UNION ALL
+    SELECT 1 FROM public.bajas b
+    WHERE v_block='bajas' AND b.idempotency_key=p_idempotency_key AND b.creado_por=auth.uid()
+    UNION ALL
+    SELECT 1 FROM public.mermas m
+    WHERE v_block='bajas' AND m.idempotency_key=p_idempotency_key AND m.creado_por=auth.uid()
+  ) INTO v_existing;
+  IF v_existing THEN RETURN; END IF;
+
   SELECT CASE v_block
     WHEN 'gastos' THEN c.gastos_completado
     WHEN 'reinversiones' THEN c.reinversiones_completado
@@ -596,17 +619,17 @@ BEGIN
 
   SELECT pg_get_functiondef('public.bc7_registrar_gasto_jornada(uuid,text,numeric,text,uuid)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install expenses checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('gastos')||');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('gastos')||',p_idempotency_key);','i');
   EXECUTE v_def;
 
   SELECT pg_get_functiondef('public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install reinvestment checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('reinversiones')||');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('reinversiones')||',p_idempotency_key);','i');
   EXECUTE v_def;
 
   SELECT pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure) INTO v_def;
   IF v_def !~* v_pattern THEN RAISE EXCEPTION 'Cannot install Bajas checklist write lock.'; END IF;
-  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('bajas')||');','i');
+  v_def:=regexp_replace(v_def,v_pattern,v_replacement||quote_literal('bajas')||',p_idempotency_key);','i');
   EXECUTE v_def;
 
   SELECT pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure) INTO v_def;
@@ -616,9 +639,9 @@ BEGIN
 END;
 $patch_operational_block_write_locks$;
 
-REVOKE ALL ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text) FROM anon;
-GRANT EXECUTE ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text,uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.bc7_validar_bloque_abierto_jornada(uuid,text,uuid) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.bc5_responsable_declarar_dinero_jornada(uuid,numeric) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.bc5_responsable_declarar_dinero_jornada(uuid,numeric) FROM anon;
