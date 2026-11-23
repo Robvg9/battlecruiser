@@ -30,6 +30,7 @@ BEGIN
   IF v_cash NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
      OR v_cash NOT LIKE '%DINERO_DECLARACION_TRANSCRITA_ADMIN%'
      OR v_cash NOT LIKE '%DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION%'
+     OR v_cash NOT LIKE '%DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO%'
      OR v_cash NOT LIKE '%transcripcion_original_conservada%'
      OR v_cash NOT LIKE '%declarado_at=now()%' THEN
     RAISE EXCEPTION 'FAIL: worker cash declaration must replace an ADMIN transcription without erasing its audit trail.';
