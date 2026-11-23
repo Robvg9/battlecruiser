@@ -7,6 +7,7 @@ const root=path.join(__dirname,"..");
 const read=file=>fs.readFileSync(path.join(root,file),"utf8");
 const ui=read("public/js/bc7-jornada-ui.js");
 const migration=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
+const cashTransferMigration=read("supabase/migrations/20261123210000_jornada_cash_per_day_and_transfer_attribution.sql");
 const app=read("public/app.js");
 const sw=read("public/service-worker.js");
 
@@ -34,15 +35,20 @@ test("sealed final physical inventory is entered directly by the assigned worker
   assert.match(migration,/p_idempotency_key\);/);
 });
 
-test("Step 5 lives inside the checklist and requires all date deliveries plus the worker final declaration",()=>{
+test("Step 5 requires one daily cash amount for every date and no period-wide declaration",()=>{
   assert.match(ui,/openChecklistSection\('declaracion_dinero'\)/);
   assert.match(ui,/data-bc7-checklist-open="declaracion_dinero"/);
   assert.match(ui,/requireComplete:true/);
-  assert.match(ui,/declaracion_registrada===true/);
-  assert.match(ui,/bc5_responsable_declarar_dinero_jornada/);
-  assert.match(ui,/finalSaved=declarationMatches&&/);
-  assert.match(migration,/v_daily_registered=v_daily_expected/);
-  assert.match(migration,/DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION/);
+  const start=ui.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const end=ui.indexOf("async function saveAdminCashDeclaration",start);
+  const save=ui.slice(start,end);
+  assert.match(save,/bc7_registrar_entrega_diaria_jornada/);
+  assert.match(save,/bc7_entregas_diarias_jornada/);
+  assert.doesNotMatch(save,/saveCashDeclaration|isFinal|bc_declarar_dinero/);
+  assert.match(cashTransferMigration,/BC7_CASH_PER_DAY_STEP5_V1/);
+  assert.match(cashTransferMigration,/v_daily_registered=v_daily_expected/);
+  assert.match(cashTransferMigration,/BC7_CASH_PER_DAY_LIQUIDATION_V1/);
+  assert.match(cashTransferMigration,/BC7_TRANSFER_ALLOW_SEALED_JORNADA_V1/);
 });
 
 test("sealed step 5 is mounted only inside the checklist source container",()=>{
@@ -53,8 +59,8 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
   assert.match(ui,/const op=.*cashDaysManagerShellHtml/);
 });
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.54"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.54/);
-  assert.match(app,/9\.5\.150/);
-  assert.match(sw,/9\.5\.150/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.55"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.55/);
+  assert.match(app,/9\.5\.151/);
+  assert.match(sw,/9\.5\.151/);
 });
