@@ -1,5 +1,6 @@
--- Contract: retroactive Jornada stock and cash accounting share the effective
--- inherited-cut window, including approved reinvestments linked to an older shift.
+-- Contract: retroactive Jornadas use the inherited FINAL cut's effective close
+-- for date-windowed stock transfers, while reinvestments follow explicit session
+-- attribution so late entries linked to this Jornada are included exactly once.
 DO $$
 DECLARE
   v_function text := pg_get_functiondef(
@@ -11,7 +12,6 @@ DECLARE
   v_cash_end integer;
   v_event_block text;
   v_cash_block text;
-  v_start_block text;
 BEGIN
   IF position('WHEN v_retroactive AND v_initial.origen_corte_id IS NOT NULL' IN v_function)=0
      OR position('source_session.corte_operativo_at' IN v_function)=0
@@ -26,11 +26,11 @@ BEGIN
   END IF;
   v_event_block := substring(v_function FROM v_event_start FOR v_event_end-v_event_start);
   IF position('r.almacen_id=v_s.almacen_id' IN v_event_block)=0
+     OR position('r.turno_sesion_id=v_s.id' IN v_event_block)=0
      OR position('r.estado=''APROBADA''' IN v_event_block)=0
      OR position('r.fecha_revision IS NOT NULL' IN v_event_block)=0
-     OR position('r.creado_en>v_start_at AND r.creado_en<=v_end_at' IN v_event_block)=0
-     OR position('r.turno_sesion_id=v_s.id' IN v_event_block)>0 THEN
-    RAISE EXCEPTION 'Stock reinvestments are not included by warehouse and operational time window independently of their legacy session link.';
+     OR position('r.creado_en>v_start_at AND r.creado_en<=v_end_at' IN v_event_block)>0 THEN
+    RAISE EXCEPTION 'Stock reinvestments must include approved rows explicitly assigned to this session, including late entries, and exclude other sessions.';
   END IF;
 
   v_cash_start := position('SELECT coalesce(sum(r.total)' IN v_function);
@@ -40,12 +40,12 @@ BEGIN
   END IF;
   v_cash_block := substring(v_function FROM v_cash_start FOR v_cash_end-v_cash_start);
   IF position('r.almacen_id=v_s.almacen_id' IN v_cash_block)=0
+     OR position('r.turno_sesion_id=v_s.id' IN v_cash_block)=0
      OR position('r.estado IN (''APROBADA'',''PENDIENTE'')' IN v_cash_block)=0
-     OR position('r.creado_en>v_start_at AND r.creado_en<=v_end_at' IN v_cash_block)=0
-     OR position('r.turno_sesion_id=v_s.id' IN v_cash_block)>0 THEN
-    RAISE EXCEPTION 'Cash reinvestment totals do not share the stock operational window.';
+     OR position('r.creado_en>v_start_at AND r.creado_en<=v_end_at' IN v_cash_block)>0 THEN
+    RAISE EXCEPTION 'Cash reinvestment totals must use the same explicit session attribution as stock reinvestment movements.';
   END IF;
 
-  RAISE NOTICE 'PASS: inherited-cut start, retroactive transfer window and warehouse-scoped reinvestment stock/cash totals are aligned.';
+  RAISE NOTICE 'PASS: inherited-cut start, transfer time window, and session-attributed reinvestment stock/cash totals are aligned.';
 END;
 $$;
