@@ -12,7 +12,7 @@ DECLARE
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
   v_warehouse uuid := '10000000-0000-0000-0000-000000000001';
   v_source_warehouse uuid := '10000000-0000-0000-0000-000000000002';
-  v_product uuid := '31000000-0000-0000-0000-000000000001';
+  v_product uuid;
   v_start_at timestamptz;
   v_end_at timestamptz;
   v_result jsonb;
@@ -64,6 +64,18 @@ BEGIN
 
   IF v_start_at IS NULL OR v_end_at IS NULL THEN
     RAISE EXCEPTION 'Step 7 fixture must provide a valid confirmed Jornada window.';
+  END IF;
+
+  -- Select a product already present in this Jornada's own settlement
+  -- snapshot; the generic Step 5 Pan fixture is not necessarily part of it.
+  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
+  SELECT (line->>'producto_id')::uuid
+    INTO v_product
+  FROM jsonb_array_elements(coalesce(v_result->'lineas','[]'::jsonb)) AS lines(line)
+  LIMIT 1;
+
+  IF v_product IS NULL THEN
+    RAISE EXCEPTION 'Step 7 fixture must expose at least one product in its Jornada settlement.';
   END IF;
 
   INSERT INTO public.transferencias
