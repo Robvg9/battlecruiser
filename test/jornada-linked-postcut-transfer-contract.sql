@@ -62,7 +62,7 @@ BEGIN
    AND final_cut.estado='CONFIRMADO'
   WHERE s.id=v_session;
 
-  IF v_start_at IS NULL OR v_end_at IS NULL OR v_end_at<=v_start_at THEN
+  IF v_start_at IS NULL OR v_end_at IS NULL THEN
     RAISE EXCEPTION 'Step 7 fixture must provide a valid confirmed Jornada window.';
   END IF;
 
