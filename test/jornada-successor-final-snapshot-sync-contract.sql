@@ -92,7 +92,7 @@ BEGIN
     v_program,v_turn,v_warehouse,1,
     (now() AT TIME ZONE 'America/Havana')::date+30000,
     (now() AT TIME ZONE 'America/Havana')::date+30000,
-    false,NULL,'07:00','23:00','America/Havana',NULL,'DESCANSO',v_owner,v_owner
+    true,v_owner,'07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner
   ) ON CONFLICT(id) DO NOTHING;
 
   INSERT INTO public.turno_sesiones(
