@@ -106,6 +106,22 @@ $old$;
     AND r.turno_sesion_id=v_s.id
     AND r.estado IN ('APROBADA','PENDIENTE');
 $new$;
+  v_old_transfer_session_scope text := $old$
+    WHERE t.almacen_destino_id=v_s.almacen_id AND lower(t.estado)='completada'
+      AND t.fecha>v_start_at
+$old$;
+  v_new_transfer_session_scope text := $new$
+    WHERE t.almacen_destino_id=v_s.almacen_id AND lower(t.estado)='completada'
+      AND t.fecha>v_start_at
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.turno_jornada_entradas_lineas_vinculadas allocated_line
+        JOIN public.turno_jornada_entradas_vinculadas allocated_link
+          ON allocated_link.id=allocated_line.entrada_vinculada_id
+        WHERE allocated_line.transferencia_linea_id=tl.id
+          AND allocated_link.turno_sesion_id<>v_s.id
+      )
+$new$;
   v_old_transfer_override text := $old$
         OR EXISTS (
           SELECT 1
@@ -160,6 +176,13 @@ BEGIN
       RAISE EXCEPTION 'Could not locate cash reinvestment aggregation; refusing a partial settlement rewrite.';
     END IF;
     v_function:=replace(v_function,v_old_cash_reinvestment,v_new_cash_reinvestment);
+  END IF;
+
+  IF position(v_new_transfer_session_scope IN v_function)=0 THEN
+    IF position(v_old_transfer_session_scope IN v_function)=0 THEN
+      RAISE EXCEPTION 'Could not locate inbound transfer session scope; refusing a partial settlement rewrite.';
+    END IF;
+    v_function:=replace(v_function,v_old_transfer_session_scope,v_new_transfer_session_scope);
   END IF;
 
   IF position(v_new_transfer_override IN v_function)=0 THEN
