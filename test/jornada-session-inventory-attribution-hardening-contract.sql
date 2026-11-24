@@ -49,8 +49,7 @@ BEGIN
 
   IF position('tl.id' IN v_pending)=0
      OR position('p.hora_fin_prevista' IN v_pending)=0
-     OR position('NOT EXISTS(' || chr(10) ||
-                  '      SELECT 1' IN v_pending)=0 THEN
+     OR position('NOT EXISTS' IN v_pending)=0 THEN
     RAISE EXCEPTION 'FAIL: pending transfer review must expose line identity and use exact scheduled end boundary.';
   END IF;
 
