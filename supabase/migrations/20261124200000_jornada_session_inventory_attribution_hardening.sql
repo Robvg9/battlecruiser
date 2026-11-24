@@ -333,7 +333,7 @@ $old$;
 $new$;
   v_old_movement_from text:=$old$
     FROM movement_rows m
-$new$;
+$old$;
   v_new_movement_from text:=$new$
     FROM normalized_movement_rows m
 $new$;
