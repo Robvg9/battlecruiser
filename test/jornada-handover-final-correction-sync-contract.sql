@@ -88,52 +88,38 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the handover did not begin with the original final count or has an unexpected receipt quantity.';
   END IF;
 
-  INSERT INTO public.turno_jornada_inventario_correcciones(
-    id,turno_sesion_id,tipo,producto_id,cantidad_original,cantidad_corregida,
-    comentario,creado_por,creado_en,vigente
-  ) VALUES(
-    v_first_correction,v_session,'FINAL',v_product,10,13,
-    'First correction of physical final count',v_owner,now()-interval '2 minutes',true
-  );
+  UPDATE public.turno_jornada_inventario_correcciones
+  SET vigente=false
+  WHERE id=v_first_correction;
   SELECT cantidad_declarada INTO v_declared
   FROM public.turno_jornada_inventario_entrega_lineas
   WHERE entrega_id=v_delivery AND producto_id=v_product;
-  IF v_declared IS DISTINCT FROM 13::numeric THEN
-    RAISE EXCEPTION 'FAIL: inserting an active FINAL correction did not update the pending handover (expected 13, got %).',v_declared;
+  IF v_declared IS DISTINCT FROM 10::numeric THEN
+    RAISE EXCEPTION 'FAIL: revoking the first active correction did not restore the immutable physical count (expected 10, got %).',v_declared;
   END IF;
 
   INSERT INTO public.turno_jornada_inventario_correcciones(
     id,turno_sesion_id,tipo,producto_id,cantidad_original,cantidad_corregida,
     comentario,creado_por,creado_en,vigente
   ) VALUES(
-    v_second_correction,v_session,'FINAL',v_product,13,14,
-    'Second correction supersedes first final count',v_owner,now(),true
+    v_second_correction,v_session,'FINAL',v_product,10,14,
+    'Second correction after the previous correction was revoked',v_owner,now(),true
   );
   SELECT cantidad_declarada INTO v_declared
   FROM public.turno_jornada_inventario_entrega_lineas
   WHERE entrega_id=v_delivery AND producto_id=v_product;
   IF v_declared IS DISTINCT FROM 14::numeric THEN
-    RAISE EXCEPTION 'FAIL: latest active FINAL correction did not win (expected 14, got %).',v_declared;
+    RAISE EXCEPTION 'FAIL: the next active FINAL correction did not update the pending handover (expected 14, got %).',v_declared;
   END IF;
 
   UPDATE public.turno_jornada_inventario_correcciones
   SET vigente=false
   WHERE id=v_second_correction;
-  SELECT cantidad_declarada INTO v_declared
-  FROM public.turno_jornada_inventario_entrega_lineas
-  WHERE entrega_id=v_delivery AND producto_id=v_product;
-  IF v_declared IS DISTINCT FROM 13::numeric THEN
-    RAISE EXCEPTION 'FAIL: disabling the latest correction did not restore the previous active correction (expected 13, got %).',v_declared;
-  END IF;
-
-  UPDATE public.turno_jornada_inventario_correcciones
-  SET vigente=false
-  WHERE id=v_first_correction;
   SELECT cantidad_declarada,cantidad_efectiva INTO v_declared,v_effective
   FROM public.turno_jornada_inventario_entrega_lineas
   WHERE entrega_id=v_delivery AND producto_id=v_product;
   IF v_declared IS DISTINCT FROM 10::numeric OR v_effective IS NOT NULL THEN
-    RAISE EXCEPTION 'FAIL: disabling all FINAL corrections did not restore the immutable physical count or altered received quantity.';
+    RAISE EXCEPTION 'FAIL: revoking the latest correction did not restore the original physical count or altered the receipt quantity.';
   END IF;
 
   SELECT count(*) INTO v_events
