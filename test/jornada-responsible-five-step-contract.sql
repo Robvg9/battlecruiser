@@ -12,7 +12,8 @@ DECLARE
   v_ajuste text:=pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure);
   v_liquidacion text:=pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure);
   v_close text:=pg_get_functiondef('public.bc5_cerrar_jornada(uuid,text)'::regprocedure);
-  v_transfer text:=pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure);
+  v_transfer text:=pg_get_functiondef('public.bc7_vincular_lineas_transferencia_jornada(uuid,uuid,uuid[],text)'::regprocedure);
+  v_transfer_legacy text:=pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure);
   v_count text:=pg_get_functiondef('public.bc7_contar_efectivo_dueno_jornada(uuid,numeric,text)'::regprocedure);
   v_read_count text:=pg_get_functiondef('public.bc7_estado_conteo_efectivo_jornada(uuid)'::regprocedure);
   v_approvals text:=pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure);
@@ -97,9 +98,16 @@ BEGIN
      OR v_transfer NOT LIKE '%t.estado=''ABIERTO''%'
      OR v_transfer NOT LIKE '%v_t.fecha<=v_period_end%'
      OR v_transfer NOT LIKE '%v_t.almacen_destino_id<>v_s.almacen_id%'
-     OR v_transfer NOT LIKE '%v_existing.turno_sesion_id=v_s.id%'
-     OR v_transfer NOT LIKE '%TRANSFERENCIA_RETROACTIVA_VINCULADA%' THEN
-    RAISE EXCEPTION 'FAIL: historical transfer attribution must allow sealed sessions without removing master-turn, period, date, destination, one-link idempotency or audit guards.';
+     OR v_transfer NOT LIKE '%v_existing_count>0%'
+     OR v_transfer NOT LIKE '%v_same_session_count=cardinality%'
+     OR v_transfer NOT LIKE '%TRANSFERENCIA_LINEAS_RETROACTIVAS_VINCULADAS%'
+     OR v_transfer NOT LIKE '%tl.id=ANY(p_transferencia_linea_ids)%' THEN
+    RAISE EXCEPTION 'FAIL: historical transfer-line attribution must retain master-turn, period, date, destination, idempotency and audit guards.';
+  END IF;
+
+  IF v_transfer_legacy NOT LIKE '%RAISE EXCEPTION%'
+     OR v_transfer_legacy LIKE '%INSERT INTO public.turno_jornada_entradas_vinculadas%' THEN
+    RAISE EXCEPTION 'FAIL: legacy whole-transfer attribution must stay disabled after line-level migration.';
   END IF;
 
   IF v_cash NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
