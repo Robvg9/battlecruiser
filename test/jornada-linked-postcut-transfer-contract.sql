@@ -92,10 +92,10 @@ BEGIN
     (v_session,'97200000-0000-0000-0000-000000000005',v_owner);
 
   v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  SELECT item
+  SELECT line
     INTO v_line
-  FROM jsonb_array_elements(coalesce(v_result->'lineas','[]'::jsonb)) AS item
-  WHERE item->>'producto_id'=v_product::text
+  FROM jsonb_array_elements(coalesce(v_result->'lineas','[]'::jsonb)) AS lines(line)
+  WHERE line->>'producto_id'=v_product::text
   LIMIT 1;
 
   IF v_line IS NULL THEN
