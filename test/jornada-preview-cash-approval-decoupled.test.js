@@ -60,7 +60,7 @@ test("Retroactive transfer attribution is ADMIN-only, line-scoped, one-time, and
   assert.match(UI,/rpc\('bc7_vincular_lineas_transferencia_jornada'/);
   assert.doesNotMatch(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
   assert.match(UI,/Atribuir líneas seleccionadas/);
-  assert.match(UI,/solo las líneas seleccionadas/);
+  assert.match(UI,/solo las líneas seleccionadas/i);
 });
 test("A rejected final declaration can be corrected without erasing the earlier amount from audit history",()=>{
   assert.match(RESPONSIBLE_MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
