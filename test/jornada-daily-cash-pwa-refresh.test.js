@@ -176,7 +176,7 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.match(block,/checklist\?\.declaracion_dinero\?\.completado===true/);
   assert.match(block,/El paso 5 ya está completo y confirmado por el servidor/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
-  assert.match(block,/Faltan importes de estas fechas/);
+  assert.match(block,/Faltan entregas enviadas de estas fechas/);
 });
 
 
