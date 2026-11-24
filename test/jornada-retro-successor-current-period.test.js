@@ -49,7 +49,12 @@ test("the form inherits the previous period length and explains genuine date con
   assert.ok(ui.includes("opcion se reserva para periodos ya terminados"));
 });
 
+test("successor UI shows SQLSTATE details but keeps network failures user-friendly",()=>{
+  assert.ok(ui.includes("context==='successor'&&raw&&code&&code!=='BC_AUTH_CONTEXT_NOT_READY'"));
+  assert.ok(ui.includes("failed to fetch|network|timeout|fetch failed|load failed"));
+});
+
 test("the updated Jornada UI is invalidated in the online loader and offline shell",()=>{
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.58"]'));
-  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.58"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.59"]'));
+  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.59"));
 });

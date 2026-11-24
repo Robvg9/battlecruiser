@@ -27,7 +27,7 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
 test("compact Step 7 updates app loader and offline cache",()=>{
  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
- assert.ok(ui.includes("v7.58 — atribución de entradas retroactivas por línea y aislamiento por sesión."));
+ assert.ok(ui.includes("v7.59 — atribución de entradas retroactivas, snapshot FINAL y reconciliación de sucesoras."));
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{

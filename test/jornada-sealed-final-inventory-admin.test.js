@@ -51,8 +51,8 @@ test("Jornada UI supports responsible physical count with audited ADMIN CSV fall
 });
 
 test("PWA loader and offline shell request the current Jornada module",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.58"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.58/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.59"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.59/);
 });
 
 test("PostgreSQL 17 runner exercises sealed admin capture and its real database contract",()=>{
