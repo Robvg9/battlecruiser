@@ -10,6 +10,13 @@ DECLARE
   v_reinversion text:=pg_get_functiondef('public.bc7_registrar_reinversion_jornada(uuid,jsonb,uuid,text)'::regprocedure);
   v_bajas text:=pg_get_functiondef('public.bc7_registrar_bajas_multiple_jornada(uuid,jsonb,text,uuid)'::regprocedure);
   v_ajuste text:=pg_get_functiondef('public.bc7_registrar_ajuste_jornada(uuid,text,uuid,numeric,text,uuid)'::regprocedure);
+  v_liquidacion text:=pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure);
+  v_close text:=pg_get_functiondef('public.bc5_cerrar_jornada(uuid,text)'::regprocedure);
+  v_transfer text:=pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure);
+  v_count text:=pg_get_functiondef('public.bc7_contar_efectivo_dueno_jornada(uuid,numeric,text)'::regprocedure);
+  v_read_count text:=pg_get_functiondef('public.bc7_estado_conteo_efectivo_jornada(uuid)'::regprocedure);
+  v_approvals text:=pg_get_functiondef('public.listar_aprobaciones_admin()'::regprocedure);
+  v_owner_review text:=pg_get_functiondef('public.bc7_obtener_revision_jornada(uuid)'::regprocedure);
   v_acl boolean;
 BEGIN
   IF v_confirm NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -20,11 +27,77 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the assigned worker must be able to confirm completeness after seal, independently of Owner approvals.';
   END IF;
 
-  IF v_state NOT LIKE '%DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION%'
+  IF v_state NOT LIKE '%turno_jornada_entregas_diarias%'
      OR v_state NOT LIKE '%v_daily_registered=v_daily_expected%'
      OR v_state NOT LIKE '%declaracion_registrada%'
-     OR v_state NOT LIKE '%entregas_diarias_esperadas%' THEN
-    RAISE EXCEPTION 'FAIL: Step 5 must require a worker-authored final declaration and every date-specific cash entry.';
+     OR v_state NOT LIKE '%entregas_diarias_esperadas%'
+     OR v_state LIKE '%public.turno_declaraciones%'
+     OR v_state LIKE '%DINERO_DECLARADO%' THEN
+    RAISE EXCEPTION 'FAIL: Step 5 must be completed by exactly one daily entry for each calendar date, without a separate worker final declaration.';
+  END IF;
+
+  IF v_liquidacion NOT LIKE '%turno_jornada_conteos_caja%'
+     OR v_liquidacion NOT LIKE '%v_daily_cash%'
+     OR v_liquidacion NOT LIKE '%THEN v_final_counted ELSE NULL END%'
+     OR v_liquidacion LIKE '%v_daily_cash+v_final_counted%'
+     OR v_liquidacion NOT LIKE '%coalesce(v_p.fecha_fin,v_p.fecha)-v_p.fecha+1%' THEN
+    RAISE EXCEPTION 'FAIL: settlement must use inclusive daily dates and the Owner physical count exactly once.';
+  END IF;
+
+  IF v_close NOT LIKE '%turno_jornada_entregas_diarias%'
+     OR v_close NOT LIKE '%a.tipo=''minorista''%'
+     OR v_close NOT LIKE '%Antes de entregar la Jornada debes registrar una entrega de dinero por cada fecha%'
+     OR v_close NOT LIKE '%turno_declaraciones%' THEN
+    RAISE EXCEPTION 'FAIL: retail close must require daily entries only while legacy non-retail declaration handling remains isolated.';
+  END IF;
+
+  IF to_regclass('public.turno_jornada_conteos_caja') IS NULL
+     OR v_count NOT LIKE '%turno_jornada_conteos_caja%'
+     OR v_count NOT LIKE '%v_daily_total%'
+     OR v_read_count NOT LIKE '%turno_jornada_conteos_caja%' THEN
+    RAISE EXCEPTION 'FAIL: the Owner count must be stored and read in its own protected table.';
+  END IF;
+
+  RAISE NOTICE 'Owner count diagnostics: table=%, count_table_ref=%, count_difference_id=%, read_resolution=%, list_con_diferencia=%, approve_aprobada_con_diferencia=%',
+    to_regclass('public.turno_diferencias') IS NOT NULL,
+    v_count LIKE '%turno_diferencias%',
+    v_count LIKE '%diferencia_id%',
+    v_read_count LIKE '%resolucion%',
+    pg_get_functiondef('public.bc7_listar_diferencias_conteo_efectivo_jornada()'::regprocedure) LIKE '%CON_DIFERENCIA%',
+    pg_get_functiondef('public.bc_aprobar_diferencia(uuid,text)'::regprocedure) LIKE '%APROBADA_CON_DIFERENCIA%';
+  IF to_regclass('public.turno_jornada_conteos_caja_diferencia_id_idx') IS NULL THEN
+    RAISE EXCEPTION 'FAIL: Owner cash discrepancy FK must have a supporting index.';
+  END IF;
+
+  IF to_regclass('public.turno_diferencias') IS NULL
+     OR v_count NOT LIKE '%turno_diferencias%'
+     OR v_count NOT LIKE '%diferencia_id%'
+     OR v_read_count NOT LIKE '%resolucion%'
+     OR pg_get_functiondef('public.bc7_listar_diferencias_conteo_efectivo_jornada()'::regprocedure) NOT LIKE '%CON_DIFERENCIA%'
+     OR pg_get_functiondef('public.bc_aprobar_diferencia(uuid,text)'::regprocedure) NOT LIKE '%APROBADA_CON_DIFERENCIA%' THEN
+    RAISE EXCEPTION 'FAIL: a mismatched Owner count must enter the Admin exception inbox and be resolvable without changing the physical count.';
+  END IF;
+
+  IF v_approvals NOT LIKE '%coalesce(a.tipo,'''')<>''minorista''%'
+     OR v_approvals NOT LIKE '%''entrega_diaria''::text%'
+     OR v_approvals NOT LIKE '%''declaracion_jornada''::text%' THEN
+    RAISE EXCEPTION 'FAIL: daily retail deliveries remain reviewable, but legacy final-declaration rows must stay out of retail approvals without being deleted.';
+  END IF;
+
+  IF v_owner_review NOT LIKE '%''es_minorista''%'
+     OR v_owner_review NOT LIKE '%a.tipo=''minorista''%' THEN
+    RAISE EXCEPTION 'FAIL: Owner review must know whether each session is retail so historical declarations can be hidden from its active cash flow.';
+  END IF;
+
+  IF v_transfer NOT LIKE '%CERRADA_OPERATIVAMENTE%'
+     OR v_transfer NOT LIKE '%v_s.estado NOT IN%'
+     OR v_transfer NOT LIKE '%v_s.turno_id%'
+     OR v_transfer NOT LIKE '%t.estado=''ABIERTO''%'
+     OR v_transfer NOT LIKE '%v_t.fecha<=v_period_end%'
+     OR v_transfer NOT LIKE '%v_t.almacen_destino_id<>v_s.almacen_id%'
+     OR v_transfer NOT LIKE '%v_existing.turno_sesion_id=v_s.id%'
+     OR v_transfer NOT LIKE '%TRANSFERENCIA_RETROACTIVA_VINCULADA%' THEN
+    RAISE EXCEPTION 'FAIL: historical transfer attribution must allow sealed sessions without removing master-turn, period, date, destination, one-link idempotency or audit guards.';
   END IF;
 
   IF v_cash NOT LIKE '%bc7_validar_tramo_responsable_jornada%'
@@ -68,6 +141,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: new responsible-only RPC grants must be limited to authenticated callers.';
   END IF;
 
-  RAISE NOTICE 'PASS responsible five-step contract: worker completion, server-side block locks, idempotent retries, approval separation, date-specific cash, auditable declaration and final physical inventory.';
+  -- Regression gate: daily cash is the only worker handover; Owner count remains independent and exposes its resolution.
+  RAISE NOTICE 'PASS Jornada contract: five-step completion, daily-only cash handover, independent Owner cash count, non-duplicated settlement, sealed transfer attribution and legacy isolation.';
 END
 $responsible_five_step_contract$;

@@ -10,6 +10,7 @@ const migration = fs.readFileSync(
   path.join(__dirname, "../supabase/migrations/20261122170000_jornada_daily_cash_post_close_rectification.sql"),
   "utf8"
 );
+const cashMigration = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql"), "utf8");
 const mobileCss = fs.readFileSync(
   path.join(__dirname, "../public/bc7-jornada-inventory-mobile.css"),
   "utf8"
@@ -41,25 +42,29 @@ test("advanced monthly calendar is an isolated desktop modal, not the default Jo
   assert.match(mobileCss, /@media \(max-width: 759px\), \(hover: none\) and \(pointer: coarse\)/);
 });
 
-test("sealed Jornada keeps date-specific cash entries separate from the final-period declaration", () => {
-  assert.match(ui, /detail\.tramo_registrable\|\|detail\.tramo_activo/);
+test("sealed retail Jornada captures only the actual date-specific cash entries", () => {
+  assert.match(ui, /sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail\.tramo_registrable/);
+  assert.match(ui,/detail\.server_responsible_access===true/);
   assert.match(ui, /sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail\.tramo_registrable/);
   assert.match(ui, /bc7_registrar_entrega_diaria_jornada/);
   assert.match(ui, /bc7_admin_registrar_entrega_diaria_jornada/);
   assert.match(ui, /data-bc7-cash-day-amount/);
-  assert.match(ui, /bc5_responsable_declarar_dinero_jornada/);
   assert.match(ui, /Dinero recogido este día \(CUP\)/);
-  assert.match(ui, /Declaración final del período/);
-  assert.match(ui, /data-bc7-admin-cash-declaration/);
-  assert.match(ui, /data-bc7-rectify-cash-declaration/);
-  assert.match(ui, /data-bc7-rectify-cash-date/);
-  assert.match(ui, /data-bc7-rectify-cash-note/);
+  const start=ui.indexOf("function renderCashDaysWorkspace(detail){");
+  const end=ui.indexOf("async function loadCashDaysWorkspace(detail){",start);
+  const daily=ui.slice(start,end);
+  assert.doesNotMatch(daily,/Declaración final del período|data-bc7-admin-cash-declaration|data-bc7-rectify-cash-declaration|id="bc7-cash"/);
+  assert.match(ui, /bc7_estado_conteo_efectivo_jornada/);
+  assert.match(ui, /bc7_contar_efectivo_dueno_jornada/);
+  assert.match(ui, /data-bc7-save-cash-days/);
+  assert.match(ui,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
+  assert.match(ui,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
+  // Historical transcription/rectification RPCs remain available for audit repair,
+  // but their forms are no longer mounted in the retail Step 5 renderer.
   assert.match(ui, /async function rectifyAdminCashDeclaration/);
   assert.match(ui, /bc5_admin_rectificar_declaracion_a_entrega_diaria/);
-  assert.match(ui, /data-bc7-save-cash-days/);
-  assert.match(ui, /closest\('\[data-bc7-close-form\]'\)/);
-  assert.match(ui, /const declarationState=String\(declaration\?\.estado_aprobacion\|\|''\)\.toUpperCase\(\);/);
-  assert.match(ui, /declarationState==='RECTIFICADA'/);
+  assert.match(cashMigration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_conteos_caja/);
+  assert.match(cashMigration,/REVOKE ALL ON TABLE public\.turno_jornada_conteos_caja/);
 });
 
 test("closed retail Jornada keeps the five-step checklist visible while preserving post-seal restrictions", () => {
@@ -67,18 +72,31 @@ test("closed retail Jornada keeps the five-step checklist visible while preservi
   const end=ui.indexOf("function calculationPhaseHtml(detail){",start);
   const checklist=ui.slice(start,end);
   assert.match(checklist,/CERRADA_OPERATIVAMENTE/);
-  for (const step of ["Gastos","Reinversiones","Bajas","Inventario final","Declaración de dinero"]) assert.ok(checklist.includes(step), "missing "+step);
+  for (const step of ["Gastos","Reinversiones","Bajas","Inventario final","Entregas diarias de efectivo"]) assert.ok(checklist.includes(step), "missing "+step);
   assert.match(checklist,/Completa el registro tardío desde tu cuenta/);
   assert.doesNotMatch(checklist,/Bloqueado tras el sello/);
   assert.match(checklist,/Reabrir sección/);
 });
 
-test("Owner cash count unlocks once the responsible completes all five steps, while the master Turn remains open", () => {
-  assert.match(ui, /const ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
+test("Owner physical count is independent and cannot duplicate the daily declared sum", () => {
+  assert.match(ui, /countState\?\.puede_contar===true/);
   assert.match(ui, /data-bc7-final-cash-count/);
-  assert.match(ui, /bc5_contar_dinero_entregado/);
-  assert.match(ui, /El conteo físico se habilitará cuando la responsable complete los cinco pasos/);
-  assert.match(ui, /el Turno maestro permanece abierto/);
+  assert.match(ui, /bc7_contar_efectivo_dueno_jornada/);
+  assert.match(ui, /total_diario_aprobado/);
+  const start=ui.indexOf("async function countFinalCash(form){");
+  const end=ui.indexOf("function cashDeclarationHtml(detail){",start);
+  const block=ui.slice(start,end);
+  assert.match(block,/p_monto_contado:amount/);
+  assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
+  assert.match(cashMigration,/THEN v_final_counted ELSE NULL END/);
+  const settlementAnchor=cashMigration.indexOf("v_cash_received:=CASE");
+  const singleCashStart=cashMigration.indexOf("v_new := $new$",settlementAnchor);
+  const singleCashEnd=cashMigration.indexOf("$new$;",singleCashStart)+6;
+  const singleCashBlock=cashMigration.slice(singleCashStart,singleCashEnd);
+  assert.match(singleCashBlock,/v_final_cash_state IN \('APROBADA','APROBADA_CON_DIFERENCIA'\)/);
+  assert.match(singleCashBlock,/THEN v_final_counted ELSE NULL END/);
+  assert.doesNotMatch(singleCashBlock,/v_daily_cash\+v_final_counted/);
+  assert.match(ui, /El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos/);
 });
 
 test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent and audited", () => {

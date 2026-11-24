@@ -90,7 +90,7 @@ test("assigned staff can declare handed-over cash and close their legacy active 
   assert.match(STAFF_UI, /API\(\)\.cerrarSesion\(sesionId\)/);
   assert.match(STAFF_UI, /await load\(state\.turno\.id\);\s*renderModal\(\);/);
   assert.match(JOURNEY_UI, /Dinero entregado \(CUP\)/);
-  assert.match(JOURNEY_UI, /El conteo físico se habilitará cuando la responsable complete los cinco pasos/i);
+  assert.match(JOURNEY_UI, /El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos/i);
   assert.match(ADMIN_UI, /Dinero entregado pendiente de contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
 });
@@ -102,6 +102,8 @@ test("the separate cash panel is an exception inbox for physical-count differenc
 });
 test("the owner inbox is RPC-only and exposes count, difference and explicit review", () => {
   assert.match(ADMIN_UI, /bc5_listar_dinero_pendiente_contar/);
+  assert.match(ADMIN_UI,/bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(ADMIN_UI,/legacyRows,jornadaRows/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
   assert.match(ADMIN_UI, /bc_aprobar_diferencia/);
   assert.match(CORE, /const client = window\.supabase\.createClient/);
@@ -182,8 +184,8 @@ test("PWA release loads and precaches the dashboard and cash handover UI", () =>
   assert.ok(appVersion, "app.js must expose its release version");
   assert.ok(swVersion, "Service Worker must expose its release version");
   assert.equal(swVersion[1], appVersion[1], "app and Service Worker release versions must match");
-  assert.match(APP, /\["turno-cash-handover-ui\.js","1\.2"\]/);
-  assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.2/);
+  assert.match(APP, /\["turno-cash-handover-ui\.js","1\.4"\]/);
+  assert.match(SW, /\.\/js\/turno-cash-handover-ui\.js\?v=1\.4/);
   assert.ok(INDEX.includes("app.js?v=" + appVersion[1]));
   assert.ok(INDEX.includes("style.css?v=" + appVersion[1]));
   assert.match(PG_CI, /20261031224227_turno_cash_handover_owner_reconciliation_20261031\.sql/);

@@ -67,13 +67,19 @@ test("cash, expenses, reinvestments, adjustments and reconciliation share the sa
   assert.match(UI, /loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\)/);
 });
 
-test("retail cash entry and final-day declaration share the same operation/close form", () => {
+test("retail Step 5 renders exactly the daily date rows and no additional total field", () => {
   assert.match(UI, /data-bc7-cash-mode="daily"/);
   assert.match(UI, /cashDaysManagerShellHtml\(detail,isAssigned,status\)/);
   assert.match(UI, /function renderCashDaysWorkspace\(detail\)/);
-  assert.match(UI, /for\(let index=0;index<totalDays;index\+\+\)/);
-  assert.match(UI, /data-bc7-cash-day-amount/);
-  assert.match(UI, /id="bc7-cash"/);
+  const start=UI.indexOf("function renderCashDaysWorkspace(detail){");
+  const end=UI.indexOf("async function loadCashDaysWorkspace(detail){",start);
+  assert.ok(start>=0&&end>start);
+  const daily=UI.slice(start,end);
+  assert.match(daily, /for\(let index=0;index<totalDays;index\+\+\)/);
+  assert.match(daily, /data-bc7-cash-day-amount/);
+  assert.match(daily, /index<totalDays/);
+  assert.doesNotMatch(daily, /Math\.min\(31/);
+  assert.doesNotMatch(daily, /id="bc7-cash"|data-bc7-admin-cash-declaration|Declaración final del período/);
   assert.match(UI, /data-bc7-save-cash-days/);
   assert.match(UI, /data-bc7-close-form/);
   assert.doesNotMatch(UI, /data-bc7-open-final-cash/);
@@ -81,22 +87,24 @@ test("retail cash entry and final-day declaration share the same operation/close
   assert.doesNotMatch(UI, /submitDailyCash\(form\)/);
 });
 
-test("previous days use daily RPC with idempotency and server readback before success", () => {
+test("daily Step 5 saves each date idempotently and verifies server readback without a final total", () => {
   const start = UI.indexOf("async function saveCashDaysWorkspace(form,options){");
   const end = UI.indexOf("async function saveAdminCashDeclaration", start);
-  assert.ok(start >= 0 && end > start, "unified cash saver exists");
+  assert.ok(start >= 0 && end > start, "daily-only cash saver exists");
   const block = UI.slice(start, end);
   assert.match(block, /freshIdempotencyKey\(\)/);
   assert.match(block, /rpc\('bc7_registrar_entrega_diaria_jornada'/);
   assert.match(block, /rpc\('bc7_entregas_diarias_jornada'/);
+  assert.match(block,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
+  assert.match(block,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
   assert.match(block, /missingRows/);
   assert.match(block, /Conservé las claves para evitar duplicados/);
-  assert.match(block, /saveCashDeclaration\(form,true,true\)/);
-  assert.ok(block.indexOf("missingRows.length") < block.indexOf("Paso 5 enviado y confirmado"));
-  assert.match(block, /Importes diarios y declaración guardados y confirmados por el servidor/);
+  assert.doesNotMatch(block, /saveCashDeclaration|finalOperation|declaración final/);
+  assert.ok(block.indexOf("missingRows.length") < block.indexOf("Paso 5 confirmado"));
+  assert.match(block, /Entregas diarias guardadas y confirmadas por el servidor/);
 });
 
-test("closing requires every date and confirms the final day before closing the jornada", () => {
+test("closing requires all daily dates and does not create a worker final declaration", () => {
   const start = UI.indexOf("async function closeSession(form){");
   const end = UI.indexOf("async function submitAdjustment(form){", start);
   assert.ok(start >= 0 && end > start, "closeSession exists");
@@ -106,10 +114,9 @@ test("closing requires every date and confirms the final day before closing the 
   const cashSaveEnd=UI.indexOf("async function saveAdminCashDeclaration",cashSaveStart);
   assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
-  assert.match(cashSave,/Faltan importes de estos días/);
-  assert.match(UI, /async function saveCashDeclaration/);
-  assert.match(UI, /rpc\('bc_declarar_dinero'/);
-  assert.match(UI, /rpc\('bc5_responsable_declarar_dinero_jornada'/);
+  assert.match(cashSave,/Faltan importes de estas fechas/);
+  assert.match(block,/cashMode!=='daily'&&!saved/);
+  assert.doesNotMatch(block,/bc5_responsable_declarar_dinero_jornada/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
   assert.match(block, /No se repitió la escritura/);
@@ -143,15 +150,17 @@ test("mobile Jornada uses labelled inventory cards and stable cash/header layout
   assert.ok(CSS.includes("#app-shell.visible>.app-header #mi-cuenta-btn"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header #logout-btn"));
 });
-test("Owner can count the declared final cash only after session completion without redeclaring it", () => {
+test("Owner counts the approved daily sum independently, without adding it twice", () => {
   assert.match(UI, /data-bc7-final-cash-count/);
   assert.match(UI, /data-bc7-final-cash-amount/);
-  assert.match(UI, /rpc\('bc5_contar_dinero_entregado'/);
-  assert.match(UI, /p_declaracion_id:declarationId,p_monto_contado:amount/);
-  assert.ok(UI.includes("['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(state.detail?.sesion?.estado||'').toUpperCase())"));
-  assert.match(UI, /declaration\.monto_contado==null/);
-  assert.match(UI, /Introduce únicamente el efectivo que contaste físicamente/);
-  assert.doesNotMatch(UI, /bc5_contar_dinero_entregado\([^)]*declaration\.monto/);
+  assert.match(UI, /rpc\('bc7_estado_conteo_efectivo_jornada'/);
+  assert.match(UI, /rpc\('bc7_contar_efectivo_dueno_jornada'/);
+  assert.match(UI, /total_diario_aprobado/);
+  const start=UI.indexOf("async function countFinalCash(form){");
+  const end=UI.indexOf("function cashDeclarationHtml(detail){",start);
+  const block=UI.slice(start,end);
+  assert.match(block,/p_monto_contado:amount/);
+  assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
 });
 
 
@@ -164,5 +173,5 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.match(block,/const alreadyDone=detail\.checklist\?\.declaracion_dinero\?\.completado===true/);
   assert.match(block,/El paso 5 ya está completo y confirmado por el servidor/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
-  assert.match(block,/Faltan importes de estos días/);
+  assert.match(block,/Faltan importes de estas fechas/);
 });

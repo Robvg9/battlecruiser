@@ -15,6 +15,6 @@ test("approved closed turn review is read-only",()=>{
   assert.ok(owner.includes("reject.disabled=busy||approved"));
 });
 test("owner review module cache key is refreshed",()=>{
-  assert.ok(app.includes('["jornada-owner-review.js","1.11"]'));
-  assert.ok(sw.includes('jornada-owner-review.js?v=1.11'));
+  assert.ok(app.includes('["jornada-owner-review.js","1.13"]'));
+  assert.ok(sw.includes('jornada-owner-review.js?v=1.13'));
 });

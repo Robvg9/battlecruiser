@@ -7,9 +7,11 @@ const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const QUEUE=read("supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql");
+const DAILY_ONLY=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
 const PHASE=read("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
 const MOVEMENTS=read("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
+const OWNER_REVIEW=read("public/js/jornada-owner-review.js");
 const CSS=read("public/style.css");
 const INDEX=read("public/index.html");
 const contentHeaderOrder=/header-right[\s\S]*id="mi-cuenta-btn"[\s\S]*id="logout-btn"/.test(INDEX);
@@ -86,16 +88,56 @@ test("Separate cash panel is now only an exception inbox for counted differences
 });
 
 test("Owner review shows declared final cash separately from physical cash counted",()=>{
-  const OWNER_REVIEW=read("public/js/jornada-owner-review.js");
   assert.ok(OWNER_REVIEW.includes("s.efectivo?.declarado"));
   assert.ok(OWNER_REVIEW.includes("Declaración final"));
-  assert.ok(OWNER_REVIEW.includes("No se suma al efectivo total recogido"));
-  assert.ok(OWNER_REVIEW.includes("Conteo final de caja"));
+  assert.ok(OWNER_REVIEW.includes("if(!isRetail&&s.efectivo?.declarado!=null"));
+  assert.ok(OWNER_REVIEW.includes("Conteo físico del Dueño"));
 });
 
 test("cash exception inbox cache key is refreshed with the new UI contract",()=>{
   const APP=read("public/app.js");
   const SW=read("public/service-worker.js");
-  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.2"'));
-  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.2"));
+  assert.ok(APP.includes('"turno-cash-handover-ui.js","1.4"'));
+  assert.ok(SW.includes("turno-cash-handover-ui.js?v=1.4"));
+});
+
+
+test("retail approvals use daily cash rows, not a second legacy final declaration",()=>{
+  assert.match(DAILY_ONLY,/coalesce\(a\.tipo,''\)<>'minorista'/);
+  assert.match(DAILY_ONLY,/AND s\.estado='COMPLETADA'[\s\S]*AND coalesce\(a\.tipo,''\)<>'minorista'/,
+    "the LIVE queue variant keeps its completed-session guard while excluding retail declarations");
+  assert.match(DAILY_ONLY,/historical form without that intermediate clause/,
+    "the migration also supports the compact disposable-fixture variant");
+  assert.match(DAILY_ONLY,/listar_aprobaciones_admin\(\)/);
+  assert.match(DAILY_ONLY,/turno_jornada_conteos_caja/);
+  assert.match(DAILY_ONLY,/bc7_contar_efectivo_dueno_jornada/);
+  assert.match(DAILY_ONLY,/No se reconoce el filtro de declaración histórica/);
+  assert.match(DAILY_ONLY,/Keep legacy turno_declaraciones rows intact/);
+  assert.match(ADMIN,/x\.tipo==='entrega_diaria'/);
+  assert.match(ADMIN,/resolverOperativaDirecta\(x,'APROBAR'\)/);
+});
+
+
+test("Owner review uses the new independent physical count for retail and hides legacy final totals",()=>{
+  const APP=read("public/app.js");
+  const SW=read("public/service-worker.js");
+  assert.match(OWNER_REVIEW,/const isRetail=s\.es_minorista===true/);
+  assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
+  assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?l\.dinero_final_contado:s\.efectivo\?\.contado/);
+  assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
+  assert.match(APP,/jornada-owner-review\.js","1\.13"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.13/);
+  assert.match(DAILY_ONLY,/es_minorista/);
+});
+
+
+test("retail owner-count mismatches enter the existing audited Admin exception inbox",()=>{
+  const CASH_UI=read("public/js/turno-cash-handover-ui.js");
+  assert.match(DAILY_ONLY,/bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(DAILY_ONLY,/CREATE OR REPLACE FUNCTION public\.bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(DAILY_ONLY,/APROBADA_CON_DIFERENCIA/);
+  assert.match(DAILY_ONLY,/bc_aprobar_diferencia\(uuid,text\)/);
+  assert.match(CASH_UI,/bc7_listar_diferencias_conteo_efectivo_jornada/);
+  assert.match(CASH_UI,/bc_aprobar_diferencia/);
+  assert.match(CASH_UI,/legacyRows,jornadaRows/);
 });

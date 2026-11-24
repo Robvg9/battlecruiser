@@ -1,5 +1,6 @@
 // BattleCruiser · conciliación de dinero entregado por responsable y contado por ADMIN.
 // El backend es la fuente de verdad; este módulo solo consume RPCs autenticadas.
+// ADMIN ve aquí tanto las entregas legacy como las diferencias del conteo físico de Jornada.
 (function () {
   'use strict';
   if (window.__BC5_CASH_HANDOVER_UI__) return;
@@ -170,7 +171,11 @@
     if (state.loading || navigator.onLine === false || document.visibilityState === 'hidden') return;
     state.loading = true;
     try {
-      const rows = list(await rpc('bc5_listar_dinero_pendiente_contar'));
+      const [legacyRows,jornadaRows]=await Promise.all([
+        rpc('bc5_listar_dinero_pendiente_contar'),
+        rpc('bc7_listar_diferencias_conteo_efectivo_jornada')
+      ]);
+      const rows=list(legacyRows).concat(list(jornadaRows));
       notifyChanges(rows);
       render(rows);
     } catch (error) {
@@ -196,7 +201,7 @@
       resolveButton.disabled = true;
       try {
         await rpc('bc_aprobar_diferencia', { p_diferencia_id: differenceId, p_comentario: comment });
-        toast('Diferencia revisada y registrada. La declaración conserva el conteo original.');
+        toast('Diferencia revisada. El conteo físico original se conserva y queda conciliado con observación.');
         await refresh();
       } catch (error) {
         alert('No se pudo resolver la diferencia: ' + (error && error.message ? error.message : error));

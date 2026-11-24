@@ -7,6 +7,7 @@ const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const MIGRATION=read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
 const RESPONSIBLE_MIGRATION=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
+const DAILY_CASH_MIGRATION=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
 const FIX=read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
 const UI=read("public/js/bc7-jornada-ui.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
@@ -14,25 +15,32 @@ const APP=read("public/app.js");
 const SW=read("public/service-worker.js");
 const INDEX=read("public/index.html");
 
-test("Jornada closure checklist is five steps and includes the saved final cash declaration",()=>{
-  assert.match(RESPONSIBLE_MIGRATION,/v_cash_declared boolean/);
-  assert.match(RESPONSIBLE_MIGRATION,/v_lista_conteo:=v_gastos AND v_reinversiones AND v_bajas AND v_final AND v_cash_declared/);
-  assert.match(RESPONSIBLE_MIGRATION,/'declaracion_dinero',jsonb_build_object\(\s*'completado',v_cash_declared/);
+test("Jornada closure checklist remains five steps and Step 5 is daily-only",()=>{
+  assert.match(DAILY_CASH_MIGRATION,/v_cash_registered:=v_daily_expected>0/);
+  assert.match(DAILY_CASH_MIGRATION,/v_daily_registered=v_daily_expected/);
   assert.match(UI,/data-bc7-checklist-open="declaracion_dinero"/);
-  assert.match(UI,/cashDone\?1:0/,"the five-step progress counter includes the cash declaration");
-  assert.match(UI,/Declaración de dinero/);
+  assert.match(UI,/cashDone\?1:0/);
+  const start=UI.indexOf("function checklistHtml(detail,isAssigned,status){");
+  const end=UI.indexOf("function calculationPhaseHtml(detail){",start);
+  assert.ok(start>=0&&end>start);
+  const checklist=UI.slice(start,end);
+  assert.match(checklist,/Entregas diarias de efectivo/);
+  assert.doesNotMatch(checklist,/Declaración de dinero|total final del período/);
 });
 
-test("The worker declares final cash in Step 5; the Owner counts it separately after handover",()=>{
-  assert.match(RESPONSIBLE_MIGRATION,/bc5_responsable_declarar_dinero_jornada/);
-  assert.match(RESPONSIBLE_MIGRATION,/DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION/);
-  assert.match(RESPONSIBLE_MIGRATION,/lista_para_conteo/);
-  assert.match(UI,/ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
+test("The Owner makes an independent physical count after all daily deliveries are approved",()=>{
+  assert.match(DAILY_CASH_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_estado_conteo_efectivo_jornada/);
+  assert.match(DAILY_CASH_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_contar_efectivo_dueno_jornada/);
+  assert.match(DAILY_CASH_MIGRATION,/v_daily_total/);
   assert.match(UI,/data-bc7-final-cash-count/);
-  assert.match(UI,/rpc\('bc5_contar_dinero_entregado'/);
-  assert.match(UI,/el Turno maestro permanece abierto/i);
-  assert.match(ADMIN,/rpc\('bc5_contar_dinero_entregado'/);
-  assert.doesNotMatch(UI,/una sola acción/);
+  assert.match(UI,/rpc\('bc7_estado_conteo_efectivo_jornada'/);
+  assert.match(UI,/rpc\('bc7_contar_efectivo_dueno_jornada'/);
+  const start=UI.indexOf("async function countFinalCash(form){");
+  const end=UI.indexOf("function cashDeclarationHtml(detail){",start);
+  const block=UI.slice(start,end);
+  assert.match(block,/p_monto_contado:amount/);
+  assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
+  assert.match(block,/total_diario_aprobado/);
 });
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
   assert.match(MIGRATION,/fecha_programada_fin/);
@@ -78,7 +86,7 @@ test("Workbook preview is read-only and includes movements, adjustments, finance
   assert.match(block,/detail\.liquidacion=null/,"the preview recalculates settlement from the refreshed state");
   assert.match(block,/Dinero recogido por día/,"the cash table is labelled by the daily amounts, not only the delivery mechanism");
   assert.doesNotMatch(block,/bajas\/mermas|baja\(s\)\/merma\(s\)/,"the preview uses only the Bajas terminology");
-  assert.match(block,/const finalDeclaration=detail\.declaracion_dinero/,"the final cash declaration is included separately from daily entries");
+  assert.match(block,/const finalDeclaration=detail\.sesion\.es_minorista===true\?null:detail\.declaracion_dinero/,"retail preview excludes the legacy final declaration while non-retail retains it");
   assert.match(block,/finalState==='DECLARACION_APROBADA'\?money\(finalDeclaration\.monto\)/,"approved final declared amount is shown without inventing a daily cash row");
   assert.doesNotMatch(block,/previewTable\(\['Producto','Inicial','Entradas','Salidas','Bajas','Mermas'/,"inventory presents one combined Bajas column");
   assert.doesNotMatch(block,/rpc\('(bc7_guardar|bc7_registrar|bc5_cerrar|bc_declarar)/,
