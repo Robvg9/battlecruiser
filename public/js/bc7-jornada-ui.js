@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.57 — aprobaciones diarias de efectivo; sin segundo conteo del Dueño.
+// v7.58 — atribución de entradas retroactivas por línea y aislamiento por sesión.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
