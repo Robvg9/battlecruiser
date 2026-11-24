@@ -36,6 +36,10 @@ BEGIN
     RAISE EXCEPTION 'FAIL: successor scheduling must not use the current active product catalogue as a historical line-count requirement.';
   END IF;
 
+  IF position('v_old_p.salario_porcentaje' IN v_function)>0 THEN
+    RAISE EXCEPTION 'FAIL: retroactive successor must not inherit the outgoing jornada-specific salary percentage.';
+  END IF;
+
   IF NOT (SELECT prosecdef FROM pg_proc WHERE oid=v_helper)
      OR NOT (SELECT prosecdef FROM pg_proc WHERE oid=v_bulk_helper)
      OR has_function_privilege('authenticated',v_helper,'EXECUTE')
