@@ -90,7 +90,13 @@ test("assigned staff can declare handed-over cash and close their legacy active 
   assert.match(STAFF_UI, /API\(\)\.cerrarSesion\(sesionId\)/);
   assert.match(STAFF_UI, /await load\(state\.turno\.id\);\s*renderModal\(\);/);
   assert.match(JOURNEY_UI, /Dinero entregado \(CUP\)/);
-  assert.match(JOURNEY_UI, /El conteo físico se habilitará cuando la responsable complete los cinco pasos/i);
+  assert.match(JOURNEY_UI, /Dinero del período · por fecha/);
+  assert.match(JOURNEY_UI, /No existe un importe final adicional/);
+  const dailyCashStart=JOURNEY_UI.indexOf("function renderCashDaysWorkspace(detail){");
+  const dailyCashEnd=JOURNEY_UI.indexOf("async function loadCashDaysWorkspace",dailyCashStart);
+  assert.ok(dailyCashStart>=0&&dailyCashEnd>dailyCashStart);
+  const dailyCashView=JOURNEY_UI.slice(dailyCashStart,dailyCashEnd);
+  assert.doesNotMatch(dailyCashView,/data-bc7-final-cash-count|data-bc7-admin-cash-declaration|#bc7-cash/);
   assert.match(ADMIN_UI, /Dinero entregado pendiente de contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
 });

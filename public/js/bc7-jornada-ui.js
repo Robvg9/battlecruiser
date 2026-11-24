@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.54 — checklist de cinco pasos y captura responsable de jornada sellada.
+// v7.55 — checklist de cinco pasos y captura responsable de jornada sellada.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1146,7 +1146,7 @@
     }
     const firstDate=String(detail.sesion.fecha||'').slice(0,10);
     const lastDate=String(detail.sesion.fecha_fin||state.dailyCashData.fecha_fin||detail.sesion.fecha||'').slice(0,10);
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(firstDate)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(lastDate)||lastDate<firstDate){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(firstDate)||!/^\d{4}-\d{2}-\d{2}$/.test(lastDate)||lastDate<firstDate){
       host.innerHTML='<div class="bc7-empty">No se pudo determinar el período de la jornada. Actualiza el detalle antes de registrar el dinero.</div>';return;
     }
     const totalDays=Math.min(31,Math.max(1,Math.round((Date.parse(lastDate+'T12:00:00Z')-Date.parse(firstDate+'T12:00:00Z'))/86400000)+1));

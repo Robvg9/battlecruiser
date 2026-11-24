@@ -162,12 +162,22 @@ test("daily cash PWA does not render an additional final declaration or cash-cou
 });
 
 
+test("retail Step 5 accepts ordinary ISO dates before rendering daily entries",()=>{
+  const start=UI.indexOf("function renderCashDaysWorkspace(detail){");
+  const end=UI.indexOf("async function loadCashDaysWorkspace",start);
+  assert.ok(start>=0&&end>start);
+  const block=UI.slice(start,end);
+  const validGuard = "if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(firstDate)||!/^\\d{4}-\\d{2}-\\d{2}$/.test(lastDate)";
+  const invalidGuard = "if(!/^\\\\d{4}";
+  assert.ok(block.includes(validGuard),"ISO date validation must use digit classes");
+  assert.equal(block.includes(invalidGuard),false,"a double-escaped digit class would reject real dates");
+});
 test("saving a period with all dates already recorded does not create duplicates",()=>{
   const start=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
   const end=UI.indexOf("async function saveAdminCashDeclaration",start);
   assert.ok(start>=0&&end>start);
   const block=UI.slice(start,end);
-  assert.match(block,/if\(!operations\.length\)/);
+  assert.match(block,/if\(!operations\.length&&!options\.requireComplete\)/);
   assert.match(block,/if\(!operations\.length&&!options\.requireComplete\)/);
   assert.match(block,/No hay importes diarios nuevos que enviar/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
