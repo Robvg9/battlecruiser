@@ -1255,6 +1255,7 @@
       const old=entries.find(item=>String(item.fecha||'').slice(0,10)===date);
       const oldRejected=old&&String(old.estado||'').toUpperCase()==='RECHAZADA';
       if(old&&!oldRejected)continue;
+      if(options.verifyOnly){missing.push(fmtDateHuman(date));continue;}
       const raw=day.querySelector('[data-bc7-cash-day-amount]')?.value.trim()??'';
       if(raw===''){
         if(options.date){msg(message,'Introduce el importe real de '+fmtDateHuman(date)+'. Escribe 0 CUP si no se entregó dinero.','error');return false;}
@@ -1267,7 +1268,7 @@
       operations.push({date,amount,note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,keyField:day.querySelector('[data-bc7-cash-day-key]')});
     }
     if(options.requireComplete&&missing.length){
-      msg(message,'Faltan importes de estas fechas: '+missing.join(', ')+'. Registra 0 CUP cuando un día no tuvo entrega.','error');return false;
+      msg(message,'Faltan entregas enviadas de estas fechas: '+missing.join(', ')+'. Introduce el importe y pulsa «Enviar este día a Administración»; registra 0 CUP cuando no hubo entrega.','error');return false;
     }
     if(!navigator.onLine){msg(message,'Conecta el dispositivo antes de registrar las entregas. No se modificó ningún dato.','error');return false;}
     if(!operations.length){
@@ -2975,7 +2976,7 @@
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
     if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
     if(cashMode==='daily'){
-      const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true});
+      const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true,verifyOnly:true});
       if(!savedAllDays)return;
       form=document.querySelector('form[data-bc7-close-form]')||form;
       msgEl=form.querySelector('[data-bc7-close-msg]')||msgEl;
@@ -3131,7 +3132,7 @@
       if(key==='declaracion_dinero'){
         const cashForm=root.querySelector('[data-bc7-close-form]');
         if(!cashForm){setStatus('No se encontró el formulario de dinero del período. No se envió nada.','error');return;}
-        const saved=await saveCashDaysWorkspace(cashForm,{requireComplete:true,skipConfirm:true,button});
+        const saved=await saveCashDaysWorkspace(cashForm,{requireComplete:true,skipConfirm:true,verifyOnly:true,button});
         if(!saved)return;
         setStatus('Paso 5 confirmado: las entregas diarias están registradas para todas las fechas.','ok');
         return;
