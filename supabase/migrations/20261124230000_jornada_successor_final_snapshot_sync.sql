@@ -305,7 +305,6 @@ DECLARE
   v_e public.turno_jornada_inventario_entregas;
   v_old_s public.turno_sesiones;
   v_old_t public.turnos;
-  v_old_p public.turno_jornada_programacion;
   v_cfg public.turno_jornada_configuracion;
   v_t public.turnos;
   v_p public.turno_jornada_programacion;
@@ -354,10 +353,6 @@ BEGIN
   WHERE id=v_e.turno_id
   FOR SHARE;
 
-  SELECT * INTO v_old_p
-  FROM public.turno_jornada_programacion
-  WHERE id=v_old_s.jornada_programacion_id;
-
   IF v_old_s.id IS NULL
      OR v_old_s.estado<>'COMPLETADA'
      OR v_old_t.estado_maestro<>'CERRADO'
@@ -403,7 +398,6 @@ BEGIN
     v_salary:=v_cfg.salario_porcentaje;
   END IF;
 
-  v_salary:=coalesce(v_salary,v_old_p.salario_porcentaje);
   v_today:=(now() AT TIME ZONE v_timezone)::date;
 
   IF v_e.fecha_destino>=v_today THEN
