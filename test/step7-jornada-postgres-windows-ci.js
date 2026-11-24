@@ -402,6 +402,8 @@ function applySql(file) {
     applySql("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
     applySql("supabase/migrations/20261124154000_jornada_retroactive_inventory_carryforward_reinvestment_window.sql");
     applySql("test/jornada-retroactive-stock-movement-window-contract.sql");
+    applySql("supabase/migrations/20261124163000_jornada_sync_pending_handover_after_final_correction.sql");
+    applySql("test/jornada-handover-final-correction-sync-contract.sql");
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
