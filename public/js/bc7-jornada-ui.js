@@ -1193,7 +1193,7 @@
         '<div class="bc7-overview-item"><small>Total de efectivo aceptado</small><b>'+esc(money(totalApproved))+' CUP</b></div></div>'+
         '<p class="bc7-muted">Cada aprobación diaria del Dueño verifica el importe de esa fecha. La suma de esos importes es el efectivo reconocido para la liquidación; no hace falta un segundo conteo ni otro formulario.</p></article>';
     }
-    host.innerHTML=html;    host.innerHTML=html;
+    host.innerHTML=html;
   }
 
   async function loadCashDaysWorkspace(detail){
