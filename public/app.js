@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.152 — Daily-only Jornada cash handover, independent Owner count and clear sealed-transfer attribution errors.
+// v9.5.152 — Independent daily cash submission and visible administrative approvals.
 (function hotfixV9475(){
   const VERSION="9.5.152";
   window.__BC_VERSION__=VERSION;
