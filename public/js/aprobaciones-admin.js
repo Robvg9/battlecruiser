@@ -20,7 +20,26 @@ function hideApprovalPanel(){
   }
   if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(0);
 }
-function ensurePanel(){if(!canAdmin())return null;let el=document.getElementById(ID);if(el)return el;const host=document.getElementById('cc-atencion');if(!host)return null;const b=document.createElement('div');b.className='cc-bloque';b.id=ID;b.hidden=true;b.style.setProperty('display','none','important');b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';host.parentElement.insertBefore(b,host);return b}
+function ensurePanel(){
+  if(!canAdmin())return null;
+  const host=document.getElementById('cc-atencion');
+  const anchor=host&&host.closest?host.closest('.cc-bloque'):null;
+  if(!anchor||!anchor.parentElement)return null;
+  let el=document.getElementById(ID);
+  // Keep this queue as a sibling of the hideable "Requiere atención" block.
+  if(el){
+    if(el.parentElement!==anchor.parentElement)anchor.parentElement.insertBefore(el,anchor);
+    return el;
+  }
+  const b=document.createElement('div');
+  b.className='cc-bloque';
+  b.id=ID;
+  b.hidden=true;
+  b.style.setProperty('display','none','important');
+  b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';
+  anchor.parentElement.insertBefore(b,anchor);
+  return b;
+}
 const listEl=()=>{const p=ensurePanel();return p&&p.querySelector('#admin-aprobaciones-lista')};
 function row(title,detail,buttons){const d=document.createElement('div');d.className='rep-fila';d.innerHTML='<span class="rep-fila-principal"><span class="cc-asunto-tipo">'+esc(title)+'</span><span class="muted">'+esc(detail)+'</span></span>';const box=document.createElement('div');box.className='btn-row';buttons.forEach(b=>{const x=document.createElement('button');x.type='button';x.className='cc-accion';x.textContent=b.text;x.disabled=!!b.disabled;if(!b.disabled)x.onclick=event=>b.fn.call(x,event,x);box.appendChild(x)});d.appendChild(box);return d}
 async function load(){

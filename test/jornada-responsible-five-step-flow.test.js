@@ -72,10 +72,10 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
   assert.match(ui,/const op=.*cashDaysManagerShellHtml/);
 });
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.55"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.55/);
-  assert.match(app,/9\.5\.151/);
-  assert.match(sw,/9\.5\.151/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.56"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.56/);
+  assert.match(app,/9\.5\.152/);
+  assert.match(sw,/9\.5\.152/);
 });
 
 
@@ -132,9 +132,11 @@ test("final Jornada handover form reads the exact daily rows entered in Step 5",
   const save=ui.slice(start,end);
   assert.match(save,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
   assert.match(save,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
+  assert.match(save,/if\(options\.date&&date!==String\(options\.date\)\)continue/);
+  assert.match(ui,/data-bc7-save-cash-day/);
   const closeStart=ui.indexOf("async function closeSession(form){");
   const closeEnd=ui.indexOf("let checklistModalContext=null",closeStart);
   const close=ui.slice(closeStart,closeEnd);
-  assert.match(close,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.match(close,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true,verifyOnly:true\}\)/);
   assert.doesNotMatch(close,/declaracion_dinero\.monto\)\);/);
 });

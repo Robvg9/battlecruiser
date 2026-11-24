@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.55 — paso 5 diario, conteo físico independiente y jornada sellada.
+// v7.56 — aprobaciones visibles y entregas de efectivo enviadas por fecha.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1176,7 +1176,8 @@
       }else if(editable&&date<=today){
         html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong><span class="bc7-pill warn">'+(rejected?'Rechazada · corregir':'Pendiente')+'</span></div>'+
           '<div class="bc7-grid"><label class="bc7-field">Dinero recogido este día (CUP)<input data-bc7-cash-day-amount type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" value="'+(rejected?esc(row.monto_declarado):'')+'"></label>'+
-          '<label class="bc7-field">Observación (opcional)<input data-bc7-cash-day-note maxlength="500" value="'+(rejected?esc(row.observacion||''):'')+'" placeholder="Aclaración de la entrega"></label><input type="hidden" data-bc7-cash-day-key value=""></div></article>';
+          '<label class="bc7-field">Observación (opcional)<input data-bc7-cash-day-note maxlength="500" value="'+(rejected?esc(row.observacion||''):'')+'" placeholder="Aclaración de la entrega"></label><input type="hidden" data-bc7-cash-day-key value=""></div>'+
+          '<div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-save-cash-day>Enviar este día a Administración</button></div></article>';
       }else{
         html+='<article class="bc7-jornada" data-bc7-cash-day-row data-bc7-cash-date="'+esc(date)+'"><div class="bc7-jornada-top"><strong>Día '+(index+1)+' · '+esc(fmtDateHuman(date))+'</strong><span class="bc7-pill">No registrado</span></div><p class="bc7-muted">'+(date>today?'Este día todavía no se puede declarar.':'No hay importe registrado para esta fecha.')+'</p></article>';
       }
@@ -1250,26 +1251,48 @@
     const operations=[],missing=[];
     for(const day of days){
       const date=String(day.dataset.bc7CashDate||'');
+      if(options.date&&date!==String(options.date))continue;
       const old=entries.find(item=>String(item.fecha||'').slice(0,10)===date);
       const oldRejected=old&&String(old.estado||'').toUpperCase()==='RECHAZADA';
       if(old&&!oldRejected)continue;
+      if(options.verifyOnly){missing.push(fmtDateHuman(date));continue;}
       const raw=day.querySelector('[data-bc7-cash-day-amount]')?.value.trim()??'';
-      if(raw===''){if(options.requireComplete)missing.push(fmtDateHuman(date));continue;}
+      if(raw===''){
+        if(options.date){msg(message,'Introduce el importe real de '+fmtDateHuman(date)+'. Escribe 0 CUP si no se entregó dinero.','error');return false;}
+        if(options.requireComplete)missing.push(fmtDateHuman(date));
+        continue;
+      }
       const amount=Number(raw);
       if(!Number.isFinite(amount)||amount<0){msg(message,'Revisa los importes diarios: todos deben ser números iguales o mayores que cero.','error');return false;}
       if(date>dateHavana()){msg(message,'No puedes declarar efectivo para una fecha futura.','error');return false;}
       operations.push({date,amount,note:day.querySelector('[data-bc7-cash-day-note]')?.value.trim()||null,keyField:day.querySelector('[data-bc7-cash-day-key]')});
     }
     if(options.requireComplete&&missing.length){
-      msg(message,'Faltan importes de estas fechas: '+missing.join(', ')+'. Registra 0 CUP cuando un día no tuvo entrega.','error');return false;
-    }
-    if(!operations.length){
-      const alreadyDone=detail.checklist?.declaracion_dinero?.completado===true;
-      if(alreadyDone){msg(message,'El paso 5 ya está completo y confirmado por el servidor.','ok');return true;}
-      msg(message,'No hay entregas nuevas que enviar. No se modificó ningún registro.','error');return false;
+      msg(message,'Faltan entregas enviadas de estas fechas: '+missing.join(', ')+'. Introduce el importe y pulsa «Enviar este día a Administración»; registra 0 CUP cuando no hubo entrega.','error');return false;
     }
     if(!navigator.onLine){msg(message,'Conecta el dispositivo antes de registrar las entregas. No se modificó ningún dato.','error');return false;}
-    if(!options.skipConfirm&&!confirm('Se enviarán únicamente las entregas de cada fecha del período. Quedarán pendientes de revisión administrativa. ¿Confirmas?'))return false;
+    if(!operations.length){
+      let checklist=detail.checklist||null;
+      if(options.requireComplete){
+        try{
+          checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});
+          detail.checklist=checklist;
+        }catch(error){msg(message,'No se pudo verificar el estado actual del paso 5. '+friendlyError(error,'calendar'),'error');return false;}
+      }
+      if(checklist?.declaracion_dinero?.completado===true){msg(message,'El paso 5 ya está completo y confirmado por el servidor.','ok');return true;}
+      if(options.requireComplete){
+        const registered=Number(checklist?.declaracion_dinero?.entregas_diarias_registradas||0);
+        const expected=Number(checklist?.declaracion_dinero?.entregas_diarias_esperadas||0);
+        msg(message,'Todavía faltan entregas diarias ('+registered+'/'+expected+'). Registra los días restantes antes de entregar la jornada.','error');
+        return false;
+      }
+      msg(message,'No hay una entrega nueva para enviar. Cada fecha se registra por separado.','error');return false;
+    }
+    const singleDay=!!options.date;
+    const confirmation=singleDay
+      ?'Se enviará únicamente la entrega del '+fmtDateHuman(operations[0].date)+' por '+money(operations[0].amount)+' CUP. Quedará pendiente de revisión administrativa; podrás registrar los demás días después. ¿Confirmas?'
+      :'Se enviarán únicamente las entregas de cada fecha del período. Quedarán pendientes de revisión administrativa. ¿Confirmas?';
+    if(!options.skipConfirm&&!confirm(confirmation))return false;
     if(saveButton&&!busy(saveButton,true))return false;
 
     const dailySubmitted=[];
@@ -1290,6 +1313,8 @@
         const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)));
         if(missingRows.length)throw new Error('El servidor no confirmó la lectura de '+missingRows.map(x=>fmtDateHuman(x.date)).join(', ')+'. Conservé las claves para evitar duplicados.');
         state.dailyCashData=reread;state.dailyCashSessionId=sessionId;state.dailyCashCount=null;
+        try{detail.checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});}catch(_){/* Daily-row readback is already authoritative. */}
+        try{state.dailyCashCount=await rpc('bc7_estado_conteo_efectivo_jornada',{p_turno_sesion_id:sessionId});}catch(_){/* Owner count remains separately gated. */}
       }
       renderCashDaysWorkspace(state.detail);
       if(options.requireComplete){
@@ -1300,6 +1325,10 @@
           throw new Error('El servidor recibió las entregas, pero el paso 5 aún no registra una entrega por cada fecha del período.');
         }
         setStatus('Paso 5 confirmado: las entregas diarias están registradas para todas las fechas.','ok');
+      }else if(singleDay){
+        const sent=dailySubmitted[0];
+        msg($('bc7-cash-days-msg')||message,'Entrega del '+fmtDateHuman(sent.date)+' enviada y confirmada por el servidor. Queda pendiente de revisión administrativa; puedes continuar con los otros días.','ok');
+        setStatus('Entrega diaria del '+fmtDateHuman(sent.date)+' enviada a Administración.','ok');
       }else{
         msg($('bc7-cash-days-msg')||message,'Entregas diarias guardadas y confirmadas por el servidor.','ok');
         setStatus('Entregas diarias del período actualizadas.','ok');
@@ -2947,7 +2976,7 @@
     if(!state.detail?.tramo_activo?.id){msg(msgEl,'No hay un tramo activo para declarar el dinero. La jornada no se ha cerrado.','error');return;}
     if(!state.detail?.cortes?.FINAL){msg(msgEl,'Primero confirma el inventario final.','error');return;}
     if(cashMode==='daily'){
-      const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true});
+      const savedAllDays=await saveCashDaysWorkspace(form,{requireComplete:true,skipConfirm:true,verifyOnly:true});
       if(!savedAllDays)return;
       form=document.querySelector('form[data-bc7-close-form]')||form;
       msgEl=form.querySelector('[data-bc7-close-msg]')||msgEl;
@@ -3103,7 +3132,7 @@
       if(key==='declaracion_dinero'){
         const cashForm=root.querySelector('[data-bc7-close-form]');
         if(!cashForm){setStatus('No se encontró el formulario de dinero del período. No se envió nada.','error');return;}
-        const saved=await saveCashDaysWorkspace(cashForm,{requireComplete:true,skipConfirm:true,button});
+        const saved=await saveCashDaysWorkspace(cashForm,{requireComplete:true,skipConfirm:true,verifyOnly:true,button});
         if(!saved)return;
         setStatus('Paso 5 confirmado: las entregas diarias están registradas para todas las fechas.','ok');
         return;
@@ -3660,6 +3689,7 @@
     if(t.hasAttribute('data-bc7-adjustment-remove')){removeAdjustmentRow(t);return;}
     if(t.hasAttribute('data-bc7-current-open')){await openCurrentSession(false);return;}
     if(t.hasAttribute('data-bc7-current-finance')){await openCurrentSession(true);return;}
+    if(t.hasAttribute('data-bc7-save-cash-day')){const day=t.closest('[data-bc7-cash-day-row]');const form=day&&day.closest('[data-bc7-close-form]');if(form&&day)await saveCashDaysWorkspace(form,{date:String(day.dataset.bc7CashDate||''),requireComplete:false,button:t});return;}
     if(t.hasAttribute('data-bc7-save-cash-days')){const form=t.closest('[data-bc7-close-form]');if(form)await saveCashDaysWorkspace(form,{requireComplete:false});return;}
     if(t.hasAttribute('data-bc7-save-cash')){const form=t.closest('form[data-bc7-close-form]');if(form)await saveCashDeclaration(form);return;}
     if(t.hasAttribute('data-bc7-build')){buildDayRows();return;}

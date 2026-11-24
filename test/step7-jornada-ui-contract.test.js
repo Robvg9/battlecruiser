@@ -159,7 +159,9 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.55");
+  assert.equal(moduleVersion,"7.56");
+  assert.match(ui,/data-bc7-save-cash-day/);
+  assert.match(ui,/Enviar este día a Administración/);
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
   assert.ok(sw.includes("./bc7-jornada-inventory-mobile.css?v=20261116.2"));
@@ -198,7 +200,9 @@ test("Cash declaration can be saved before the final inventory unlocks jornada c
   assert.match(ui,/async function saveCashDeclaration\(form/);
   assert.match(ui,/data-bc7-save-cash/);
   assert.match(ui,/data-bc7-save-cash-days/);
-  assert.match(ui,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.match(ui,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true,verifyOnly:true\}\)/);
+  assert.match(ui,/data-bc7-save-cash-day/);
+  assert.match(ui,/if\(options\.verifyOnly\)\{missing\.push/);
   assert.match(ui,/rpc\('bc_declarar_dinero'/);
   assert.match(ui,/El cierre se habilitará al confirmar el inventario final/);
   assert.match(ui,/Finalizar jornada/);

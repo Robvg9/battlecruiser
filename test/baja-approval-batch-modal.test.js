@@ -14,7 +14,7 @@ const BAJAS = read("public/js/bajas-multiple.js");
 
 function setupApprovalWindow(t) {
   const dom = new JSDOM(
-    "<!doctype html><html><body><main><div id='cc-atencion'></div></main></body></html>",
+    "<!doctype html><html><body><main><section class='cc-bloque'><div id='cc-atencion'></div></section></main></body></html>",
     { url: "https://battlecruiser.test/", runScripts: "outside-only", pretendToBeVisual: true }
   );
   const w = dom.window;

@@ -109,12 +109,14 @@ test("closing requires all daily dates and does not create a worker final declar
   const end = UI.indexOf("async function submitAdjustment(form){", start);
   assert.ok(start >= 0 && end > start, "closeSession exists");
   const block = UI.slice(start, end);
-  assert.match(block, /saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.match(block, /saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true,verifyOnly:true\}\)/);
   const cashSaveStart=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
   const cashSaveEnd=UI.indexOf("async function saveAdminCashDeclaration",cashSaveStart);
   assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
-  assert.match(cashSave,/Faltan importes de estas fechas/);
+  assert.match(cashSave,/verifyOnly/);
+  assert.match(cashSave,/Faltan entregas enviadas de estas fechas/);
+  assert.match(cashSave,/if\(options\.verifyOnly\)\{missing\.push/);
   assert.match(block,/cashMode!=='daily'&&!saved/);
   assert.doesNotMatch(block,/bc5_responsable_declarar_dinero_jornada/);
   assert.match(block, /bc5_cerrar_jornada/);
@@ -170,8 +172,22 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.ok(start>=0&&end>start);
   const block=UI.slice(start,end);
   assert.match(block,/if\(!operations\.length\)/);
-  assert.match(block,/const alreadyDone=detail\.checklist\?\.declaracion_dinero\?\.completado===true/);
+  assert.match(block,/checklist=await rpc\('bc7_estado_confirmaciones_jornada'/);
+  assert.match(block,/checklist\?\.declaracion_dinero\?\.completado===true/);
   assert.match(block,/El paso 5 ya está completo y confirmado por el servidor/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
-  assert.match(block,/Faltan importes de estas fechas/);
+  assert.match(block,/Faltan entregas enviadas de estas fechas/);
+});
+
+
+test("worker can submit one completed cash date without waiting for the rest of the period",()=>{
+  const start=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const end=UI.indexOf("async function saveAdminCashDeclaration",start);
+  const save=UI.slice(start,end);
+  assert.match(save,/if\(options\.date&&date!==String\(options\.date\)\)continue/);
+  assert.match(save,/if\(options\.date\)\{msg\(message,'Introduce el importe real de '/);
+  assert.match(save,/data-bc7-save-cash-day/);
+  assert.match(save,/const singleDay=!!options\.date/);
+  assert.match(save,/Entrega del '\+fmtDateHuman\(sent\.date\)\+' enviada y confirmada por el servidor/);
+  assert.match(save,/bc7_estado_confirmaciones_jornada/);
 });
