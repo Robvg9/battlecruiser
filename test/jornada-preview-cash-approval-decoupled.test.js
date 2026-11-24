@@ -8,6 +8,7 @@ const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const MIGRATION=read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
 const RESPONSIBLE_MIGRATION=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
 const DAILY_CASH_MIGRATION=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
+const DAILY_APPROVALS_MIGRATION=read("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
 const FIX=read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
 const UI=read("public/js/bc7-jornada-ui.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
@@ -28,19 +29,15 @@ test("Jornada closure checklist remains five steps and Step 5 is daily-only",()=
   assert.doesNotMatch(checklist,/Declaración de dinero|total final del período/);
 });
 
-test("The Owner makes an independent physical count after all daily deliveries are approved",()=>{
-  assert.match(DAILY_CASH_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_estado_conteo_efectivo_jornada/);
-  assert.match(DAILY_CASH_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_contar_efectivo_dueno_jornada/);
-  assert.match(DAILY_CASH_MIGRATION,/v_daily_total/);
-  assert.match(UI,/data-bc7-final-cash-count/);
+test("Approved daily cash is the sole retail cash verification; no second Owner count is required",()=>{
+  assert.match(DAILY_APPROVALS_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_estado_conteo_efectivo_jornada/);
+  assert.match(DAILY_APPROVALS_MIGRATION,/v_daily_approved=v_daily_expected/);
+  assert.match(DAILY_APPROVALS_MIGRATION,/'requiere_conteo_fisico',false/);
+  assert.doesNotMatch(DAILY_APPROVALS_MIGRATION,/turno_jornada_conteos_caja/);
   assert.match(UI,/rpc\('bc7_estado_conteo_efectivo_jornada'/);
-  assert.match(UI,/rpc\('bc7_contar_efectivo_dueno_jornada'/);
-  const start=UI.indexOf("async function countFinalCash(form){");
-  const end=UI.indexOf("function cashDeclarationHtml(detail){",start);
-  const block=UI.slice(start,end);
-  assert.match(block,/p_monto_contado:amount/);
-  assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
-  assert.match(block,/total_diario_aprobado/);
+  assert.match(UI,/Verificación del efectivo por aprobaciones diarias/);
+  assert.match(UI,/Cada aprobación diaria del Dueño verifica el importe de esa fecha/);
+  assert.doesNotMatch(UI,/data-bc7-final-cash-count|data-bc7-final-cash-amount|countFinalCash|bc7_contar_efectivo_dueno_jornada/);
 });
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
   assert.match(MIGRATION,/fecha_programada_fin/);
