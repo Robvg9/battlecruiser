@@ -109,12 +109,14 @@ test("closing requires all daily dates and does not create a worker final declar
   const end = UI.indexOf("async function submitAdjustment(form){", start);
   assert.ok(start >= 0 && end > start, "closeSession exists");
   const block = UI.slice(start, end);
-  assert.match(block, /saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.match(block, /saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true,verifyOnly:true\}\)/);
   const cashSaveStart=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
   const cashSaveEnd=UI.indexOf("async function saveAdminCashDeclaration",cashSaveStart);
   assert.ok(cashSaveStart>=0&&cashSaveEnd>cashSaveStart,"daily cash saver exists");
   const cashSave=UI.slice(cashSaveStart,cashSaveEnd);
-  assert.match(cashSave,/Faltan importes de estas fechas/);
+  assert.match(cashSave,/verifyOnly/);
+  assert.match(cashSave,/Faltan entregas enviadas de estas fechas/);
+  assert.match(cashSave,/if\(options\.verifyOnly\)\{missing\.push/);
   assert.match(block,/cashMode!=='daily'&&!saved/);
   assert.doesNotMatch(block,/bc5_responsable_declarar_dinero_jornada/);
   assert.match(block, /bc5_cerrar_jornada/);
