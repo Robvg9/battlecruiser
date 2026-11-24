@@ -90,7 +90,8 @@ test("assigned staff can declare handed-over cash and close their legacy active 
   assert.match(STAFF_UI, /API\(\)\.cerrarSesion\(sesionId\)/);
   assert.match(STAFF_UI, /await load\(state\.turno\.id\);\s*renderModal\(\);/);
   assert.match(JOURNEY_UI, /Dinero entregado \(CUP\)/);
-  assert.match(JOURNEY_UI, /El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos/i);
+  assert.match(JOURNEY_UI, /Verificación del efectivo por aprobaciones diarias/);
+  assert.doesNotMatch(JOURNEY_UI, /data-bc7-final-cash-count|bc7_contar_efectivo_dueno_jornada/);
   assert.match(ADMIN_UI, /Dinero entregado pendiente de contar/);
   assert.match(ADMIN_UI, /bc5_contar_dinero_entregado/);
 });
