@@ -203,6 +203,181 @@ BEGIN
 END
 $patch_settlement$;
 
+-- The live stock-balance helper used by mandatory price-change counts must
+-- share the exact same family normalization, opening boundary and transfer-line
+-- ownership rules as the final settlement. Previously it summed variant UUIDs
+-- but compared the root product UUID, understating stock at the checkpoint.
+DO $patch_operational_stock$
+DECLARE
+  v_function text:=pg_get_functiondef(
+    'public.bc7_jornada_saldos_operativos(uuid)'::regprocedure
+  );
+  v_old_initial text:=$old$
+  SELECT c.id, c.confirmado_en, c.creado_en
+  INTO v_initial
+$old$;
+  v_new_initial text:=$new$
+  SELECT c.id, c.confirmado_en, c.creado_en, c.origen_corte_id
+  INTO v_initial
+$new$;
+  v_old_start text:=$old$
+  v_start_at := COALESCE(v_session.apertura_real, v_initial.confirmado_en, v_initial.creado_en);
+$old$;
+  v_new_start text:=$new$
+  v_start_at := CASE
+    WHEN COALESCE(v_session.apertura_retroactiva,false)
+      AND v_initial.origen_corte_id IS NOT NULL
+    THEN COALESCE(
+      (
+        SELECT COALESCE(
+          source_session.corte_operativo_at,
+          (
+            SELECT max(source_tramo.fin_at)
+            FROM public.turno_tramos source_tramo
+            WHERE source_tramo.turno_sesion_id=source_session.id
+              AND source_tramo.fin_at IS NOT NULL
+          ),
+          source_cut.confirmado_en
+        )
+        FROM public.turno_jornada_inventario_cortes source_cut
+        JOIN public.turno_sesiones source_session
+          ON source_session.id=source_cut.turno_sesion_id
+        WHERE source_cut.id=v_initial.origen_corte_id
+          AND source_cut.tipo='FINAL'
+          AND source_cut.estado='CONFIRMADO'
+          AND source_cut.corte_sucesora_origen_id=v_initial.id
+      ),
+      v_initial.confirmado_en,v_initial.creado_en,v_session.apertura_real
+    )
+    ELSE COALESCE(v_initial.confirmado_en,v_initial.creado_en,v_session.apertura_real)
+  END;
+$new$;
+  v_old_initial_rows text:=$old$
+    SELECT
+      l.producto_id,
+      SUM(coalesce(c.cantidad_corregida,l.cantidad_contada))::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=p_turno_sesion_id
+     AND c.tipo='INICIAL'
+     AND c.producto_id=l.producto_id
+     AND c.vigente
+    WHERE l.corte_id = v_initial.id
+    GROUP BY l.producto_id
+$old$;
+  v_new_initial_rows text:=$new$
+    SELECT
+      CASE WHEN v_session.almacen_tipo='minorista'
+        THEN coalesce(product.producto_padre_id,l.producto_id)
+        ELSE l.producto_id END AS producto_id,
+      SUM(coalesce(c.cantidad_corregida,l.cantidad_contada))::numeric AS cantidad
+    FROM public.turno_jornada_inventario_lineas l
+    LEFT JOIN public.turno_jornada_inventario_correcciones c
+      ON c.turno_sesion_id=p_turno_sesion_id
+     AND c.tipo='INICIAL'
+     AND c.producto_id=l.producto_id
+     AND c.vigente
+    LEFT JOIN public.productos product ON product.id=l.producto_id
+    WHERE l.corte_id = v_initial.id
+    GROUP BY CASE WHEN v_session.almacen_tipo='minorista'
+      THEN coalesce(product.producto_padre_id,l.producto_id)
+      ELSE l.producto_id END
+$new$;
+  v_old_link_block text:=$old$
+        OR EXISTS (
+          SELECT 1
+          FROM public.turno_jornada_entradas_vinculadas x
+          WHERE x.turno_sesion_id = p_turno_sesion_id
+            AND x.transferencia_id = t.id
+        )
+      )
+$old$;
+  v_new_link_block text:=$new$
+        OR EXISTS (
+          SELECT 1
+          FROM public.turno_jornada_entradas_vinculadas x
+          JOIN public.turno_jornada_entradas_lineas_vinculadas line_link
+            ON line_link.entrada_vinculada_id=x.id
+          WHERE x.turno_sesion_id=p_turno_sesion_id
+            AND x.transferencia_id=t.id
+            AND line_link.transferencia_linea_id=tl.id
+        )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.turno_jornada_entradas_lineas_vinculadas allocated_line
+        JOIN public.turno_jornada_entradas_vinculadas allocated_link
+          ON allocated_link.id=allocated_line.entrada_vinculada_id
+        WHERE allocated_line.transferencia_linea_id=tl.id
+          AND allocated_link.turno_sesion_id<>p_turno_sesion_id
+      )
+$new$;
+  v_old_totals text:=$old$
+  movement_totals AS (
+    SELECT
+      m.producto_id,
+$old$;
+  v_new_totals text:=$new$
+  normalized_movement_rows AS (
+    SELECT
+      CASE WHEN v_session.almacen_tipo='minorista'
+        THEN coalesce(product.producto_padre_id,m.producto_id)
+        ELSE m.producto_id END AS producto_id,
+      m.tipo,m.cantidad
+    FROM movement_rows m
+    LEFT JOIN public.productos product ON product.id=m.producto_id
+  ),
+  movement_totals AS (
+    SELECT
+      m.producto_id,
+$old$;
+  v_old_movement_from text:=$old$
+    FROM movement_rows m
+$new$;
+  v_new_movement_from text:=$new$
+    FROM normalized_movement_rows m
+$new$;
+BEGIN
+  IF position(v_new_initial IN v_function)=0 THEN
+    IF position(v_old_initial IN v_function)=0 THEN
+      RAISE EXCEPTION 'Operational stock helper: initial cut source anchor not found.';
+    END IF;
+    v_function:=replace(v_function,v_old_initial,v_new_initial);
+  END IF;
+  IF position(v_new_start IN v_function)=0 THEN
+    IF position(v_old_start IN v_function)=0 THEN
+      RAISE EXCEPTION 'Operational stock helper: opening boundary anchor not found.';
+    END IF;
+    v_function:=replace(v_function,v_old_start,v_new_start);
+  END IF;
+  IF position(v_new_initial_rows IN v_function)=0 THEN
+    IF position(v_old_initial_rows IN v_function)=0 THEN
+      RAISE EXCEPTION 'Operational stock helper: initial family aggregation anchor not found.';
+    END IF;
+    v_function:=replace(v_function,v_old_initial_rows,v_new_initial_rows);
+  END IF;
+  IF position(v_new_link_block IN v_function)=0 THEN
+    IF position(v_old_link_block IN v_function)=0 THEN
+      RAISE EXCEPTION 'Operational stock helper: transfer-line ownership anchor not found.';
+    END IF;
+    v_function:=replace(v_function,v_old_link_block,v_new_link_block);
+  END IF;
+  IF position(v_new_totals IN v_function)=0 THEN
+    IF position(v_old_totals IN v_function)=0 THEN
+      RAISE EXCEPTION 'Operational stock helper: movement normalization CTE anchor not found.';
+    END IF;
+    v_function:=replace(v_function,v_old_totals,v_new_totals);
+  END IF;
+  IF position(v_new_movement_from IN v_function)=0 THEN
+    IF position(v_old_movement_from IN v_function)=0 THEN
+      RAISE EXCEPTION 'Operational stock helper: normalized movement source anchor not found.';
+    END IF;
+    v_function:=replace(v_function,v_old_movement_from,v_new_movement_from);
+  END IF;
+  EXECUTE v_function;
+END
+$patch_operational_stock$;
+
 -- A transfer is auto-associated with a Jornada only when its actual event
 -- timestamp lies inside exactly one scheduled operational window. Never pick
 -- the "latest EN_CURSO" session merely because it is still awaiting sealing.
