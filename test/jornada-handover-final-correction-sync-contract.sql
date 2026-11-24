@@ -88,6 +88,20 @@ BEGIN
     RAISE EXCEPTION 'FAIL: the handover did not begin with the original final count or has an unexpected receipt quantity.';
   END IF;
 
+  INSERT INTO public.turno_jornada_inventario_correcciones(
+    id,turno_sesion_id,tipo,producto_id,cantidad_original,cantidad_corregida,
+    comentario,creado_por,creado_en,vigente
+  ) VALUES(
+    v_first_correction,v_session,'FINAL',v_product,10,13,
+    'First correction of physical final count',v_owner,now()-interval '2 minutes',true
+  );
+  SELECT cantidad_declarada INTO v_declared
+  FROM public.turno_jornada_inventario_entrega_lineas
+  WHERE entrega_id=v_delivery AND producto_id=v_product;
+  IF v_declared IS DISTINCT FROM 13::numeric THEN
+    RAISE EXCEPTION 'FAIL: inserting an active FINAL correction did not update the pending handover (expected 13, got %).',v_declared;
+  END IF;
+
   UPDATE public.turno_jornada_inventario_correcciones
   SET vigente=false
   WHERE id=v_first_correction;
