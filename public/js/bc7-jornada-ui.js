@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.57 — aprobaciones diarias de efectivo; sin segundo conteo del Dueño.
+// v7.58 — atribución de entradas retroactivas por línea y aislamiento por sesión.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -2008,12 +2008,12 @@
     const cards=Array.from(groups.values()).map(group=>{
       const units=group.lineas.reduce((sum,line)=>sum+Number(line.cantidad||0),0);
       const stamp=String(group.fecha||'').replace('T',' ').slice(0,16);
-      const rowsHtml=group.lineas.map(line=>'<tr><td>'+esc(line.producto||'Producto')+'</td><td>'+esc(qty(line.cantidad))+'</td></tr>').join('');
+      const rowsHtml=group.lineas.map(line=>'<tr><td><input type="checkbox" data-bc7-transfer-line-select="'+esc(line.transferencia_linea_id||'')+'" aria-label="Seleccionar '+esc(line.producto||'producto')+'"></td><td>'+esc(line.producto||'Producto')+'</td><td>'+esc(qty(line.cantidad))+'</td></tr>').join('');
       return '<article class="bc7-card bc7-pending-inbound-card"><b>Entrada pendiente · '+group.lineas.length+' líneas</b>'+
         '<p class="bc7-muted">Fecha real de registro: '+esc(stamp)+'<br>'+esc(group.origen)+' → '+esc(group.destino)+'<br>Total: '+esc(qty(units))+' unidades</p>'+
-        '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Producto</th><th>Cantidad</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+        '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Incluir</th><th>Producto</th><th>Cantidad</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
         '<p class="bc7-muted">La transferencia ya existe. Atribuirla conserva el movimiento real y no vuelve a mover existencias.</p>'+
-        (isAdmin?'<button type="button" class="bc7-btn primary" data-bc7-movement-link-transfer="'+esc(group.id)+'">Atribuir a esta jornada</button>':'<small class="bc7-muted">Solo Administración puede atribuir una entrada histórica.</small>')+
+        (isAdmin?'<button type="button" class="bc7-btn primary" data-bc7-movement-link-transfer="'+esc(group.id)+'">Atribuir líneas seleccionadas</button>':'<small class="bc7-muted">Solo Administración puede atribuir una entrada histórica.</small>')+
         '</article>';
     }).join('');
     return '<section class="bc7-pending-inbound"><h4>Entradas pendientes de atribución · '+groups.size+'</h4>'+cards+'</section>';
@@ -2035,17 +2035,24 @@
     host.onclick=async e=>{
       const button=e.target&&e.target.closest?e.target.closest('[data-bc7-movement-link-transfer]'):null;if(!button)return;
       const transferId=button.dataset.bc7MovementLinkTransfer;
+      const card=button.closest('article');
+      const selectedLineIds=Array.from(card?.querySelectorAll('[data-bc7-transfer-line-select]:checked')||[])
+        .map(input=>input.dataset.bc7TransferLineSelect).filter(Boolean);
+      if(!selectedLineIds.length){alert('Selecciona las líneas concretas que pertenecen a esta jornada. No se modificó nada.');return;}
       const period=String(detail.sesion.fecha||'')+' a '+String(detail.sesion.fecha_fin||detail.sesion.fecha||'');
-      const reason=window.prompt('Motivo obligatorio de atribución histórica para el período '+period+'. La fecha real se conservará.','');
+      const reason=window.prompt('Explica por qué estas '+selectedLineIds.length+' líneas corresponden al período '+period+'. La fecha real se conservará.','');
       if(!reason)return;
-      if(reason.trim().length<10){alert('El motivo debe tener al menos 10 caracteres para dejar la atribución auditada. No se modificó la transferencia.');return;}
-      if(!window.confirm('Se atribuirá una sola vez a la jornada '+period+'. La fecha real se conserva y no se ejecuta otra transferencia. ¿Confirmas?'))return;
+      if(reason.trim().length<15){alert('El motivo debe explicar la atribución (mínimo 15 caracteres). No se modificó nada.');return;}
+      if(!window.confirm('Se atribuirán únicamente las '+selectedLineIds.length+' líneas seleccionadas. Las demás líneas de la transferencia no se incluirán. ¿Confirmas?'))return;
       button.disabled=true;
       try{
-        await rpc('bc7_vincular_transferencia_jornada',{p_turno_sesion_id:detail.sesion.id,p_transferencia_id:transferId,p_motivo:reason.trim()});
+        await rpc('bc7_vincular_lineas_transferencia_jornada',{
+          p_turno_sesion_id:detail.sesion.id,p_transferencia_id:transferId,
+          p_transferencia_linea_ids:selectedLineIds,p_motivo:reason.trim()
+        });
         await openWorkspace(detail.sesion.id);
-        setStatus('Entrada atribuida a esta jornada. Revisa movimientos e inventario final.','ok');
-      }catch(error){button.disabled=false;alert(friendlyError(error,'transfer')+' No se modificó la transferencia.');}
+        setStatus('Solo las líneas seleccionadas se atribuyeron a esta jornada.','ok');
+      }catch(error){button.disabled=false;alert(friendlyError(error,'transfer')+' No se modificaron las líneas.');}
     };
   }
   function checklistHtml(detail,isAssigned,status){
@@ -2206,22 +2213,27 @@
       if(!linkButton)return;
       e.preventDefault();
       const transferId=linkButton.dataset.bc7LinkTransfer;
+      const card=linkButton.closest('article');
+      const selectedLineIds=Array.from(card?.querySelectorAll('[data-bc7-transfer-line-select]:checked')||[])
+        .map(input=>input.dataset.bc7TransferLineSelect).filter(Boolean);
+      if(!selectedLineIds.length){alert('Selecciona las líneas concretas que pertenecen a esta jornada. No se modificó nada.');return;}
       const period=String(detail.sesion.fecha||'')+' a '+String(detail.sesion.fecha_fin||detail.sesion.fecha||'');
-      const reason=window.prompt('Motivo obligatorio de atribución histórica. Período operativo '+period+'. La fecha real de registro se conservará.', 'Una sola transferencia agrupada para el período '+period+', según confirmación del Dueño.');
-      if(!reason||reason.trim().length<10)return;
-      if(!confirm('Se vinculará la transferencia  UNA SOLA VEZ a esta jornada ('+period+'). Se conservará su fecha real de registro. No se dividirá entre días ni se aplicará a otra jornada. ¿Confirmas?'))return;
+      const reason=window.prompt('Explica por qué estas '+selectedLineIds.length+' líneas corresponden al período '+period+'. La fecha real de registro se conservará.','');
+      if(!reason||reason.trim().length<15)return;
+      if(!confirm('Se atribuirán únicamente las '+selectedLineIds.length+' líneas seleccionadas. Las demás líneas de esta transferencia no se incluirán. ¿Confirmas?'))return;
       linkButton.disabled=true;
       try{
-        await rpc('bc7_vincular_transferencia_jornada',{
-          p_turno_sesion_id:detail.sesion.id,p_transferencia_id:transferId,p_motivo:reason.trim()
+        await rpc('bc7_vincular_lineas_transferencia_jornada',{
+          p_turno_sesion_id:detail.sesion.id,p_transferencia_id:transferId,
+          p_transferencia_linea_ids:selectedLineIds,p_motivo:reason.trim()
         });
         close();
         await openWorkspace(detail.sesion.id);
-        setStatus('Transferencia atribuida una sola vez a esta jornada. Revisa de nuevo la previsualización y el inventario.','ok');
+        setStatus('Solo las líneas seleccionadas se atribuyeron a esta jornada.','ok');
         await openJornadaPreview(null);
       }catch(error){
         linkButton.disabled=false;
-        alert(friendlyError(error,'transfer')+' No se modificó la transferencia.');
+        alert(friendlyError(error,'transfer')+' No se modificaron las líneas.');
       }
     });
     try{
@@ -2287,17 +2299,19 @@
           group={id:item.transferencia_id,fecha:item.fecha_registro,origen:item.almacen_origen,destino:item.almacen_destino,total:item.lineas_total,lines:[]};
           pendingTransferGroups.push(group);
         }
-        group.lines.push([item.producto,qty(item.cantidad)]);
+        group.lines.push({id:item.transferencia_linea_id,producto:item.producto,cantidad:item.cantidad});
       }
       const periodLabel=fmtDate(detail.sesion.fecha)+' – '+fmtDate(detail.sesion.fecha_fin||detail.sesion.fecha);
       const pendingTransferHtml=pendingTransferGroups.length?pendingTransferGroups.map(group=>
-        '<article class="bc7-card"><h4>Transferencia pendiente de atribución · '+group.lines.length+' líneas</h4>'+
+        '<article class="bc7-card"><h4>Transferencia pendiente · '+group.lines.length+' líneas disponibles</h4>'+
         '<p><b>Fecha real de registro:</b> '+esc(fmtDateTimeHavana(group.fecha))+
         '<br><b>Origen → destino:</b> '+esc(group.origen)+' → '+esc(group.destino)+
         '<br><b>Período operativo propuesto:</b> '+esc(periodLabel)+'</p>'+
-        previewTable(['Producto','Cantidad'],group.lines,2)+
-        '<p class="bc7-note">No está incluida en el saldo ni en la liquidación. Si la atribuyes, se registrará como una sola operación para todo el período, sin dividirla por día.</p>'+
-        (state.admin?'<button type="button" class="bc7-btn primary" data-bc7-link-transfer="'+esc(group.id)+'">Atribuir una sola vez a esta jornada</button>':'<span class="bc7-muted">Solo ADMIN puede atribuir esta transferencia.</span>')+
+        '<div class="bc7-table-wrap"><table class="bc7-table"><thead><tr><th>Incluir</th><th>Producto</th><th>Cantidad</th></tr></thead><tbody>'+
+        group.lines.map(line=>'<tr><td><input type="checkbox" data-bc7-transfer-line-select="'+esc(line.id||'')+'" aria-label="Seleccionar '+esc(line.producto||'producto')+'"></td><td>'+esc(line.producto||'Producto')+'</td><td>'+esc(qty(line.cantidad))+'</td></tr>').join('')+
+        '</tbody></table></div>'+
+        '<p class="bc7-note">La transferencia agrupada no se incluye automáticamente. Selecciona solo las líneas que pertenecen a este período; las demás quedan fuera.</p>'+
+        (state.admin?'<button type="button" class="bc7-btn primary" data-bc7-link-transfer="'+esc(group.id)+'">Atribuir líneas seleccionadas</button>':'<span class="bc7-muted">Solo ADMIN puede atribuir líneas históricas.</span>')+
         '</article>'
       ).join(''):'<div class="bc7-empty">No hay transferencias completadas fuera del período pendientes de atribución.</div>';
       const declaration=detail.declaracion_dinero;

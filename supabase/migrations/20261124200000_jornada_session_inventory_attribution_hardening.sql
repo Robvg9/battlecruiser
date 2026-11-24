@@ -59,7 +59,23 @@ JOIN public.turno_jornada_programacion program
   ON program.id=s.jornada_programacion_id
 JOIN public.almacenes warehouse
   ON warehouse.id=s.almacen_id
-WHERE NOT (
+WHERE (
+  transfer.fecha<=coalesce(
+    s.corte_operativo_at,
+    (
+      (coalesce(program.fecha_fin,program.fecha)::timestamp+program.hora_fin_prevista)
+      AT TIME ZONE coalesce(nullif(program.zona_horaria,''),'America/Havana')
+    )
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.turno_eventos explicit_link_event
+    WHERE explicit_link_event.turno_sesion_id=s.id
+      AND explicit_link_event.tipo='TRANSFERENCIA_RETROACTIVA_VINCULADA'
+      AND explicit_link_event.payload->>'transferencia_id'=transfer.id::text
+  )
+)
+AND NOT (
   s.fecha=DATE '2026-11-18'
   AND program.fecha_fin=DATE '2026-11-20'
   AND warehouse.nombre ILIKE '%La Cueva%'
@@ -321,19 +337,19 @@ $old$;
   normalized_movement_rows AS (
     SELECT
       CASE WHEN v_session.almacen_tipo='minorista'
-        THEN coalesce(product.producto_padre_id,m.producto_id)
-        ELSE m.producto_id END AS producto_id,
-      m.tipo,m.cantidad
-    FROM movement_rows m
-    LEFT JOIN public.productos product ON product.id=m.producto_id
+        THEN coalesce(product.producto_padre_id,raw_m.producto_id)
+        ELSE raw_m.producto_id END AS producto_id,
+      raw_m.tipo,raw_m.cantidad
+    FROM movement_rows raw_m
+    LEFT JOIN public.productos product ON product.id=raw_m.producto_id
   ),
   movement_totals AS (
     SELECT
       m.producto_id,
-$old$;
+$new$;
   v_old_movement_from text:=$old$
     FROM movement_rows m
-$new$;
+$old$;
   v_new_movement_from text:=$new$
     FROM normalized_movement_rows m
 $new$;
@@ -377,6 +393,171 @@ BEGIN
   EXECUTE v_function;
 END
 $patch_operational_stock$;
+
+-- Reconcile previously stored price checkpoints that were computed from a
+-- family root only and therefore ignored variant transfer lines. The correction
+-- is conservative: it runs only when the normalized operational stock differs
+-- from the stored snapshot, the physical checkpoint is compatible, and no
+-- tracked stock movement for that product occurred after the price checkpoint.
+DO $reconcile_price_change_stock$
+DECLARE
+  v_row record;
+  v_previous_sold numeric;
+  v_corrected_sold numeric;
+  v_inserted integer;
+BEGIN
+  FOR v_row IN
+    SELECT
+      c.id AS change_id,
+      c.turno_sesion_id,
+      s.turno_id,
+      c.almacen_id,
+      c.producto_id,
+      p.nombre AS producto,
+      c.precio_anterior,
+      c.precio_nuevo,
+      c.stock_sistema AS stock_sistema_anterior,
+      c.stock_contado,
+      coalesce(c.unidades_vendidas_precio_anterior,0) AS unidades_precio_anterior_previas,
+      c.confirmado_en,
+      q.cantidad_actual AS stock_sistema_corregido,
+      s.corte_operativo_at
+    FROM public.turno_jornada_cambios_precio c
+    JOIN public.turno_sesiones s ON s.id=c.turno_sesion_id
+    JOIN public.productos p ON p.id=c.producto_id
+    JOIN LATERAL public.bc7_jornada_saldos_operativos(c.turno_sesion_id) q
+      ON q.producto_id=c.producto_id
+    WHERE c.estado='APLICADO'
+      AND s.estado IN ('EN_CURSO','CERRADA_OPERATIVAMENTE')
+      AND c.confirmado_en IS NOT NULL
+      AND c.stock_sistema IS NOT NULL
+      AND c.stock_contado IS NOT NULL
+      AND q.cantidad_actual>c.stock_sistema
+      AND q.cantidad_actual>=c.stock_contado
+      AND q.cantidad_actual-c.stock_contado>coalesce(c.unidades_vendidas_precio_anterior,0)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.turno_eventos e
+        WHERE e.turno_id=s.turno_id
+          AND e.idempotency_key='price_change_stock_reconcile:'||c.id::text
+      )
+      -- No later transfer of the same retail family can have changed the
+      -- operational snapshot between the recorded price count and session cut.
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.transferencias t
+        JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+        JOIN public.productos moved ON moved.id=tl.producto_id
+        WHERE (t.almacen_origen_id=c.almacen_id OR t.almacen_destino_id=c.almacen_id)
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND t.fecha>c.confirmado_en
+          AND t.fecha<=coalesce(s.corte_operativo_at,now())
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.lotes_compra lc
+        JOIN public.productos moved ON moved.id=lc.producto_id
+        WHERE lc.almacen_id=c.almacen_id
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND lc.fecha_compra>c.confirmado_en
+          AND lc.fecha_compra<=coalesce(s.corte_operativo_at,now())
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.reinversiones r
+        JOIN public.reinversiones_lineas rl ON rl.reinversion_id=r.id
+        JOIN public.productos moved ON moved.id=rl.producto_id
+        WHERE r.turno_sesion_id=c.turno_sesion_id
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND r.estado='APROBADA'
+          AND coalesce(r.fecha_revision,r.creado_en)>c.confirmado_en
+          AND coalesce(r.fecha_revision,r.creado_en)<=coalesce(s.corte_operativo_at,now())
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.vales_salida vs
+        JOIN public.productos moved ON moved.id=vs.producto_id
+        WHERE vs.almacen_id=c.almacen_id
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND vs.fecha>c.confirmado_en
+          AND vs.fecha<=coalesce(s.corte_operativo_at,now())
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.mermas m
+        JOIN public.productos moved ON moved.id=m.producto_id
+        WHERE m.turno_sesion_id=c.turno_sesion_id
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND m.estado='APROBADA'
+          AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)>c.confirmado_en
+          AND coalesce(m.fecha_revision,m.actualizado_en,m.creado_en)<=coalesce(s.corte_operativo_at,now())
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.bajas b
+        JOIN public.productos moved ON moved.id=b.producto_id
+        WHERE b.turno_sesion_id=c.turno_sesion_id
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND b.estado='APROBADA'
+          AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)>c.confirmado_en
+          AND coalesce(b.fecha_revision,b.actualizado_en,b.creado_en)<=coalesce(s.corte_operativo_at,now())
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.ventas v
+        JOIN public.ventas_lineas vl ON vl.venta_id=v.id
+        JOIN public.productos moved ON moved.id=vl.producto_id
+        WHERE v.almacen_id=c.almacen_id
+          AND coalesce(moved.producto_padre_id,moved.id)=c.producto_id
+          AND lower(coalesce(v.estado,'')) IN ('completada','completado')
+          AND v.fecha>c.confirmado_en
+          AND v.fecha<=coalesce(s.corte_operativo_at,now())
+      )
+    ORDER BY c.confirmado_en,c.id
+  LOOP
+    SELECT coalesce(sum(previous.unidades_vendidas_precio_anterior),0)
+      INTO v_previous_sold
+    FROM public.turno_jornada_cambios_precio previous
+    WHERE previous.turno_sesion_id=v_row.turno_sesion_id
+      AND previous.producto_id=v_row.producto_id
+      AND previous.estado='APLICADO'
+      AND previous.confirmado_en<v_row.confirmado_en;
+
+    v_corrected_sold:=greatest(
+      0,
+      v_row.stock_sistema_corregido-v_row.stock_contado-coalesce(v_previous_sold,0)
+    );
+    IF v_corrected_sold<=v_row.unidades_precio_anterior_previas THEN
+      CONTINUE;
+    END IF;
+
+    INSERT INTO public.turno_eventos(
+      turno_id,turno_sesion_id,turno_tramo_id,actor_user_id,tipo,payload,idempotency_key
+    ) VALUES (
+      v_row.turno_id,v_row.turno_sesion_id,NULL,NULL,
+      'CAMBIO_PRECIO_TRAMO_STOCK_RECONCILIADO',
+      jsonb_build_object(
+        'change_id',v_row.change_id,
+        'producto_id',v_row.producto_id,
+        'producto',v_row.producto,
+        'precio_anterior',v_row.precio_anterior,
+        'precio_nuevo',v_row.precio_nuevo,
+        'stock_sistema_antes',v_row.stock_sistema_anterior,
+        'stock_sistema_corregido',v_row.stock_sistema_corregido,
+        'stock_contado',v_row.stock_contado,
+        'unidades_precio_anterior_antes',v_row.unidades_precio_anterior_previas,
+        'unidades_precio_anterior_corregidas',v_corrected_sold,
+        'motivo','El cálculo histórico no agrupó las transferencias de variantes con su producto padre. Se recalculó con el saldo operativo normalizado; no se alteró ningún conteo físico ni movimiento.',
+        'metodo','INVENTARIO_INICIAL + MOVIMIENTOS_OPERATIVOS_NORMALIZADOS - CONTEO_FISICO_DEL_CAMBIO'
+      ),
+      'price_change_stock_reconcile:'||v_row.change_id::text
+    )
+    ON CONFLICT DO NOTHING;
+
+    GET DIAGNOSTICS v_inserted=ROW_COUNT;
+    IF v_inserted=1 THEN
+      UPDATE public.turno_jornada_cambios_precio
+      SET stock_sistema=v_row.stock_sistema_corregido,
+          unidades_vendidas_precio_anterior=v_corrected_sold
+      WHERE id=v_row.change_id;
+    END IF;
+  END LOOP;
+END
+$reconcile_price_change_stock$;
 
 -- A transfer is auto-associated with a Jornada only when its actual event
 -- timestamp lies inside exactly one scheduled operational window. Never pick

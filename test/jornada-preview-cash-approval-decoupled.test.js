@@ -6,6 +6,7 @@ const fs=require("node:fs");
 const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const MIGRATION=read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
+const ATTRIBUTION_MIGRATION=read("supabase/migrations/20261124200000_jornada_session_inventory_attribution_hardening.sql");
 const RESPONSIBLE_MIGRATION=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
 const DAILY_CASH_MIGRATION=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
 const DAILY_APPROVALS_MIGRATION=read("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
@@ -45,17 +46,21 @@ test("Retroactive multi-day balances exclude transfers outside the scheduled per
   assert.match(MIGRATION,/BETWEEN v_p\.fecha AND coalesce\(v_p\.fecha_fin,v_p\.fecha\)/);
   assert.match(MIGRATION,/linked\.transferencia_id = t\.id/);
 });
-test("Retroactive transfer attribution is ADMIN-only, one-time, and auditable from the preview",()=>{
-  assert.match(MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_vincular_transferencia_jornada/);
-  assert.match(MIGRATION,/Solo ADMIN puede atribuir una transferencia histórica/);
-  assert.match(MIGRATION,/El Turno maestro debe seguir ABIERTO/);
-  assert.match(MIGRATION,/turno_jornada_entradas_vinculadas/);
-  assert.match(MIGRATION,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
-  assert.match(MIGRATION,/aplicacion_unica',true/);
-  assert.match(MIGRATION,/Esta transferencia ya está vinculada a otra Jornada/);
-  assert.match(UI,/data-bc7-link-transfer/);
-  assert.match(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
-  assert.match(UI,/No se dividirá entre días ni se aplicará a otra jornada/);
+test("Retroactive transfer attribution is ADMIN-only, line-scoped, one-time, and auditable from the preview",()=>{
+  assert.match(ATTRIBUTION_MIGRATION,/CREATE OR REPLACE FUNCTION public\.bc7_vincular_lineas_transferencia_jornada/);
+  assert.match(ATTRIBUTION_MIGRATION,/Solo ADMIN puede atribuir líneas históricas/);
+  assert.match(ATTRIBUTION_MIGRATION,/El Turno maestro debe seguir ABIERTO/);
+  assert.match(ATTRIBUTION_MIGRATION,/turno_jornada_entradas_lineas_vinculadas/);
+  assert.match(ATTRIBUTION_MIGRATION,/TRANSFERENCIA_LINEAS_RETROACTIVAS_VINCULADAS/);
+  assert.match(ATTRIBUTION_MIGRATION,/aplicacion_unica',true/);
+  assert.match(ATTRIBUTION_MIGRATION,/transferencia_linea_id/);
+  assert.match(ATTRIBUTION_MIGRATION,/Esta acción fue retirada/);
+  assert.match(ATTRIBUTION_MIGRATION,/REVOKE ALL ON FUNCTION public\.bc7_vincular_transferencia_jornada/);
+  assert.match(UI,/data-bc7-transfer-line-select/);
+  assert.match(UI,/rpc\('bc7_vincular_lineas_transferencia_jornada'/);
+  assert.doesNotMatch(UI,/rpc\('bc7_vincular_transferencia_jornada'/);
+  assert.match(UI,/Atribuir líneas seleccionadas/);
+  assert.match(UI,/solo las líneas seleccionadas/i);
 });
 test("A rejected final declaration can be corrected without erasing the earlier amount from audit history",()=>{
   assert.match(RESPONSIBLE_MIGRATION,/DINERO_DECLARACION_RESPONSABLE_RECTIFICA_RECHAZO/);
