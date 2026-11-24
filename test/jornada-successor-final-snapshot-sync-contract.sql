@@ -80,7 +80,7 @@ BEGIN
     estado_maestro,dias_turno,apertura_real
   ) VALUES (
     v_turn,v_owner,'Snapshot owner',v_warehouse,
-    (now() AT TIME ZONE 'America/Havana')::date+365,
+    (now() AT TIME ZONE 'America/Havana')::date+30000,
     'ABIERTO',v_owner,v_owner,'EN_CURSO',1,now()-interval '8 hours'
   ) ON CONFLICT(id) DO NOTHING;
 
@@ -90,8 +90,8 @@ BEGIN
     creado_por,actualizado_por
   ) VALUES (
     v_program,v_turn,v_warehouse,1,
-    (now() AT TIME ZONE 'America/Havana')::date+365,
-    (now() AT TIME ZONE 'America/Havana')::date+365,
+    (now() AT TIME ZONE 'America/Havana')::date+30000,
+    (now() AT TIME ZONE 'America/Havana')::date+30000,
     true,v_owner,'07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner
   ) ON CONFLICT(id) DO NOTHING;
 
@@ -101,7 +101,7 @@ BEGIN
     cierre_operativo_origen,cierre_operativo_por
   ) VALUES (
     v_session,v_turn,v_warehouse,1,'JORNADA',
-    (now() AT TIME ZONE 'America/Havana')::date+365,
+    (now() AT TIME ZONE 'America/Havana')::date+30000,
     'CERRADA_OPERATIVAMENTE',v_program,false,now(),now(),'AUTO_HORA_FIN',v_owner
   ) ON CONFLICT(id) DO NOTHING;
 
