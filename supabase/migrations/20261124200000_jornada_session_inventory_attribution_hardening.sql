@@ -107,23 +107,23 @@ $old$;
     AND r.estado IN ('APROBADA','PENDIENTE');
 $new$;
   v_old_transfer_override text := $old$
-      OR EXISTS (
-        SELECT 1
-        FROM public.turno_jornada_entradas_vinculadas linked_override
-        WHERE linked_override.turno_sesion_id=v_s.id
-          AND linked_override.transferencia_id=t.id
-      )
+        OR EXISTS (
+          SELECT 1
+          FROM public.turno_jornada_entradas_vinculadas linked_override
+          WHERE linked_override.turno_sesion_id=v_s.id
+            AND linked_override.transferencia_id=t.id
+        )
 $old$;
   v_new_transfer_override text := $new$
-      OR EXISTS (
-        SELECT 1
-        FROM public.turno_jornada_entradas_vinculadas linked_override
-        JOIN public.turno_jornada_entradas_lineas_vinculadas linked_line
-          ON linked_line.entrada_vinculada_id=linked_override.id
-        WHERE linked_override.turno_sesion_id=v_s.id
-          AND linked_override.transferencia_id=t.id
-          AND linked_line.transferencia_linea_id=tl.id
-      )
+        OR EXISTS (
+          SELECT 1
+          FROM public.turno_jornada_entradas_vinculadas linked_override
+          JOIN public.turno_jornada_entradas_lineas_vinculadas linked_line
+            ON linked_line.entrada_vinculada_id=linked_override.id
+          WHERE linked_override.turno_sesion_id=v_s.id
+            AND linked_override.transferencia_id=t.id
+            AND linked_line.transferencia_linea_id=tl.id
+        )
 $new$;
   v_old_retroactive_override text := $old$
         OR EXISTS(SELECT 1 FROM public.turno_jornada_entradas_vinculadas linked
