@@ -42,7 +42,7 @@ test("each attendant checklist item opens its own operational section and has on
   assert.match(ui,/bc7-checklist-section-source" hidden/);
   assert.match(ui,/Reabrir sección/);
 });
-test("final cash declaration and physical count are resolved in one Owner action", () => {
+test("non-retail final cash declaration and physical count remain a single Owner action", () => {
   const admin = read("public/js/aprobaciones-admin.js");
   const migration = read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
   assert.match(admin, /Confirmar conteo físico/);
@@ -59,7 +59,7 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
-  assert.match(app, /bc7-jornada-ui\.js","7\.56"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.56/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.57"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.57/);
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
 });
