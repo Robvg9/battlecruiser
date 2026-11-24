@@ -59,7 +59,23 @@ JOIN public.turno_jornada_programacion program
   ON program.id=s.jornada_programacion_id
 JOIN public.almacenes warehouse
   ON warehouse.id=s.almacen_id
-WHERE NOT (
+WHERE (
+  transfer.fecha<=coalesce(
+    s.corte_operativo_at,
+    (
+      (coalesce(program.fecha_fin,program.fecha)::timestamp+program.hora_fin_prevista)
+      AT TIME ZONE coalesce(nullif(program.zona_horaria,''),'America/Havana')
+    )
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.turno_eventos explicit_link_event
+    WHERE explicit_link_event.turno_sesion_id=s.id
+      AND explicit_link_event.tipo='TRANSFERENCIA_RETROACTIVA_VINCULADA'
+      AND explicit_link_event.payload->>'transferencia_id'=transfer.id::text
+  )
+)
+AND NOT (
   s.fecha=DATE '2026-11-18'
   AND program.fecha_fin=DATE '2026-11-20'
   AND warehouse.nombre ILIKE '%La Cueva%'

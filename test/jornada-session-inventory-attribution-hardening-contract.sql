@@ -21,6 +21,35 @@ BEGIN
     RAISE EXCEPTION 'FAIL: price-change confirmation must use the corrected family-normalized stock snapshot.';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM public.turno_jornada_entradas_lineas_vinculadas allocated_line
+    JOIN public.turno_jornada_entradas_vinculadas link
+      ON link.id=allocated_line.entrada_vinculada_id
+    JOIN public.transferencias transfer
+      ON transfer.id=link.transferencia_id
+    JOIN public.turno_sesiones session
+      ON session.id=link.turno_sesion_id
+    JOIN public.turno_jornada_programacion program
+      ON program.id=session.jornada_programacion_id
+    WHERE transfer.fecha>coalesce(
+        session.corte_operativo_at,
+        (
+          (coalesce(program.fecha_fin,program.fecha)::timestamp+program.hora_fin_prevista)
+          AT TIME ZONE coalesce(nullif(program.zona_horaria,''),'America/Havana')
+        )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.turno_eventos explicit_link_event
+        WHERE explicit_link_event.turno_sesion_id=session.id
+          AND explicit_link_event.tipo='TRANSFERENCIA_RETROACTIVA_VINCULADA'
+          AND explicit_link_event.payload->>'transferencia_id'=transfer.id::text
+      )
+  ) THEN
+    RAISE EXCEPTION 'FAIL: an automatic post-cut transfer link without an explicit Owner audit event must never become a line-level override.';
+  END IF;
+
   IF position('source_cut.corte_sucesora_origen_id=v_initial.id' IN v_settlement)=0 THEN
     RAISE EXCEPTION 'FAIL: a one-way inherited cut pointer must not move the opening boundary without reciprocal successor proof.';
   END IF;
