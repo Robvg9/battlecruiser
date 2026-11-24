@@ -21,6 +21,7 @@ on:
       - 'supabase/migrations/20261124180000_jornada_linked_transfer_cutoff_override.sql'
       - 'supabase/migrations/20261124200000_jornada_session_inventory_attribution_hardening.sql'
       - 'test/jornada-session-inventory-attribution-hardening-contract.sql'
+      - 'test/jornada-responsible-five-step-contract.sql'
       - 'public/js/bc7-jornada-ui.js'
       - 'test/jornada-linked-postcut-transfer-contract.sql'
       - 'test/step7-jornada-postgres-windows-ci.js'
