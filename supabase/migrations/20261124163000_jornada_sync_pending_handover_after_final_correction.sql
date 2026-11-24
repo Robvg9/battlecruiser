@@ -15,7 +15,6 @@ DECLARE
   v_session_id uuid;
   v_product_id uuid;
   v_actor_id uuid;
-  v_session public.turno_sesiones;
   v_delivery record;
   v_quantity numeric;
   v_old_quantity numeric;
@@ -32,16 +31,8 @@ BEGIN
     IF NEW.tipo<>'FINAL' THEN RETURN NEW; END IF;
   END IF;
 
-  SELECT * INTO v_session
-  FROM public.turno_sesiones
-  WHERE id=v_session_id;
-
-  IF NOT FOUND THEN
-    RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
-  END IF;
-
   FOR v_delivery IN
-    SELECT e.id,e.turno_id,e.almacen_id,e.origen_corte_id
+    SELECT e.id,e.turno_id,e.origen_corte_id
     FROM public.turno_jornada_inventario_entregas e
     WHERE e.origen_sesion_id=v_session_id
       AND e.estado='PENDIENTE_PROGRAMACION'
@@ -111,7 +102,10 @@ BEGIN
     );
   END LOOP;
 
-  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP='DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
 END;
 $function$;
 
@@ -123,5 +117,19 @@ AFTER INSERT OR UPDATE OR DELETE
 ON public.turno_jornada_inventario_correcciones
 FOR EACH ROW
 EXECUTE FUNCTION public.bc7_sync_pending_handover_after_final_correction();
+
+-- Backfill existing active Owner corrections into still-unprogrammed handovers.
+-- The trigger performs the compare-and-update and writes one immutable audit event
+-- per changed product, so an exact re-run is harmless.
+UPDATE public.turno_jornada_inventario_correcciones c
+SET vigente=c.vigente
+WHERE c.tipo='FINAL'
+  AND c.vigente
+  AND EXISTS (
+    SELECT 1 FROM public.turno_jornada_inventario_entregas e
+    WHERE e.origen_sesion_id=c.turno_sesion_id
+      AND e.estado='PENDIENTE_PROGRAMACION'
+      AND e.destino_sesion_id IS NULL
+  );
 
 COMMIT;
