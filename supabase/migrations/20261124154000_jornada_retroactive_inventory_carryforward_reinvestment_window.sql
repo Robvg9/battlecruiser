@@ -1,11 +1,15 @@
 BEGIN;
 
--- A retroactive Jornada may inherit its initial snapshot from a prior FINAL cut
--- that was recorded late. In that case, movement accounting must start at the
--- source cut's effective close, not at the delayed timestamp when it was entered.
--- Approved reinvestments are warehouse movements; a legacy turn/session link must
--- not exclude an otherwise in-period reinvestment from the current stock balance.
--- The cash reinvestment total uses the same operational window as stock movement.
+-- Retroactive Jornadas inherit their opening from a prior FINAL cut that may
+-- have been entered late. Count warehouse transfers from the inherited cut's
+-- effective close, not from the delayed data-entry timestamp.
+--
+-- Reinvestments use a different attribution rule: the Jornada session_id is
+-- the explicit business link. This is important when an authorized reinvestment
+-- is entered after the physical cut but belongs to this sealed Jornada. Include
+-- all approved reinvestments linked to this session, even when created late;
+-- exclude reinvestments linked to other sessions even if their timestamps happen
+-- to fall inside this Jornada's calendar window. Stock and cash totals must agree.
 
 DO $migration$
 DECLARE
@@ -41,13 +45,13 @@ DECLARE
       AND r.estado='APROBADA' AND r.fecha_revision IS NOT NULL
       AND r.creado_en>v_start_at AND r.creado_en<=v_end_at$old_event$;
   v_new_event text := $new_event$WHERE r.almacen_id=v_s.almacen_id
-      AND r.estado='APROBADA' AND r.fecha_revision IS NOT NULL
-      AND r.creado_en>v_start_at AND r.creado_en<=v_end_at$new_event$;
+      AND r.turno_sesion_id=v_s.id
+      AND r.estado='APROBADA' AND r.fecha_revision IS NOT NULL$new_event$;
   v_old_cash text := $old_cash$FROM public.reinversiones r WHERE r.turno_sesion_id=v_s.id AND r.estado IN ('APROBADA','PENDIENTE');$old_cash$;
   v_new_cash text := $new_cash$FROM public.reinversiones r
   WHERE r.almacen_id=v_s.almacen_id
-    AND r.estado IN ('APROBADA','PENDIENTE')
-    AND r.creado_en>v_start_at AND r.creado_en<=v_end_at;$new_cash$;
+    AND r.turno_sesion_id=v_s.id
+    AND r.estado IN ('APROBADA','PENDIENTE');$new_cash$;
 BEGIN
   IF position(v_new_start IN v_function)=0 THEN
     IF position(v_old_start IN v_function)=0 THEN
@@ -71,7 +75,7 @@ BEGIN
   END IF;
 
   EXECUTE v_function;
-  RAISE NOTICE 'PASS: retroactive Jornada movements and reinvestment totals now use the effective inherited-cut window.';
+  RAISE NOTICE 'PASS: retroactive Jornada start uses inherited effective close; reinvestment stock and cash use the same explicit session attribution.';
 END
 $migration$;
 
