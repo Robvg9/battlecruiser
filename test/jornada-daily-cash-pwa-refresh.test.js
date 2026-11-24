@@ -152,23 +152,20 @@ test("mobile Jornada uses labelled inventory cards and stable cash/header layout
   assert.ok(CSS.includes("#app-shell.visible>.app-header #mi-cuenta-btn"));
   assert.ok(CSS.includes("#app-shell.visible>.app-header #logout-btn"));
 });
-test("Owner counts the approved daily sum independently, without adding it twice", () => {
-  assert.match(UI, /data-bc7-final-cash-count/);
-  assert.match(UI, /data-bc7-final-cash-amount/);
+test("Owner-approved daily declarations are the only retail cash verification", () => {
   assert.match(UI, /rpc\('bc7_estado_conteo_efectivo_jornada'/);
-  assert.match(UI, /rpc\('bc7_contar_efectivo_dueno_jornada'/);
   assert.match(UI, /total_diario_aprobado/);
-  const start=UI.indexOf("async function countFinalCash(form){");
-  const end=UI.indexOf("function cashDeclarationHtml(detail){",start);
-  const block=UI.slice(start,end);
-  assert.match(block,/p_monto_contado:amount/);
-  assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
+  assert.match(UI, /entregas_diarias_aprobadas/);
+  assert.match(UI, /Verificación del efectivo por aprobaciones diarias/);
+  assert.doesNotMatch(UI, /data-bc7-final-cash-count|data-bc7-final-cash-amount|countFinalCash/);
+  assert.doesNotMatch(UI, /rpc\('bc7_contar_efectivo_dueno_jornada'/);
+  assert.match(UI, /Cada aprobación diaria del Dueño verifica el importe de esa fecha/);
 });
 
 
 test("saving an already-declared cash period is a successful no-op, not a false validation error",()=>{
   const start=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
-  const end=UI.indexOf("async function countFinalCash(form){",start);
+  const end=UI.indexOf("function cashDeclarationHtml(detail){",start);
   assert.ok(start>=0&&end>start);
   const block=UI.slice(start,end);
   assert.match(block,/if\(!operations\.length\)/);
