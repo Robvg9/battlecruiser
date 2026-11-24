@@ -400,6 +400,8 @@ function applySql(file) {
     applySql("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
     applySql("supabase/migrations/20261123200000_jornada_cash_count_difference_index.sql");
     applySql("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
+    applySql("supabase/migrations/20261124154000_jornada_retroactive_inventory_carryforward_reinvestment_window.sql");
+    applySql("test/jornada-retroactive-stock-movement-window-contract.sql");
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
