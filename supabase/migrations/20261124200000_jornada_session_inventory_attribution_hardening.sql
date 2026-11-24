@@ -356,11 +356,10 @@ BEGIN
   IF NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo ADMIN puede atribuir líneas históricas a una Jornada.' USING ERRCODE='42501';
   END IF;
-  SELECT count(DISTINCT character) INTO v_distinct_chars
-  FROM regexp_split_to_table(coalesce(v_reason,''),'') AS character
-  WHERE character ~ '[[:alnum:]]';
-  IF v_reason IS NULL OR length(v_reason)<15 OR coalesce(v_distinct_chars,0)<6
-     OR v_reason ~* '^(.)\\1{9,}$' THEN
+  SELECT count(DISTINCT ch) INTO v_distinct_chars
+  FROM regexp_split_to_table(coalesce(v_reason,''),'') AS chars(ch)
+  WHERE ch ~ '[[:alnum:]]';
+  IF v_reason IS NULL OR length(v_reason)<15 OR coalesce(v_distinct_chars,0)<6 THEN
     RAISE EXCEPTION 'Explica la atribución con un motivo real de al menos 15 caracteres.' USING ERRCODE='23514';
   END IF;
   IF coalesce(cardinality(p_transferencia_linea_ids),0)<1
@@ -496,5 +495,7 @@ BEGIN
 END;
 $function$;
 REVOKE ALL ON FUNCTION public.bc7_vincular_transferencia_jornada(uuid,uuid,text) FROM PUBLIC,anon,authenticated;
+
+NOTIFY pgrst, 'reload schema';
 
 COMMIT;
