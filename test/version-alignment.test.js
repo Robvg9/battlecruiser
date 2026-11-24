@@ -202,7 +202,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.ok(app.includes("// v9.5.153 — Independent daily cash submission and visible administrative approvals."));
+  assert.ok(app.includes("// v9.5.153 — Approved daily cash is the retail cash verification; no second Owner count."));
   assert.ok(index.includes('<script src="app.js?v=9.5.153"></script>'));
   for (const asset of [
     'style.css?v=9.5.153',
