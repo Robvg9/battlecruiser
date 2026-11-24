@@ -413,7 +413,7 @@
     const raw=String(error&&error.message||error||'').trim();
     const value=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const code=String(error&&error.code||'').toUpperCase();
-    if(context==='successor'&&raw&&code!=='BC_AUTH_CONTEXT_NOT_READY') return raw;
+    if(context==='successor'&&raw&&code&&code!=='BC_AUTH_CONTEXT_NOT_READY') return raw;
     let message='';
     if(context==='adjustment'&&/stock insuficiente/.test(value)) message='La cantidad solicitada supera las existencias disponibles de uno o más productos. Revisa el stock y ajusta la lista; no se registró ninguna baja.';
     else if(context==='adjustment'&&/idempotencia|clave.*(otra lista|otro ajuste)/.test(value)) message='Esta referencia ya corresponde a otra solicitud. Actualiza la Jornada antes de volver a enviar la lista.';
