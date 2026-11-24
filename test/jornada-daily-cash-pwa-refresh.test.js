@@ -175,3 +175,16 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
   assert.match(block,/Faltan importes de estas fechas/);
 });
+
+
+test("worker can submit one completed cash date without waiting for the rest of the period",()=>{
+  const start=UI.indexOf("async function saveCashDaysWorkspace(form,options){");
+  const end=UI.indexOf("async function saveAdminCashDeclaration",start);
+  const save=UI.slice(start,end);
+  assert.match(save,/if\(options\.date&&date!==String\(options\.date\)\)continue/);
+  assert.match(save,/if\(options\.date\)\{msg\(message,'Introduce el importe real de '/);
+  assert.match(save,/data-bc7-save-cash-day/);
+  assert.match(save,/const singleDay=!!options\.date/);
+  assert.match(save,/Entrega del '\+fmtDateHuman\(sent\.date\)\+' enviada y confirmada por el servidor/);
+  assert.match(save,/bc7_estado_confirmaciones_jornada/);
+});
