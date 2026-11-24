@@ -412,6 +412,7 @@ BEGIN
     JOIN LATERAL public.bc7_jornada_saldos_operativos(c.turno_sesion_id) q
       ON q.producto_id=c.producto_id
     WHERE c.estado='APLICADO'
+      AND s.estado IN ('EN_CURSO','CERRADA_OPERATIVAMENTE')
       AND c.confirmado_en IS NOT NULL
       AND c.stock_sistema IS NOT NULL
       AND c.stock_contado IS NOT NULL
