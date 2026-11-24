@@ -7,6 +7,7 @@ const path=require("node:path");
 const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const MIGRATION=read("supabase/migrations/20261117001442_jornada_cash_declaration_approval_decoupled.sql");
 const RESPONSIBLE_MIGRATION=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
+const CASH_PER_DAY_MIGRATION=read("supabase/migrations/20261123210000_jornada_cash_per_day_and_transfer_attribution.sql");
 const FIX=read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
 const UI=read("public/js/bc7-jornada-ui.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
@@ -23,17 +24,21 @@ test("Jornada closure checklist is five steps and includes the saved final cash 
   assert.match(UI,/Declaración de dinero/);
 });
 
-test("The worker declares final cash in Step 5; the Owner counts it separately after handover",()=>{
-  assert.match(RESPONSIBLE_MIGRATION,/bc5_responsable_declarar_dinero_jornada/);
-  assert.match(RESPONSIBLE_MIGRATION,/DINERO_DECLARACION_RESPONSABLE_SUSTITUYE_TRANSCRIPCION/);
-  assert.match(RESPONSIBLE_MIGRATION,/lista_para_conteo/);
-  assert.match(UI,/ownerMayCount=detail\.is_admin&&\['COMPLETADA','CERRADA_OPERATIVAMENTE'\]\.includes\(sessionState\)&&detail\.checklist\?\.lista_para_conteo===true/);
-  assert.match(UI,/data-bc7-final-cash-count/);
-  assert.match(UI,/rpc\('bc5_contar_dinero_entregado'/);
-  assert.match(UI,/el Turno maestro permanece abierto/i);
-  assert.match(ADMIN,/rpc\('bc5_contar_dinero_entregado'/);
-  assert.doesNotMatch(UI,/una sola acción/);
+test("The worker records one amount per date in Step 5; the Owner approves each daily entry",()=>{
+  assert.match(CASH_PER_DAY_MIGRATION,/BC7_CASH_PER_DAY_STEP5_V1/);
+  assert.match(CASH_PER_DAY_MIGRATION,/v_cash_registered:=v_daily_expected>0 AND v_daily_registered=v_daily_expected/);
+  assert.match(CASH_PER_DAY_MIGRATION,/v_daily_approved=v_daily_expected/);
+  assert.match(CASH_PER_DAY_MIGRATION,/PENDIENTE_APROBACION_ENTREGAS_DIARIAS/);
+  assert.match(CASH_PER_DAY_MIGRATION,/v_cash_received:=CASE[\\s\\S]*THEN v_daily_cash/);
+  assert.match(UI,/data-bc7-cash-mode="daily"/);
+  assert.match(UI,/bc7_registrar_entrega_diaria_jornada/);
+  assert.match(UI,/No existe un importe final adicional/);
+  assert.doesNotMatch(UI,/ownerMayCount=detail\\.is_admin/);
+  assert.doesNotMatch(UI,/data-bc7-final-cash-count/);
+  assert.match(ADMIN,/const isDailyCash=x\.tipo==='entrega_diaria'/);
+  assert.match(ADMIN,/Solo el importe aprobado se suma al dinero recogido de la jornada/);
 });
+
 test("Retroactive multi-day balances exclude transfers outside the scheduled period unless explicitly linked",()=>{
   assert.match(MIGRATION,/fecha_programada_fin/);
   assert.match(MIGRATION,/BETWEEN v_session\.fecha_programada AND COALESCE\(v_session\.fecha_programada_fin,v_session\.fecha_programada\)/);

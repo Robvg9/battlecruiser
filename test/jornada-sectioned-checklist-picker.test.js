@@ -42,16 +42,21 @@ test("each attendant checklist item opens its own operational section and has on
   assert.match(ui,/bc7-checklist-section-source" hidden/);
   assert.match(ui,/Reabrir sección/);
 });
-test("final cash declaration and physical count are resolved in one Owner action", () => {
-  const admin = read("public/js/aprobaciones-admin.js");
-  const migration = read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
-  assert.match(admin, /Confirmar conteo físico/);
-  assert.match(admin, /rpc\('bc5_contar_dinero_entregado'/);
-  assert.doesNotMatch(admin, /Aprobar declaración/);
-  assert.match(admin, /Solicitar corrección/);
-  assert.match(migration, /La declaración final debe confirmarse con el conteo físico en una sola acción/);
-  const countStart = migration.indexOf("DO $patch_one_step_final_cash_count$");
-  assert.ok(countStart >= 0);
+test("daily cash is reviewed by the Owner per date, without a second period-wide physical count", () => {
+  const admin=read("public/js/aprobaciones-admin.js");
+  const dailyMigration=read("supabase/migrations/20261123210000_jornada_cash_per_day_and_transfer_attribution.sql");
+  const ui=read("public/js/bc7-jornada-ui.js");
+  assert.match(admin,/const isDailyCash=x\.tipo==='entrega_diaria'/);
+  assert.match(admin,/Solo el importe aprobado se suma al dinero recogido de la jornada/);
+  assert.match(admin,/isFinalCash/,"legacy declarations remain distinguishable from daily entries");
+  assert.match(dailyMigration,/BC7_CASH_PER_DAY_STEP5_V1/);
+  assert.match(dailyMigration,/v_daily_approved=v_daily_expected/);
+  assert.match(dailyMigration,/PENDIENTE_APROBACION_ENTREGAS_DIARIAS/);
+  const shellStart=ui.indexOf("function cashDaysManagerShellHtml(detail,isAssigned,status){");
+  const renderEnd=ui.indexOf("async function loadCashDaysWorkspace(detail){",shellStart);
+  assert.ok(shellStart>=0&&renderEnd>shellStart);
+  const retailDailyView=ui.slice(shellStart,renderEnd);
+  assert.doesNotMatch(retailDailyView,/data-bc7-final-cash-count|data-bc7-admin-cash-declaration|#bc7-cash/);
 });
 
 test("PWA release versions stay aligned after the jornada UX update", () => {
@@ -59,7 +64,7 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
-  assert.match(app, /bc7-jornada-ui\.js","7\.54"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.54/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.55"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.55/);
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
 });

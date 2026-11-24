@@ -35,8 +35,12 @@ test("reintentar el cierre reutiliza la declaración guardada sin intentar regis
   assert.ok(start >= 0 && end > start, "closeSession debe existir en el bundle");
   const close = JOURNADA_UI.slice(start, end);
   assert.match(close, /let amount=\$\('bc7-cash'\)\?\.value\.trim\(\)/);
-  assert.match(close, /if\(saved\)\{amount=String\(state\.detail\.declaracion_dinero\.monto\);\}/);
-  assert.match(close, /if\(!saved\) await rpc\('bc_declarar_dinero'/);
+  assert.match(close,/const dailyCashOnly=cashMode==='daily'&&state\.detail\?\.sesion\?\.es_minorista===true/);
+  assert.match(close,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.match(close,/const existing=state\.detail\.declaracion_dinero&&String\(state\.detail\.declaracion_dinero\.turno_tramo_id\)===String\(tramoId\)/);
+  assert.match(close,/if\(existing\)amount=String\(state\.detail\.declaracion_dinero\.monto\);/);
+  assert.match(close,/if\(!cashReady\)await rpc\('bc_declarar_dinero'/);
+
   assert.match(close, /await rpc\('bc5_cerrar_jornada'/);
 });
 

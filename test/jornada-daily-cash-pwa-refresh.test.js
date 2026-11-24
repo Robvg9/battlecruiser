@@ -73,9 +73,12 @@ test("retail Step 5 is a per-date cash workflow with no period-wide declaration"
   assert.match(UI, /function renderCashDaysWorkspace\(detail\)/);
   assert.match(UI, /for\(let index=0;index<totalDays;index\+\+\)/);
   assert.match(UI, /data-bc7-cash-day-amount/);
-  assert.doesNotMatch(UI, /id="bc7-cash"/);
-  assert.doesNotMatch(UI, /data-bc7-final-cash-count/);
-  assert.doesNotMatch(UI, /data-bc7-admin-cash-declaration/);
+  const dailyShellStart=UI.indexOf("function cashDaysManagerShellHtml(detail,isAssigned,status){");
+  const dailyRenderStart=UI.indexOf("function renderCashDaysWorkspace(detail){",dailyShellStart);
+  const dailyRenderEnd=UI.indexOf("async function loadCashDaysWorkspace(detail){",dailyRenderStart);
+  assert.ok(dailyShellStart>=0&&dailyRenderStart>dailyShellStart&&dailyRenderEnd>dailyRenderStart);
+  const retailCashMarkup=UI.slice(dailyShellStart,dailyRenderEnd);
+  assert.doesNotMatch(retailCashMarkup,/id="bc7-cash"|data-bc7-final-cash-count|data-bc7-admin-cash-declaration/);
   assert.match(UI, /data-bc7-save-cash-days/);
   assert.match(UI, /data-bc7-close-form/);
   assert.doesNotMatch(UI, /data-bc7-open-final-cash/);
@@ -115,7 +118,7 @@ test("handover requires every date and does not create a second final-period cas
   const dailyBranch=block.slice(0,block.indexOf("}else{"));
   assert.match(dailyBranch,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
   assert.doesNotMatch(dailyBranch,/bc_declarar_dinero/);
-  assert.match(dailyBranch,/checklist\?\.declaracion_dinero\?\.completado===true/);
+  assert.match(dailyBranch,/checklist\?\.declaracion_dinero\?\.completado!==true/);
   assert.doesNotMatch(dailyBranch,/declaracion_dinero\.monto/);
   assert.match(block, /bc5_cerrar_jornada/);
   assert.match(block, /finalState!=='COMPLETADA'/);
