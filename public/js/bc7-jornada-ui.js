@@ -413,6 +413,7 @@
     const raw=String(error&&error.message||error||'').trim();
     const value=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const code=String(error&&error.code||'').toUpperCase();
+    if(context==='successor'&&raw&&code!=='BC_AUTH_CONTEXT_NOT_READY') return raw;
     let message='';
     if(context==='adjustment'&&/stock insuficiente/.test(value)) message='La cantidad solicitada supera las existencias disponibles de uno o más productos. Revisa el stock y ajusta la lista; no se registró ninguna baja.';
     else if(context==='adjustment'&&/idempotencia|clave.*(otra lista|otro ajuste)/.test(value)) message='Esta referencia ya corresponde a otra solicitud. Actualiza la Jornada antes de volver a enviar la lista.';
@@ -3358,7 +3359,7 @@
       const host=$('bc7-retro-handover-content');
       if(host)host.innerHTML='<div class="bc7-note"><b>Sucesora preparada.</b><p>Período '+esc(fmtDate(result.fecha_inicio))+'–'+esc(fmtDate(result.fecha_fin))+' · '+esc(result.lineas_inventario)+' familias vinculadas · responsable '+esc(userName(result.responsable_id))+'.</p><p>La jornada sigue bloqueada hasta que se registre la recepción física.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-open="'+esc(result.sesion_id)+'">Abrir recepción física</button></div></div>';
       setStatus('Sucesora retroactiva preparada y vinculada. El turno anterior permanece cerrado.','ok');
-    }catch(e){msg(output,'No se creó la sucesora. '+friendlyError(e,'create'),'error');}
+    }catch(e){msg(output,'No se creó la sucesora. '+friendlyError(e,'successor'),'error');}
     finally{busy(btn,false);}
   }
   async function startRetroSuccessor(btn){
