@@ -23,10 +23,17 @@ $old$;
     );
 $new$;
 BEGIN
-  SELECT pg_get_functiondef(
-    'public.bc7_admin_programar_sucesora_pendiente(uuid,date,uuid,text)'::regprocedure
+  SELECT replace(
+    pg_get_functiondef(
+      'public.bc7_admin_programar_sucesora_pendiente(uuid,date,uuid,text)'::regprocedure
+    ),
+    E'\\r\\n',
+    E'\\n'
   )
   INTO v_definition;
+
+  v_old_block:=replace(v_old_block,E'\\r\\n',E'\\n');
+  v_new_block:=replace(v_new_block,E'\\r\\n',E'\\n');
 
   IF position(v_old_block IN v_definition)=0 THEN
     RAISE EXCEPTION
