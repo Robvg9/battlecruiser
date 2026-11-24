@@ -141,3 +141,10 @@ test("retail owner-count mismatches enter the existing audited Admin exception i
   assert.match(CASH_UI,/bc_aprobar_diferencia/);
   assert.match(CASH_UI,/legacyRows,jornadaRows/);
 });
+
+
+test("admin approval queue is a sibling of the hideable attention block",()=>{
+  assert.match(ADMIN,/const anchor=host&&host\.closest\?host\.closest\('\.cc-bloque'\):null/);
+  assert.match(ADMIN,/anchor\.parentElement\.insertBefore\(b,anchor\)/);
+  assert.doesNotMatch(ADMIN,/host\.parentElement\.insertBefore\(b,host\)/);
+});
