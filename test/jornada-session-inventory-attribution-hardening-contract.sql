@@ -4,10 +4,19 @@ DECLARE
   v_settlement text := pg_get_functiondef('public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure);
   v_trigger text := pg_get_functiondef('public.bc7_vincular_transferencia_jornada_destino_minorista()'::regprocedure);
   v_pending text := pg_get_functiondef('public.bc7_transferencias_pendientes_vinculo_jornada(uuid)'::regprocedure);
+  v_balance text := pg_get_functiondef('public.bc7_jornada_saldos_operativos(uuid)'::regprocedure);
   v_full_link text := pg_get_functiondef('public.bc7_vincular_transferencia_jornada(uuid,uuid,text)'::regprocedure);
   v_line_link text := pg_get_functiondef('public.bc7_vincular_lineas_transferencia_jornada(uuid,uuid,uuid[],text)'::regprocedure);
   v_constraint boolean;
 BEGIN
+  IF position('normalized_movement_rows AS' IN v_balance)=0
+     OR position('FROM movement_rows raw_m' IN v_balance)=0
+     OR position('FROM normalized_movement_rows m' IN v_balance)=0
+     OR position('coalesce(product.producto_padre_id,raw_m.producto_id)' IN v_balance)=0
+     OR position('line_link.transferencia_linea_id=tl.id' IN v_balance)=0 THEN
+    RAISE EXCEPTION 'FAIL: operational stock snapshots (including mandatory price-change counts) must normalize variant lines to the same retail family and use exact transfer-line ownership.';
+  END IF;
+
   IF position('source_cut.corte_sucesora_origen_id=v_initial.id' IN v_settlement)=0 THEN
     RAISE EXCEPTION 'FAIL: a one-way inherited cut pointer must not move the opening boundary without reciprocal successor proof.';
   END IF;

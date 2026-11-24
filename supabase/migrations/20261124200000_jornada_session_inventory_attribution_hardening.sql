@@ -321,11 +321,11 @@ $old$;
   normalized_movement_rows AS (
     SELECT
       CASE WHEN v_session.almacen_tipo='minorista'
-        THEN coalesce(product.producto_padre_id,m.producto_id)
-        ELSE m.producto_id END AS producto_id,
-      m.tipo,m.cantidad
-    FROM movement_rows m
-    LEFT JOIN public.productos product ON product.id=m.producto_id
+        THEN coalesce(product.producto_padre_id,raw_m.producto_id)
+        ELSE raw_m.producto_id END AS producto_id,
+      raw_m.tipo,raw_m.cantidad
+    FROM movement_rows raw_m
+    LEFT JOIN public.productos product ON product.id=raw_m.producto_id
   ),
   movement_totals AS (
     SELECT
