@@ -8,6 +8,7 @@ const read=file=>fs.readFileSync(path.join(__dirname,"..",file),"utf8");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const QUEUE=read("supabase/migrations/20261112141000_bc7_jornada_final_cash_admin_queue.sql");
 const DAILY_ONLY=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
+const DAILY_APPROVALS=read("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
 const PHASE=read("supabase/migrations/20261113160000_jornada_owner_checklist_cash_reorder.sql");
 const MOVEMENTS=read("supabase/migrations/20261112140000_bc7_linked_jornada_movements.sql");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
@@ -118,20 +119,25 @@ test("retail approvals use daily cash rows, not a second legacy final declaratio
 });
 
 
-test("Owner review uses the new independent physical count for retail and hides legacy final totals",()=>{
+test("Owner review reports the approved daily sum for retail without a second physical count",()=>{
   const APP=read("public/app.js");
   const SW=read("public/service-worker.js");
   assert.match(OWNER_REVIEW,/const isRetail=s\.es_minorista===true/);
-  assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
-  assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?l\.dinero_final_contado:s\.efectivo\?\.contado/);
-  assert.match(OWNER_REVIEW,/if\(!isRetail&&s\.efectivo\?\.declarado!=null\)/);
-  assert.match(APP,/jornada-owner-review\.js","1\.13"/);
-  assert.match(SW,/jornada-owner-review\.js\?v=1\.13/);
-  assert.match(DAILY_ONLY,/es_minorista/);
+  assert.match(OWNER_REVIEW,/const ownerPhysicalCash=isRetail\?null:s\.efectivo\?\.contado/);
+  assert.match(OWNER_REVIEW,/efectivo diario aprobado/);
+  assert.match(OWNER_REVIEW,/l\.dinero_recogido_total/);
+  assert.match(OWNER_REVIEW,/cada aprobación del Dueño verifica el efectivo declarado de esa fecha/);
+  assert.doesNotMatch(OWNER_REVIEW,/l\.dinero_final_contado/);
+  assert.match(APP,/jornada-owner-review\.js","1\.14"/);
+  assert.match(SW,/jornada-owner-review\.js\?v=1\.14/);
+  assert.match(APP,/9\.5\.153/);
+  assert.match(DAILY_APPROVALS,/CERRADA_OPERATIVAMENTE/);
+  assert.match(DAILY_APPROVALS,/v_daily_cash/);
+  assert.doesNotMatch(DAILY_APPROVALS,/turno_jornada_conteos_caja/);
 });
 
 
-test("retail owner-count mismatches enter the existing audited Admin exception inbox",()=>{
+test("legacy cash-count differences remain auditable without gating new daily-approved Jornadas",()=>{
   const CASH_UI=read("public/js/turno-cash-handover-ui.js");
   assert.match(DAILY_ONLY,/bc7_listar_diferencias_conteo_efectivo_jornada/);
   assert.match(DAILY_ONLY,/CREATE OR REPLACE FUNCTION public\.bc7_listar_diferencias_conteo_efectivo_jornada/);

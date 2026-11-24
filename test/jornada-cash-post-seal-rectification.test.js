@@ -11,6 +11,7 @@ const migration = fs.readFileSync(
   "utf8"
 );
 const cashMigration = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql"), "utf8");
+const dailyApprovalMigration = fs.readFileSync(path.join(__dirname, "../supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql"), "utf8");
 const mobileCss = fs.readFileSync(
   path.join(__dirname, "../public/bc7-jornada-inventory-mobile.css"),
   "utf8"
@@ -55,7 +56,9 @@ test("sealed retail Jornada captures only the actual date-specific cash entries"
   const daily=ui.slice(start,end);
   assert.doesNotMatch(daily,/Declaración final del período|data-bc7-admin-cash-declaration|data-bc7-rectify-cash-declaration|id="bc7-cash"/);
   assert.match(ui, /bc7_estado_conteo_efectivo_jornada/);
-  assert.match(ui, /bc7_contar_efectivo_dueno_jornada/);
+  assert.match(ui, /dailyCashStatus/);
+  assert.match(ui, /Verificación del efectivo por aprobaciones diarias/);
+  assert.doesNotMatch(ui, /bc7_contar_efectivo_dueno_jornada|data-bc7-final-cash-count|countFinalCash/);
   assert.match(ui, /data-bc7-save-cash-days/);
   assert.match(ui,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
   assert.match(ui,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
@@ -78,25 +81,19 @@ test("closed retail Jornada keeps the five-step checklist visible while preservi
   assert.match(checklist,/Reabrir sección/);
 });
 
-test("Owner physical count is independent and cannot duplicate the daily declared sum", () => {
-  assert.match(ui, /countState\?\.puede_contar===true/);
-  assert.match(ui, /data-bc7-final-cash-count/);
-  assert.match(ui, /bc7_contar_efectivo_dueno_jornada/);
+test("Owner-approved daily declarations verify all retail Jornada cash without a second count", () => {
+  assert.match(ui, /Verificación del efectivo por aprobaciones diarias/);
+  assert.match(ui, /entregas_diarias_aprobadas/);
   assert.match(ui, /total_diario_aprobado/);
-  const start=ui.indexOf("async function countFinalCash(form){");
-  const end=ui.indexOf("function cashDeclarationHtml(detail){",start);
-  const block=ui.slice(start,end);
-  assert.match(block,/p_monto_contado:amount/);
-  assert.doesNotMatch(block,/bc5_contar_dinero_entregado|declarationId/);
-  assert.match(cashMigration,/THEN v_final_counted ELSE NULL END/);
-  const settlementAnchor=cashMigration.indexOf("v_cash_received:=CASE");
-  const singleCashStart=cashMigration.indexOf("v_new := $new$",settlementAnchor);
-  const singleCashEnd=cashMigration.indexOf("$new$;",singleCashStart)+6;
-  const singleCashBlock=cashMigration.slice(singleCashStart,singleCashEnd);
-  assert.match(singleCashBlock,/v_final_cash_state IN \('APROBADA','APROBADA_CON_DIFERENCIA'\)/);
-  assert.match(singleCashBlock,/THEN v_final_counted ELSE NULL END/);
-  assert.doesNotMatch(singleCashBlock,/v_daily_cash\+v_final_counted/);
-  assert.match(ui, /El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos/);
+  assert.doesNotMatch(ui, /data-bc7-final-cash-count|countFinalCash|bc7_contar_efectivo_dueno_jornada/);
+  assert.doesNotMatch(dailyApprovalMigration, /turno_jornada_conteos_caja/);
+  assert.match(dailyApprovalMigration, /v_daily_approved=v_daily_expected/);
+  assert.match(dailyApprovalMigration, /coalesce\(v_daily_cash,0\)/);
+  assert.match(dailyApprovalMigration, /'requiere_conteo_fisico',false/);
+  assert.match(dailyApprovalMigration, /'listo_para_revision'/);
+  assert.doesNotMatch(dailyApprovalMigration, /v_daily_cash\+v_final_counted/);
+  // Legacy table and count RPC are preserved for historical/non-retail expedientes.
+  assert.match(cashMigration,/CREATE TABLE IF NOT EXISTS public\.turno_jornada_conteos_caja/);
 });
 
 test("post-seal daily cash backfill is ADMIN-gated, period-bounded, idempotent and audited", () => {

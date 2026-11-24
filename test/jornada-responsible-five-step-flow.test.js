@@ -8,6 +8,7 @@ const read=file=>fs.readFileSync(path.join(root,file),"utf8");
 const ui=read("public/js/bc7-jornada-ui.js");
 const migration=read("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
 const cashMigration=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
+const dailyApprovalMigration=read("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
 const transferMigration=read("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
 const app=read("public/app.js");
 const sw=read("public/service-worker.js");
@@ -53,15 +54,14 @@ test("Step 5 requires exactly one daily entry per period date and no worker fina
   const saveBlock=ui.slice(saveStart,saveEnd);
   assert.doesNotMatch(saveBlock,/saveCashDeclaration|finalOperation|declaración final/);
   assert.match(ui,/bc7_estado_conteo_efectivo_jornada/);
-  assert.match(ui,/bc7_contar_efectivo_dueno_jornada/);
-  assert.match(cashMigration,/v_daily_registered=v_daily_expected/);
-  assert.match(cashMigration,/turno_jornada_conteos_caja/);
-  assert.match(cashMigration,/THEN v_final_counted ELSE NULL END/);
-  const settlementStart=cashMigration.indexOf("v_new := $new$",cashMigration.indexOf("v_cash_received:=CASE"));
-  const settlementEnd=cashMigration.indexOf("$new$;",settlementStart)+6;
-  const settlement=cashMigration.slice(settlementStart,settlementEnd);
-  assert.match(settlement,/v_final_cash_state IN \('APROBADA','APROBADA_CON_DIFERENCIA'\)/);
-  assert.doesNotMatch(settlement,/v_daily_cash\+v_final_counted/);
+  assert.doesNotMatch(ui,/bc7_contar_efectivo_dueno_jornada|data-bc7-final-cash-count|countFinalCash/);
+  assert.match(ui,/Verificación del efectivo por aprobaciones diarias/);
+  assert.match(dailyApprovalMigration,/v_daily_approved=v_daily_expected/);
+  assert.match(dailyApprovalMigration,/v_cash_received:=CASE/);
+  assert.match(dailyApprovalMigration,/coalesce\(v_daily_cash,0\)/);
+  assert.doesNotMatch(dailyApprovalMigration,/turno_jornada_conteos_caja/);
+  assert.match(dailyApprovalMigration,/requiere_conteo_fisico',false/);
+  assert.match(dailyApprovalMigration,/PENDIENTE_APROBACION_DIARIA/);
 });
 
 test("sealed step 5 is mounted only inside the checklist source container",()=>{
@@ -72,10 +72,10 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
   assert.match(ui,/const op=.*cashDaysManagerShellHtml/);
 });
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.56"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.56/);
-  assert.match(app,/9\.5\.152/);
-  assert.match(sw,/9\.5\.152/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.57"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.57/);
+  assert.match(app,/9\.5\.153/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.153"/);
 });
 
 

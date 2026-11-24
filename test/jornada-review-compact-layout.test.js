@@ -26,7 +26,7 @@ test("Product review can switch between stock and financial columns",()=>{
 });
 test("Review evidence is optional in collapsible panels",()=>{
   assert.match(REVIEW,/class="bcjr-detail"/);
-  assert.match(REVIEW,/Entregas y conteo de efectivo/);
+  assert.match(REVIEW,/Entregas diarias de efectivo/);
   assert.match(REVIEW,/Bajas y mermas para clasificar/);
   assert.match(REVIEW,/Liquidación y desglose financiero/);
 });

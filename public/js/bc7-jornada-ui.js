@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.56 — aprobaciones visibles y entregas de efectivo enviadas por fecha.
+// v7.57 — aprobaciones diarias de efectivo; sin segundo conteo del Dueño.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashCount:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarCache:new Map(),calendarPromises:new Map()};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarCache:new Map(),calendarPromises:new Map()};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1156,7 +1156,7 @@
     const editable=(sessionState==='EN_CURSO'&&!!detail.tramo_activo&&isAssigned)||
       (sessionState==='CERRADA_OPERATIVAMENTE'&&!!detail.tramo_registrable&&(isAssigned||!!detail.is_admin));
     const rows=arr(state.dailyCashData.entregas);
-    const countState=state.dailyCashCount||null;
+    const cashStatus=state.dailyCashStatus||null;
     const today=dateHavana();
     let html='<div class="bc7-list">';
     let registered=0;
@@ -1183,20 +1183,15 @@
       }
     }
     html+='<p class="bc7-muted">Fechas registradas: <b>'+registered+'/'+totalDays+'</b>. Administración revisa cada entrega diaria por separado.</p>';
-    if(detail.is_admin===true&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)&&detail.checklist?.lista_para_conteo===true){
-      const counted=countState&&countState.monto_contado!=null;
-      html+='<article class="bc7-jornada bc7-owner-cash-count"><div class="bc7-jornada-top"><strong>Conteo físico del Dueño · independiente</strong><span class="bc7-pill '+(counted?(countState.estado==='APROBADA'?'ok':'warn'):'warn')+'">'+(counted?esc(humanStatus(countState.estado||'CON_DIFERENCIA')):'Pendiente')+'</span></div>'+
-        '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Total diario aprobado</small><b>'+esc(money(countState?.total_diario_aprobado??0))+' CUP</b></div>'+
-        '<div class="bc7-overview-item"><small>Conteo físico</small><b>'+(counted?esc(money(countState.monto_contado))+' CUP':'Pendiente')+'</b></div>'+
-        '<div class="bc7-overview-item"><small>Diferencia</small><b>'+(counted?esc(money(countState.diferencia))+' CUP':'Pendiente')+'</b></div></div>'+
-        (counted
-          ?'<p class="bc7-muted">Conteo registrado por ADMIN. Las entregas diarias y el conteo físico permanecen como evidencias separadas.</p>'
-          :countState?.puede_contar===true
-            ?'<form data-bc7-final-cash-count="'+esc(sessionId)+'" data-bc7-final-cash-session="'+esc(sessionId)+'"><p class="bc7-note">Cuenta físicamente el efectivo recibido. El total diario aprobado es la referencia; no se suma dos veces al conteo.</p><label class="bc7-field">Efectivo contado físicamente (CUP)<input data-bc7-final-cash-amount type="number" min="0" step="0.01" inputmode="decimal" required placeholder="Importe contado"></label><label class="bc7-field">Observación del conteo (opcional)<input data-bc7-final-cash-note maxlength="1000" placeholder="Billetes faltantes, sobrantes o incidencias"></label><div class="bc7-actions"><button class="bc7-btn primary" type="submit">Guardar conteo del Dueño</button></div><p class="bc7-msg" data-bc7-final-cash-msg></p></form>'
-            :'<p class="bc7-muted">El conteo se habilitará cuando Administración haya aprobado todas las entregas diarias y los cinco pasos estén completos.</p>')+
-        '</article>';
-    }else if(detail.is_admin&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)&&detail.checklist?.lista_para_conteo!==true){
-      html+='<p class="bc7-muted">El conteo físico del Dueño se habilitará cuando la responsable complete los cinco pasos.</p>';
+    if(detail.is_admin===true&&['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(sessionState)){
+      const approved=Number(cashStatus?.entregas_diarias_aprobadas||0);
+      const expected=Number(cashStatus?.entregas_diarias_esperadas||totalDays);
+      const totalApproved=Number(cashStatus?.total_diario_aprobado||0);
+      const ready=expected>0&&approved===expected&&Number(cashStatus?.entregas_diarias_pendientes_aprobacion||0)===0;
+      html+='<article class="bc7-jornada bc7-owner-cash-count"><div class="bc7-jornada-top"><strong>Verificación del efectivo por aprobaciones diarias</strong><span class="bc7-pill '+(ready?'ok':'warn')+'">'+(ready?'Aprobado':'Pendiente')+'</span></div>'+
+        '<div class="bc7-workspace-overview"><div class="bc7-overview-item"><small>Entregas aprobadas</small><b>'+approved+'/'+expected+'</b></div>'+
+        '<div class="bc7-overview-item"><small>Total de efectivo aceptado</small><b>'+esc(money(totalApproved))+' CUP</b></div></div>'+
+        '<p class="bc7-muted">Cada aprobación diaria del Dueño verifica el importe de esa fecha. La suma de esos importes es el efectivo reconocido para la liquidación; no hace falta un segundo conteo ni otro formulario.</p></article>';
     }
     host.innerHTML=html;
   }
@@ -1211,7 +1206,7 @@
       host.innerHTML='<div class="bc7-empty">El servidor aún no ha confirmado tu asignación a esta jornada. No se mostraron importes.</div>';
       return;
     }
-    if(state.dailyCashSessionId===sessionId&&state.dailyCashData&&state.dailyCashCount){
+    if(state.dailyCashSessionId===sessionId&&state.dailyCashData&&state.dailyCashStatus){
       renderCashDaysWorkspace(detail);
       return true;
     }
@@ -1223,12 +1218,12 @@
       ]);
       if(results[0].status==='rejected')throw results[0].reason;
       state.dailyCashData=results[0].value||{};
-      state.dailyCashCount=results[1].status==='fulfilled'?(results[1].value||{}):null;
+      state.dailyCashStatus=results[1].status==='fulfilled'?(results[1].value||{}):null;
       state.dailyCashSessionId=sessionId;
       renderCashDaysWorkspace(detail);
       if(results[1].status==='rejected'&&state.admin){
         const message=$('bc7-cash-days-msg');
-        msg(message,'No se pudo consultar el estado del conteo físico del Dueño. Las entregas diarias sí se cargaron; actualiza antes de contar.','error');
+        msg(message,'No se pudo consultar el estado de aprobación de las entregas diarias. Las entregas sí se cargaron; actualiza antes de revisar.','error');
       }
       return true;
     }catch(e){
@@ -1312,9 +1307,9 @@
         const readRows=arr(reread.entregas);
         const missingRows=dailySubmitted.filter(sent=>!readRows.some(item=>String(item.fecha||'').slice(0,10)===sent.date&&Number(item.monto_declarado)===sent.amount&&(!sent.id||String(item.id)===sent.id)));
         if(missingRows.length)throw new Error('El servidor no confirmó la lectura de '+missingRows.map(x=>fmtDateHuman(x.date)).join(', ')+'. Conservé las claves para evitar duplicados.');
-        state.dailyCashData=reread;state.dailyCashSessionId=sessionId;state.dailyCashCount=null;
+        state.dailyCashData=reread;state.dailyCashSessionId=sessionId;state.dailyCashStatus=null;
         try{detail.checklist=await rpc('bc7_estado_confirmaciones_jornada',{p_turno_sesion_id:sessionId});}catch(_){/* Daily-row readback is already authoritative. */}
-        try{state.dailyCashCount=await rpc('bc7_estado_conteo_efectivo_jornada',{p_turno_sesion_id:sessionId});}catch(_){/* Owner count remains separately gated. */}
+        try{state.dailyCashStatus=await rpc('bc7_estado_conteo_efectivo_jornada',{p_turno_sesion_id:sessionId});}catch(_){/* The daily-approval summary is refreshed independently from the delivered rows. */}
       }
       renderCashDaysWorkspace(state.detail);
       if(options.requireComplete){
@@ -1393,55 +1388,6 @@
       setStatus('Declaración rectificada: importe diario y fecha guardados con auditoría.','ok');return true;
     }catch(error){
       msg(message,friendlyError(error,'create')+' '+String(error?.message||''),'error');return false;
-    }finally{busy(button,false);}
-  }
-  async function countFinalCash(form){
-    const sessionId=String(form?.dataset?.bc7FinalCashSession||form?.dataset?.bc7FinalCashCount||'');
-    const amountInput=form?.querySelector('[data-bc7-final-cash-amount]');
-    const amount=amountInput?Number(amountInput.value):NaN;
-    const note=form?.querySelector('[data-bc7-final-cash-note]')?.value.trim()||null;
-    const message=form?.querySelector('[data-bc7-final-cash-msg]');
-    const button=form?.querySelector('button[type="submit"]');
-    const session=state.detail?.sesion;
-    const countState=state.dailyCashCount;
-    if(!state.admin||!sessionId||String(session?.id||'')!==sessionId||
-       !['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(String(session?.estado||'').toUpperCase())||
-       state.detail?.checklist?.lista_para_conteo!==true){
-      msg(message,'El conteo solo está disponible para ADMIN después de completar los cinco pasos.','error');return false;
-    }
-    if(!countState||countState.puede_contar!==true||countState.monto_contado!=null){
-      msg(message,'Las entregas diarias todavía no están todas aprobadas o el conteo ya fue guardado. Actualiza la Jornada antes de continuar.','error');return false;
-    }
-    if(!Number.isFinite(amount)||amount<0){
-      msg(message,'Introduce el importe físico real, igual o mayor que cero.','error');return false;
-    }
-    if(!confirm('Total de entregas diarias aprobadas: '+money(countState.total_diario_aprobado)+' CUP.\\nConteo físico que estás registrando: '+money(amount)+' CUP.\\n\\nSe guardará en un registro independiente, sin sumar dos veces las entregas diarias. ¿Confirmas?'))return false;
-    if(!busy(button,true))return false;
-    try{
-      const result=await rpc('bc7_contar_efectivo_dueno_jornada',{
-        p_turno_sesion_id:sessionId,p_monto_contado:amount,p_observacion:note
-      });
-      state.dailyCashCount=null;
-      const loaded=await loadCashDaysWorkspace(state.detail);
-      const saved=state.dailyCashCount;
-      if(!loaded||!saved||String(saved.turno_sesion_id)!==sessionId||Number(saved.monto_contado)!==amount){
-        throw new Error('El servidor no confirmó la lectura del mismo conteo físico. Actualiza antes de repetir.');
-      }
-      setStatus(Number(saved.diferencia||0)===0?'Conteo físico del Dueño guardado y conciliado.':'Conteo físico guardado; existe una diferencia que requiere revisión.','ok');
-      return true;
-    }catch(e){
-      try{
-        state.dailyCashCount=null;
-        await loadCashDaysWorkspace(state.detail);
-        const saved=state.dailyCashCount;
-        if(saved&&String(saved.turno_sesion_id)===sessionId&&Number(saved.monto_contado)===amount){
-          setStatus(Number(saved.diferencia||0)===0?'Conteo del Dueño confirmado al volver a consultar.':'Conteo confirmado; la diferencia requiere revisión.','ok');
-          return true;
-        }
-      }catch(_){}
-      msg(message,friendlyError(e,'create')+' No repitas el conteo con otro importe hasta actualizar y comprobar el estado.','error');
-      setStatus('No se pudo confirmar la lectura del conteo físico.','error');
-      return false;
     }finally{busy(button,false);}
   }
 
@@ -2373,8 +2319,8 @@
       if(session.es_minorista===true){
         summary.push(
           ['Entregas diarias',Number(cashCount?.entregas_diarias_registradas||0)+'/'+Number(cashCount?.entregas_diarias_esperadas||0)+' fechas'],
-          ['Conteo físico del Dueño',cashCount?.monto_contado==null?'Pendiente':money(cashCount.monto_contado)+' CUP'],
-          ['Diferencia del conteo',cashCount?.diferencia==null?'Pendiente':money(cashCount.diferencia)+' CUP']
+          ['Efectivo diario aprobado',money(cashCount?.total_diario_aprobado||0)+' CUP'],
+          ['Entregas aprobadas',Number(cashCount?.entregas_diarias_aprobadas||0)+'/'+Number(cashCount?.entregas_diarias_esperadas||0)+' fechas']
         );
       }else{
         summary.push(
@@ -2390,7 +2336,6 @@
         const dailyRegistered=Number(cashCount?.entregas_diarias_registradas||0);
         const dailyExpected=Number(cashCount?.entregas_diarias_esperadas||0);
         if(dailyExpected>0&&dailyRegistered!==dailyExpected)missing.push('Entregas diarias de efectivo incompletas ('+dailyRegistered+'/'+dailyExpected+').');
-        if(complete&&cashCount?.monto_contado==null)missing.push('Conteo físico del Dueño pendiente.');
       }else if(!declaration)missing.push('Declaración de efectivo pendiente');
       if(settlement?.calculable!==true)missing.push('Liquidación todavía no calculable o con datos pendientes');
       const body=root.querySelector('.bc7-checklist-modal-body');
@@ -2516,7 +2461,7 @@
     state.workspaceOperationPromise=null;
     state.workspaceOperationLoaded=false;
     state.inventorySettlement=null;
-    if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;state.dailyCashCount=null;}
+    if(isNewSelection){state.workspaceTab='inventario';state.dailyCashData=null;state.dailyCashSessionId=null;state.dailyCashStatus=null;}
     setPageMode(true);$('bc7-workspace').hidden=false;$('bc7-workspace-title').textContent='Cargando jornada…';
     $('bc7-workspace-body').innerHTML='<div class="bc7-empty">Cargando jornada…</div>';
     try{
@@ -3723,7 +3668,6 @@
     else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
     else if(f.matches('[data-bc7-admin-cash-declaration]')){e.preventDefault();await saveAdminCashDeclaration(f);}
     else if(f.matches('[data-bc7-rectify-cash-declaration]')){e.preventDefault();await rectifyAdminCashDeclaration(f);}
-    else if(f.matches('[data-bc7-final-cash-count]')){e.preventDefault();await countFinalCash(f);}
   });
   document.addEventListener('change',function(e){
     const t=e.target;
