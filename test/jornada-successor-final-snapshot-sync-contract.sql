@@ -71,10 +71,7 @@ BEGIN
   ON CONFLICT(id) DO NOTHING;
 
   INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
-  VALUES
-    (v_product,'Snapshot base product','unidad',true,10),
-    (v_late_product,'Product created after source snapshot','unidad',true,10),
-    (v_third_product,'Another later product','unidad',true,10)
+  VALUES(v_product,'Snapshot base product','unidad',true,10)
   ON CONFLICT(id) DO UPDATE
     SET activo=true,producto_padre_id=NULL,archivado_at=NULL;
 
@@ -143,8 +140,13 @@ BEGIN
     RAISE EXCEPTION 'FAIL: initial pending handover should contain one source FINAL line, got %.',v_count;
   END IF;
 
-  -- A new catalogue product is not part of the old snapshot until a physical
-  -- FINAL line is added. Adding the line later must update the pending handover.
+  -- The catalogue item itself is created only after the old handover exists.
+  INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
+  VALUES(v_late_product,'Product created after source snapshot','unidad',true,10)
+  ON CONFLICT(id) DO UPDATE
+    SET activo=true,producto_padre_id=NULL,archivado_at=NULL;
+
+  -- Adding its physical FINAL line later must update the pending handover.
   INSERT INTO public.turno_jornada_inventario_lineas(
     corte_id,producto_id,cantidad_contada,stock_sistema
   ) VALUES(v_cut,v_late_product,7,7);
@@ -182,6 +184,11 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'FAIL: deleting a FINAL line must remove it from an unlinked pending handover.';
   END IF;
+
+  INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
+  VALUES(v_third_product,'Another later product','unidad',true,10)
+  ON CONFLICT(id) DO UPDATE
+    SET activo=true,producto_padre_id=NULL,archivado_at=NULL;
 
   INSERT INTO public.turno_jornada_inventario_lineas(
     corte_id,producto_id,cantidad_contada,stock_sistema
