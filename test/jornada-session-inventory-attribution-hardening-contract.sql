@@ -36,7 +36,8 @@ BEGIN
      OR position('NEW.fecha <=' IN v_trigger)=0
      OR position('p.hora_inicio_prevista' IN v_trigger)=0
      OR position('p.hora_fin_prevista' IN v_trigger)=0
-     OR position('lower(coalesce(NEW.estado, ''''))<>''completada''' IN v_trigger)=0
+     OR position('lower(coalesce(NEW.estado' IN v_trigger)=0
+     OR position('completada' IN v_trigger)=0
      OR position('ORDER BY s.fecha DESC' IN v_trigger)>0 THEN
     RAISE EXCEPTION 'FAIL: automatic attribution must require completed transfer timestamp inside exactly one scheduled Jornada window.';
   END IF;
