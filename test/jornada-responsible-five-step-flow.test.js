@@ -72,10 +72,10 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
   assert.match(ui,/const op=.*cashDaysManagerShellHtml/);
 });
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.55"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.55/);
-  assert.match(app,/9\.5\.151/);
-  assert.match(sw,/9\.5\.151/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.56"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.56/);
+  assert.match(app,/9\.5\.152/);
+  assert.match(sw,/9\.5\.152/);
 });
 
 
