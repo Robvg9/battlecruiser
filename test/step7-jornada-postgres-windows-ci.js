@@ -411,6 +411,8 @@ function applySql(file) {
     applySql("test/jornada-fosforeras-and-operational-close-price-tranches-contract.sql");
     log("Apply source-FINAL successor snapshot synchronization and verify historical product-set immutability.");
     applySql("supabase/migrations/20261124230000_jornada_successor_final_snapshot_sync.sql");
+    log("\\r\\n=== Scope historical mismatch validation to the exact source FINAL cut ===");
+    applySql("supabase/migrations/20261124233000_jornada_successor_scope_final_snapshot_validation.sql");
     applySql("test/jornada-successor-final-snapshot-sync-contract.sql");
     applySql("test/jornada-session-inventory-attribution-hardening-contract.sql");
     applySql("test/jornada-linked-postcut-transfer-contract.sql");
