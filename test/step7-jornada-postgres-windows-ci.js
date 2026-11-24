@@ -399,13 +399,15 @@ function applySql(file) {
     applySql("supabase/migrations/20261123183000_jornada_responsable_completar_cinco_pasos.sql");
     applySql("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
     applySql("supabase/migrations/20261123200000_jornada_cash_count_difference_index.sql");
+    applySql("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
+    applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
     log("\\r\\n=== Verify sealed Jornada late-Baja functional behavior (saldo, retry, reservations and master-Turn gate) ===");
     applySql("test/jornada-sealed-baja-balance-functional.sql");
     applySql("test/jornada-period-reprogramming-contract.sql");
     log("\\r\\nPASS Jornada period rescheduling: overlapping shifts, conflicts, inventory/activity freeze, audit, idempotency and RBAC.");
-    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with mandatory physical count and effective-dated price/cost history.");
+    log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with daily cash approvals as retail verification and no second Owner count.");
   } catch (error) {
     failure = error;
     log("\r\nFAIL Step 7 PostgreSQL 17 contract: " + (error && error.stack ? error.stack : String(error)));
