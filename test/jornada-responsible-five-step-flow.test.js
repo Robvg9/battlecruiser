@@ -10,6 +10,7 @@ const migration=read("supabase/migrations/20261123183000_jornada_responsable_com
 const cashMigration=read("supabase/migrations/20261123193000_jornada_daily_cash_without_final_declaration.sql");
 const dailyApprovalMigration=read("supabase/migrations/20261124001500_jornada_daily_approvals_replace_owner_cash_count.sql");
 const transferMigration=read("supabase/migrations/20261121193906_jornada_operational_close_and_transfer_attribution.sql");
+const attributionMigration=read("supabase/migrations/20261124200000_jornada_session_inventory_attribution_hardening.sql");
 const app=read("public/app.js");
 const sw=read("public/service-worker.js");
 
@@ -111,18 +112,21 @@ test("transfer attribution never disguises server errors as schedule conflicts",
   assert.match(helper,/context==='transfer'&&\(code==='23514'\|\|code==='23505'\)\) message=raw/);
 });
 
-test("sealed transfer attribution surfaces the real server rejection and keeps all safety guards",()=>{
-  assert.match(ui,/bc7_vincular_transferencia_jornada/);
-  assert.match(ui,/reason\.trim\(\)\.length<10/);
+test("sealed transfer-line attribution surfaces server rejection and keeps every safety guard",()=>{
+  assert.match(ui,/bc7_vincular_lineas_transferencia_jornada/);
+  assert.match(ui,/selectedLineIds/);
+  assert.match(ui,/p_transferencia_linea_ids:selectedLineIds/);
+  assert.match(ui,/reason\.trim\(\)\.length<15/);
   assert.match(ui,/friendlyError\(error,'transfer'\)/);
   assert.match(ui,/context==='transfer'&&\(code==='23514'\|\|code==='23505'\)\) message=raw/);
-  assert.match(cashMigration,/v_s\.estado NOT IN \(''PROGRAMADA'',''EN_CURSO'',''COMPLETADA'',''CERRADA_OPERATIVAMENTE''\)/);
-  assert.match(cashMigration,/v_t\.fecha<=v_period_end/);
-  assert.match(cashMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
-  assert.match(cashMigration,/v_existing\.turno_sesion_id=v_s\.id/);
-  assert.match(cashMigration,/t\.estado=''ABIERTO''/);
-  assert.match(cashMigration,/TRANSFERENCIA_RETROACTIVA_VINCULADA/);
-  assert.match(cashMigration,/La función de atribución histórica no conserva las guardas/);
+  assert.match(attributionMigration,/v_s\.estado NOT IN \('PROGRAMADA','EN_CURSO','COMPLETADA','CERRADA_OPERATIVAMENTE'\)/);
+  assert.match(attributionMigration,/v_s\.turno_id/);
+  assert.match(attributionMigration,/t\.estado='ABIERTO'/);
+  assert.match(attributionMigration,/v_t\.fecha<=v_period_end/);
+  assert.match(attributionMigration,/v_t\.almacen_destino_id<>v_s\.almacen_id/);
+  assert.match(attributionMigration,/v_existing_count>0/);
+  assert.match(attributionMigration,/TRANSFERENCIA_LINEAS_RETROACTIVAS_VINCULADAS/);
+  assert.match(attributionMigration,/Esta acción fue retirada/);
 });
 
 

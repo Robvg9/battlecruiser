@@ -74,9 +74,15 @@ test("archived products leave operational selectors and can be restored from the
  assert.ok(PRODUCTS.includes("bc_producto_archivar"));
  assert.ok(PRODUCTS.includes("btn-editar-producto:not(.btn-archivar-producto):not(.btn-restaurar-producto)"));assert.ok(PRODUCTS.includes("bc_producto_restaurar"));assert.ok(PRODUCTS.includes("No se borrarán ventas, compras ni movimientos"));
 });
-test("Jornada Movimientos displays pending late inbound transfers and supports one-time attribution",()=>{
- assert.ok(JORNADA.includes("bc7_transferencias_pendientes_vinculo_jornada"));assert.ok(JORNADA.includes("renderPendingInboundTransfers"));assert.ok(JORNADA.includes("data-bc7-movement-link-transfer"));
- assert.ok(JORNADA.includes("bc7_vincular_transferencia_jornada"));assert.ok(JORNADA.includes("no se ejecuta otra transferencia"));
+test("Jornada Movimientos displays pending late inbound transfers and supports explicit one-time line attribution",()=>{
+ assert.ok(JORNADA.includes("bc7_transferencias_pendientes_vinculo_jornada"));
+ assert.ok(JORNADA.includes("renderPendingInboundTransfers"));
+ assert.ok(JORNADA.includes("data-bc7-movement-link-transfer"));
+ assert.ok(JORNADA.includes("data-bc7-transfer-line-select"));
+ assert.ok(JORNADA.includes("bc7_vincular_lineas_transferencia_jornada"));
+ assert.ok(JORNADA.includes("p_transferencia_linea_ids:selectedLineIds"));
+ assert.ok(JORNADA.includes("Atribuir líneas seleccionadas"));
+ assert.equal(JORNADA.includes("rpc('bc7_vincular_transferencia_jornada'"),false);
 });
 test("historical importer is generic and visibly exceptional",()=>{
  assert.ok(IMPORTER.includes("Importar cierre externo · uso excepcional"));assert.ok(IMPORTER.includes("recupera la jornada sucesora"));
