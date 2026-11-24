@@ -137,6 +137,6 @@ test("final Jornada handover form reads the exact daily rows entered in Step 5",
   const closeStart=ui.indexOf("async function closeSession(form){");
   const closeEnd=ui.indexOf("let checklistModalContext=null",closeStart);
   const close=ui.slice(closeStart,closeEnd);
-  assert.match(close,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true\}\)/);
+  assert.match(close,/saveCashDaysWorkspace\(form,\{requireComplete:true,skipConfirm:true,verifyOnly:true\}\)/);
   assert.doesNotMatch(close,/declaracion_dinero\.monto\)\);/);
 });
