@@ -27,13 +27,13 @@ BEGIN
     pg_get_functiondef(
       'public.bc7_admin_programar_sucesora_pendiente(uuid,date,uuid,text)'::regprocedure
     ),
-    E'\\r\\n',
-    E'\\n'
+    chr(13),
+    ''
   )
   INTO v_definition;
 
-  v_old_block:=replace(v_old_block,E'\\r\\n',E'\\n');
-  v_new_block:=replace(v_new_block,E'\\r\\n',E'\\n');
+  v_old_block:=replace(v_old_block,chr(13),'');
+  v_new_block:=replace(v_new_block,chr(13),'');
 
   IF position(v_old_block IN v_definition)=0 THEN
     RAISE EXCEPTION
