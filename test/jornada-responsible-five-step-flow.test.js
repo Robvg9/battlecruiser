@@ -132,6 +132,8 @@ test("final Jornada handover form reads the exact daily rows entered in Step 5",
   const save=ui.slice(start,end);
   assert.match(save,/const dayRoot=document\.querySelector\('#bc7-cash-days-manager \[data-bc7-close-form\]'\)\|\|form/);
   assert.match(save,/dayRoot\.querySelectorAll\('\[data-bc7-cash-day-row\]'\)/);
+  assert.match(save,/if\(options\.date&&date!==String\(options\.date\)\)continue/);
+  assert.match(ui,/data-bc7-save-cash-day/);
   const closeStart=ui.indexOf("async function closeSession(form){");
   const closeEnd=ui.indexOf("let checklistModalContext=null",closeStart);
   const close=ui.slice(closeStart,closeEnd);
