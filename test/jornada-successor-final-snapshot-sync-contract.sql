@@ -15,6 +15,7 @@ DECLARE
   v_quantity numeric;
   v_events integer;
   v_function text;
+  v_validation_block text;
   v_helper oid := 'public.bc7_sync_pending_handover_product_from_final(uuid,uuid,uuid)'::regprocedure;
   v_bulk_helper oid := 'public.bc7_sync_pending_handover_from_final_cut(uuid,uuid)'::regprocedure;
   v_helper_config text[];
@@ -24,6 +25,17 @@ BEGIN
   SELECT pg_get_functiondef(
     'public.bc7_admin_programar_sucesora_pendiente(uuid,date,uuid,text)'::regprocedure
   ) INTO v_function;
+
+  -- The line comparison must be scoped to this delivery's exact source FINAL cut.
+  v_validation_block:=substring(
+    v_function
+    FROM position('LEFT JOIN LATERAL (' IN v_function)
+    FOR position('SELECT v_mismatch_count + count(*)::integer' IN v_function)
+        - position('LEFT JOIN LATERAL (' IN v_function)
+  );
+  IF position('WHERE source_line.corte_id=v_e.origen_corte_id' IN v_validation_block)=0 THEN
+    RAISE EXCEPTION 'FAIL: FINAL-vs-delivery mismatch validation must exclude inventory lines from every other historical cut.';
+  END IF;
 
   IF position('bc7_sync_pending_handover_from_final_cut' IN v_function)=0
      OR position('turno_jornada_inventario_lineas' IN v_function)=0
