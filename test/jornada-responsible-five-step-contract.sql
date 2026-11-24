@@ -36,12 +36,13 @@ BEGIN
     RAISE EXCEPTION 'FAIL: Step 5 must be completed by exactly one daily entry for each calendar date, without a separate worker final declaration.';
   END IF;
 
-  IF v_liquidacion NOT LIKE '%turno_jornada_conteos_caja%'
+  IF v_liquidacion LIKE '%turno_jornada_conteos_caja%'
      OR v_liquidacion NOT LIKE '%v_daily_cash%'
-     OR v_liquidacion NOT LIKE '%THEN v_final_counted ELSE NULL END%'
+     OR v_liquidacion NOT LIKE '%v_daily_approved=v_daily_expected%'
+     OR v_liquidacion NOT LIKE '%coalesce(v_daily_cash,0)%'
      OR v_liquidacion LIKE '%v_daily_cash+v_final_counted%'
      OR v_liquidacion NOT LIKE '%coalesce(v_p.fecha_fin,v_p.fecha)-v_p.fecha+1%' THEN
-    RAISE EXCEPTION 'FAIL: settlement must use inclusive daily dates and the Owner physical count exactly once.';
+    RAISE EXCEPTION 'FAIL: retail settlement must use the complete sum of Owner-approved daily cash, without a second aggregate count.';
   END IF;
 
   IF v_close NOT LIKE '%turno_jornada_entregas_diarias%'
@@ -54,8 +55,9 @@ BEGIN
   IF to_regclass('public.turno_jornada_conteos_caja') IS NULL
      OR v_count NOT LIKE '%turno_jornada_conteos_caja%'
      OR v_count NOT LIKE '%v_daily_total%'
-     OR v_read_count NOT LIKE '%turno_jornada_conteos_caja%' THEN
-    RAISE EXCEPTION 'FAIL: the Owner count must be stored and read in its own protected table.';
+     OR v_read_count LIKE '%turno_jornada_conteos_caja%'
+     OR v_read_count NOT LIKE '%requiere_conteo_fisico%' THEN
+    RAISE EXCEPTION 'FAIL: legacy physical-count evidence must remain available, but the active retail daily-cash status must not read or require it.';
   END IF;
 
   RAISE NOTICE 'Owner count diagnostics: table=%, count_table_ref=%, count_difference_id=%, read_resolution=%, list_con_diferencia=%, approve_aprobada_con_diferencia=%',
@@ -141,7 +143,7 @@ BEGIN
     RAISE EXCEPTION 'FAIL: new responsible-only RPC grants must be limited to authenticated callers.';
   END IF;
 
-  -- Regression gate: daily cash is the only worker handover; Owner count remains independent and exposes its resolution.
-  RAISE NOTICE 'PASS Jornada contract: five-step completion, daily-only cash handover, independent Owner cash count, non-duplicated settlement, sealed transfer attribution and legacy isolation.';
+  -- Regression gate: daily cash is the only retail cash verification; historical count evidence remains intact but is not a close/review gate.
+  RAISE NOTICE 'PASS Jornada contract: five-step completion, daily-only cash handover, no redundant Owner recount, non-duplicated settlement, sealed transfer attribution and legacy evidence preserved.';
 END
 $responsible_five_step_contract$;
