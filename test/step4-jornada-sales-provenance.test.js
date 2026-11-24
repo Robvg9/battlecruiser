@@ -100,15 +100,15 @@ test("POS routes only a live Jornada through the new endpoint; legacy/offline sa
   assert.match(OFFLINE, /case "venta":\s*case "venta_jornada":\s*marcarRefrescoPendiente\("stock"\)/);
 });
 
-test("Jornada finance shows actual cash declaration/count separately from payment-channel sales", () => {
+test("Jornada finance keeps approved daily cash separate from payment-channel sales", () => {
   assert.match(JOURNEY_UI, /cashDeclarationHtml\(detail\)/);
   assert.match(JOURNEY_UI, /renderSalesLedger\(host,data\)/);
   assert.match(JOURNEY_UI, /bc7_ventas_jornada/);
   assert.match(JOURNEY_UI, /Ventas por forma de pago/);
   assert.match(JOURNEY_UI, /Método no declarado/);
-  assert.match(JOURNEY_UI, /data-bc7-final-cash-count/);
-  assert.match(JOURNEY_UI, /Total diario aprobado/);
-  assert.match(JOURNEY_UI, /Conteo físico del Dueño · independiente/);
+  assert.match(JOURNEY_UI, /Verificación del efectivo por aprobaciones diarias/);
+  assert.match(JOURNEY_UI, /Cada aprobación diaria del Dueño verifica el importe de esa fecha/);
+  assert.doesNotMatch(JOURNEY_UI, /data-bc7-final-cash-count|data-bc7-final-cash-amount|countFinalCash|bc7_contar_efectivo_dueno_jornada/);
   assert.match(INDEX, /id="venta-metodo-pago"/);
   assert.match(INDEX, /id="venta-jornada-payment-wrap"/);
   assert.match(APP, /\["venta-turno-ui\.js","9\.4\.46"\]/);
