@@ -32,6 +32,11 @@ BEGIN
     RAISE EXCEPTION 'FAIL: whole-transfer override found without line-level guard.';
   END IF;
 
+  IF position('allocated_link.turno_sesion_id<>v_s.id' IN v_settlement)=0
+     OR position('allocated_line.transferencia_linea_id=tl.id' IN v_settlement)=0 THEN
+    RAISE EXCEPTION 'FAIL: a line allocated to another Jornada must be excluded from this session, even when its timestamp falls inside this session window.';
+  END IF;
+
   IF position('NEW.fecha >=' IN v_trigger)=0
      OR position('NEW.fecha <=' IN v_trigger)=0
      OR position('p.hora_inicio_prevista' IN v_trigger)=0
