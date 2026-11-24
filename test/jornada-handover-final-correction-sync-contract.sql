@@ -16,7 +16,7 @@ DECLARE
   v_declared numeric;
   v_effective numeric;
   v_events integer;
-  v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
+  v_today date:=(now() AT TIME ZONE 'America/Havana')::date+365;
 BEGIN
   IF to_regprocedure('public.bc7_sync_pending_handover_after_final_correction()') IS NULL
      OR NOT EXISTS (
@@ -47,7 +47,7 @@ BEGIN
     id,turno_id,almacen_id,numero_dia,fecha,fecha_fin,trabaja,responsable_id,
     hora_inicio_prevista,hora_fin_prevista,zona_horaria,patron_id,estado,creado_por,actualizado_por
   ) VALUES(
-    v_program,v_turn,v_warehouse,1,v_today,v_today,true,NULL,
+    v_program,v_turn,v_warehouse,1,v_today,v_today,true,v_owner,
     '07:00','23:00','America/Havana',NULL,'PROGRAMADA',v_owner,v_owner
   ) ON CONFLICT(id) DO NOTHING;
 
