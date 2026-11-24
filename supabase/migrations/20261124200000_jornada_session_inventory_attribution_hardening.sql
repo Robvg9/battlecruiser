@@ -330,7 +330,7 @@ $old$;
   movement_totals AS (
     SELECT
       m.producto_id,
-$old$;
+$new$;
   v_old_movement_from text:=$old$
     FROM movement_rows m
 $new$;
