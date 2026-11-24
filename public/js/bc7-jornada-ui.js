@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.58 — atribución de entradas retroactivas por línea y aislamiento por sesión.
+// v7.59 — atribución de entradas retroactivas, snapshot FINAL y reconciliación de sucesoras.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
