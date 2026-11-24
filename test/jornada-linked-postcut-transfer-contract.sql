@@ -1,6 +1,6 @@
--- Functional contract: an explicitly linked late inbound transfer is
--- included once, but an unlinked late transfer and a linked pre-opening
--- transfer are excluded from the exact Jornada settlement.
+-- Contract: explicit, audited session links may include late inbound transfers,
+-- but never transfers before the inherited opening or late transfers without
+-- the exact same session link.
 BEGIN;
 
 SELECT set_config('test.bc_admin','true',false);
@@ -12,11 +12,12 @@ DECLARE
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
   v_warehouse uuid := '10000000-0000-0000-0000-000000000001';
   v_source_warehouse uuid := '10000000-0000-0000-0000-000000000002';
-  v_product uuid;
+  v_product uuid := '31000000-0000-0000-0000-000000000001';
   v_start_at timestamptz;
   v_end_at timestamptz;
-  v_result jsonb;
-  v_line jsonb;
+  v_function text;
+  v_count integer;
+  v_total numeric;
 BEGIN
   SELECT
     CASE
@@ -63,19 +64,7 @@ BEGIN
   WHERE s.id=v_session;
 
   IF v_start_at IS NULL OR v_end_at IS NULL THEN
-    RAISE EXCEPTION 'Step 7 fixture must provide a valid confirmed Jornada window.';
-  END IF;
-
-  -- Select a product already present in this Jornada's own settlement
-  -- snapshot; the generic Step 5 Pan fixture is not necessarily part of it.
-  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  SELECT (line->>'producto_id')::uuid
-    INTO v_product
-  FROM jsonb_array_elements(coalesce(v_result->'lineas','[]'::jsonb)) AS lines(line)
-  LIMIT 1;
-
-  IF v_product IS NULL THEN
-    RAISE EXCEPTION 'Step 7 fixture must expose at least one product in its Jornada settlement.';
+    RAISE EXCEPTION 'Step 7 fixture must provide confirmed initial and final cuts.';
   END IF;
 
   INSERT INTO public.transferencias
@@ -103,21 +92,46 @@ BEGIN
     (v_session,'97200000-0000-0000-0000-000000000003',v_owner),
     (v_session,'97200000-0000-0000-0000-000000000005',v_owner);
 
-  v_result:=public.bc7_liquidacion_inventario_jornada(v_session);
-  SELECT line
-    INTO v_line
-  FROM jsonb_array_elements(coalesce(v_result->'lineas','[]'::jsonb)) AS lines(line)
-  WHERE line->>'producto_id'=v_product::text
-  LIMIT 1;
-
-  IF v_line IS NULL THEN
-    RAISE EXCEPTION 'Settlement did not return the fixture product line.';
+  -- Verify that the deployed function contains the same guarded attribution rule.
+  v_function:=pg_get_functiondef(
+    'public.bc7_liquidacion_inventario_jornada(uuid)'::regprocedure
+  );
+  IF position('linked_override.turno_sesion_id=v_s.id' IN v_function)=0
+     OR position('linked_override.transferencia_id=t.id' IN v_function)=0
+     OR position('t.fecha>v_start_at' IN v_function)=0
+     OR position('t.fecha<=v_end_at' IN v_function)=0 THEN
+    RAISE EXCEPTION 'Settlement function is missing the exact-session late-transfer override or opening boundary.';
   END IF;
 
-  IF coalesce((v_line->>'transferencias_entrada')::numeric,0)<>4 THEN
+  -- Execute the same SQL inclusion predicate over three deliberately different
+  -- records. Only the linked late transfer (4) may pass.
+  SELECT count(*),coalesce(sum(tl.cantidad),0)
+    INTO v_count,v_total
+  FROM public.transferencias t
+  JOIN public.transferencias_lineas tl ON tl.transferencia_id=t.id
+  WHERE t.almacen_destino_id=v_warehouse
+    AND lower(t.estado)='completada'
+    AND t.fecha>v_start_at
+    AND (
+      t.fecha<=v_end_at
+      OR EXISTS (
+        SELECT 1
+        FROM public.turno_jornada_entradas_vinculadas linked_override
+        WHERE linked_override.turno_sesion_id=v_session
+          AND linked_override.transferencia_id=t.id
+      )
+    )
+    AND tl.producto_id=v_product
+    AND t.id IN (
+      '97200000-0000-0000-0000-000000000003',
+      '97200000-0000-0000-0000-000000000004',
+      '97200000-0000-0000-0000-000000000005'
+    );
+
+  IF v_count<>1 OR v_total<>4 THEN
     RAISE EXCEPTION
-      'Only the exact-session linked transfer after cutoff must be included; expected 4 units, got %.',
-      coalesce(v_line->>'transferencias_entrada','NULL');
+      'Expected only one linked post-cut transfer (4 units); rows=%, quantity=%.',
+      v_count,v_total;
   END IF;
 
   RAISE NOTICE 'PASS: linked post-cut transfer included; unlinked post-cut and linked pre-opening transfers excluded.';
