@@ -17,6 +17,10 @@ BEGIN
     RAISE EXCEPTION 'FAIL: operational stock snapshots (including mandatory price-change counts) must normalize variant lines to the same retail family and use exact transfer-line ownership.';
   END IF;
 
+  IF position('bc7_jornada_saldos_operativos(v_s.id)' IN pg_get_functiondef('public.bc7_confirmar_cambios_precio_conteo(uuid,jsonb)'::regprocedure))=0 THEN
+    RAISE EXCEPTION 'FAIL: price-change confirmation must use the corrected family-normalized stock snapshot.';
+  END IF;
+
   IF position('source_cut.corte_sucesora_origen_id=v_initial.id' IN v_settlement)=0 THEN
     RAISE EXCEPTION 'FAIL: a one-way inherited cut pointer must not move the opening boundary without reciprocal successor proof.';
   END IF;
