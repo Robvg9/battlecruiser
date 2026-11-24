@@ -178,10 +178,13 @@ test("Dependienta can open her active jornada without searching a future-only ca
 });
 
 
-test("Jornada handover precedes Owner cash count and automatic calculation",()=>{
-  for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc7_estado_conteo_efectivo_jornada","bc7_contar_efectivo_dueno_jornada"]) {
+test("Jornada handover uses approved daily cash and never asks the Owner for a second count",()=>{
+  for(const rpcName of ["bc7_estado_confirmaciones_jornada","bc7_confirmar_bloque_jornada","bc7_productos_ajuste_jornada","bc7_estado_conteo_efectivo_jornada"]) {
     assert.ok(ui.includes(rpcName),`Jornada workflow must call ${rpcName}`);
   }
+  assert.match(ui,/Verificación del efectivo por aprobaciones diarias/);
+  assert.match(ui,/Cada aprobación diaria del Dueño verifica el importe de esa fecha/);
+  assert.doesNotMatch(ui,/bc7_contar_efectivo_dueno_jornada|data-bc7-final-cash-count|data-bc7-final-cash-amount|countFinalCash/);
   assert.match(ui,/Checklist de la jornada/);
   assert.match(ui,/Registra todos los gastos reales de este período/);
   assert.match(ui,/Registra todas las reinversiones reales de este período/);
