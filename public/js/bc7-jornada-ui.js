@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.64 — auth profile resolver reads the authenticated global lexical context.
+// v7.65 — Adriana quick-action recovery and session-only historical value corrections.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
