@@ -273,7 +273,7 @@ BEGIN
               WHERE mr.turno_sesion_id=v_s.id AND mr.tipo_movimiento='BAJA'
                 AND mr.movimiento_id=b.id AND mr.clasificacion='ANTES_CORTE'))
         )
-    )
+    ),
   movement_products AS (
     SELECT DISTINCT product_id FROM movement_events
   ),
