@@ -240,7 +240,7 @@
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
     const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
     const body=document.getElementById('bcjr-content');
-    const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes||0)>0);
+    const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes??s.liquidacion?.pendientes?.movimientos_posteriores_corte??s.liquidacion?.movimientos_posteriores_corte?.length??0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
     const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
     const completedSessions=sessions.filter(s=>s.estado==='COMPLETADA');
@@ -263,7 +263,8 @@
       const l=s.liquidacion||{};
       if(!['COMPLETADA','CANCELADA','CERRADA_OPERATIVAMENTE'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía está operativamente abierta.');
       if(['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(s.estado)&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
-      if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Jornada '+fmtDate(s.fecha)+': movimientos posteriores sin clasificar');
+      const pendingPostCount=Number(l.movimientos_posteriores_pendientes??l.pendientes?.movimientos_posteriores_corte??l.movimientos_posteriores_corte?.length??0);
+      if(pendingPostCount>0)blockers.push('Jornada '+fmtDate(s.fecha)+': '+pendingPostCount+' movimientos posteriores sin clasificar');
     });
     const approved=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
     const reject=modal.querySelector('[data-bcjr-action="reject"]');
