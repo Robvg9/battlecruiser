@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.160 — Worker quick actions reopen editable jornada blocks; closed-cut corrections stay session-local.
+// v9.5.162 — Warehouse per-dependent salary settings; Jornada financial summary stays in Owner review.
 (function hotfixV9475(){
-  const VERSION="9.5.160";
+  const VERSION="9.5.162";
   window.__BC_VERSION__=VERSION;
   document.addEventListener("wheel",function(event){var input=event.target&&event.target.closest?event.target.closest("input[type=number]"):null;if(input)event.preventDefault();},{capture:true,passive:false});
   function aplicarVersion(){
