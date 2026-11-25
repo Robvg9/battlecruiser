@@ -264,15 +264,15 @@ test("ver y crear son permisos independientes; crear no abre la navegación", as
 test("app shell, application and Service Worker stay release-aligned and load refreshed navigation modules", () => {
   const { appVersion } = assertPwaReleaseAligned(assert,{app,serviceWorker,index});
   assert.ok(index.includes('href="style.css?v=' + appVersion + '"'));
-  assert.match(app, /\["permisos-navegacion\.js","67\.8"\]/);
-  assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.8/, "Service Worker debe precargar la misma versión de app.js");
+  assert.match(app, /\["permisos-navegacion\.js","67\.9"\]/);
+  assert.match(serviceWorker, /(?:\.\/)?js\/permisos-navegacion\.js\?v=67\.9/, "Service Worker debe precargar la misma versión de app.js");
   assert.ok(index.includes("js/navegacion.js?v=9.5.65"));
   assert.ok(serviceWorker.includes("js/navegacion.js?v=9.5.65"));
   assert.ok(app.includes('["m29-turnos-organizacion.js","29.22"]'));
   assert.ok(app.includes('["bc7-legacy-history.js","1.0"]'));
   assert.ok(serviceWorker.includes("js/m29-turnos-organizacion.js?v=29.22"));
   assert.ok(serviceWorker.includes("js/bc7-legacy-history.js?v=1.0"));
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.61"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.62"\]/);
   assert.match(app, /\["ui-visual-salon\.js","54\.2"\]/);
   assert.ok(app.includes('["hotfix-regresiones-20260902.js","20261120.2"]'));
   assert.ok(serviceWorker.includes("./js/hotfix-regresiones-20260902.js?v=20261120.2"));

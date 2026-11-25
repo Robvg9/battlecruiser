@@ -20,12 +20,15 @@ test("Mis jornadas has a real navigation icon and label", () => {
 });
 
 test("permission controller removes the native hidden attribute only when access is granted", () => {
-  const visibleBranch = navigation.match(/if \(visible\) \{([\s\S]*?)\} else \{/);
+  const visibilityStart = navigation.indexOf("function setTabVisible(btn, visible)");
+  const visibilityEnd = navigation.indexOf("function asegurarPanelSinPermisos", visibilityStart);
+  const tabVisibility = navigation.slice(visibilityStart, visibilityEnd);
+  const visibleBranch = tabVisibility.match(/if \(visible\) \{([\s\S]*?)\} else \{/);
   assert.ok(visibleBranch, "setTabVisible must contain explicit visible/hidden branches");
   assert.match(visibleBranch[1], /removeAttribute\("hidden"\)/);
   assert.match(visibleBranch[1], /btn\.hidden\s*=\s*false/);
   assert.match(navigation, /typeof role === "object"[\s\S]*?role\.nombre[\s\S]*?normalized\.indexOf\("dependienta"\)/);
-  const hiddenBranch = navigation.match(/\} else \{([\s\S]*?)\n    \}/);
+  const hiddenBranch = tabVisibility.match(/\} else \{([\s\S]*?)\n    \}/);
   assert.ok(hiddenBranch);
   assert.match(hiddenBranch[1], /setAttribute\("hidden", ""\)/);
   assert.match(hiddenBranch[1], /btn\.hidden\s*=\s*true/);
