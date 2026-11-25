@@ -421,6 +421,7 @@ function applySql(file) {
     applySql("test/jornada-linked-postcut-transfer-contract.sql");
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
+    applySql("supabase/migrations/20261125033000_jornada_dashboard_checklist_final_product_set.sql");
     applySql("supabase/migrations/20261125130000_jornada_zero_stock_skip_and_settlement_diagnostics.sql");
     applySql("test/jornada-zero-stock-final-skip-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
