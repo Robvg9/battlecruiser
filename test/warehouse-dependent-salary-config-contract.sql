@@ -2,8 +2,8 @@
 DO $test$
 DECLARE
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
-  v_temp_worker uuid := '20000000-0000-0000-0000-000000000010';
-  v_perm_worker uuid := '20000000-0000-0000-0000-000000000011';
+  v_temp_worker uuid := gen_random_uuid();
+  v_perm_worker uuid := gen_random_uuid();
   v_temp_store uuid := 'a2000000-0000-0000-0000-000000000001';
   v_perm_store uuid := 'a2000000-0000-0000-0000-000000000002';
   v_base date := (now() AT TIME ZONE 'America/Havana')::date + 200;
