@@ -145,7 +145,7 @@ test("dependienta home route stays visible and shows a startup state before BC7 
 test("owner review never says there are no blockers while calculation is still incomplete", () => {
   assert.match(ownerReview, /Liquidación calculable · sin bloqueos/);
   assert.match(ownerReview, /Liquidación todavía no calculable/);
-  assert.match(ownerReview, /pendingPostCount=Number/);
+  assert.match(ownerReview, /pendingPostCount=Math\\.max/);
   assert.match(ownerReview, /movimientos posteriores sin clasificar/);
   assert.doesNotMatch(ownerReview, /Sin bloqueos de cálculo/);
 });
