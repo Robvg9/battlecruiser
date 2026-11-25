@@ -446,7 +446,7 @@ BEGIN
     'public.bc7_recibir_entrega_jornada(uuid,jsonb,text,uuid)'::regprocedure
   );
 
-  v_def:=replace(v_def,'  v_synced integer:=0;','  v_synced integer:=0;'||chr(10)||'  v_final_correction jsonb;');
+  v_def:=replace(v_def,'v_synced integer:=0;','v_synced integer:=0;'||chr(10)||' v_final_correction jsonb;');
   IF position('v_final_correction jsonb;' IN v_def)=0 THEN
     RAISE EXCEPTION 'Could not add final correction result to the receipt function.';
   END IF;
