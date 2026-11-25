@@ -11,7 +11,7 @@ const base = "https://" + previewName + ".robvg9.workers.dev";
 const appSource = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
 const swSource = fs.readFileSync(path.join(__dirname, "..", "public", "service-worker.js"), "utf8");
 const indexSource = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
-const sha256 = (value) => require("node:crypto").createHash("sha256").update(String(value).replace(/\\r\\n/g, "\\n")).digest("hex");
+const sha256 = (value) => require("node:crypto").createHash("sha256").update(String(value).replace(/\r\n/g, "\n")).digest("hex");
 const expectedAppVersion = (appSource.match(/const VERSION="([^"]*)"/) || [])[1];
 const expectedSwVersion = (swSource.match(/BC_SW_VERSION = "([^"]*)"/) || [])[1];
 if (!expectedAppVersion || !expectedSwVersion) {
