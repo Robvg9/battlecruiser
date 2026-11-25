@@ -3199,6 +3199,35 @@
     document.body.style.overflow=checklistModalContext.previousBodyOverflow||'';
     checklistModalContext=null;
   }
+  async function openWorkerShortcut(sessionId,section){
+    const editableSections=['gastos','reinversiones','bajas'];
+    if(!sessionId||!['gastos','reinversiones','bajas','inventario_final','declaracion_dinero'].includes(section)){
+      setStatus('Este acceso rápido no corresponde a una sección disponible.','error');
+      return false;
+    }
+    if(!await openWorkspace(sessionId))return false;
+    const completed=state.detail?.checklist?.[section]?.completado===true;
+    if(editableSections.includes(section)&&completed){
+      if(!navigator.onLine){
+        setStatus('Sin conexión: no se puede reabrir el bloque hasta verificarlo con el servidor.','error');
+        return false;
+      }
+      try{
+        await rpc('bc7_confirmar_bloque_jornada',{
+          p_turno_sesion_id:sessionId,
+          p_bloque:section,
+          p_completado:false
+        });
+        if(!await openWorkspace(sessionId))return false;
+        setStatus('Bloque reabierto. Ya puedes registrar los movimientos que faltan; al enviar la evidencia volverá a quedar cerrado.','ok');
+      }catch(error){
+        setStatus('No se pudo reabrir el bloque. '+friendlyError(error,'create'),'error');
+        return false;
+      }
+    }
+    openChecklistSection(section);
+    return true;
+  }
   function openChecklistSection(key){
     if(!['gastos','reinversiones','bajas','inventario_final','declaracion_dinero'].includes(key))return;
     closeChecklistModal({restore:true});
@@ -3715,7 +3744,13 @@
       return;
     }
     const workerShortcut=e.target&&e.target.closest?e.target.closest('[data-bc7-worker-shortcut]'):null;
-    if(workerShortcut){e.preventDefault();const sessionId=workerShortcut.getAttribute('data-session-id');const section=workerShortcut.getAttribute('data-bc7-worker-shortcut');if(sessionId&&await openWorkspace(sessionId))openChecklistSection(section);return;}
+    if(workerShortcut){
+      e.preventDefault();
+      const sessionId=workerShortcut.getAttribute('data-session-id');
+      const section=workerShortcut.getAttribute('data-bc7-worker-shortcut');
+      await openWorkerShortcut(sessionId,section);
+      return;
+    }
     const workerOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-worker-open-jornada]'):null;
     if(workerOpen){e.preventDefault();navTo('jornada');return;}
     const ownerReview=e.target&&e.target.closest?e.target.closest('[data-bc7-open-owner-review]'):null;
