@@ -60,12 +60,14 @@ test("versioned core assets retain their requested cache key and receive a uniqu
 
 test("preview config invokes Worker first for root and every versioned core asset", () => {
   const config = fs.readFileSync(path.join(ROOT, "wrangler.preview.toml"), "utf8");
+  const connectedConfig = JSON.parse(fs.readFileSync(path.join(ROOT, "wrangler.jsonc"), "utf8"));
   const worker = fs.readFileSync(path.join(ROOT, "preview-worker.mjs"), "utf8");
   const verifier = fs.readFileSync(path.join(ROOT, "test/verify-pr-preview-assets.js"), "utf8");
 
   for (const route of ["/", "/index.html", "/app.js", "/service-worker.js", "/style.css", "/__bc_preview/*"]) {
     assert.ok(config.includes('"'+route+'"'), "missing Worker-first route " + route);
   }
+  assert.deepEqual(connectedConfig.assets.run_worker_first, ["/", "/index.html", "/app.js", "/service-worker.js", "/style.css", "/__bc_preview/*"]);
   assert.match(worker, /PREVIEW_CORE_ASSETS/);
   assert.match(worker, /url\.pathname === "\/" \? "\/index\.html"/);
   assert.match(worker, /__bc_preview_asset/);
