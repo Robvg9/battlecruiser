@@ -44,7 +44,7 @@ test("admin archive distinguishes sealed, pending master-close and truly closed 
   assert.match(UI,/bc7-archived-schedule/);
   assert.match(UI,/Pendiente de cuadre/);
   assert.match(UI,/Pendiente de cierre maestro/);
-  assert.match(NAV,/turno_estado_maestro/);
+  assert.match(MIG,/turno_estado_maestro/);
   assert.match(MIG,/LEFT JOIN public\.turnos t ON t\.id=p\.turno_id/);
 });
 
