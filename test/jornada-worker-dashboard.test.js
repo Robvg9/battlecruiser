@@ -61,6 +61,28 @@ test("worker dashboard and owner review release versions are aligned with the pr
   assert.match(index, /app\.js\?v=9\.5\.157/);
 });
 
+test("Mis jornadas shows an explicit state while session and calendar startup are pending or failing", () => {
+  assert.match(jornada, /function renderWorkerDashboardState\(title,detail,retryAction\)/);
+  assert.match(jornada, /role="status" aria-live="polite"/);
+  assert.match(jornada, /renderWorkerDashboardState\('Cargando tus jornadas…'/);
+  assert.match(jornada, /renderWorkerDashboardState\('Validando tu sesión…'/);
+  assert.match(jornada, /data-bc7-worker-retry=/);
+  assert.match(jornada, /No se pudo validar la sesión/);
+  assert.match(jornada, /No se pudo iniciar Mis jornadas/);
+});
+
+test("calendar RPC errors are surfaced in the personal dashboard instead of a false empty state", () => {
+  const start = jornada.indexOf("async function loadCalendar(options)");
+  const end = jornada.indexOf("function renderCurrentSession", start);
+  assert.ok(start >= 0 && end > start, "calendar loader must exist");
+  const loader = jornada.slice(start, end);
+  assert.match(loader, /state\.calendarLoadError=friendlyError\(e,'calendar'\)/);
+  assert.match(loader, /state\.calendarLoading=false/);
+  assert.match(loader, /renderWorkerDashboard\(\)/);
+  assert.match(loader, /renderWorkerDashboardState\('Cargando tus jornadas…'/);
+  assert.match(loader, /data-bc7-worker-retry="calendar"/);
+});
+ 
 test("owner review never says there are no blockers while calculation is still incomplete", () => {
   assert.match(ownerReview, /Liquidación calculable · sin bloqueos/);
   assert.match(ownerReview, /Liquidación todavía no calculable/);
