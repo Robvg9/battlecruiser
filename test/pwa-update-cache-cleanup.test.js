@@ -14,12 +14,12 @@ const index = read("public/index.html");
 test("manual PWA updater clears both app-owned release cache namespaces", () => {
   assert.match(
     auth,
-    /return k\.startsWith\("battlecruiser-shell-"\)\s*\|\|\s*k\.startsWith\("battlecruiser-static-"\);/,
+    /return k === "battlecruiser"\s*\|\|\s*k\.startsWith\("battlecruiser-shell-"\)\s*\|\|\s*k\.startsWith\("battlecruiser-static-"\);/,
     "the original login updater must clear shell and static release caches"
   );
   assert.match(
     cacheUpdater,
-    /return name\.startsWith\("battlecruiser-shell-"\)\s*\|\|\s*name\.startsWith\("battlecruiser-static-"\);/,
+    /return name === "battlecruiser"\s*\|\|\s*name\.startsWith\("battlecruiser-shell-"\)\s*\|\|\s*name\.startsWith\("battlecruiser-static-"\);/,
     "the scoped updater must clear shell and static release caches"
   );
   assert.doesNotMatch(
