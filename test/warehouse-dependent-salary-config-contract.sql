@@ -2,7 +2,8 @@
 DO $test$
 DECLARE
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
-  v_worker uuid := '20000000-0000-0000-0000-000000000002';
+  v_temp_worker uuid := '20000000-0000-0000-0000-000000000010';
+  v_perm_worker uuid := '20000000-0000-0000-0000-000000000011';
   v_temp_store uuid := 'a2000000-0000-0000-0000-000000000001';
   v_perm_store uuid := 'a2000000-0000-0000-0000-000000000002';
   v_base date := (now() AT TIME ZONE 'America/Havana')::date + 200;
@@ -18,6 +19,12 @@ BEGIN
     (v_temp_store,'Salario temporal fixture','VENTA',true),
     (v_perm_store,'Salario permanente fixture','VENTA',true);
 
+  -- Workers exclusivos del contrato: no colisionan con programaciones de otros fixtures.
+  INSERT INTO auth.users(id) VALUES (v_temp_worker),(v_perm_worker);
+  INSERT INTO public.usuarios(id,nombre,role_id,activo,archivado) VALUES
+    (v_temp_worker,'Dependienta temporal fixture','30000000-0000-0000-0000-000000000002',true,false),
+    (v_perm_worker,'Dependienta permanente fixture','30000000-0000-0000-0000-000000000002',true,false);
+
   INSERT INTO public.turno_jornada_configuracion(almacen_id)
   VALUES (v_temp_store),(v_perm_store)
   ON CONFLICT (almacen_id) DO NOTHING;
@@ -29,7 +36,7 @@ BEGIN
   -- Una regla de una sola Jornada queda pendiente y se consume en el primer
   -- programa elegible de esta dependienta y almacén.
   v_result := public.bc8_configurar_dependienta_almacen(
-    v_temp_store,v_worker,true,8,'PROXIMA_JORNADA'
+    v_temp_store,v_temp_worker,true,8,'PROXIMA_JORNADA'
   );
   IF v_result->>'aplicacion' <> 'PENDIENTE_HASTA_PROXIMA_JORNADA' THEN
     RAISE EXCEPTION 'FAIL: temporary salary rule was not kept for the next Jornada: %',v_result;
@@ -38,7 +45,7 @@ BEGIN
   v_result := public.bc5_crear_jornada_unica(
     v_temp_store,v_base,2,
     jsonb_build_array(
-      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_worker),
+      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_temp_worker),
       jsonb_build_object('numero_dia',2,'trabaja',false,'responsable_id',NULL)
     ),
     'Salary temporary contract'
@@ -52,7 +59,7 @@ BEGIN
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM public.almacen_dependienta_configuracion c
-    WHERE c.almacen_id=v_temp_store AND c.usuario_id=v_worker
+    WHERE c.almacen_id=v_temp_store AND c.usuario_id=v_temp_worker
       AND c.salario_temporal_programacion_id=v_program
       AND c.salario_temporal_consumido_en IS NOT NULL
   ) THEN
@@ -61,7 +68,7 @@ BEGIN
 
   -- Una regla permanente se copia al snapshot al crear la Jornada.
   v_result := public.bc8_configurar_dependienta_almacen(
-    v_perm_store,v_worker,true,6,'PERMANENTE'
+    v_perm_store,v_perm_worker,true,6,'PERMANENTE'
   );
   IF v_result->>'aplicacion' <> 'TODAS_LAS_JORNADAS_FUTURAS_NO_INICIADAS' THEN
     RAISE EXCEPTION 'FAIL: permanent salary rule returned an unexpected scope: %',v_result;
@@ -69,7 +76,7 @@ BEGIN
   v_result := public.bc5_crear_jornada_unica(
     v_perm_store,v_base,2,
     jsonb_build_array(
-      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_worker),
+      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_temp_worker),
       jsonb_build_object('numero_dia',2,'trabaja',false,'responsable_id',NULL)
     ),
     'Salary permanent contract'
@@ -88,10 +95,10 @@ BEGIN
   FROM public.turno_sesiones s
   WHERE s.jornada_programacion_id=v_program;
   INSERT INTO public.turno_tramos(turno_id,turno_sesion_id,usuario_id,tipo,estado)
-  VALUES(v_turn,v_session,v_worker,'NORMAL','ACTIVO');
+  VALUES(v_turn,v_session,v_perm_worker,'NORMAL','ACTIVO');
 
   v_result := public.bc8_configurar_dependienta_almacen(
-    v_perm_store,v_worker,true,9,'PERMANENTE'
+    v_perm_store,v_perm_worker,true,9,'PERMANENTE'
   );
   SELECT p.salario_porcentaje INTO v_rate
   FROM public.turno_jornada_programacion p WHERE p.id=v_program;
@@ -102,7 +109,7 @@ BEGIN
   v_list := public.bc8_listar_dependientas_almacen(v_perm_store);
   IF NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_list->'dependientas') d
-    WHERE d->>'usuario_id'=v_worker::text
+    WHERE d->>'usuario_id'=v_perm_worker::text
       AND (d->>'salario_porcentaje_permanente')::numeric=9
   ) THEN
     RAISE EXCEPTION 'FAIL: warehouse listing did not expose the updated individual permanent rate: %',v_list;
@@ -110,7 +117,7 @@ BEGIN
 
   SELECT count(*) INTO v_event_count
   FROM public.almacen_dependienta_eventos
-  WHERE usuario_id=v_worker
+  WHERE usuario_id=v_temp_worker
     AND almacen_id IN (v_temp_store,v_perm_store);
   IF v_event_count<4 THEN
     RAISE EXCEPTION 'FAIL: individual salary actions were not audited; events=%',v_event_count;
