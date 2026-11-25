@@ -3,8 +3,16 @@ const { assertPwaReleaseAligned, assertModuleCacheAligned } = require("./helpers
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs");
 const ui=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8"),sw=fs.readFileSync("public/service-worker.js","utf8"),index=fs.readFileSync("public/index.html","utf8");
-test("Step 7 folds help/admin and keeps first view to the calendar",()=>{
- assert.match(ui,/<details id="bc7-help-details" class="bc7-help">/);
+test("Step 7 uses a compact help modal and places the active Jornada before planning",()=>{
+ assert.match(ui,/class="bc7-help-icon" data-bc7-help-open/);
+ assert.match(ui,/id="bc7-help-modal" class="bc7-help-modal" hidden/);
+ assert.match(ui,/role="dialog" aria-modal="true" aria-labelledby="bc7-help-title"/);
+ assert.match(ui,/data-bc7-help-close/);
+ assert.match(ui,/¿Para qué sirve esta sección\?/);
+ const current=ui.indexOf('id="bc7-current-session-card"');
+ const calendar=ui.indexOf('id="bc7-calendar-section"');
+ const organizer=ui.indexOf('id="bc7-admin-details"');
+ assert.ok(current>=0&&calendar>current&&organizer>calendar,"current Jornada appears before calendar and organizer");
  assert.match(ui,/<details id="bc7-admin-details" class="bc7-admin-details" hidden>/);
  assert.match(ui,/id="bc7-calendar-section"/);
  assert.match(ui,/function setPageMode\(workspace\)/);
@@ -27,7 +35,7 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
 test("compact Step 7 updates app loader and offline cache",()=>{
  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
- assert.ok(ui.includes("v7.60 — atribución de entradas retroactivas, snapshot FINAL y reconciliación de sucesoras."));
+ assert.ok(ui.includes("v7.61 — checklist efectivo primero, dashboard de dependienta y vistas administrativas de Jornada."));
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
