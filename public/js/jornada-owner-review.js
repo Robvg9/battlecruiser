@@ -295,7 +295,7 @@
     const guidance=sessionLocal
       ?'Esta jornada ya cerró operativamente. La corrección queda auditada y solo modifica su liquidación histórica; no altera el catálogo ni las jornadas futuras.'
       :'La jornada está completada. La corrección queda auditada y actualiza la referencia vigente del catálogo para futuras jornadas, sin reescribir los cortes ni las ventas anteriores.';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">'+guidance+' Precio actual en el cálculo: <b>'+esc(button.dataset.price===''?'Sin precio':money(button.dataset.price))+' CUP</b>. Costo documentado actual: <b>'+esc(button.dataset.cost===''?'Sin costo':money(button.dataset.cost))+' CUP</b>. Deja vacío cualquier campo que no quieras modificar; cuando hubo varios importes, usa el promedio ponderado de la jornada.</p><label>Nuevo precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price placeholder="Sin cambio"></label><label>Nuevo costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost placeholder="Sin cambio"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'">Guardar valores auditados</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Valores históricos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">'+guidance+' Precio actual en el cálculo: <b>'+esc(button.dataset.price===''?'Sin precio':money(button.dataset.price))+' CUP</b>. Costo documentado actual: <b>'+esc(button.dataset.cost===''?'Sin costo':money(button.dataset.cost))+' CUP</b>. Deja vacío cualquier campo que no quieras modificar; cuando hubo varios importes, usa el promedio ponderado de la jornada.</p><label>Nuevo precio de venta unitario / promedio (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-price placeholder="Sin cambio"></label><label>Nuevo costo de compra unitario / promedio histórico (CUP)<input type="number" min="0" step="0.0001" data-bcjr-value-cost placeholder="Sin cambio"></label><label>Motivo y fuente de verificación<textarea rows="3" maxlength="500" data-bcjr-value-reason placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-values-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'" data-session-state="'+esc(button.dataset.sessionState||'')+'">Guardar valores auditados</button></div></section>';
     document.body.appendChild(box);box.querySelector('[data-bcjr-value-price]')?.focus();
   }
   // Preserve each historical price segment; revenue is summed from quantity × price, never inferred from an average.
@@ -360,17 +360,19 @@
         p_ajustes:[{producto_id:button.dataset.product,precio_venta_unitario:hasPrice?Number(price):null,costo_unitario:hasCost?Number(cost):null}],
         p_comentario:reason
       });
-      if(sessionLocal){
-        if(result.valores_solo_jornada!==true||result.catalogo_modificado!==false){
-          throw new Error('El servidor no confirmó una corrección exclusiva de esta Jornada. Reabre la revisión para comprobar el resultado antes de repetir el guardado.');
-        }
-        setStatus('Corrección guardada solo para esta Jornada. El catálogo global no cambió. Actualizando la liquidación…','success');
-      }else{
-        if(result.valores_producto_persistidos!==true){
-          throw new Error('El servidor no confirmó la persistencia de los valores del producto para futuras Jornadas.');
-        }
-        setStatus('Valores guardados y persistidos para futuras Jornadas. Actualizando la liquidación…','success');
+      const sessionOnlySaved=result?.ok===true
+        && result.valores_solo_jornada===true
+        && result.catalogo_modificado===false
+        && result.valores_producto_persistidos===false;
+      const persistentSaved=result?.ok===true
+        && result.valores_solo_jornada===false
+        && result.valores_producto_persistidos===true;
+      if(!sessionOnlySaved&&!persistentSaved){
+        throw new Error('El servidor no confirmó una corrección válida. Reabre la revisión para comprobar el resultado antes de repetir el guardado.');
       }
+      setStatus(sessionOnlySaved
+        ?'Corrección guardada solo para esta Jornada. El catálogo global no cambió. Actualizando la liquidación…'
+        :'Valores guardados y persistidos para futuras Jornadas. Actualizando la liquidación…','success');
       box.remove();await openReview(activeTurnId);
     }catch(error){
       setStatus('No se pudo guardar: '+(error?.message||String(error)),'error');
