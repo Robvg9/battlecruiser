@@ -892,7 +892,7 @@ async function actualizarApp(btn) {
       var keys = await caches.keys();
       await Promise.all(
         keys.filter(function (k) {
-          return k.startsWith("battlecruiser-shell-") || k.startsWith("battlecruiser");
+          return k.startsWith("battlecruiser-shell-") || k.startsWith("battlecruiser-static-");
         }).map(function (k) { return caches.delete(k); })
       );
     }
