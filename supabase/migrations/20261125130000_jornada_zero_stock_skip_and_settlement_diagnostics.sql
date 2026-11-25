@@ -279,6 +279,7 @@ BEGIN
   ),
   eligible_product_candidates AS (
     SELECT producto_id FROM expected
+    UNION SELECT product_id FROM final_lines
     UNION SELECT product_id FROM movement_products
   ),
   eligible AS (
