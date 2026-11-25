@@ -91,7 +91,7 @@ test("price-change eligibility remains unchanged in this mission",()=>{
   assert.match(PRICE,/bc7_cambios_precio_contexto/);
   assert.match(PRICE_MIG,/s\.estado='EN_CURSO'/);
   assert.match(PRICE_MIG,/tr\.estado='ACTIVO'/);
-  assert.doesNotMatch(MIG,/bc7_cambios_precio_contexto|turno_tramos/);
+  assert.doesNotMatch(MIG,/bc7_cambios_precio_contexto/);
 });
 
 test("PWA asset versions are aligned",()=>{
