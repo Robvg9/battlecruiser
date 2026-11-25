@@ -588,7 +588,7 @@ $old$;
     ),'[]'::jsonb)
   );
   RETURN v_result;
-$old$;
+$new$;
 BEGIN
   v_def:=pg_get_functiondef('public.bc7_obtener_inventario_jornada(uuid)'::regprocedure);
   IF position(v_old IN v_def)=0 THEN
