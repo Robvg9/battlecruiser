@@ -277,9 +277,13 @@ BEGIN
   movement_products AS (
     SELECT DISTINCT product_id FROM movement_events
   ),
+  eligible_product_candidates AS (
+    SELECT producto_id FROM expected
+    UNION SELECT product_id FROM movement_products
+  ),
   eligible AS (
     SELECT e.producto_id
-    FROM expected e
+    FROM eligible_product_candidates e
     LEFT JOIN initial_lines i ON i.product_id=e.producto_id
     LEFT JOIN final_lines f ON f.product_id=e.producto_id
     LEFT JOIN movement_products m ON m.product_id=e.producto_id
@@ -627,7 +631,7 @@ BEGIN
   ),
   eligible_product_ids AS (
     SELECT ids.product_id
-    FROM eligible_product_ids ids
+    FROM all_product_ids ids
     LEFT JOIN initial_lines i ON i.product_id=ids.product_id
     LEFT JOIN final_lines f ON f.product_id=ids.product_id
     LEFT JOIN movement_totals mt ON mt.product_id=ids.product_id
@@ -645,7 +649,7 @@ BEGIN
       (coalesce(i.qty,0)+coalesce(mt.transfer_in,0)+coalesce(mt.purchases_in,0)+coalesce(mt.reinvestment_in,0)
         -coalesce(mt.transfer_out,0)-coalesce(mt.vales_out,0)-coalesce(mt.merma_out,0)-coalesce(mt.bajas_out,0)-coalesce(f.qty,0)) sold_qty,
       pi.precio_unitario,pi.estado_precio
-    FROM all_product_ids ids
+    FROM eligible_product_ids ids
     JOIN public.productos p ON p.id=ids.product_id
     LEFT JOIN price_info pi ON pi.product_id=ids.product_id
     LEFT JOIN initial_lines i ON i.product_id=ids.product_id
