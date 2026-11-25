@@ -24,6 +24,7 @@ test("permission controller removes the native hidden attribute only when access
   assert.ok(visibleBranch, "setTabVisible must contain explicit visible/hidden branches");
   assert.match(visibleBranch[1], /removeAttribute\("hidden"\)/);
   assert.match(visibleBranch[1], /btn\.hidden\s*=\s*false/);
+  assert.match(navigation, /typeof role === "object"[\s\S]*?role\.nombre[\s\S]*?normalized\.indexOf\("dependienta"\)/);
   const hiddenBranch = navigation.match(/\} else \{([\s\S]*?)\n    \}/);
   assert.ok(hiddenBranch);
   assert.match(hiddenBranch[1], /setAttribute\("hidden", ""\)/);
