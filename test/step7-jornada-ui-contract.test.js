@@ -193,10 +193,19 @@ test("Jornada handover uses approved daily cash and never asks the Owner for a s
   assert.match(ui,/lista_para_conteo/);
   assert.doesNotMatch(ui,/lista_para_calcular|Fase 2|Cálculos automáticos completados/);
   assert.doesNotMatch(ui,/detail\.checklist\?\.lista_para_calcular!==true/);
-  assert.match(ui,/LISTA_PARA_ENTREGA/);
+  assert.match(ui,/CERRADA_OPERATIVAMENTE/);
+  assert.match(ui,/Sellado operativo · pendiente de conciliación/);
   assert.match(ui,/Jornada entregada al Dueño/);
   assert.doesNotMatch(ui,/Cálculos automáticos completados/);
-  assert.match(ui,/[Ee]l Turno todavía no está cerrado/);
+  assert.match(ui,/data-bc7-open-owner-review=/);
+  assert.match(ui,/Abrir revisión integral del turno/);
+  assert.match(ui,/Turno maestro sigue abierto/);
+});
+
+test("salary percentage configuration lives in Almacenes, not inside a Jornada",()=>{
+  assert.doesNotMatch(ui,/Configurar porcentaje salarial|data-bc7-salary-rate-form|data-bc7-salary-percent|submitSalaryRate|bc7_configurar_salario_porcentaje_jornada/);
+  assert.match(ui,/Configura el porcentaje salarial individual de esta dependienta desde Almacenes/);
+  assert.match(ui,/porcentaje individual configurado para esta dependienta en Almacenes/);
 });
 
 test("Cash declaration can be saved before the final inventory unlocks jornada closure",()=>{
