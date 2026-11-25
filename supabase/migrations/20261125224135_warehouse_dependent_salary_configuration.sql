@@ -73,7 +73,7 @@ INSERT INTO public.almacen_dependienta_configuracion
   (almacen_id, usuario_id, activo, salario_porcentaje_permanente, creado_por, actualizado_por)
 SELECT DISTINCT r.almacen_id, r.usuario_id, true,
        COALESCE(latest.salario_porcentaje, cfg.salario_porcentaje),
-       NULL, NULL
+       NULL::uuid, NULL::uuid
 FROM responsables r
 JOIN public.almacenes al ON al.id = r.almacen_id AND al.activo = true
 JOIN public.usuarios u ON u.id = r.usuario_id AND u.activo = true AND u.archivado = false
