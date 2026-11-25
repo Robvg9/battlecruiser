@@ -19,6 +19,8 @@ test("retroactive successor opens automatically after accepted physical receipt 
   assert.match(migration,/CREATE OR REPLACE FUNCTION public\.bc7_asegurar_inicio_sucesora_programada/);
   assert.match(migration,/p\.hora_inicio_prevista/);
   assert.match(migration,/bc5_cerrar_jornadas_operativas_vencidas/);
+  assert.match(migration,/cron\.alter_job/);
+  assert.doesNotMatch(migration,/UPDATE\s+cron\.job/i);
   assert.match(ui,/bc7_asegurar_inicio_sucesora_programada/);
   assert.doesNotMatch(ui,/El dueño debe activar esta jornada retroactiva/);
   assert.doesNotMatch(ui,/Motivo obligatorio de apertura retroactiva/);

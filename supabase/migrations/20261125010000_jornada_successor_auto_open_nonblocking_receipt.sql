@@ -608,16 +608,26 @@ $patch$;
 -- 5) The existing minute job now auto-starts eligible successors and then seals any
 -- already-ended operational periods using their original scheduled cutoff.
 DO $job$
+DECLARE
+  v_job_id bigint;
 BEGIN
   IF to_regclass('cron.job') IS NOT NULL THEN
-    UPDATE cron.job
-    SET command='SELECT public.bc7_procesar_sucesoras_programadas();'
+    SELECT jobid INTO v_job_id
+    FROM cron.job
     WHERE jobname='battlecruiser-jornada-operational-seal';
-    IF NOT FOUND THEN
+
+    IF v_job_id IS NULL THEN
       PERFORM cron.schedule(
         'battlecruiser-jornada-operational-seal',
         '* * * * *',
         'SELECT public.bc7_procesar_sucesoras_programadas();'
+      );
+    ELSE
+      PERFORM cron.alter_job(
+        v_job_id,
+        schedule=>'* * * * *',
+        command=>'SELECT public.bc7_procesar_sucesoras_programadas();',
+        active=>true
       );
     END IF;
   END IF;
