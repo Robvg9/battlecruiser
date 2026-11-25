@@ -43,15 +43,15 @@ test("worker dashboard resolves the authenticated lexical user context created b
   assert.ok(start >= 0 && end > start, "currentUser must exist before catalogCache");
   const currentUserSource = jornada.slice(start, end);
   const lexicalUser = vm.runInNewContext(
-    'let _usuarioActual={id:"worker-lexical",rol:"Dependienta"};\\n' +
-      currentUserSource + '\\ncurrentUser();',
+    'let _usuarioActual={id:"worker-lexical",rol:"Dependienta"};\n' +
+      currentUserSource + '\ncurrentUser();',
     { window: {} }
   );
   assert.equal(lexicalUser.id, "worker-lexical");
   assert.equal(lexicalUser.rol, "Dependienta");
   const legacyUser = vm.runInNewContext(
-    'let _usuarioActual=null;\\n' +
-      currentUserSource + '\\ncurrentUser();',
+    'let _usuarioActual=null;\n' +
+      currentUserSource + '\ncurrentUser();',
     { window: { __bcUser: { id: "worker-legacy", rol: "Dependienta" } } }
   );
   assert.equal(legacyUser.id, "worker-legacy");
