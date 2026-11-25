@@ -7,6 +7,8 @@ DECLARE
   v_warehouse uuid:='10000000-0000-0000-0000-000000000111';
   v_product uuid:='31000000-0000-0000-0000-000000000011';
   v_product2 uuid:='31000000-0000-0000-0000-000000000012';
+  v_product_zero uuid:='31000000-0000-0000-0000-000000000013';
+  v_product_entry uuid:='31000000-0000-0000-0000-000000000014';
   v_admin_role uuid;
   v_turn uuid:='a9100000-0000-0000-0000-000000000011';
   v_program uuid:='a9200000-0000-0000-0000-000000000011';
@@ -21,13 +23,15 @@ DECLARE
   v_retry jsonb;
   v_balance numeric;
   v_global numeric;
+  v_liquidation jsonb;
   v_error boolean:=false;
   v_today date:=(now() AT TIME ZONE 'America/Havana')::date;
   v_cutoff timestamptz:=now()-interval '60 minutes';
   v_start timestamptz:=now()-interval '8 hours';
   v_lines jsonb:=jsonb_build_array(
     jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000011','cantidad',7),
-    jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000012','cantidad',3)
+    jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000012','cantidad',3),
+    jsonb_build_object('producto_id','31000000-0000-0000-0000-000000000014','cantidad',4)
   );
   v_incomplete jsonb:=jsonb_build_array(jsonb_build_object(
     'producto_id','31000000-0000-0000-0000-000000000011','cantidad',7
@@ -59,8 +63,17 @@ BEGIN
   VALUES(v_product2,'Producto fixture sellado 2','unidad',true,10)
   ON CONFLICT(id) DO UPDATE SET nombre=EXCLUDED.nombre,activo=true,producto_padre_id=NULL,archivado_at=NULL;
 
+  INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
+  VALUES(v_product_zero,'Producto cero sin movimientos','unidad',true,10)
+  ON CONFLICT(id) DO UPDATE SET nombre=EXCLUDED.nombre,activo=true,producto_padre_id=NULL,archivado_at=NULL;
+
+  INSERT INTO public.productos(id,nombre,unidad,activo,precio_normal)
+  VALUES(v_product_entry,'Producto con entrada durante la jornada','unidad',true,10)
+  ON CONFLICT(id) DO UPDATE SET nombre=EXCLUDED.nombre,activo=true,producto_padre_id=NULL,archivado_at=NULL;
+
   INSERT INTO public.stock(producto_id,almacen_id,cantidad,minimo)
-  VALUES(v_product,v_warehouse,10,0),(v_product2,v_warehouse,5,0)
+  VALUES(v_product,v_warehouse,10,0),(v_product2,v_warehouse,5,0),
+        (v_product_zero,v_warehouse,0,0),(v_product_entry,v_warehouse,0,0)
   ON CONFLICT(producto_id,almacen_id) DO UPDATE SET cantidad=EXCLUDED.cantidad,minimo=0;
 
   INSERT INTO public.turnos(
@@ -110,11 +123,29 @@ BEGIN
     'Opening physical count'
   );
   INSERT INTO public.turno_jornada_inventario_lineas(corte_id,producto_id,cantidad_contada,stock_sistema)
-  VALUES(v_initial_cut,v_product,10,10),(v_initial_cut,v_product2,5,5);
+  VALUES(v_initial_cut,v_product,10,10),(v_initial_cut,v_product2,5,5),
+        (v_initial_cut,v_product_zero,0,0),(v_initial_cut,v_product_entry,0,0);
+
+  -- No stock and no movement means this product is omitted from FINAL.
+  -- A real purchase makes the second zero-opening product mandatory again.
+  INSERT INTO public.lotes_compra(
+    producto_id,almacen_id,cantidad_inicial,cantidad_restante,costo_unitario,
+    fecha_compra,origen,usuario_id
+  ) VALUES(v_product_entry,v_warehouse,4,4,2,v_start+interval '4 hours','compra',v_admin);
 
   PERFORM set_config('request.jwt.claim.sub',v_admin::text,false);
   PERFORM set_config('test.bc_admin','true',false);
   PERFORM set_config('test.perms','turnos:ver,turnos:editar_any',false);
+
+  IF EXISTS(SELECT 1 FROM public.bc7_jornada_productos_corte(v_session,'FINAL') x WHERE x.producto_id=v_product_zero) THEN
+    RAISE EXCEPTION 'FAIL: zero-opening product with no movement must be omitted from FINAL.';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.bc7_jornada_productos_corte(v_session,'FINAL') x WHERE x.producto_id=v_product_entry) THEN
+    RAISE EXCEPTION 'FAIL: zero-opening product with a real purchase must be included in FINAL.';
+  END IF;
+  IF (SELECT count(*) FROM public.bc7_jornada_productos_corte(v_session,'FINAL'))<>3 THEN
+    RAISE EXCEPTION 'FAIL: expected two opening-stock products and one product with a period purchase.';
+  END IF;
 
   -- A completed tranche after the operational cutoff must not be mistaken for
   -- the sealed Jornada tranche. The checklist must remain untouched.
@@ -175,13 +206,31 @@ BEGIN
          WHERE turno_sesion_id=v_session AND tipo='FINAL' AND estado='CONFIRMADO')<>1 THEN
     RAISE EXCEPTION 'FAIL: sealed ADMIN capture did not create exactly one confirmed final cut: %',v_result;
   END IF;
+  IF (SELECT count(*) FROM public.turno_jornada_inventario_lineas WHERE corte_id=v_cut)<>3
+     OR EXISTS(SELECT 1 FROM public.turno_jornada_inventario_lineas WHERE corte_id=v_cut AND producto_id=v_product_zero)
+     OR NOT EXISTS(SELECT 1 FROM public.turno_jornada_inventario_lineas WHERE corte_id=v_cut AND producto_id=v_product_entry) THEN
+    RAISE EXCEPTION 'FAIL: final cut must omit the untouched zero product but include the product with a period purchase.';
+  END IF;
 
   IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas
       WHERE corte_id=v_cut AND producto_id=v_product) IS DISTINCT FROM 7::numeric
      OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas
-      WHERE corte_id=v_cut AND producto_id=v_product2) IS DISTINCT FROM 3::numeric THEN
+      WHERE corte_id=v_cut AND producto_id=v_product2) IS DISTINCT FROM 3::numeric
+     OR (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas
+      WHERE corte_id=v_cut AND producto_id=v_product_entry) IS DISTINCT FROM 4::numeric THEN
     RAISE EXCEPTION 'FAIL: complete physical quantities were not stored.';
   END IF;
+  v_liquidation:=public.bc7_liquidacion_inventario_jornada(v_session);
+  IF EXISTS(
+    SELECT 1 FROM jsonb_array_elements(coalesce(v_liquidation->'lineas','[]'::jsonb)) AS line(value)
+    WHERE line.value->>'producto_id'=v_product_zero::text
+  ) OR NOT EXISTS(
+    SELECT 1 FROM jsonb_array_elements(coalesce(v_liquidation->'lineas','[]'::jsonb)) AS line(value)
+    WHERE line.value->>'producto_id'=v_product_entry::text
+  ) THEN
+    RAISE EXCEPTION 'FAIL: settlement must omit untouched zero products but retain a product with a real period purchase.';
+  END IF;
+
   IF (SELECT stock_sistema FROM public.turno_jornada_inventario_lineas
       WHERE corte_id=v_cut AND producto_id=v_product) IS DISTINCT FROM 10::numeric THEN
     RAISE EXCEPTION 'FAIL: reference balance should be operational balance 10, not arbitrary global stock.';

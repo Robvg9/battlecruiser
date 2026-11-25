@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.61 — checklist efectivo primero, dashboard de dependienta y vistas administrativas de Jornada.
+// v7.62 — Mis jornadas con historial propio y catálogo FINAL que omite productos sin stock ni movimientos.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -410,7 +410,11 @@
   }
   function warehouseName(id){const w=warehouses().find(x=>String(x.id)===String(id));return w?(w.nombre||'Almacén'):'Almacén no disponible';}
   function userName(id){if(id==null||String(id)==='')return 'Sin asignar';const key=String(id);const sources=[staffRowsFrom(window.__BC_M29_STAFF_CACHE__),users(),eligibleStaff()];for(const source of sources){const u=source.find(person=>person&&String(person.id)===key);if(u){const name=u.nombre||u.nombre_completo||u.nombre_usuario||u.full_name||u.fullName||u.name||u.email||u.email_usuario;return String(name||'Responsable asignado').trim();}}return 'Responsable asignado';}
-  function roleOf(u){return String(u&&(u.rol||u.role_name||u.nombre_rol||u.role)||'').toLowerCase();}
+  function roleOf(u){
+    let value=u&&(u.rol||u.role_name||u.nombre_rol||u.role)||'';
+    if(value&&typeof value==='object')value=value.nombre||value.name||value.rol||value.role_name||'';
+    return String(value||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').trim();
+  }
   function friendlyError(error,context){
     const raw=String(error&&error.message||error||'').trim();
     const value=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -617,7 +621,34 @@
       '#tab-jornada details summary{cursor:pointer;color:var(--gold);font-size:12px}',
       '#tab-jornada .bc7-check{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text)}',
       '#tab-jornada .bc7-empty{padding:18px 10px;text-align:center;border:1px dashed var(--gold-dim);border-radius:8px;color:var(--mist);font-size:12px}',
-      '@media(max-width:650px){#tab-jornada .bc7-hero{display:block}#tab-jornada .bc7-status{text-align:left;margin-top:9px;max-width:none}#tab-jornada .bc7-grid{grid-template-columns:1fr}#tab-jornada .bc7-day-row{grid-template-columns:1fr;gap:5px}#tab-jornada .bc7-day-row label{margin-top:4px}#tab-jornada .bc7-actions .bc7-btn{flex:1 1 140px}#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:8px 6px}}'
+      '#tab-mi-jornada{max-width:980px;margin:0 auto;padding:8px 0 28px}',
+      '#tab-mi-jornada .bc-worker-dashboard-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border:1px solid var(--gold-dim);border-radius:10px;background:var(--stone)}',
+      '#tab-mi-jornada .bc-worker-dashboard-head span{font:700 10px Inter,sans-serif;letter-spacing:.08em;color:var(--gold)}',
+      '#tab-mi-jornada .bc-worker-dashboard-head h3{margin:4px 0;color:var(--text);font-size:22px}',
+      '#tab-mi-jornada .bc-worker-dashboard-head p{margin:5px 0 0;color:var(--mist);font-size:12px;line-height:1.45}',
+      '#tab-mi-jornada .bc-worker-dashboard-head .bc7-btn{min-height:40px;padding:9px 13px;border:1px solid var(--gold-dim);border-radius:7px;background:var(--void);color:var(--text);font-weight:600}',
+      '#tab-mi-jornada .bc-worker-shortcuts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:12px 0}',
+      '#tab-mi-jornada .bc-worker-shortcut{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;min-height:100px;padding:12px;border:1px solid var(--gold-dim);border-radius:9px;background:var(--stone);color:var(--text);text-align:left;cursor:pointer}',
+      '#tab-mi-jornada .bc-worker-shortcut span{font-size:20px}',
+      '#tab-mi-jornada .bc-worker-shortcut b{font-size:12px}',
+      '#tab-mi-jornada .bc-worker-shortcut small{font-size:10px;color:var(--mist);line-height:1.35}',
+      '#tab-mi-jornada .bc-worker-jornada-history{margin-top:14px}',
+      '#tab-mi-jornada .bc-worker-jornada-history-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}',
+      '#tab-mi-jornada .bc-worker-jornada-history-head h4{margin:0;color:var(--text);font-size:15px}',
+      '#tab-mi-jornada .bc-worker-jornada-history-head span{color:var(--mist);font-size:10px}',
+      '#tab-mi-jornada .bc-worker-jornada-list{display:grid;gap:8px}',
+      '#tab-mi-jornada .bc-worker-jornada-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid var(--gold-dim);border-radius:8px;background:var(--stone)}',
+      '#tab-mi-jornada .bc-worker-jornada-copy{display:grid;gap:3px;min-width:0}',
+      '#tab-mi-jornada .bc-worker-jornada-copy b{color:var(--text);font-size:13px}',
+      '#tab-mi-jornada .bc-worker-jornada-copy span,#tab-mi-jornada .bc-worker-jornada-copy small{color:var(--mist);font-size:11px}',
+      '#tab-mi-jornada .bc-worker-jornada-open{min-height:36px;padding:7px 11px;border:1px solid var(--gold-dim);border-radius:6px;background:var(--void);color:var(--text);font:600 11px Inter,sans-serif;cursor:pointer}',
+      '#tab-mi-jornada .bc-worker-jornada-pending{font-size:10px;color:var(--mist)}',
+      '#tab-mi-jornada .bc-worker-jornada-empty{display:grid;justify-items:center;gap:6px;padding:28px 14px;border:1px dashed var(--gold-dim);border-radius:9px;color:var(--mist);text-align:center}',
+      '#tab-mi-jornada .bc-worker-jornada-empty span{font-size:26px}',
+      '#tab-mi-jornada .bc-worker-jornada-empty b{color:var(--text);font-size:14px}',
+      '#tab-mi-jornada .bc-worker-jornada-empty p{max-width:420px;margin:0;font-size:12px;line-height:1.4}',
+
+      '@media(max-width:650px){#tab-mi-jornada .bc-worker-dashboard-head{align-items:stretch;flex-direction:column}#tab-mi-jornada .bc-worker-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}#tab-mi-jornada .bc-worker-jornada-card{align-items:flex-start;flex-direction:column}#tab-mi-jornada .bc-worker-jornada-actions{width:100%}#tab-mi-jornada .bc-worker-jornada-open{width:100%}#tab-jornada .bc7-hero{display:block}#tab-jornada .bc7-status{text-align:left;margin-top:9px;max-width:none}#tab-jornada .bc7-grid{grid-template-columns:1fr}#tab-jornada .bc7-day-row{grid-template-columns:1fr;gap:5px}#tab-jornada .bc7-day-row label{margin-top:4px}#tab-jornada .bc7-actions .bc7-btn{flex:1 1 140px}#tab-jornada .bc7-table th,#tab-jornada .bc7-table td{padding:8px 6px}}'
     ].join('\n');
     document.head.appendChild(s);
     if(!$('bc7-month-calendar-style')){
@@ -1079,18 +1110,41 @@
   function renderWorkerDashboard(){
     const host=$('bc-worker-dashboard');if(!host)return;
     const user=currentUser()||{},role=roleOf(user);
-    if(!role.includes('dependienta')||state.admin){host.innerHTML='';return;}
+    if(!role.includes('dependienta')){host.innerHTML='';return;}
     const today=dateHavana();
-    const assigned=(state.rows||[]).filter(row=>String(row.responsable_id||'')===String(user.id||'')&&row.sesion_id&&['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(row.sesion_estado||'').toUpperCase()));
+    const ownRows=(state.rows||[]).filter(row=>
+      row&&String(row.responsable_id||'')===String(user.id||'')&&row.trabaja!==false
+    );
+    const activeRows=ownRows.filter(row=>
+      row.sesion_id&&['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(row.sesion_estado||'').toUpperCase())
+    ).sort((a,b)=>{
+      const aToday=String(a.fecha||'').slice(0,10)<=today&&String(a.fecha_fin||a.fecha||'').slice(0,10)>=today;
+      const bToday=String(b.fecha||'').slice(0,10)<=today&&String(b.fecha_fin||b.fecha||'').slice(0,10)>=today;
+      return Number(bToday)-Number(aToday)||String(b.fecha||'').localeCompare(String(a.fecha||''));
+    });
     const current=state.currentSession;
-    const row=assigned.find(item=>String(item.fecha||'').slice(0,10)<=today&&String(item.fecha_fin||item.fecha||'').slice(0,10)>=today)||assigned.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')))[0]||null;
-    const sessionId=current?.turno_sesion_id||row?.sesion_id||'';
-    if(!sessionId){host.innerHTML='<div class="bc-worker-dashboard-head"><div><span>ESPACIO DE TRABAJO</span><h3>Mi jornada</h3><p>No tienes una jornada activa en este momento. Aquí aparecerán tus accesos cuando el servidor confirme una asignación en curso.</p></div></div><button type="button" class="bc7-btn" data-bc7-worker-open-jornada>Ver mis jornadas</button>';return;}
-    const fecha=row?fmtDateHuman(row.fecha)+(row.fecha_fin&&row.fecha_fin!==row.fecha?' – '+fmtDateHuman(row.fecha_fin):''):fmtDateHuman(current?.fecha||today);
-    const status=String(row?.sesion_estado||'EN_CURSO').toUpperCase();
-    const statusText=status==='CERRADA_OPERATIVAMENTE'?'Pendiente de cuadre':'En curso';
+    const primary=activeRows[0]||null;
+    const sessionId=current?.turno_sesion_id||primary?.sesion_id||'';
+    const primaryRow=primary||ownRows.find(row=>String(row.sesion_id||'')===String(sessionId))||null;
     const shortcuts=[['declaracion_dinero','💵','Entregas diarias','Registrar efectivo del día'],['gastos','🧾','Gastos','Registrar un gasto'],['reinversiones','📦','Reinversiones','Registrar una reinversión'],['bajas','↘','Bajas','Registrar una baja'],['inventario_final','📋','Inventario final','Contar al terminar']];
-    host.innerHTML='<div class="bc-worker-dashboard-head"><div><span>ESPACIO DE TRABAJO</span><h3>Mi jornada</h3><p>'+esc(fecha)+' · '+esc(statusText)+' · '+esc(warehouseName(row?.almacen_id||current?.almacen_id))+'</p></div><button type="button" class="bc7-btn" data-bc7-worker-open-jornada>Ver mi jornada</button></div><div class="bc-worker-shortcuts">'+shortcuts.map(item=>'<button type="button" class="bc-worker-shortcut" data-bc7-worker-shortcut="'+item[0]+'" data-session-id="'+esc(sessionId)+'"><span aria-hidden="true">'+item[1]+'</span><b>'+item[2]+'</b><small>'+item[3]+'</small></button>').join('')+'</div>';
+    const header=sessionId
+      ?'<div class="bc-worker-dashboard-head"><div><span>ESPACIO DE TRABAJO</span><h3>Mi jornada</h3><p>'+esc(fmtDateHuman(primaryRow?.fecha||current?.fecha||today))+(primaryRow?.fecha_fin&&primaryRow.fecha_fin!==primaryRow.fecha?' – '+esc(fmtDateHuman(primaryRow.fecha_fin)):'')+' · '+esc(calendarStatus(primaryRow||{sesion_estado:'EN_CURSO'}).short)+' · '+esc(warehouseName(primaryRow?.almacen_id||current?.almacen_id))+'</p></div><button type="button" class="bc7-btn" data-bc7-worker-open-jornada>Ver calendario</button></div>'+
+       '<div class="bc-worker-shortcuts">'+shortcuts.map(item=>'<button type="button" class="bc-worker-shortcut" data-bc7-worker-shortcut="'+item[0]+'" data-session-id="'+esc(sessionId)+'"><span aria-hidden="true">'+item[1]+'</span><b>'+item[2]+'</b><small>'+item[3]+'</small></button>').join('')+'</div>'
+      :'<div class="bc-worker-dashboard-head"><div><span>ESPACIO PERSONAL</span><h3>Mis jornadas</h3><p>No tienes una jornada activa o pendiente de cuadre. Tus asignaciones aparecen debajo.</p></div><button type="button" class="bc7-btn" data-bc7-worker-open-jornada>Ver calendario</button></div>';
+    const sorted=ownRows.slice().sort((a,b)=>
+      String(b.fecha||'').localeCompare(String(a.fecha||''))||Number(b.numero_dia||0)-Number(a.numero_dia||0)
+    );
+    const history=sorted.length
+      ?'<section class="bc-worker-jornada-history"><div class="bc-worker-jornada-history-head"><h4>Mis jornadas</h4><span>'+sorted.length+' registro(s)</span></div><div class="bc-worker-jornada-list">'+sorted.map(item=>{
+        const status=calendarStatus(item);
+        const period=fmtDateHuman(item.fecha)+(item.fecha_fin&&item.fecha_fin!==item.fecha?' – '+fmtDateHuman(item.fecha_fin):'');
+        const action=item.sesion_id
+          ?'<button type="button" class="bc-worker-jornada-open" data-bc7-open="'+esc(item.sesion_id)+'">Abrir jornada</button>'
+          :'<span class="bc-worker-jornada-pending">Sesión aún no iniciada</span>';
+        return '<article class="bc-worker-jornada-card"><div class="bc-worker-jornada-copy"><b>'+esc(period)+'</b><span>'+esc(warehouseName(item.almacen_id))+'</span><small>'+esc(status.label)+'</small></div><div class="bc-worker-jornada-actions">'+action+'</div></article>';
+      }).join('')+'</div></section>'
+      :'<div class="bc-worker-jornada-empty"><span aria-hidden="true">🗓️</span><b>No hay jornadas asignadas en este mes</b><p>Cuando Administración te asigne una jornada, aparecerá aquí con su estado y acceso directo.</p></div>';
+    host.innerHTML=header+history;
   }
   function checklistConfirmButtonHtml(detail,key,isAssigned){
     if(!isAssigned)return '';

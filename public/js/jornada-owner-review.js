@@ -160,7 +160,8 @@
     const rectifications=Array.isArray(l.rectificaciones_post_cierre)?l.rectificaciones_post_cierre:[];
     const turnClosed=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
     const pending=l.pendientes||{},post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:[];
-    const pendingPost=Number(l.movimientos_posteriores_pendientes||pending.movimientos_posteriores_corte||0)>0;
+    const pendingPostCount=Number(l.movimientos_posteriores_pendientes??pending.movimientos_posteriores_corte??post.length??0);
+    const pendingPost=pendingPostCount>0;
     const blocked='Pendiente de clasificación';
     const cards=[
       ['Ventas estimadas',pendingPost?blocked:(l.ventas_estimadas==null?'No calculable':money(l.ventas_estimadas)+' CUP')],
@@ -193,7 +194,7 @@
       negative.forEach(x=>warnings.push((x.nombre||'Producto')+': diferencia '+qty(x.unidades_vendidas)+' · inicial '+qty(x.inventario_inicial)+' + entradas '+qty(Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0))+' − salidas '+qty(Number(x.transferencias_salida||0)+Number(x.vales_salida||0)+Number(x.mermas_aprobadas||0)+Number(x.bajas_aprobadas||0))+' − final '+qty(x.inventario_final)));
     }
     if(l.salario_porcentaje==null)warnings.push('Falta fijar el porcentaje salarial del Dueño.');
-    if(Number(l.movimientos_posteriores_pendientes||0)>0)warnings.push(Number(l.movimientos_posteriores_pendientes)+' bajas/mermas aprobadas después del inventario final necesitan clasificación.');
+    if(pendingPostCount>0)warnings.push(pendingPostCount+' bajas/mermas aprobadas después del inventario final necesitan clasificación para calcular ventas, salario y diferencia de caja.');
     if(Number(l.costos_sin_cobertura||0)>0)warnings.push(Number(l.costos_sin_cobertura)+' productos con ventas sin costo de compra histórico comprobado; la ganancia mostrada es parcial.');
     if(Number(l.productos_vendidos_con_precio_faltante||0)>0)warnings.push(Number(l.productos_vendidos_con_precio_faltante)+' productos vendidos sin precio de venta válido.');
     if(Number(pending.gastos||0)>0)warnings.push(Number(pending.gastos)+' gastos pendientes.');
@@ -226,7 +227,7 @@
     const dailyCash='<details class="bcjr-detail"><summary>Entregas diarias de efectivo <small>'+esc(money(l.dinero_recogido_total))+' CUP</small></summary><div class="bcjr-detail-body">'+(cashRows.length?'<ul>'+cashRows.join('')+'</ul>':'<p class="bcjr-muted">No hay entregas diarias ni conteo físico registrados.</p>')+'<p class="bcjr-muted">'+cashNote+'</p></div></details>';
     const rectificationPanel=rectifications.length?'<details class="bcjr-detail" open><summary>Rectificaciones posteriores al cierre <small>'+rectifications.length+' producto(s) · solo lectura</small></summary><div class="bcjr-detail-body"><p class="bcjr-muted">El Turno y sus registros originales permanecen cerrados e intactos. Estos valores se aplican únicamente a la vista de revisión histórica y tienen trazabilidad separada.</p><ul>'+rectifications.map(r=>'<li><b>'+esc(r.producto||'Producto')+'</b> · versión '+esc(r.version)+' · '+esc(qty(r.cantidad_vendida))+' unidades · '+(Array.isArray(r.tramos)?esc(r.tramos.map(t=>qty(t.cantidad)+' × '+money(t.precio_unitario)).join(' + ')):'')+' = <b>'+esc(money(r.importe_total))+' CUP</b><br><small>Valor anterior: '+esc(money(r.estado_anterior?.importe_estimado))+' CUP · Registrado por '+esc(r.creado_nombre||'ADMIN')+' · '+esc(r.creado_en?new Date(r.creado_en).toLocaleString():'—')+'<br>Fuente: '+esc(r.fuente_documental)+' · Dropbox content hash: '+esc(r.fuente_content_hash)+'<br>Motivo: '+esc(r.comentario||'—')+'</small></li>').join('')+'</ul></div></details>':'';
     const salaryPanel='<details class="bcjr-detail"><summary>Porcentaje salarial y cálculo <small>'+(s.salario_porcentaje==null?'Pendiente':esc(qty(s.salario_porcentaje))+'%')+'</small></summary><div class="bcjr-detail-body">'+salary+'</div></details>';
-    const warningsPanel=warnings.length?'<details class="bcjr-detail"><summary>Validaciones pendientes <small>'+warnings.length+'</small></summary><div class="bcjr-detail-body"><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div></details>':'<p class="bcjr-pill ok">Sin bloqueos de cálculo</p>';
+    const warningsPanel=warnings.length?'<details class="bcjr-detail" open><summary>Validaciones pendientes <small>'+warnings.length+'</small></summary><div class="bcjr-detail-body"><ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul></div></details>':l.calculable===true?'<p class="bcjr-pill ok">Liquidación calculable · sin bloqueos</p>':'<div class="bcjr-alert"><b>Liquidación todavía no calculable</b><p>El servidor no devolvió una causa específica. Actualiza la revisión; el sistema no debe presentar esta jornada como libre de bloqueos mientras el cálculo siga pendiente.</p></div>';
     const correctionPanel=correctionForm?'<details class="bcjr-detail"><summary>Correcciones de conteo <small>'+negative.length+' producto(s)</small></summary><div class="bcjr-detail-body">'+correctionForm+'</div></details>':'';
     const movementPanel=movements?'<details class="bcjr-detail"><summary>Bajas y mermas para clasificar <small>'+post.length+'</small></summary><div class="bcjr-detail-body">'+movements+'</div></details>':'';
     const grossProfitLabel=pendingPost?'Pendiente de clasificación':(l.ganancia_bruta_parcial==null?'No calculable':money(l.ganancia_bruta_parcial)+' CUP'+(l.ganancia_bruta_es_total?'':' · PARCIAL'));
@@ -239,7 +240,7 @@
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
     const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
     const body=document.getElementById('bcjr-content');
-    const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes||0)>0);
+    const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes??s.liquidacion?.pendientes?.movimientos_posteriores_corte??s.liquidacion?.movimientos_posteriores_corte?.length??0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
     const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
     const completedSessions=sessions.filter(s=>s.estado==='COMPLETADA');
@@ -262,7 +263,8 @@
       const l=s.liquidacion||{};
       if(!['COMPLETADA','CANCELADA','CERRADA_OPERATIVAMENTE'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía está operativamente abierta.');
       if(['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(s.estado)&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
-      if(Number(l.movimientos_posteriores_pendientes||0)>0)blockers.push('Jornada '+fmtDate(s.fecha)+': movimientos posteriores sin clasificar');
+      const pendingPostCount=Number(l.movimientos_posteriores_pendientes??l.pendientes?.movimientos_posteriores_corte??l.movimientos_posteriores_corte?.length??0);
+      if(pendingPostCount>0)blockers.push('Jornada '+fmtDate(s.fecha)+': '+pendingPostCount+' movimientos posteriores sin clasificar');
     });
     const approved=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
     const reject=modal.querySelector('[data-bcjr-action="reject"]');
