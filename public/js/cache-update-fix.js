@@ -24,7 +24,7 @@
           var keys = await window.caches.keys();
           var propias = keys.filter(function(k){
             var name = String(k);
-            return name.startsWith("battlecruiser-shell-") || name.startsWith("battlecruiser-static-");
+            return name === "battlecruiser" || name.startsWith("battlecruiser-shell-") || name.startsWith("battlecruiser-static-");
           });
           await Promise.all(propias.map(function(k){ return window.caches.delete(k); }));
         }
