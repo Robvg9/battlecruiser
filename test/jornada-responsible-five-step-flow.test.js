@@ -75,8 +75,8 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
   assert.match(app,/\["bc7-jornada-ui\.js","7\.62"\]/);
   assert.match(sw,/bc7-jornada-ui\.js\?v=7\.62/);
-  assert.match(app,/9\.5\.156/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.156"/);
+  assert.match(app,/9\.5\.157/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.157"/);
 });
 
 

@@ -1,6 +1,6 @@
 // BattleCruiser — cache cleanup hardening
-// Replaces the legacy updater with an explicit cache scope. Only caches whose
-// name starts with battlecruiser-shell- are eligible for deletion.
+// Replaces the legacy updater with an explicit allowlist of both app-owned
+// release caches. Static release assets live in battlecruiser-static-* too.
 (function bcPatchCacheUpdater(){
   "use strict";
   if (window.__BC_CACHE_UPDATE_FIX__) return;
@@ -22,7 +22,10 @@
         }
         if ("caches" in window && window.caches && typeof window.caches.keys === "function") {
           var keys = await window.caches.keys();
-          var propias = keys.filter(function(k){ return String(k).startsWith("battlecruiser-shell-"); });
+          var propias = keys.filter(function(k){
+            var name = String(k);
+            return name === "battlecruiser" || name.startsWith("battlecruiser-shell-") || name.startsWith("battlecruiser-static-");
+          });
           await Promise.all(propias.map(function(k){ return window.caches.delete(k); }));
         }
       } catch (e) {
