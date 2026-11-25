@@ -67,7 +67,7 @@ test("cash, expenses, reinvestments, adjustments and reconciliation share the sa
   assert.match(UI, /loadCashDaysWorkspace\(state\.detail\);\s*loadFinances\(state\.detail\)/);
 });
 
-test("retail Step 5 renders exactly the daily date rows and no additional total field", () => {
+test("retail Step 1 renders exactly the daily date rows and no additional total field", () => {
   assert.match(UI, /data-bc7-cash-mode="daily"/);
   assert.match(UI, /cashDaysManagerShellHtml\(detail,isAssigned,status\)/);
   assert.match(UI, /function renderCashDaysWorkspace\(detail\)/);
@@ -87,7 +87,7 @@ test("retail Step 5 renders exactly the daily date rows and no additional total 
   assert.doesNotMatch(UI, /submitDailyCash\(form\)/);
 });
 
-test("daily Step 5 saves each date idempotently and verifies server readback without a final total", () => {
+test("daily Step 1 saves each date idempotently and verifies server readback without a final total", () => {
   const start = UI.indexOf("async function saveCashDaysWorkspace(form,options){");
   const end = UI.indexOf("async function saveAdminCashDeclaration", start);
   assert.ok(start >= 0 && end > start, "daily-only cash saver exists");
@@ -100,7 +100,7 @@ test("daily Step 5 saves each date idempotently and verifies server readback wit
   assert.match(block, /missingRows/);
   assert.match(block, /Conservé las claves para evitar duplicados/);
   assert.doesNotMatch(block, /saveCashDeclaration|finalOperation|declaración final/);
-  assert.ok(block.indexOf("missingRows.length") < block.indexOf("Paso 5 confirmado"));
+  assert.ok(block.indexOf("missingRows.length") < block.indexOf("Paso 1 confirmado"));
   assert.match(block, /Entregas diarias guardadas y confirmadas por el servidor/);
 });
 
@@ -171,7 +171,7 @@ test("saving an already-declared cash period is a successful no-op, not a false 
   assert.match(block,/if\(!operations\.length\)/);
   assert.match(block,/checklist=await rpc\('bc7_estado_confirmaciones_jornada'/);
   assert.match(block,/checklist\?\.declaracion_dinero\?\.completado===true/);
-  assert.match(block,/El paso 5 ya está completo y confirmado por el servidor/);
+  assert.match(block,/El paso 1 ya está completo y confirmado por el servidor/);
   assert.match(block,/if\(options\.requireComplete&&missing\.length\)/);
   assert.match(block,/Faltan entregas enviadas de estas fechas/);
 });
