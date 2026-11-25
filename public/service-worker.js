@@ -227,7 +227,7 @@ self.addEventListener("message", function(event) {
   if (event.data.type === "PRUNE_OLD_RELEASES" && event.waitUntil) {
     event.waitUntil(Promise.resolve().then(function() {
       // The active old worker must never delete assets prepared for its waiting update.
-      if (self.registration && self.registration.waiting) return;
+      if (self.registration && (self.registration.installing || self.registration.waiting)) return;
       return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(clients) {
         // Another open tab may still be running an older release.
         if (clients.length > 1) return;
