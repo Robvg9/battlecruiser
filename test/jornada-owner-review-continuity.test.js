@@ -174,8 +174,8 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   assert.match(REVIEW,/Periodo del turno/);
   assert.match(REVIEW,/Entregas diarias de efectivo/);
   assert.match(REVIEW,/Efectivo total recogido/);
-  assert.match(REVIEW,/Marcar todas: antes del corte/);
-  assert.match(REVIEW,/Marcar todas: después del corte/);
+  assert.match(REVIEW,/Marcar todas: antes del cierre/);
+  assert.match(REVIEW,/Marcar todas: después del cierre/);
   assert.match(REVIEW,/valor_estimado/);
   assert.match(MIGRATION,/valor_estimado/);
   assert.match(MIGRATION,/turno_jornada_inventario_correcciones/);
