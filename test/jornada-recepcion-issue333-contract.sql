@@ -183,7 +183,7 @@ BEGIN
   END IF;
 
   ---------------------------------------------------------------------------
-  -- 1 difference (+/- capable payload kept full), mandatory reasons, rejection & recount.
+  -- 1 difference: the real physical receipt is accepted without an Owner review gate.
   ---------------------------------------------------------------------------
   UPDATE public.turno_sesiones SET estado='EN_CURSO' WHERE id=v_s2;
   PERFORM public.bc7_guardar_inventario_jornada(v_s2,'FINAL',v_lines,'S2 final 66');
@@ -192,7 +192,6 @@ BEGIN
   UPDATE public.turno_sesiones SET estado='COMPLETADA' WHERE id=v_s2;
   SELECT id INTO v_entrega FROM public.turno_jornada_inventario_entregas WHERE origen_sesion_id=v_s2;
 
-  -- 1 negative difference on p1 (-1.25), rest equal (full 66-line payload).
   SELECT jsonb_agg(
     jsonb_build_object(
       'producto_id',(l->>'producto_id')::uuid,
@@ -206,42 +205,30 @@ BEGIN
   IF jsonb_array_length(v_lines) <> 66 THEN RAISE EXCEPTION 'FAIL: 1-diff payload not 66'; END IF;
 
   v_result := public.bc7_recibir_entrega_jornada(v_s3,v_lines,'1 diff','33330000-0000-0000-0000-000000000101');
-  IF v_result->>'estado' <> 'PENDIENTE_REVISION' THEN RAISE EXCEPTION 'FAIL: 1-diff not pending review'; END IF;
+  IF v_result->>'estado' <> 'ACEPTADA'
+     OR coalesce((v_result->>'requiere_revision')::boolean,true) IS NOT FALSE
+     OR coalesce((v_result->>'diferencias_informativas')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'FAIL: 1-diff receipt must auto-accept without Owner review: %',v_result;
+  END IF;
+  v_initial:=(v_result->>'inventario_inicial_id')::uuid;
+  IF v_initial IS NULL THEN RAISE EXCEPTION 'FAIL: 1-diff physical INITIAL not created'; END IF;
   IF (SELECT count(*) FROM public.turno_jornada_inventario_recepcion_lineas rl
       JOIN public.turno_jornada_inventario_recepciones r ON r.id=rl.recepcion_id
       WHERE r.entrega_id=v_entrega AND rl.diferencia<>0) <> 1 THEN
     RAISE EXCEPTION 'FAIL: expected 1 diff line';
   END IF;
-
-  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
-  PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','turnos:ver,turnos:editar_any,auditoria:editar_any',false);
-
-  v_error:=false;
-  BEGIN PERFORM public.bc7_resolver_entrega_jornada(v_entrega,'APROBAR',NULL);
-  EXCEPTION WHEN others THEN v_error:=true; END;
-  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: APROBAR without reason allowed'; END IF;
-
-  v_error:=false;
-  BEGIN PERFORM public.bc7_resolver_entrega_jornada(v_entrega,'RECHAZAR','   ');
-  EXCEPTION WHEN others THEN v_error:=true; END;
-  IF NOT v_error THEN RAISE EXCEPTION 'FAIL: RECHAZAR with blank reason allowed'; END IF;
-
-  v_result := public.bc7_resolver_entrega_jornada(v_entrega,'RECHAZAR','Conteo incorrecto, repetir');
-  IF v_result->>'estado' <> 'REQUIERE_RECUENTO' THEN RAISE EXCEPTION 'FAIL: reject did not require recount'; END IF;
-
-  PERFORM set_config('request.jwt.claim.sub',v_worker::text,false);
-  PERFORM set_config('test.bc_admin','false',false);
-  PERFORM set_config('test.perms','turnos:ver',false);
-
-  SELECT jsonb_agg(jsonb_build_object('producto_id',el.producto_id,'cantidad',el.cantidad_declarada) ORDER BY el.producto_id)
-    INTO v_lines FROM public.turno_jornada_inventario_entrega_lineas el WHERE el.entrega_id=v_entrega;
-  v_result := public.bc7_recibir_entrega_jornada(v_s3,v_lines,'Recount match','33330000-0000-0000-0000-000000000102');
-  IF v_result->>'estado' <> 'ACEPTADA' OR (v_result->>'intento')::int <> 2 THEN
-    RAISE EXCEPTION 'FAIL: recount not accepted as attempt 2';
+  IF (SELECT cantidad_contada FROM public.turno_jornada_inventario_lineas
+      WHERE corte_id=v_initial AND producto_id=v_p1) IS DISTINCT FROM
+     (SELECT cantidad_recibida FROM public.turno_jornada_inventario_recepcion_lineas
+      WHERE recepcion_id=(v_result->>'id')::uuid AND producto_id=v_p1) THEN
+    RAISE EXCEPTION 'FAIL: physical INITIAL must use the received quantity';
   END IF;
-  IF (SELECT count(*) FROM public.turno_jornada_inventario_recepciones WHERE entrega_id=v_entrega) <> 2 THEN
-    RAISE EXCEPTION 'FAIL: recount history lost';
+  IF (SELECT count(*) FROM public.turno_jornada_inventario_correcciones
+      WHERE turno_sesion_id=v_s2 AND tipo='FINAL' AND producto_id=v_p1 AND vigente) <> 1 THEN
+    RAISE EXCEPTION 'FAIL: previous FINAL correction overlay missing';
+  END IF;
+  IF (SELECT count(*) FROM public.turno_jornada_inventario_recepciones WHERE entrega_id=v_entrega) <> 1 THEN
+    RAISE EXCEPTION 'FAIL: receipt differences must not require recount/retry';
   END IF;
 
   ---------------------------------------------------------------------------
@@ -276,19 +263,28 @@ BEGIN
   ) t;
 
   v_result := public.bc7_recibir_entrega_jornada(v_s4,v_lines,'15 diffs mixed','33330000-0000-0000-0000-000000000115');
-  IF v_result->>'estado' <> 'PENDIENTE_REVISION' THEN RAISE EXCEPTION 'FAIL: 15-diff not pending review'; END IF;
+  IF v_result->>'estado' <> 'ACEPTADA'
+     OR coalesce((v_result->>'requiere_revision')::boolean,true) IS NOT FALSE
+     OR coalesce((v_result->>'diferencias_informativas')::boolean,false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'FAIL: 15-diff receipt must auto-accept without Owner review: %',v_result;
+  END IF;
+  v_initial := (v_result->>'inventario_inicial_id')::uuid;
+  IF v_initial IS NULL THEN RAISE EXCEPTION 'FAIL: 15-diff physical INITIAL not created'; END IF;
   IF (SELECT count(*) FROM public.turno_jornada_inventario_recepcion_lineas rl
       JOIN public.turno_jornada_inventario_recepciones r ON r.id=rl.recepcion_id
       WHERE r.entrega_id=v_entrega AND rl.diferencia<>0) <> 15 THEN
     RAISE EXCEPTION 'FAIL: expected 15 diff lines';
   END IF;
 
-  PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
-  PERFORM set_config('test.bc_admin','true',false);
-  PERFORM set_config('test.perms','turnos:ver,turnos:editar_any,auditoria:editar_any',false);
-  v_result := public.bc7_resolver_entrega_jornada(v_entrega,'APROBAR','Aprobado con diferencias verificadas');
-  IF v_result->>'estado' <> 'ACEPTADA' THEN RAISE EXCEPTION 'FAIL: 15-diff approve failed'; END IF;
-  v_initial := (v_result->>'inventario_inicial_id')::uuid;
+  IF (SELECT count(*) FROM public.turno_jornada_inventario_recepcion_lineas rl
+      JOIN public.turno_jornada_inventario_recepciones r ON r.id=rl.recepcion_id
+      WHERE r.entrega_id=v_entrega AND rl.diferencia<>0) <> 15 THEN
+    RAISE EXCEPTION 'FAIL: 15-diff receipt details not preserved';
+  END IF;
+  IF (SELECT count(*) FROM public.turno_jornada_inventario_correcciones
+      WHERE turno_sesion_id=v_s3 AND tipo='FINAL' AND vigente) <> 15 THEN
+    RAISE EXCEPTION 'FAIL: all 15 safe previous-FINAL correction overlays must be recorded';
+  END IF;
 
   IF (SELECT count(*) FROM public.turno_jornada_inventario_lineas WHERE corte_id=v_source_cut) <> 66 THEN
     RAISE EXCEPTION 'FAIL: source FINAL integrity broken';

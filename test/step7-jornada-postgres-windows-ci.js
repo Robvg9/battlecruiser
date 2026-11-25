@@ -346,9 +346,8 @@ function applySql(file) {
     applySql("supabase/migrations/20261115134000_jornada_handover_uses_actual_close_date.sql");
     log("\\r\\n=== Verify owner-confirmed Dahiana successor period recovery ===");
     applySql("supabase/migrations/20261115142000_restore_cueva_dahiana_successor_20261111_13.sql");
-    log("\\r\\n=== Apply Issue #333 reception admin queue/detail and verify contract ===");
+    log("\\r\\n=== Apply Issue #333 reception admin queue/detail; its updated behavioral contract runs after successor non-blocking migration ===");
     applySql("supabase/migrations/20261116090000_jornada_recepcion_admin_queue_issue_333.sql");
-    applySql("test/jornada-recepcion-issue333-contract.sql");
     log("Apply PR #341 shared inventory handover truth migration and verify late-correction guard.");
     applySql("supabase/migrations/20261116180000_jornada_inventory_handover_truth.sql");
     applySql("test/jornada-inventory-handover-truth-contract.sql");
@@ -414,6 +413,10 @@ function applySql(file) {
     log("\\r\\n=== Scope historical mismatch validation to the exact source FINAL cut ===");
     applySql("supabase/migrations/20261124233000_jornada_successor_scope_final_snapshot_validation.sql");
     applySql("test/jornada-successor-final-snapshot-sync-contract.sql");
+    log("\\r\\n=== Auto-open retroactive successors and accept physical receipt differences without Owner gating ===");
+    applySql("supabase/migrations/20261125010000_jornada_successor_auto_open_nonblocking_receipt.sql");
+    applySql("test/jornada-successor-auto-open-nonblocking-contract.sql");
+    applySql("test/jornada-recepcion-issue333-contract.sql");
     applySql("test/jornada-session-inventory-attribution-hardening-contract.sql");
     applySql("test/jornada-linked-postcut-transfer-contract.sql");
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
