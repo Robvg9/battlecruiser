@@ -103,7 +103,9 @@ test("Post-cutoff classification controls remain visible and usable on mobile wi
   assert.match(REVIEW,/bcjr-movement-decision/);
   assert.match(REVIEW,/Antes del cierre operativo/);
   assert.match(REVIEW,/Después del cierre operativo/);
-  assert.match(REVIEW,/Guardar clasificación auditada/);\n  assert.match(REVIEW,/Corte operativo registrado/);\n  assert.match(REVIEW,/pendingPostCount=Math.max/);
+  assert.match(REVIEW,/Guardar clasificación auditada/);
+  assert.match(REVIEW,/Corte operativo registrado/);
+  assert.match(REVIEW,/pendingPostCount=Math.max/);
   assert.doesNotMatch(REVIEW,/bcjr-movement-list.*<table/);
 });
 
