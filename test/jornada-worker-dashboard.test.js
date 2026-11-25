@@ -80,7 +80,7 @@ test("calendar RPC errors are surfaced in the personal dashboard instead of a fa
   assert.match(loader, /state\.calendarLoading=false/);
   assert.match(loader, /renderWorkerDashboard\(\)/);
   assert.match(loader, /renderWorkerDashboardState\('Cargando tus jornadas…'/);
-  assert.match(loader, /data-bc7-worker-retry="calendar"/);
+  assert.match(jornada, /data-bc7-worker-retry="calendar"/);
 });
  
 test("owner review never says there are no blockers while calculation is still incomplete", () => {
