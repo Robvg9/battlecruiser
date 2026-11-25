@@ -577,3 +577,52 @@
     font-size: 16px;
   }
 }
+
+
+/* Jornada 9.5.156 — dashboard, help dialog, archive and compact transfer attribution. */
+#tab-jornada .bc7-wrap{display:flex;flex-direction:column;gap:12px}
+#tab-jornada #bc7-current-session-card{order:1}
+#tab-jornada #bc7-calendar-section{order:2}
+#tab-jornada #bc7-admin-details{order:3}
+#tab-jornada #bc7-workspace{order:4}
+#tab-jornada .bc7-hero-actions{display:flex;align-items:center;gap:10px;min-width:0}
+#tab-jornada .bc7-help-icon{display:grid;place-items:center;width:32px;height:32px;min-width:32px;padding:0;border:1px solid var(--gold-dim);border-radius:50%;background:rgba(201,162,77,.10);color:var(--gold);font-size:17px;font-weight:800;cursor:pointer}
+#tab-jornada .bc7-help-icon:focus-visible,#tab-jornada .bc7-help-modal button:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+#tab-jornada .bc7-help-modal{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:18px}
+#tab-jornada .bc7-help-modal[hidden]{display:none!important}
+#tab-jornada .bc7-help-backdrop{position:absolute;inset:0;border:0;background:rgba(0,0,0,.68)}
+#tab-jornada .bc7-help-dialog{position:relative;z-index:1;width:min(720px,100%);max-height:min(82vh,820px);overflow:auto;padding:18px;border:1px solid var(--gold-dim);border-radius:14px;background:var(--stone);color:var(--text);box-shadow:0 22px 80px rgba(0,0,0,.4)}
+#tab-jornada .bc7-help-dialog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--gold-dim)}
+#tab-jornada .bc7-help-dialog>header span{font-size:10px;letter-spacing:.12em;color:var(--gold)}
+#tab-jornada .bc7-help-dialog h3{margin:3px 0 0;color:var(--gold)}
+#tab-jornada .bc7-help-content{font-size:13px;line-height:1.55}
+#tab-jornada .bc7-help-content h4{margin:18px 0 6px;color:var(--gold)}
+#tab-jornada .bc7-help-content ul,#tab-jornada .bc7-help-content ol{padding-left:22px}
+#tab-jornada .bc7-archive{margin-top:12px;border:1px solid var(--gold-dim);border-radius:9px;padding:10px 12px;background:rgba(7,20,16,.24)}
+#tab-jornada .bc7-archive>summary{cursor:pointer;color:var(--mist);font-weight:650}
+#tab-jornada .bc7-pending-inbound-card .bc7-transfer-select-all{display:flex;align-items:center;gap:8px;margin:8px 0;padding:7px 9px;border:1px solid var(--gold-dim);border-radius:7px;font-size:12px}
+#tab-jornada .bc7-pending-inbound-card .bc7-transfer-select-all input[type=checkbox],
+#tab-jornada .bc7-pending-inbound-table input[type=checkbox]{appearance:auto!important;-webkit-appearance:checkbox!important;width:16px!important;height:16px!important;min-width:16px!important;min-height:16px!important;max-width:16px!important;max-height:16px!important;margin:0!important;padding:0!important;flex:0 0 16px;accent-color:var(--gold)}
+#tab-jornada .bc7-pending-inbound-card .bc7-table-wrap{overflow-x:hidden!important;overflow-y:visible!important}
+#tab-jornada .bc7-pending-inbound-table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse}
+#tab-jornada .bc7-pending-inbound-table th:first-child,#tab-jornada .bc7-pending-inbound-table td:first-child{width:42px;text-align:center}
+#tab-jornada .bc7-pending-inbound-table th:last-child,#tab-jornada .bc7-pending-inbound-table td:last-child{width:76px;text-align:right}
+#tab-jornada .bc7-pending-inbound-table td{white-space:normal!important;overflow-wrap:anywhere;word-break:normal;padding:7px 6px!important;font-size:12px}
+#tab-mi-jornada .bc-worker-dashboard{max-width:980px;margin:0 auto;padding:16px;border:1px solid var(--gold-dim);border-radius:14px;background:var(--stone)}
+#tab-mi-jornada .bc-worker-dashboard-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+#tab-mi-jornada .bc-worker-dashboard-head>div>span{font-size:10px;letter-spacing:.14em;color:var(--gold)}
+#tab-mi-jornada .bc-worker-dashboard-head h3{margin:4px 0;color:var(--text);font-size:24px}
+#tab-mi-jornada .bc-worker-dashboard-head p{margin:0;color:var(--mist);font-size:13px}
+#tab-mi-jornada .bc-worker-shortcuts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+#tab-mi-jornada .bc-worker-shortcut{display:grid;gap:7px;min-height:112px;padding:14px;text-align:left;border:1px solid var(--gold-dim);border-radius:10px;background:rgba(7,20,16,.38);color:var(--text);cursor:pointer}
+#tab-mi-jornada .bc-worker-shortcut>span{font-size:22px}
+#tab-mi-jornada .bc-worker-shortcut b{font-size:14px}
+#tab-mi-jornada .bc-worker-shortcut small{font-size:11px;color:var(--mist)}
+#tab-mi-jornada .bc-worker-shortcut:hover{border-color:var(--gold);transform:translateY(-1px)}
+@media(max-width:560px){
+ #tab-jornada .bc7-hero-actions{gap:6px}
+ #tab-jornada .bc7-help-dialog{padding:14px;max-height:88vh}
+ #tab-jornada .bc7-pending-inbound-table th,#tab-jornada .bc7-pending-inbound-table td{font-size:11px!important}
+ #tab-jornada .bc7-pending-inbound-table th:last-child,#tab-jornada .bc7-pending-inbound-table td:last-child{width:64px}
+ #tab-mi-jornada .bc-worker-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
