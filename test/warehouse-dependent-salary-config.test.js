@@ -14,6 +14,7 @@ const app = read("public/app.js");
 const sw = read("public/service-worker.js");
 const index = read("public/index.html");
 const css = read("public/style.css");
+const postgresRunner = read("test/step7-jornada-postgres-windows-ci.js");
 
 test("salary rules are scoped to a dependent and warehouse, with audit history and protected RPC access", () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.almacen_dependienta_configuracion/);
@@ -75,6 +76,13 @@ test("the Jornada dashboard no longer duplicates Phase 2 financial calculations"
   assert.match(helper, /return ''/);
   assert.doesNotMatch(helper, /Fase 2|Cálculos automáticos completados|Ventas estimadas|Salario calculado/);
   assert.doesNotMatch(jornadaUi, /Fase 2 · Cálculos automáticos completados/);
+});
+
+test("PostgreSQL 17 runner applies and exercises the new production migration", () => {
+  assert.ok(postgresRunner.includes('applySql("supabase/migrations/20261125224135_warehouse_dependent_salary_configuration.sql")'));
+  assert.ok(postgresRunner.includes('applySql("test/warehouse-dependent-salary-config-contract.sql")'));
+  assert.match(read("test/warehouse-dependent-salary-config-contract.sql"), /temporary salary was not stamped/i);
+  assert.match(read("test/warehouse-dependent-salary-config-contract.sql"), /already-started Jornada snapshot/i);
 });
 
 test("PWA shell and module cache versions are aligned for the new release", () => {
