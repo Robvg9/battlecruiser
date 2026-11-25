@@ -15,12 +15,12 @@ test("Operationally closed value corrections update only the session-level audit
   assert.match(migration,/'valores_producto_persistidos',v_s\.estado='COMPLETADA'/);
   assert.match(contract,/v_s\.estado NOT IN/);
   assert.match(ui,/data-session-state=/);
-  assert.match(ui,/result\?\.valores_solo_jornada!==true/);
+  assert.match(ui,/result\.valores_solo_jornada!==true/);
   assert.match(ui,/El catálogo global no cambió/);
 });
 
 test("Completed Jornadas keep the existing persistent product value path",()=>{
   assert.match(migration,/IF v_s\.estado='COMPLETADA' THEN/);
   assert.match(ui,/fijándolos para futuras Jornadas/);
-  assert.match(ui,/result\?\.valores_producto_persistidos!==true/);
+  assert.match(ui,/result\.valores_producto_persistidos!==true/);
 });
