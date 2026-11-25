@@ -15,7 +15,9 @@ test("Operationally closed value corrections update only the session-level audit
   assert.match(migration,/'valores_producto_persistidos',v_s\.estado='COMPLETADA'/);
   assert.match(contract,/v_s\.estado NOT IN/);
   assert.match(ui,/data-session-state=/);
-  assert.match(ui,/result\.valores_solo_jornada!==true/);
+  assert.match(ui,/data-bcjr-values-save[\s\S]*?data-session-state=/);
+  assert.match(ui,/sessionOnlySaved=result\?\.ok===true[\s\S]*?result\.catalogo_modificado===false[\s\S]*?result\.valores_producto_persistidos===false/);
+  assert.match(ui,/persistentSaved=result\?\.ok===true[\s\S]*?result\.valores_solo_jornada===false[\s\S]*?result\.valores_producto_persistidos===true/);
   assert.match(ui,/El catálogo global no cambió/);
 });
 
