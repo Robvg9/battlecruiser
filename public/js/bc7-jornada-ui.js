@@ -2284,53 +2284,9 @@
     '</section>';
   }
   function calculationPhaseHtml(detail){
-    if(detail.sesion?.es_minorista!==true)return '';
-    const checks=detail.checklist||{};
-    const phase=checks.fase||'OPERACION';
-    const settlement=detail.liquidacion||{};
-    if(!checks.lista_para_conteo)return '';
-    const cashDone=String(checks.estado_efectivo_final||'').toUpperCase()==='APROBADA';
-    const cashState=String(checks.estado_efectivo_final||'').toUpperCase();
-    const fifthCheck='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
-      '<span class="bc7-checklist-mark">'+(cashDone?'✓':'↻')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Conteo físico independiente</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo físico del efectivo recibido por el Dueño')+'</small></div>'+
-      '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
-    '</div>';
-    if(!checks.lista_para_calcular){
-      if(phase==='LISTA_PARA_ENTREGA'){
-        return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cinco pasos de la jornada están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
-      }
-      if(phase==='PENDIENTE_CONTEO_DUENO'){
-        return '<section class="bc7-calculation-phase is-waiting"><h4>Conteo físico · paso posterior</h4>'+
-          fifthCheck+'<p>Los cinco pasos de la jornada están completos. El Dueño debe registrar el conteo físico independiente del total de entregas diarias aprobadas antes de iniciar los cálculos.</p></section>';
-      }
-      const pending=settlement.pendientes||{};
-      const reasons=[];
-      if(Number(pending.gastos||0)>0)reasons.push(Number(pending.gastos)+' gasto(s) pendientes');
-      if(Number(pending.reinversiones||0)>0)reasons.push(Number(pending.reinversiones)+' reinversión(es) pendientes');
-      if(Number(pending.ajustes||0)>0)reasons.push(Number(pending.ajustes)+' bajas pendientes');
-      if(Number(pending.entregas_diarias||0)>0||Number(pending.entregas_diarias_faltantes||0)>0)reasons.push('entregas diarias de efectivo pendientes');
-      if(cashState==='CON_DIFERENCIA')reasons.push('el conteo de efectivo tiene una diferencia pendiente de revisión');
-      if(settlement.salario_porcentaje==null)reasons.push('falta configurar el porcentaje salarial');
-      if(Number(settlement.familias_sin_precio||0)>0)reasons.push('hay productos sin precio');
-      if(Number(settlement.familias_con_vendidas_negativas||0)>0)reasons.push('hay diferencias negativas de inventario');
-      return '<section class="bc7-calculation-phase is-waiting"><h4>Fase 2 · Preparando cálculos</h4>'+
-        fifthCheck+'<p>Las entregas diarias de efectivo ya quedaron registradas en el paso 1. El conteo físico independiente se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
-        (reasons.length?'<small>'+esc(reasons.join(' · '))+'</small>':'')+'</section>';
-    }
-    if(settlement.calculable!==true)return '';
-    const metrics=[
-      ['Ventas estimadas',settlement.ventas_estimadas],
-      ['Salario calculado',settlement.salario_calculado],
-      ['Gastos aprobados',settlement.gastos_aprobados],
-      ['Reinversiones aprobadas',settlement.reinversiones_aprobadas],
-      ['Efectivo esperado (sin salario)',(settlement.efectivo_esperado_despues_de_gastos_reinversiones??settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario)],
-      ['Sobrante / faltante (− sobrante · + faltante)',settlement.diferencia]
-    ];
-    return '<section class="bc7-calculation-phase is-ready"><h4>Fase 2 · Cálculos automáticos completados</h4>'+
-      fifthCheck+'<div class="bc7-calculation-grid">'+
-      metrics.map(([label,value])=>'<div><small>'+esc(label)+'</small><b>'+(value==null?'—':money(value)+' CUP')+'</b></div>').join('')+
-      '</div><p>La jornada queda lista para la revisión final. El Turno todavía no está cerrado: el Dueño debe revisar el expediente, dejar su observación y pulsar «Aprobar turno» en Turnos.</p></section>';
+    // La revisión integral del turno es la fuente única de los cálculos financieros.
+    // No duplicar este resumen en la pantalla de captura de la Jornada.
+    return '';
   }
   function previewValue(value){return value==null?'—':esc(String(value));}
   function previewTable(headers,rows,primaryCount=3){
