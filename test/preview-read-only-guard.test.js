@@ -47,7 +47,10 @@ test("the branch preview proxy is allowlisted and LIVE stays on its direct endpo
   const auth=read("public/js/auth.js"),worker=read("preview-worker.mjs"),config=read("wrangler.jsonc");
   assert.match(auth,/ux-jornada-status-colors-transfer-modern-picker-battlecruiser/);
   assert.match(worker,/ux-jornada-status-colors-transfer-modern-picker-battlecruiser/);
-  assert.match(config,/"main": "\.\/preview-worker\.mjs"/);
+  const workerFirst = JSON.parse(config).assets.run_worker_first;
+  for (const route of ["/", "/index.html", "/app.js", "/service-worker.js", "/style.css", "/__bc_preview/*"]) {
+    assert.ok(workerFirst.includes(route), "missing Worker-first route " + route);
+  }
   assert.match(config,/"run_worker_first": \["\/__bc_preview\/\*"\]/);
   assert.match(worker,/Origin": PRODUCTION_ORIGIN/);
 });
