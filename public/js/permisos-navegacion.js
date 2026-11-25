@@ -61,6 +61,7 @@
     "mando", "usuarios", "config", "conectividad", "preferencias"
   ];
   var homeInicialAplicado = false;
+  var homeInicialUsuarioId = null;
 
   function esDependienta() {
     var u = usuarioActual() || {};
@@ -181,6 +182,8 @@
     var loggedIn = !!usuarioActual();
     var cargaOk = permisosListos() && !!mapaPermisos();
     var ready = loggedIn && cargaOk;
+    var userId = loggedIn ? String((usuarioActual()||{}).id||"") : "";
+    if (userId !== homeInicialUsuarioId) { homeInicialUsuarioId = userId; homeInicialAplicado = false; }
     var shell = document.getElementById("app-shell");
     var shellVisible = !!(shell && shell.classList.contains("visible"));
 
