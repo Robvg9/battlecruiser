@@ -1119,7 +1119,10 @@
   function renderWorkerDashboard(){
     const host=$('bc-worker-dashboard');if(!host)return;
     const user=currentUser()||{},role=roleOf(user);
-    if(!role.includes('dependienta')){host.innerHTML='';return;}
+    if(!role.includes('dependienta')){
+      renderWorkerDashboardState('No pudimos identificar tu perfil','La sesión actual no permite resolver el perfil de esta vista. Vuelve a validar la sesión para cargar Mis jornadas.','boot');
+      return;
+    }
     if(state.calendarLoading){renderWorkerDashboardState('Cargando tus jornadas…','Estamos consultando tus asignaciones y el estado de tu jornada.');return;}
     const today=dateHavana();
     const ownRows=(state.rows||[]).filter(row=>
