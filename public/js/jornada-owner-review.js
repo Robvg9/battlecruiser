@@ -361,12 +361,12 @@
         p_comentario:reason
       });
       if(sessionLocal){
-        if(result?.valores_solo_jornada!==true||result?.catalogo_modificado!==false){
+        if(result.valores_solo_jornada!==true||result.catalogo_modificado!==false){
           throw new Error('El servidor no confirmó una corrección exclusiva de esta Jornada. Reabre la revisión para comprobar el resultado antes de repetir el guardado.');
         }
         setStatus('Corrección guardada solo para esta Jornada. El catálogo global no cambió. Actualizando la liquidación…','success');
       }else{
-        if(result?.valores_producto_persistidos!==true){
+        if(result.valores_producto_persistidos!==true){
           throw new Error('El servidor no confirmó la persistencia de los valores del producto para futuras Jornadas.');
         }
         setStatus('Valores guardados y persistidos para futuras Jornadas. Actualizando la liquidación…','success');
