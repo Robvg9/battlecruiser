@@ -11,8 +11,8 @@ DECLARE
   v_command text;
 BEGIN
   IF position('_bc7_rectificar_final_anterior_desde_recepcion' IN v_receipt)=0
-     OR position('requiere_revision',v_receipt)=0
-     OR position('diferencias_informativas',v_receipt)=0
+     OR strpos(v_receipt,'requiere_revision')=0
+     OR strpos(v_receipt,'diferencias_informativas')=0
      OR position('ACEPTADA',v_receipt)=0 THEN
     RAISE EXCEPTION 'FAIL: receipt must accept and expose differences as informational, with traceable previous-final reconciliation';
   END IF;
