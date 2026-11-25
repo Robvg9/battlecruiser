@@ -38,7 +38,7 @@ test("sealed final physical inventory is entered directly by the assigned worker
   assert.match(migration,/p_idempotency_key\);/);
 });
 
-test("Step 5 requires exactly one daily entry per period date and no worker final-total declaration",()=>{
+test("Step 1 requires exactly one daily entry per period date and no worker final-total declaration",()=>{
   assert.match(ui,/openChecklistSection\('declaracion_dinero'\)/);
   assert.match(ui,/data-bc7-checklist-open="declaracion_dinero"/);
   assert.match(ui,/requireComplete:true/);
@@ -73,8 +73,8 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
   assert.match(ui,/const op=.*cashDaysManagerShellHtml/);
 });
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.60"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.60/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.61"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.61/);
   assert.match(app,/9\.5\.155/);
   assert.match(sw,/BC_SW_VERSION = "9\.5\.155"/);
 });
