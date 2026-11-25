@@ -873,7 +873,7 @@ BEGIN
     )
   );
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.bc7_clasificar_movimientos_fuera_corte(p_turno_sesion_id uuid, p_decisiones jsonb)
@@ -958,7 +958,7 @@ BEGIN
   ) pending;
   RETURN jsonb_build_object('ok',true,'revisados',v_count,'pendientes',v_pending);
 END;
-$function$
+$function$;
 
 
 COMMIT;
