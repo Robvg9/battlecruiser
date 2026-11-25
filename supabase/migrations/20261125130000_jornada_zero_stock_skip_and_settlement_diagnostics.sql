@@ -278,7 +278,7 @@ BEGIN
     SELECT DISTINCT product_id FROM movement_events
   ),
   eligible_product_candidates AS (
-    SELECT producto_id FROM expected
+    SELECT expected.producto_id FROM expected
     UNION SELECT product_id FROM final_lines
     UNION SELECT product_id FROM movement_products
   ),
