@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -33,6 +34,27 @@ test("permission controller removes the native hidden attribute only when access
   assert.ok(hiddenBranch);
   assert.match(hiddenBranch[1], /setAttribute\("hidden", ""\)/);
   assert.match(hiddenBranch[1], /btn\.hidden\s*=\s*true/);
+});
+
+
+test("worker dashboard resolves the authenticated lexical user context created by auth.js", () => {
+  const start = jornada.indexOf("function currentUser(){");
+  const end = jornada.indexOf("function catalogCache()", start);
+  assert.ok(start >= 0 && end > start, "currentUser must exist before catalogCache");
+  const currentUserSource = jornada.slice(start, end);
+  const lexicalUser = vm.runInNewContext(
+    'let _usuarioActual={id:"worker-lexical",rol:"Dependienta"};\\n' +
+      currentUserSource + '\\ncurrentUser();',
+    { window: {} }
+  );
+  assert.equal(lexicalUser.id, "worker-lexical");
+  assert.equal(lexicalUser.rol, "Dependienta");
+  const legacyUser = vm.runInNewContext(
+    'let _usuarioActual=null;\\n' +
+      currentUserSource + '\\ncurrentUser();',
+    { window: { __bcUser: { id: "worker-legacy", rol: "Dependienta" } } }
+  );
+  assert.equal(legacyUser.id, "worker-legacy");
 });
 
 test("worker dashboard shows the signed-in worker's own jornada list and direct open actions", () => {
