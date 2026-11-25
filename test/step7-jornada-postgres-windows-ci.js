@@ -414,6 +414,10 @@ function applySql(file) {
     log("\\r\\n=== Scope historical mismatch validation to the exact source FINAL cut ===");
     applySql("supabase/migrations/20261124233000_jornada_successor_scope_final_snapshot_validation.sql");
     applySql("test/jornada-successor-final-snapshot-sync-contract.sql");
+    log("\\r\\n=== Auto-open retroactive successors and accept physical receipt differences without Owner gating ===");
+    applySql("supabase/migrations/20261125010000_jornada_successor_auto_open_nonblocking_receipt.sql");
+    applySql("test/jornada-successor-auto-open-nonblocking-contract.sql");
+    applySql("test/jornada-recepcion-issue333-contract.sql");
     applySql("test/jornada-session-inventory-attribution-hardening-contract.sql");
     applySql("test/jornada-linked-postcut-transfer-contract.sql");
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
