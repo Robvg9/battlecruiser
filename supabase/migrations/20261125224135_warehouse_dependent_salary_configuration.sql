@@ -56,11 +56,7 @@ REVOKE ALL ON TABLE public.almacen_dependienta_eventos FROM PUBLIC, anon, authen
 WITH responsables AS (
   SELECT p.almacen_id, p.responsable_id AS usuario_id
   FROM public.turno_jornada_programacion p
-  WHERE p.trabaja = true AND p.estado = 'PROGRAMADA'
-    AND p.fecha >= (now() AT TIME ZONE COALESCE((
-      SELECT cfg.zona_horaria FROM public.turno_jornada_configuracion cfg
-      WHERE cfg.almacen_id = p.almacen_id
-    ), 'America/Havana'))::date
+  WHERE p.trabaja = true
     AND p.responsable_id IS NOT NULL
   UNION
   SELECT patron.almacen_id, dia.responsable_id
@@ -71,8 +67,7 @@ WITH responsables AS (
   SELECT s.almacen_id, a.usuario_id
   FROM public.turno_sesiones s
   JOIN public.turno_asignaciones a ON a.turno_sesion_id = s.id
-  WHERE s.estado IN ('PENDIENTE','PROGRAMADA')
-    AND s.bloque = 'JORNADA' AND a.retirado_at IS NULL
+  WHERE s.bloque = 'JORNADA' AND a.retirado_at IS NULL
 )
 INSERT INTO public.almacen_dependienta_configuracion
   (almacen_id, usuario_id, activo, salario_porcentaje_permanente, creado_por, actualizado_por)
