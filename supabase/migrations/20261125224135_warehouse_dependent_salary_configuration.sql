@@ -249,7 +249,7 @@ BEGIN
     SET activo = true,
         salario_porcentaje_permanente = CASE
           WHEN upper(p_vigencia_tipo) = 'PERMANENTE' THEN EXCLUDED.salario_porcentaje_permanente
-          ELSE public.almacen_dependienta_configuracion.salario_porcentaje_permanente
+          ELSE almacen_dependienta_configuracion.salario_porcentaje_permanente
         END,
         salario_porcentaje_temporal = EXCLUDED.salario_porcentaje_temporal,
         salario_temporal_programacion_id = NULL,
@@ -395,8 +395,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF v_role NOT IN ('dependienta','dependientas') THEN
-    RAISE EXCEPTION 'La responsable no tiene un rol elegible para la Jornada.'
+  IF v_role IS NULL OR v_role NOT IN ('dependienta','dependientas') THEN
+    RAISE EXCEPTION 'La responsable no existe, está inactiva o no tiene el rol Dependienta.'
       USING ERRCODE = '42501';
   END IF;
 
