@@ -56,7 +56,11 @@ REVOKE ALL ON TABLE public.almacen_dependienta_eventos FROM PUBLIC, anon, authen
 WITH responsables AS (
   SELECT p.almacen_id, p.responsable_id AS usuario_id
   FROM public.turno_jornada_programacion p
-  WHERE p.trabaja = true AND p.estado = 'PROGRAMADA' AND p.fecha >= CURRENT_DATE
+  WHERE p.trabaja = true AND p.estado = 'PROGRAMADA'
+    AND p.fecha >= (now() AT TIME ZONE COALESCE((
+      SELECT cfg.zona_horaria FROM public.turno_jornada_configuracion cfg
+      WHERE cfg.almacen_id = p.almacen_id
+    ), 'America/Havana'))::date
     AND p.responsable_id IS NOT NULL
   UNION
   SELECT patron.almacen_id, dia.responsable_id
@@ -73,18 +77,24 @@ WITH responsables AS (
 INSERT INTO public.almacen_dependienta_configuracion
   (almacen_id, usuario_id, activo, salario_porcentaje_permanente, creado_por, actualizado_por)
 SELECT DISTINCT r.almacen_id, r.usuario_id, true,
-       COALESCE(cfg.salario_porcentaje, latest.salario_porcentaje),
+       COALESCE(latest.salario_porcentaje, cfg.salario_porcentaje),
        NULL, NULL
 FROM responsables r
+JOIN public.almacenes al ON al.id = r.almacen_id AND al.activo = true
 JOIN public.usuarios u ON u.id = r.usuario_id AND u.activo = true AND u.archivado = false
 JOIN public.roles rol ON rol.id = u.role_id AND rol.activo = true
 LEFT JOIN public.turno_jornada_configuracion cfg ON cfg.almacen_id = r.almacen_id
 LEFT JOIN LATERAL (
   SELECT p.salario_porcentaje
   FROM public.turno_jornada_programacion p
+  JOIN public.turno_sesiones s
+    ON s.jornada_programacion_id = p.id AND s.turno_id = p.turno_id
   WHERE p.almacen_id = r.almacen_id AND p.responsable_id = r.usuario_id
+    AND p.trabaja = true AND p.estado = 'PROGRAMADA'
+    AND p.fecha >= (now() AT TIME ZONE COALESCE(cfg.zona_horaria, 'America/Havana'))::date
+    AND s.estado IN ('PENDIENTE','PROGRAMADA')
     AND p.salario_porcentaje IS NOT NULL
-  ORDER BY p.fecha DESC, p.actualizado_en DESC
+  ORDER BY p.fecha, p.numero_dia
   LIMIT 1
 ) latest ON true
 WHERE lower(btrim(rol.nombre)) IN ('dependienta','dependientas')
