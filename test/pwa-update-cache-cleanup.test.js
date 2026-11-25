@@ -47,10 +47,10 @@ test("an active old Service Worker cannot prune caches while a new worker is wai
 });
 
 test("cache updater and release assets use fresh immutable version keys", () => {
-  assert.match(app, /const VERSION="9\.5\.158"/);
+  assert.match(app, /const VERSION="9\.5\.159"/);
   assert.match(app, /\["cache-update-fix\.js","1\.1"\]/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.158"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.159"/);
   assert.match(serviceWorker, /cache-update-fix\.js\?v=1\.1/);
-  assert.match(index, /style\.css\?v=9\.5\.158/);
-  assert.match(index, /app\.js\?v=9\.5\.158/);
+  assert.match(index, /style\.css\?v=9\.5\.159/);
+  assert.match(index, /app\.js\?v=9\.5\.159/);
 });
