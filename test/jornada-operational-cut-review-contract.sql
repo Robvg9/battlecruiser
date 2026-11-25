@@ -27,7 +27,7 @@ BEGIN
      OR position(v_old_merma IN v_review)>0 THEN
     RAISE EXCEPTION 'Owner review does not list Bajas/Mermas against the immutable operational cutoff.';
   END IF;
-  IF position('corte_operativo_at',v_review)=0 THEN
+  IF strpos(v_review,'corte_operativo_at')=0 THEN
     RAISE EXCEPTION 'Owner review does not return the operational cutoff timestamp.';
   END IF;
 
@@ -40,8 +40,8 @@ BEGIN
     RAISE EXCEPTION 'Classifier MERMA validation/recount must both use the operational cutoff; count=%',v_count;
   END IF;
 
-  IF position('ANTES_CORTE',v_classifier)=0 OR position('DESPUES_CORTE',v_classifier)=0
-     OR position('MOVIMIENTOS_POST_CORTE_CLASIFICADOS',v_classifier)=0 THEN
+  IF strpos(v_classifier,'ANTES_CORTE')=0 OR strpos(v_classifier,'DESPUES_CORTE')=0
+     OR strpos(v_classifier,'MOVIMIENTOS_POST_CORTE_CLASIFICADOS')=0 THEN
     RAISE EXCEPTION 'Explicit classification categories and audit event must remain available.';
   END IF;
   IF NOT has_function_privilege('authenticated','public.bc7_obtener_revision_jornada(uuid)','EXECUTE')
