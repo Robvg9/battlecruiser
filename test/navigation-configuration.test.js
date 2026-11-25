@@ -23,19 +23,19 @@ const sectionScope = fs.readFileSync("public/js/section-scope-fix.js", "utf8");
 const finalLoader = fs.readFileSync("public/js/hotfix-17-final-loader-20260903.js", "utf8");
 
 
-test("RWHT navigation contract: 20 logical routes, 16 visible destinations, hidden-route aliases preserved", () => {
+test("RWHT navigation contract: 21 logical routes, 17 role-gated destinations, hidden-route aliases preserved", () => {
   const routeIds = [...index.matchAll(/<button\b[^>]*\bdata-tab="([^"]+)"/g)].map(match => match[1]);
   const panelIds = [...index.matchAll(/<section\b[^>]*\bid="tab-([^"]+)"/g)].map(match => match[1]);
   const expectedVisible = [
-    "resumen", "jornada", "productos", "ventas", "almacenes", "pendientes", "reportes",
+    "resumen", "mi-jornada", "jornada", "productos", "ventas", "almacenes", "pendientes", "reportes",
     "inventario", "movimientos", "operacion", "comunicacion",
     "mando", "usuarios", "config", "conectividad", "preferencias",
   ];
   const expectedHidden = ["transferencias", "vales", "turnos", "ciclos"];
 
-  assert.equal(routeIds.length, 20, "the source declares 20 logical navigation buttons");
-  assert.equal(new Set(routeIds).size, 20, "logical navigation IDs must be unique");
-  assert.equal(panelIds.length, 20, "the source declares 20 logical tab panels");
+  assert.equal(routeIds.length, 21, "the source declares 21 logical navigation buttons including the dependienta home");
+  assert.equal(new Set(routeIds).size, 21, "logical navigation IDs must be unique");
+  assert.equal(panelIds.length, 21, "the source declares 21 logical tab panels");
   assert.deepEqual(
     [...new Set(panelIds)].sort(),
     [...new Set(routeIds)].sort(),
@@ -44,7 +44,7 @@ test("RWHT navigation contract: 20 logical routes, 16 visible destinations, hidd
   assert.deepEqual(
     routeIds.filter(id => !expectedHidden.includes(id)).sort(),
     expectedVisible.slice().sort(),
-    "the visible route contract must be the documented 16 destinations"
+    "the role-gated route contract includes 17 destinations, with mi-jornada restricted to dependientas"
   );
 
   for (const id of expectedHidden) {
