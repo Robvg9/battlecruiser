@@ -37,7 +37,7 @@ test("an active old Service Worker cannot prune caches while a new worker is wai
   const pruneHandler = serviceWorker.slice(start, end);
   assert.match(
     pruneHandler,
-    /self\.registration\s*&&\s*self\.registration\.waiting/,
+    /self\.registration\s*&&\s*\(self\.registration\.installing\s*\|\|\s*self\.registration\.waiting\)/,
     "the old active worker must defer cleanup while a new worker is waiting"
   );
   assert.ok(
