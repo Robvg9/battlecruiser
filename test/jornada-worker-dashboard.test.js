@@ -9,6 +9,7 @@ const root = path.join(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const jornada = read("public/js/bc7-jornada-ui.js");
 const navigation = read("public/js/permisos-navegacion.js");
+const tabNavigation = read("public/js/navegacion.js");
 const index = read("public/index.html");
 const app = read("public/app.js");
 const serviceWorker = read("public/service-worker.js");
@@ -40,6 +41,7 @@ test("worker dashboard shows the signed-in worker's own jornada list and direct 
   assert.ok(start >= 0 && end > start, "worker dashboard renderer must exist");
   const render = jornada.slice(start, end);
   assert.match(render, /role\.includes\('dependienta'\)/);
+  assert.match(render, /renderWorkerDashboardState\('No pudimos identificar tu perfil'/);
   assert.match(render, /row\.responsable_id[\s\S]*?user\.id/);
   assert.doesNotMatch(render, /role\.includes\('dependienta'\)\s*\|\|\s*state\.admin/);
   assert.match(render, /Mis jornadas/);
@@ -52,13 +54,70 @@ test("worker dashboard shows the signed-in worker's own jornada list and direct 
 test("worker dashboard and owner review release versions are aligned with the precache", () => {
   assert.match(app, /\["permisos-navegacion\.js","67\.9"\]/);
   assert.match(serviceWorker, /permisos-navegacion\.js\?v=67\.9/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.62"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.63"\]/);
   assert.match(app, /\["jornada-owner-review\.js","1\.15"\]/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.157"/);
-  assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.62/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.158"/);
+  assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.63/);
   assert.match(serviceWorker, /jornada-owner-review\.js\?v=1\.15/);
-  assert.match(index, /style\.css\?v=9\.5\.157/);
-  assert.match(index, /app\.js\?v=9\.5\.157/);
+  assert.match(index, /style\.css\?v=9\.5\.158/);
+  assert.match(index, /app\.js\?v=9\.5\.158/);
+});
+
+test("Mis jornadas shows an explicit state while session and calendar startup are pending or failing", () => {
+  assert.match(jornada, /function renderWorkerDashboardState\(title,detail,retryAction\)/);
+  assert.match(jornada, /role="status" aria-live="polite"/);
+  assert.match(jornada, /renderWorkerDashboardState\('Cargando tus jornadas…'/);
+  assert.match(jornada, /renderWorkerDashboardState\('Validando tu sesión…'/);
+  assert.match(jornada, /data-bc7-worker-retry=/);
+  assert.match(jornada, /No se pudo validar la sesión/);
+  assert.match(jornada, /No se pudo iniciar Mis jornadas/);
+});
+
+test("calendar RPC errors are surfaced in the personal dashboard instead of a false empty state", () => {
+  const start = jornada.indexOf("async function loadCalendar(options)");
+  const end = jornada.indexOf("function renderCurrentSession", start);
+  assert.ok(start >= 0 && end > start, "calendar loader must exist");
+  const loader = jornada.slice(start, end);
+  assert.match(loader, /state\.calendarLoadError=friendlyError\(e,'calendar'\)/);
+  assert.match(loader, /state\.calendarLoading=false/);
+  assert.match(loader, /renderWorkerDashboard\(\)/);
+  assert.match(loader, /renderWorkerDashboardState\('Cargando tus jornadas…'/);
+  assert.match(jornada, /data-bc7-worker-retry="calendar"/);
+});
+ 
+test("dependienta home route stays visible and shows a startup state before BC7 auth context resolves", () => {
+  const { JSDOM } = require("jsdom");
+  const dom = new JSDOM(index, { runScripts: "outside-only", url: "https://battlecruiser.test/" });
+  const { window } = dom;
+  const { document } = window;
+  window.safeInit = function (_name, init) { init(); };
+  window._usuarioActual = { id: "worker-home-test", rol: "Dependienta" };
+  window._permisosCargaExitosa = true;
+  window._permisosEfectivos = { turnos: { ver: true } };
+  document.getElementById("app-shell").classList.add("visible");
+
+  window.eval(tabNavigation);
+  window.eval(navigation);
+
+  const button = document.querySelector('#tabs .tab-btn[data-tab="mi-jornada"]');
+  const panel = document.getElementById("tab-mi-jornada");
+  const host = document.getElementById("bc-worker-dashboard");
+  assert.equal(button.getAttribute("data-bc-permiso"), "1");
+  assert.equal(button.classList.contains("active"), true, "Mis jornadas must be selected as the dependienta home");
+  assert.equal(panel.hidden, false, "the permitted personal panel must lose its native hidden state");
+  assert.equal(panel.classList.contains("visible"), true, "the selected personal panel must be visible");
+  assert.equal(host.textContent.trim(), "", "the dashboard host starts empty before BC7 is loaded");
+
+  window.eval(jornada);
+  if (document.readyState === "loading") {
+    document.dispatchEvent(new window.Event("DOMContentLoaded"));
+  }
+
+  assert.match(host.textContent, /Validando tu sesión/);
+  assert.ok(host.querySelector('[role="status"][aria-live="polite"]'));
+  assert.equal(panel.hidden, false);
+  assert.equal(panel.classList.contains("visible"), true);
+  dom.window.close();
 });
 
 test("owner review never says there are no blockers while calculation is still incomplete", () => {

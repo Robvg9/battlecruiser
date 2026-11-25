@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.62 — Mis jornadas con historial propio y catálogo FINAL que omite productos sin stock ni movimientos.
+// v7.63 — Mis jornadas nunca queda vacía durante la validación o un fallo de carga.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarCache:new Map(),calendarPromises:new Map()};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map()};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1035,7 +1035,8 @@
   }
   async function loadCalendar(options){
     options=options||{};const force=options.force===true;
-    const board=$('bc7-month-board'),list=$('bc7-schedule-list');if(!board&&!list)return false;
+    const board=$('bc7-month-board'),list=$('bc7-schedule-list');
+    if(!board&&!list){state.calendarLoading=false;state.calendarLoadError='La vista del calendario no está disponible en esta sesión.';renderWorkerDashboard();return false;}
     const monthInput=$('bc7-calendar-month'),fallback=$('bc7-list-from')?.value||dateHavana();
     let month=String(monthInput&&monthInput.value||fallback.slice(0,7)).slice(0,7);if(!monthParts(month))month=dateHavana().slice(0,7);
     const from=month+'-01',days=monthDayCount(month),to=month+'-'+String(days).padStart(2,'0');
@@ -1045,6 +1046,7 @@
     const user=currentUser()||{},key=String(user.id||user.username||user.email||'authenticated-user')+'|'+month;
     const renderRows=data=>{
       if(String($('bc7-calendar-month')?.value||month)!==month)return;
+      state.calendarLoading=false;state.calendarLoadError='';
       const archived=[],visible=[];
       data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(['COMPLETADA','CERRADA','CERRADO'].includes(st)&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
       const rank=row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();return st==='EN_CURSO'?0:st==='CERRADA_OPERATIVAMENTE'?1:(st==='COMPLETADA'?2:3);};
@@ -1059,8 +1061,10 @@
       renderWorkerDashboard();
     };
     const cached=state.calendarCache.get(key);
-    if(!force&&cached&&Date.now()-cached.at<60000){renderRows(cached.rows);return true;}
+    if(!force&&cached&&Date.now()-cached.at<60000){state.calendarLoading=false;state.calendarLoadError='';renderRows(cached.rows);return true;}
     const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
+    state.calendarLoading=true;state.calendarLoadError='';
+    renderWorkerDashboardState('Cargando tus jornadas…','Estamos consultando tus asignaciones y el estado de tu jornada.');
     if(board&&!board.querySelector('.bc7-month-day'))board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
     if(list&&!list.querySelector('.bc7-jornada'))list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
     msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
@@ -1069,11 +1073,16 @@
       state.calendarCache.set(key,{at:Date.now(),rows:data});while(state.calendarCache.size>6)state.calendarCache.delete(state.calendarCache.keys().next().value);
       renderRows(data);msg($('bc7-list-msg'),'');return true;
     }catch(e){
-      if(String($('bc7-calendar-month')?.value||month)===month){if(!cached){state.rows=[];
-        if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
-        if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
-        const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';}
-        msg($('bc7-list-msg'),friendlyError(e,'calendar'),'error');}return false;
+      if(String($('bc7-calendar-month')?.value||month)===month){
+        state.calendarLoading=false;state.calendarLoadError=friendlyError(e,'calendar');
+        if(!cached){state.rows=[];
+          if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+          if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+          const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
+        }
+        msg($('bc7-list-msg'),state.calendarLoadError,'error');
+        renderWorkerDashboard();
+      }return false;
     }finally{if(state.calendarPromises.get(key)===request)state.calendarPromises.delete(key);}})();
     state.calendarPromises.set(key,request);return request;
   }
@@ -1110,7 +1119,11 @@
   function renderWorkerDashboard(){
     const host=$('bc-worker-dashboard');if(!host)return;
     const user=currentUser()||{},role=roleOf(user);
-    if(!role.includes('dependienta')){host.innerHTML='';return;}
+    if(!role.includes('dependienta')){
+      renderWorkerDashboardState('No pudimos identificar tu perfil','La sesión actual no permite resolver el perfil de esta vista. Vuelve a validar la sesión para cargar Mis jornadas.','boot');
+      return;
+    }
+    if(state.calendarLoading){renderWorkerDashboardState('Cargando tus jornadas…','Estamos consultando tus asignaciones y el estado de tu jornada.');return;}
     const today=dateHavana();
     const ownRows=(state.rows||[]).filter(row=>
       row&&String(row.responsable_id||'')===String(user.id||'')&&row.trabaja!==false
@@ -1134,7 +1147,12 @@
     const sorted=ownRows.slice().sort((a,b)=>
       String(b.fecha||'').localeCompare(String(a.fecha||''))||Number(b.numero_dia||0)-Number(a.numero_dia||0)
     );
-    const history=sorted.length
+    const loadNotice=state.calendarLoadError
+      ?'<div class="bc-worker-jornada-empty" role="status" aria-live="polite"><span aria-hidden="true">⚠️</span><b>No se pudo actualizar el calendario</b><p>'+esc(state.calendarLoadError)+'</p><button type="button" class="bc7-btn" data-bc7-worker-retry="calendar">Reintentar</button></div>'
+      :'';
+    const history=state.calendarLoadError&&!sorted.length
+      ?''
+      :sorted.length
       ?'<section class="bc-worker-jornada-history"><div class="bc-worker-jornada-history-head"><h4>Mis jornadas</h4><span>'+sorted.length+' registro(s)</span></div><div class="bc-worker-jornada-list">'+sorted.map(item=>{
         const status=calendarStatus(item);
         const period=fmtDateHuman(item.fecha)+(item.fecha_fin&&item.fecha_fin!==item.fecha?' – '+fmtDateHuman(item.fecha_fin):'');
@@ -1144,7 +1162,14 @@
         return '<article class="bc-worker-jornada-card"><div class="bc-worker-jornada-copy"><b>'+esc(period)+'</b><span>'+esc(warehouseName(item.almacen_id))+'</span><small>'+esc(status.label)+'</small></div><div class="bc-worker-jornada-actions">'+action+'</div></article>';
       }).join('')+'</div></section>'
       :'<div class="bc-worker-jornada-empty"><span aria-hidden="true">🗓️</span><b>No hay jornadas asignadas en este mes</b><p>Cuando Administración te asigne una jornada, aparecerá aquí con su estado y acceso directo.</p></div>';
-    host.innerHTML=header+history;
+    host.innerHTML=header+loadNotice+history;
+  }
+  function renderWorkerDashboardState(title,detail,retryAction){
+    const host=$('bc-worker-dashboard');if(!host)return;
+    const retry=retryAction
+      ?'<button type="button" class="bc7-btn" data-bc7-worker-retry="'+esc(retryAction)+'">Reintentar</button>'
+      :'';
+    host.innerHTML='<div class="bc-worker-jornada-empty" role="status" aria-live="polite"><span aria-hidden="true">⏳</span><b>'+esc(title)+'</b><p>'+esc(detail)+'</p>'+retry+'</div>';
   }
   function checklistConfirmButtonHtml(detail,key,isAssigned){
     if(!isAssigned)return '';
@@ -3622,7 +3647,8 @@
     ensureStyles();ensureDayRowsStyles();if(!ensureShell())return;
     if(!authenticatedContextReady()){
       setStatus('Esperando la validación segura de tu sesión antes de consultar las jornadas…','');
-      return;
+      renderWorkerDashboardState('Validando tu sesión…','Estamos comprobando tu identidad y permisos antes de mostrar tus jornadas.','boot');
+      return false;
     }
     const today=dateHavana();
     if($('bc7-anchor'))$('bc7-anchor').value=today;
@@ -3660,12 +3686,29 @@
     renderWorkerDashboard();
     window.addEventListener('online',()=>{setStatus('Conexión restaurada. Actualiza el calendario para leer el estado LIVE.','ok');ensureWarehouseCatalog();});
     window.addEventListener('offline',()=>setStatus('Sin conexión: las escrituras quedan bloqueadas.','error'));
+    return true;
   }
   document.addEventListener('click',async function(e){
     const helpOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-help-open]'):null;
     if(helpOpen){e.preventDefault();const modal=$('bc7-help-modal');if(modal){modal.hidden=false;modal.querySelector('[data-bc7-help-close]')?.focus();}return;}
     const helpClose=e.target&&e.target.closest?e.target.closest('[data-bc7-help-close]'):null;
     if(helpClose){e.preventDefault();const modal=$('bc7-help-modal');if(modal)modal.hidden=true;return;}
+    const workerRetry=e.target&&e.target.closest?e.target.closest('[data-bc7-worker-retry]'):null;
+    if(workerRetry){
+      e.preventDefault();
+      const retry=workerRetry.getAttribute('data-bc7-worker-retry');
+      if(retry==='calendar'){
+        state.calendarLoadError='';state.calendarLoading=true;
+        renderWorkerDashboardState('Actualizando tus jornadas…','Volviendo a consultar tus asignaciones.');
+        await Promise.all([loadCurrentSession(),loadCalendar({force:true})]);
+        renderWorkerDashboard();
+      }else{
+        if(authWaitTimer!==null)window.clearTimeout(authWaitTimer);
+        authWaitTimer=null;bootStarted=false;
+        scheduleAuthenticatedBoot();
+      }
+      return;
+    }
     const workerShortcut=e.target&&e.target.closest?e.target.closest('[data-bc7-worker-shortcut]'):null;
     if(workerShortcut){e.preventDefault();const sessionId=workerShortcut.getAttribute('data-session-id');const section=workerShortcut.getAttribute('data-bc7-worker-shortcut');if(sessionId&&await openWorkspace(sessionId))openChecklistSection(section);return;}
     const workerOpen=e.target&&e.target.closest?e.target.closest('[data-bc7-worker-open-jornada]'):null;
@@ -3911,19 +3954,29 @@
     ensureStyles();ensureDayRowsStyles();
     if(!ensureShell())return;
     setStatus('Validando la sesión y los permisos de tu cuenta…','');
+    renderWorkerDashboardState('Validando tu sesión…','Estamos comprobando tu identidad y permisos antes de mostrar tus jornadas.');
     const deadline=Date.now()+30000;
     function check(){
       authWaitTimer=null;
       if(bootStarted)return;
       if(authenticatedContextReady()){
         bootStarted=true;
-        Promise.resolve().then(boot).catch(function(error){
-          setStatus('No se pudo iniciar Jornada e inventario. Actualiza la sección y vuelve a intentarlo.','error');
+        Promise.resolve().then(boot).then(function(ready){
+          if(ready===false){
+            bootStarted=false;
+            check();
+          }
+        }).catch(function(error){
+          bootStarted=false;
+          state.calendarLoading=false;
+          renderWorkerDashboardState('No se pudo iniciar Mis jornadas',friendlyError(error,'general'),'boot');
+          setStatus('No se pudo iniciar Jornada e inventario. Puedes reintentar desde Mis jornadas.','error');
           console.warn('[BC7] No se pudo iniciar tras validar la sesión:',error);
         });
         return;
       }
       if(Date.now()>=deadline){
+        renderWorkerDashboardState('No se pudo validar la sesión','Vuelve a intentar. No se consultaron ni modificaron datos.','boot');
         setStatus('La sesión todavía no se ha validado. Vuelve a entrar en BattleCruiser y pulsa Actualizar calendario.','error');
         return;
       }
