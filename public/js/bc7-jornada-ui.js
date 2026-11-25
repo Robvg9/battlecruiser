@@ -1264,13 +1264,33 @@
     row.classList.toggle('is-done',done);row.classList.toggle('is-pending',!done);
     const mark=row.querySelector('.bc7-checklist-mark');if(mark)mark.textContent=done?'✓':'1';
     const copy=row.querySelector('.bc7-checklist-copy small');
-    if(copy){const registered=Number(checklist?.declaracion_dinero?.entregas_diarias_registradas||0);const expected=Number(checklist?.declaracion_dinero?.entregas_diarias_esperadas||0);copy.textContent=done?registered+'/'+expected+' entregas diarias registradas para todas las fechas del período.':'Registra una entrega por cada fecha del período ('+registered+'/'+expected+'). Escribe 0 CUP cuando ese día no hubo entrega.';}
-    const label=row.querySelector('.bc7-checklist-state');if(label)label.textContent=done?'✓ Enviado':'Pendiente';
+    if(copy){
+      const registered=Number(checklist?.declaracion_dinero?.entregas_diarias_registradas||0);
+      const expected=Number(checklist?.declaracion_dinero?.entregas_diarias_esperadas||0);
+      copy.textContent=done?registered+'/'+expected+' entregas diarias registradas para todas las fechas del período.':'Registra una entrega por cada fecha del período ('+registered+'/'+expected+'). Escribe 0 CUP cuando ese día no hubo entrega.';
+    }
     const action=row.querySelector('[data-bc7-checklist-open="declaracion_dinero"]');
-    if(done&&action){const pill=document.createElement('span');pill.className='bc7-pill ok';pill.textContent='Enviado';action.replaceWith(pill);}
-    if(!done&&!action&&!row.querySelector('.bc7-pill.ok')){const button=document.createElement('button');button.type='button';button.className='bc7-btn primary';button.dataset.bc7ChecklistOpen='declaracion_dinero';button.textContent='Completar paso 1';const stateLabel=row.querySelector('.bc7-checklist-state');row.insertBefore(button,stateLabel||null);}
+    const stateLabel=row.querySelector('.bc7-checklist-state');
+    if(done){
+      if(action&&action.textContent.indexOf('Revisar y contar efectivo')===-1){
+        const pill=document.createElement('span');pill.className='bc7-pill ok';pill.textContent='Enviado';action.replaceWith(pill);
+      }
+      if(stateLabel)stateLabel.textContent='✓ Enviado';
+    }else{
+      row.querySelector('.bc7-pill.ok')?.remove();
+      if(!row.querySelector('[data-bc7-checklist-open="declaracion_dinero"]')){
+        const button=document.createElement('button');button.type='button';button.className='bc7-btn primary';
+        button.dataset.bc7ChecklistOpen='declaracion_dinero';button.textContent='Completar paso 1';
+        row.insertBefore(button,stateLabel||null);
+      }
+      if(stateLabel)stateLabel.textContent='Pendiente';
+    }
     const counter=row.closest('.bc7-checklist')?.querySelector('.bc7-checklist-count');
-    if(counter&&state.detail?.checklist){const c=state.detail.checklist;const total=['gastos','reinversiones','bajas'].filter(k=>c[k]?.completado===true).length+(c.inventario_final?.completado===true?1:0)+(done?1:0);counter.textContent=total+'/5';}
+    if(counter&&state.detail?.checklist){
+      const c=state.detail.checklist;
+      const total=['gastos','reinversiones','bajas'].filter(k=>c[k]?.completado===true).length+(c.inventario_final?.completado===true?1:0)+(done?1:0);
+      counter.textContent=total+'/5';
+    }
   }
   async function saveCashDaysWorkspace(form,options){
     options=options||{};
