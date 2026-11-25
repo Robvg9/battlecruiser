@@ -439,8 +439,10 @@ DECLARE
   v_new text;
   v_old_event text;
   v_new_event text;
-  v_old_return text;
+  v_return_anchor text;
   v_new_return text;
+  v_return_start integer;
+  v_return_end integer;
 BEGIN
   v_def:=pg_get_functiondef(
     'public.bc7_recibir_entrega_jornada(uuid,jsonb,text,uuid)'::regprocedure
@@ -536,13 +538,20 @@ $new$;
   END IF;
   v_def:=replace(v_def,v_old_event,v_new_event);
 
-  v_old_return:=$old$ RETURN jsonb_build_object('id',v_r.id,'entrega_id',v_e.id,'estado',v_r.estado,'intento',v_attempt,
-  'requiere_revision',v_has_diff,'inventario_inicial_id',v_initial,
-  'inventario_agrupado_por_familia',v_grouped,'idempotente',false);
-END;
-$function$
-$old$;
-  v_new_return:=$new$ RETURN jsonb_build_object(
+  v_return_anchor:='RETURN jsonb_build_object('
+    ||quote_literal('id')||',v_r.id,'
+    ||quote_literal('entrega_id')||',v_e.id,'
+    ||quote_literal('estado')||',v_r.estado,'
+    ||quote_literal('intento')||',v_attempt,';
+  v_return_start:=position(v_return_anchor IN v_def);
+  IF v_return_start=0 THEN
+    RAISE EXCEPTION 'Could not locate the receipt result object by its stable idempotent fields.';
+  END IF;
+  v_return_end:=v_return_start+position('END;' IN substring(v_def FROM v_return_start))-1;
+  IF v_return_end<v_return_start THEN
+    RAISE EXCEPTION 'Could not locate the end of the receipt function.';
+  END IF;
+  v_new_return:=$return$RETURN jsonb_build_object(
   'id',v_r.id,
   'entrega_id',v_e.id,
   'estado',v_r.estado,
@@ -556,13 +565,10 @@ $old$;
   'inventario_agrupado_por_familia',v_grouped,
   'idempotente',false
  );
-END;
-$function$
-$new$;
-  IF position(v_old_return IN v_def)=0 THEN
-    RAISE EXCEPTION 'The expected receipt return block was not found.';
-  END IF;
-  v_def:=replace(v_def,v_old_return,v_new_return);
+$return$;
+  v_def:=substring(v_def FROM 1 FOR v_return_start-1)
+    ||v_new_return
+    ||substring(v_def FROM v_return_end);
   EXECUTE v_def;
 END
 $patch$;
