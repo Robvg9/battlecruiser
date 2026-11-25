@@ -177,7 +177,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["bc-modal-manager\.js","1\.0"\]/);
   assert.match(app, /\["mi-cuenta\.js","1\.3"\]/);
   assert.ok(app.indexOf('["bc-modal-manager.js","1.0"]') < app.indexOf('["mi-cuenta.js","1.3"]'));
-  assert.match(app, /\["bc7-jornada-ui\.js","7.64"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7.65"\]/, "the Step 7 jornada UI must be loaded dynamically");
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
@@ -224,7 +224,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/bc-modal-manager\.js\?v=1\.0/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.3/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.64/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.65/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
