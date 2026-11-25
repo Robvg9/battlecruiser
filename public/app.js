@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
 // v9.5.155 — Approved daily cash is the retail cash verification; no second Owner count.
 (function hotfixV9475(){
-  const VERSION="9.5.156";
+  const VERSION="9.5.155";
   window.__BC_VERSION__=VERSION;
   document.addEventListener("wheel",function(event){var input=event.target&&event.target.closest?event.target.closest("input[type=number]"):null;if(input)event.preventDefault();},{capture:true,passive:false});
   function aplicarVersion(){
