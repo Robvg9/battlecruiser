@@ -521,7 +521,7 @@
       if(msg)msg.textContent='Selección preparada. Revisa los movimientos y guarda la clasificación auditada para aplicar el cambio.';
       return;
     }
-    if(action==='classify'){{
+    if(action==='classify'){
       const session=t.dataset.session,section=t.closest('.bcjr-session');
       const rows=Array.from(section?.querySelectorAll('[data-bcjr-movement-row]')||[]);
       const comment=(section?.querySelector('[data-bcjr-movement-comment]')?.value||'').trim();
