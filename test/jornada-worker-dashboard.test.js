@@ -47,6 +47,8 @@ test("worker dashboard shows the signed-in worker's own jornada list and direct 
 });
 
 test("worker dashboard and owner review release versions are aligned with the precache", () => {
+  assert.match(app, /\["permisos-navegacion\.js","67\.9"\]/);
+  assert.match(serviceWorker, /permisos-navegacion\.js\?v=67\.9/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.62"\]/);
   assert.match(app, /\["jornada-owner-review\.js","1\.15"\]/);
   assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.156"/);
