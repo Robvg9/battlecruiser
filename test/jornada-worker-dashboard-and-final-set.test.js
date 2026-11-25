@@ -31,9 +31,11 @@ test("Dependienta lands on a dedicated dashboard with direct Jornada shortcuts",
   for(const key of ["declaracion_dinero","gastos","reinversiones","bajas","inventario_final"])assert.ok(UI.includes(key));
 });
 
-test("Step 1 check state refreshes from the server checklist RPC",()=>{
+test("Step 1 check refreshes from server and preserves the Owner cash-review action",()=>{
   assert.match(UI,/bc7_estado_confirmaciones_jornada/);
   assert.match(UI,/refreshCashChecklistStep\(latest\)/);
+  assert.match(UI,/Revisar y contar efectivo/);
+  assert.match(UI,/row\.querySelector\('\.bc7-pill\.ok'\)\?\.remove\(\)/);
 });
 
 test("mouse wheel cannot mutate number input values",()=>{
