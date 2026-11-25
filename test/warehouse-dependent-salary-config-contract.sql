@@ -5,7 +5,7 @@ DECLARE
   v_worker uuid := '20000000-0000-0000-0000-000000000002';
   v_temp_store uuid := 'a2000000-0000-0000-0000-000000000001';
   v_perm_store uuid := 'a2000000-0000-0000-0000-000000000002';
-  v_base date := (now() AT TIME ZONE 'America/Havana')::date + 20;
+  v_base date := (now() AT TIME ZONE 'America/Havana')::date + 200;
   v_result jsonb;
   v_turn uuid;
   v_program uuid;
