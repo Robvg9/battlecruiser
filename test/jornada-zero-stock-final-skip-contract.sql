@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 -- Structural contract for the Jornada zero-opening inventory omission rule
 -- and the operationally closed Owner movement-classification path.
 DO $jornada_zero_stock_final_skip_contract$
