@@ -248,6 +248,143 @@ function actualizarBotonesAccionesAlmacen() {
   }
 }
 
+let _bcAlmacenEquipoRequestId = 0;
+
+function bcAlmacenEquipoSectionHtml(almacenId, almacenActivo) {
+  return '<section class="bc-alm-equipo" data-bc-alm-equipo data-almacen-id="' + escHtml(almacenId) + '" data-almacen-activo="' + (almacenActivo ? 'true' : 'false') + '">' +
+    '<div class="bc-alm-equipo-head"><div><h4>Personal y salarios</h4><p>Asigna las dependientas que trabajan en este almacén y define el porcentaje individual de su salario.</p></div></div>' +
+    '<div class="bc-alm-equipo-body" data-bc-alm-equipo-body><p class="lista-estado">Consultando el equipo del almacén…</p></div>' +
+    '<p class="bc-alm-equipo-status" data-bc-alm-equipo-status role="status" aria-live="polite"></p></section>';
+}
+
+function bcAlmacenEquipoStatus(section, message, isError) {
+  const status = section && section.querySelector('[data-bc-alm-equipo-status]');
+  if (!status) return;
+  status.textContent = message || '';
+  status.classList.toggle('is-error', !!isError);
+  status.classList.toggle('is-ok', !!message && !isError);
+}
+
+function bcAlmacenEquipoBodyHtml(data, almacenActivo) {
+  const assigned = Array.isArray(data && data.dependientas) ? data.dependientas : [];
+  const available = Array.isArray(data && data.disponibles) ? data.disponibles : [];
+  const assignedHtml = assigned.length ? assigned.map(function (person) {
+    const userId = escHtml(person.usuario_id);
+    const name = escHtml(person.nombre || 'Dependienta');
+    const permanent = person.salario_porcentaje_permanente;
+    const temporary = person.salario_porcentaje_temporal;
+    let temporaryLabel = 'Sin porcentaje temporal pendiente.';
+    if (temporary != null && person.salario_temporal_consumido_en) {
+      temporaryLabel = 'Temporal ' + escHtml(String(temporary)) + '% aplicado; el porcentaje de esa jornada quedó congelado.';
+    } else if (temporary != null && person.salario_temporal_fecha) {
+      temporaryLabel = 'Temporal ' + escHtml(String(temporary)) + '% reservado para el ' + escHtml(person.salario_temporal_fecha) + '.';
+    } else if (temporary != null) {
+      temporaryLabel = 'Temporal ' + escHtml(String(temporary)) + '% pendiente: se aplicará a la próxima jornada programada.';
+    }
+    return '<article class="bc-alm-equipo-persona" data-bc-alm-equipo-card>' +
+      '<div class="bc-alm-equipo-persona-head"><div><b>' + name + '</b><small>' +
+        (permanent == null ? 'Porcentaje permanente sin configurar' : 'Permanente actual: ' + escHtml(String(permanent)) + '%') +
+      '</small><small>' + temporaryLabel + '</small></div><span class="bc-alm-equipo-pill">Asignada</span></div>' +
+      '<div class="bc-alm-equipo-controls">' +
+        '<label>Porcentaje (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bc-alm-equipo-rate value="' + escHtml(permanent == null ? '' : String(permanent)) + '" placeholder="Ej. 5"></label>' +
+        '<label>Vigencia<select data-bc-alm-equipo-scope><option value="PERMANENTE">Permanente · futuras jornadas</option><option value="PROXIMA_JORNADA">Solo próxima jornada</option></select></label>' +
+        '<div class="bc-alm-equipo-actions"><button type="button" class="cc-accion" data-bc-alm-equipo-action="save" data-user-id="' + userId + '"' + (almacenActivo ? '' : ' disabled') + '>Guardar porcentaje</button>' +
+        '<button type="button" class="cc-accion" data-bc-alm-equipo-action="remove" data-user-id="' + userId + '"' + (almacenActivo ? '' : ' disabled') + '>Quitar del almacén</button></div>' +
+      '</div></article>';
+  }).join('') : '<p class="lista-estado">Todavía no hay dependientas asignadas a este almacén.</p>';
+  const options = available.map(function (person) {
+    return '<option value="' + escHtml(person.usuario_id) + '">' + escHtml(person.nombre || 'Dependienta') + '</option>';
+  }).join('');
+  const addHtml = '<div class="bc-alm-equipo-add"><h5>Asignar dependienta</h5>' +
+    (available.length
+      ? '<div class="bc-alm-equipo-controls">' +
+          '<label>Dependienta<select data-bc-alm-equipo-new-user><option value="">Selecciona una dependienta</option>' + options + '</select></label>' +
+          '<label>Porcentaje (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bc-alm-equipo-new-rate placeholder="Ej. 5"></label>' +
+          '<label>Vigencia<select data-bc-alm-equipo-new-scope><option value="PERMANENTE">Permanente · futuras jornadas</option><option value="PROXIMA_JORNADA">Solo próxima jornada</option></select></label>' +
+          '<button type="button" class="cc-accion" data-bc-alm-equipo-action="assign"' + (almacenActivo ? '' : ' disabled') + '>Asignar al almacén</button></div>'
+      : '<p class="lista-estado">Todas las dependientas activas ya están asignadas a este almacén.</p>') +
+    '</div>';
+  return '<div class="bc-alm-equipo-list">' + assignedHtml + '</div>' + addHtml;
+}
+
+async function cargarEquipoAlmacen(almacenId) {
+  const section = document.querySelector('[data-bc-alm-equipo][data-almacen-id="' + String(almacenId).replace(/"/g, '') + '"]');
+  if (!section) return;
+  const body = section.querySelector('[data-bc-alm-equipo-body]');
+  if (!body) return;
+  const requestId = ++_bcAlmacenEquipoRequestId;
+  const api = window.client || (typeof client !== 'undefined' ? client : null);
+  if (!api || typeof api.rpc !== 'function') {
+    body.innerHTML = '<p class="lista-estado">El servicio de configuración no está disponible.</p>';
+    return;
+  }
+  try {
+    const result = await api.rpc('bc8_listar_dependientas_almacen', { p_almacen_id: almacenId });
+    if (requestId !== _bcAlmacenEquipoRequestId || !section.isConnected || String(_almacenSeleccionadoId) !== String(almacenId)) return;
+    if (result && result.error) throw result.error;
+    body.innerHTML = bcAlmacenEquipoBodyHtml(result && result.data || {}, section.dataset.almacenActivo === 'true');
+  } catch (error) {
+    if (requestId !== _bcAlmacenEquipoRequestId || !section.isConnected) return;
+    const message = error && (error.message || error.details) || 'No se pudo consultar el equipo del almacén.';
+    body.innerHTML = '<p class="lista-estado">' + escHtml(message) + '</p><button type="button" class="cc-accion" data-bc-alm-equipo-action="retry">Reintentar</button>';
+  }
+}
+
+async function guardarConfiguracionDependientaAlmacen(section, actionButton) {
+  const almacenId = section.dataset.almacenId;
+  const action = actionButton.dataset.bcAlmEquipoAction;
+  const isAssign = action === 'assign';
+  const card = actionButton.closest('[data-bc-alm-equipo-card]');
+  const userId = isAssign
+    ? (section.querySelector('[data-bc-alm-equipo-new-user]') || {}).value
+    : actionButton.dataset.userId;
+  const rateInput = isAssign ? section.querySelector('[data-bc-alm-equipo-new-rate]') : card && card.querySelector('[data-bc-alm-equipo-rate]');
+  const scopeInput = isAssign ? section.querySelector('[data-bc-alm-equipo-new-scope]') : card && card.querySelector('[data-bc-alm-equipo-scope]');
+  if (action === 'remove') {
+    if (!confirm('¿Quitar esta dependienta del equipo del almacén? Las jornadas ya programadas conservarán su porcentaje registrado.')) return;
+  } else {
+    const raw = rateInput && String(rateInput.value || '').trim();
+    const rate = Number(raw);
+    if (!userId) { bcAlmacenEquipoStatus(section, 'Selecciona una dependienta.', true); return; }
+    if (!raw || !Number.isFinite(rate) || rate < 0 || rate > 100) {
+      bcAlmacenEquipoStatus(section, 'Escribe un porcentaje entre 0 y 100.', true);
+      if (rateInput) rateInput.focus();
+      return;
+    }
+    if (!scopeInput || !['PERMANENTE', 'PROXIMA_JORNADA'].includes(scopeInput.value)) {
+      bcAlmacenEquipoStatus(section, 'Selecciona la vigencia del porcentaje.', true);
+      return;
+    }
+  }
+  if (!navigator.onLine) { bcAlmacenEquipoStatus(section, 'Necesitas conexión para guardar la configuración salarial.', true); return; }
+  const api = window.client || (typeof client !== 'undefined' ? client : null);
+  if (!api || typeof api.rpc !== 'function') { bcAlmacenEquipoStatus(section, 'Backend no disponible.', true); return; }
+  const originalLabel = actionButton.textContent;
+  actionButton.disabled = true;
+  actionButton.textContent = 'Guardando…';
+  bcAlmacenEquipoStatus(section, 'Guardando configuración y registrando auditoría…', false);
+  try {
+    const result = await api.rpc('bc8_configurar_dependienta_almacen', {
+      p_almacen_id: almacenId,
+      p_usuario_id: userId,
+      p_asignada: action !== 'remove',
+      p_salario_porcentaje: action === 'remove' ? null : Number(rateInput.value),
+      p_vigencia_tipo: action === 'remove' ? null : scopeInput.value
+    });
+    if (result && result.error) throw result.error;
+    await cargarEquipoAlmacen(almacenId);
+    const currentSection = document.querySelector('[data-bc-alm-equipo][data-almacen-id="' + String(almacenId).replace(/"/g, '') + '"]');
+    if (currentSection) bcAlmacenEquipoStatus(currentSection, action === 'remove'
+      ? 'Dependienta retirada del equipo. Las jornadas ya programadas siguen intactas.'
+      : 'Configuración salarial guardada.', false);
+  } catch (error) {
+    const message = error && (error.message || error.details) || 'No se pudo guardar la configuración.';
+    bcAlmacenEquipoStatus(section, message, true);
+  } finally {
+    if (actionButton.isConnected) { actionButton.disabled = false; actionButton.textContent = originalLabel; }
+  }
+}
+
 function renderPanelAlmacenSeleccionado() {
   const panel = document.getElementById("alm-info-panel");
   if (!panel) return;
@@ -275,7 +412,8 @@ function renderPanelAlmacenSeleccionado() {
         '<div class="alm-info-item"><span class="alm-info-label">Tipo</span><span class="alm-info-valor">' + escHtml(etiquetaTipoAlmacen(a.tipo)) + "</span></div>" +
         '<div class="alm-info-item"><span class="alm-info-label">Estado</span><span class="alm-info-valor ' + (active ? "alm-estado-activo" : "alm-estado-inactivo") + '">' + (active ? "Activo" : "Inactivo") + "</span></div>" +
         '<div class="alm-info-item"><span class="alm-info-label">Inventario</span><span class="alm-info-valor">' + escHtml(message) + "</span></div>" +
-      "</div>";
+      "</div>" + bcAlmacenEquipoSectionHtml(id, active);
+    cargarEquipoAlmacen(id);
     renderProductosDelAlmacen(id);
     actualizarBotonesAccionesAlmacen();
     return;
@@ -313,7 +451,8 @@ function renderPanelAlmacenSeleccionado() {
             (sinMinimo ? fmtQty(sinMinimo) + " sin mínimo" : "")
           : "Sin alertas") +
       "</span></div>" +
-    "</div>";
+    "</div>" + bcAlmacenEquipoSectionHtml(id, activo);
+  cargarEquipoAlmacen(id);
   renderProductosDelAlmacen(id);
   actualizarBotonesAccionesAlmacen();
 }
@@ -717,6 +856,21 @@ safeInit("almacenes-ui", () => {
   }
   const btnCancelar = document.getElementById("alm-cancelar-btn");
   if (btnCancelar) btnCancelar.addEventListener("click", () => cerrarFormAlmacen());
+
+  const equipoPanel = document.getElementById("alm-info-panel");
+  if (equipoPanel && !equipoPanel.dataset.bcAlmEquipoBound) {
+    equipoPanel.dataset.bcAlmEquipoBound = "1";
+    equipoPanel.addEventListener("click", function (event) {
+      const button = event.target && event.target.closest ? event.target.closest("[data-bc-alm-equipo-action]") : null;
+      if (!button) return;
+      const section = button.closest("[data-bc-alm-equipo]");
+      if (!section) return;
+      const action = button.dataset.bcAlmEquipoAction;
+      if (action === "retry") { cargarEquipoAlmacen(section.dataset.almacenId); return; }
+      if (!["assign", "save", "remove"].includes(action)) return;
+      guardarConfiguracionDependientaAlmacen(section, button);
+    });
+  }
 });
 
 async function editarAlmacen(almacen_id, cambios) {
