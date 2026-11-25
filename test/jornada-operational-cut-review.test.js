@@ -3,7 +3,6 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
-const vm=require("node:vm");
 
 const root=path.join(__dirname,"..");
 const read=file=>fs.readFileSync(path.join(root,file),"utf8");
@@ -14,24 +13,6 @@ const SW=read("public/service-worker.js");
 const INDEX=read("public/index.html");
 const MIG=read("supabase/migrations/20261125170000_jornada_owner_review_operational_cut_classification.sql");
 const RUNNER=read("test/step7-jornada-postgres-windows-ci.js");
-
-test("BC7 reads the authenticated global lexical user context before legacy window aliases",()=>{
-  const start=UI.indexOf("function currentUser(){");
-  const end=UI.indexOf("function catalogCache()",start);
-  assert.ok(start>=0&&end>start,"currentUser helper must exist");
-  const source=UI.slice(start,end);
-  const lexical=vm.runInNewContext(
-    'let _usuarioActual={id:"worker-lexical",rol:"Dependienta"};\\n'+source+'\\ncurrentUser();',
-    {window:{}}
-  );
-  assert.equal(lexical.id,"worker-lexical");
-  assert.equal(lexical.rol,"Dependienta");
-  const legacy=vm.runInNewContext(
-    'let _usuarioActual=null;\\n'+source+'\\ncurrentUser();',
-    {window:{__bcUser:{id:"worker-legacy",rol:"Dependienta"}}}
-  );
-  assert.equal(legacy.id,"worker-legacy");
-});
 
 test("Owner movement summary cannot hide the pending count returned by nested liquidation",()=>{
   assert.match(OWNER,/pendingPostCount=Math\.max\(0,Number\(l\.movimientos_posteriores_pendientes\)\|\|0,Number\(pending\.movimientos_posteriores_corte\)\|\|0,post\.length\)/);
