@@ -131,11 +131,15 @@
     if (visible) {
       btn.classList.remove("hidden", "tab-sin-permiso");
       btn.style.removeProperty("display");
+      btn.removeAttribute("hidden");
+      btn.hidden = false;
       btn.removeAttribute("aria-hidden");
       btn.tabIndex = 0;
     } else {
       btn.classList.add("hidden", "tab-sin-permiso");
       btn.style.setProperty("display", "none", "important");
+      btn.setAttribute("hidden", "");
+      btn.hidden = true;
       btn.setAttribute("aria-hidden", "true");
       btn.tabIndex = -1;
       btn.classList.remove("active");
