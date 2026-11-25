@@ -222,11 +222,11 @@ BEGIN
   END IF;
   v_liquidation:=public.bc7_liquidacion_inventario_jornada(v_session);
   IF EXISTS(
-    SELECT 1 FROM jsonb_array_elements(coalesce(v_liquidation->'lineas','[]'::jsonb)) line
-    WHERE line->>'producto_id'=v_product_zero::text
+    SELECT 1 FROM jsonb_array_elements(coalesce(v_liquidation->'lineas','[]'::jsonb)) AS line(value)
+    WHERE line.value->>'producto_id'=v_product_zero::text
   ) OR NOT EXISTS(
-    SELECT 1 FROM jsonb_array_elements(coalesce(v_liquidation->'lineas','[]'::jsonb)) line
-    WHERE line->>'producto_id'=v_product_entry::text
+    SELECT 1 FROM jsonb_array_elements(coalesce(v_liquidation->'lineas','[]'::jsonb)) AS line(value)
+    WHERE line.value->>'producto_id'=v_product_entry::text
   ) THEN
     RAISE EXCEPTION 'FAIL: settlement must omit untouched zero products but retain a product with a real period purchase.';
   END IF;
