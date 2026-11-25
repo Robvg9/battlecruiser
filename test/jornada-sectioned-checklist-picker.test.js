@@ -42,6 +42,22 @@ test("each attendant checklist item opens its own operational section and has on
   assert.match(ui,/bc7-checklist-section-source" hidden/);
   assert.match(ui,/Reabrir sección/);
 });
+test("worker quick actions reopen completed editable blocks and keep sealed cash/inventory read-only", () => {
+  const ui = read("public/js/bc7-jornada-ui.js");
+  const start = ui.indexOf("async function openWorkerShortcut(sessionId,section)");
+  const end = ui.indexOf("function openChecklistSection(key)", start);
+  assert.ok(start >= 0 && end > start, "worker shortcut handler is missing");
+  const shortcut = ui.slice(start, end);
+  for (const key of ["gastos", "reinversiones", "bajas"]) assert.ok(shortcut.includes("'" + key + "'"));
+  assert.match(shortcut, /state\.detail\?\.checklist\?\.\[section\]\?\.completado===true/);
+  assert.match(shortcut, /bc7_confirmar_bloque_jornada/);
+  assert.match(shortcut, /p_completado:false/);
+  assert.match(shortcut, /await openWorkspace\(sessionId\)/);
+  assert.match(shortcut, /openChecklistSection\(section\)/);
+  assert.doesNotMatch(shortcut, /p_bloque:'inventario_final'|p_bloque:'declaracion_dinero'/);
+  assert.match(ui, /await openWorkerShortcut\(sessionId,section\)/);
+});
+
 test("non-retail final cash declaration and physical count remain a single Owner action", () => {
   const admin = read("public/js/aprobaciones-admin.js");
   const migration = read("supabase/migrations/20261119160000_jornada_retroactive_cut_single_cash_count.sql");
@@ -59,7 +75,7 @@ test("PWA release versions stay aligned after the jornada UX update", () => {
   const sw = read("public/service-worker.js");
   const html = read("public/index.html");
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index:html});
-  assert.match(app, /bc7-jornada-ui\.js","7\.64"/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.64/);
+  assert.match(app, /bc7-jornada-ui\.js","7\.65"/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.65/);
   assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"aprobaciones-admin.js"});
 });

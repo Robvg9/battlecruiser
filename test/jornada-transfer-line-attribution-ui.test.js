@@ -26,7 +26,7 @@ test("No UI path can still invoke whole-transfer retroactive attribution", () =>
 test("Jornada module, loader and Service Worker share the line-attribution release key", () => {
   const app = fs.readFileSync("public/app.js", "utf8");
   const sw = fs.readFileSync("public/service-worker.js", "utf8");
-  assert.match(ui, /^\/\/ v7\.64/m);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.64"\]/);
-  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.64/);
+  assert.match(ui, /^\/\/ v7\.65/m);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.65"\]/);
+  assert.match(sw, /bc7-jornada-ui\.js\?v=7\.65/);
 });
