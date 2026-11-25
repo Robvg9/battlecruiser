@@ -1297,7 +1297,7 @@
     options=options||{};
     if(!form||!state.detail)return false;
     const detail=state.detail,sessionId=String(form.dataset.bc7CloseForm||detail.sesion?.id||'');
-    // Step 5 rows are mounted in the cash workspace; the final handover button
+    // Step 1 rows are mounted in the cash workspace; the final handover button
     // lives in a separate form. Both entry points must read the same daily rows.
     const dayRoot=document.querySelector('#bc7-cash-days-manager [data-bc7-close-form]')||form;
     const message=dayRoot.querySelector('#bc7-cash-days-msg')||$('bc7-cash-days-msg')||form.querySelector('[data-bc7-close-msg]');
@@ -1335,7 +1335,7 @@
           detail.checklist=checklist;
         }catch(error){msg(message,'No se pudo verificar el estado actual del paso 1. '+friendlyError(error,'calendar'),'error');return false;}
       }
-      if(checklist?.declaracion_dinero?.completado===true){msg(message,'El paso 5 ya está completo y confirmado por el servidor.','ok');return true;}
+      if(checklist?.declaracion_dinero?.completado===true){msg(message,'El paso 1 ya está completo y confirmado por el servidor.','ok');return true;}
       if(options.requireComplete){
         const registered=Number(checklist?.declaracion_dinero?.entregas_diarias_registradas||0);
         const expected=Number(checklist?.declaracion_dinero?.entregas_diarias_esperadas||0);
