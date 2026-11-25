@@ -26,6 +26,7 @@
   }
 
   var TAB_A_SECCION = {
+    "mi-jornada": "turnos",
     resumen: "reportes",
     productos: "productos",
     ventas: "ventas",
@@ -55,10 +56,12 @@
   // El Centro de Control es la entrada por defecto cuando el rol tiene acceso.
   // Jornada queda como fallback natural para perfiles sin permiso de reportes.
   var ORDEN_HOME = [
-    "resumen", "jornada", "comunicacion", "productos", "almacenes",
+    "mi-jornada", "resumen", "jornada", "comunicacion", "productos", "almacenes",
     "movimientos", "inventario", "reportes", "ventas", "operacion", "pendientes",
     "mando", "usuarios", "config", "conectividad", "preferencias"
   ];
+  var homeInicialAplicado = false;
+  var homeInicialUsuarioId = null;
 
   function esDependienta() {
     var u = usuarioActual() || {};
@@ -76,6 +79,7 @@
     if (!usuarioActual() || !permisosListos()) return false;
     if (RUTAS_SIEMPRE_OCULTAS[tab]) return false;
     if (RUTAS_PERSONALES[tab]) return true;
+    if (tab === "mi-jornada") return esDependienta() && tienePermiso("turnos", "ver");
     if (tab === "operacion") return puedeVerOperaciones();
     if (tab === "config") {
       return tienePermiso("categorias", "ver");
@@ -178,6 +182,8 @@
     var loggedIn = !!usuarioActual();
     var cargaOk = permisosListos() && !!mapaPermisos();
     var ready = loggedIn && cargaOk;
+    var userId = loggedIn ? String((usuarioActual()||{}).id||"") : "";
+    if (userId !== homeInicialUsuarioId) { homeInicialUsuarioId = userId; homeInicialAplicado = false; }
     var shell = document.getElementById("app-shell");
     var shellVisible = !!(shell && shell.classList.contains("visible"));
 
@@ -216,8 +222,10 @@
     });
 
     if (ready && shellVisible && visibles.length) {
+      var elegirHomeInicial = !homeInicialAplicado;
+      homeInicialAplicado = true;
       var activo = document.querySelector("#tabs .tab-btn.active[data-tab]");
-      if (!activo || activo.getAttribute("data-bc-permiso") !== "1") {
+      if (elegirHomeInicial || !activo || activo.getAttribute("data-bc-permiso") !== "1") {
         var elegido = null;
         for (var i = 0; i < ORDEN_HOME.length; i++) {
           elegido = document.querySelector('#tabs .tab-btn[data-tab="' + ORDEN_HOME[i] + '"][data-bc-permiso="1"]');

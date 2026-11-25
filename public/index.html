@@ -31,7 +31,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=9.5.155">
-<link rel="stylesheet" href="bc7-jornada-inventory-mobile.css?v=20261116.2">
+<link rel="stylesheet" href="bc7-jornada-inventory-mobile.css?v=20261116.3">
 <style>
 .app-shell{display:none}.card.hidden,.lantern-wrap.hidden{display:none}
 #app-shell.visible:not([data-bc-permisos-cargados="1"]) #tabs .tab-btn[data-tab],
@@ -115,6 +115,7 @@
       </div>
       <nav class="sidebar-nav" id="tabs">
         <button class="tab-btn active" data-tab="resumen">Centro de Control <span id="resumen-tab-badge" class="pendientes-tab-badge hidden"></span></button>
+        <button class="tab-btn" data-tab="mi-jornada" hidden>Mi jornada</button>
         <button class="tab-btn" data-tab="productos">Productos</button>
         <button class="tab-btn" data-tab="ventas">Ventas</button>
         <button class="tab-btn" data-tab="almacenes">Almacenes</button>
@@ -222,6 +223,10 @@
           <div class="cc-bloque"><h3>Stock bajo mínimo</h3><div id="resumen-alertas-lista" class="lista"></div></div>
         </aside>
       </div>
+    </section>
+
+    <section id="tab-mi-jornada" class="tab-panel" hidden aria-label="Dashboard personal de jornada">
+      <div class="bc-worker-dashboard" id="bc-worker-dashboard" aria-live="polite"></div>
     </section>
 
     <section id="tab-productos" class="tab-panel">
