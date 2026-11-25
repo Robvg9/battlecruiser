@@ -65,8 +65,12 @@
 
   function esDependienta() {
     var u = usuarioActual() || {};
-    var rol = String(u.rol || u.role_name || u.nombre_rol || u.role || "").toLowerCase();
-    return rol.indexOf("dependienta") >= 0;
+    var role = u.rol || u.role_name || u.nombre_rol || u.role || "";
+    if (role && typeof role === "object") {
+      role = role.nombre || role.name || role.rol || role.role_name || "";
+    }
+    var normalized = String(role || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim();
+    return normalized.indexOf("dependienta") >= 0;
   }
 
   function puedeVerOperaciones() {
