@@ -191,11 +191,11 @@ test("Jornada handover uses approved daily cash and never asks the Owner for a s
   assert.match(ui,/Registra todas las bajas y mermas reales de este período/);
   assert.match(ui,/El Dueño aprueba los registros por separado/);
   assert.match(ui,/lista_para_conteo/);
-  assert.match(ui,/lista_para_calcular/);
+  assert.doesNotMatch(ui,/lista_para_calcular|Fase 2|Cálculos automáticos completados/);
   assert.doesNotMatch(ui,/detail\.checklist\?\.lista_para_calcular!==true/);
   assert.match(ui,/LISTA_PARA_ENTREGA/);
   assert.match(ui,/Jornada entregada al Dueño/);
-  assert.match(ui,/Cálculos automáticos completados/);
+  assert.doesNotMatch(ui,/Cálculos automáticos completados/);
   assert.match(ui,/[Ee]l Turno todavía no está cerrado/);
 });
 

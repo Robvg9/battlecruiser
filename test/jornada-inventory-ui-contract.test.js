@@ -65,6 +65,6 @@ test("warehouse detail reads jornada-projected balances without changing the raw
   assert.match(warehouses, /client\.from\("stock"\)\.select\("producto_id, almacen_id, cantidad, minimo"\)/);
   assert.match(warehouses, /_cache\.stock = Array\.isArray\(stock\)/);
   assert.match(warehouses, /return \(_cache\.stock \|\| \[\]\)\.filter/);
-  assert.match(index, /js\/almacenes\.js\?v=20261111\.1/);
-  assert.match(sw, /js\/almacenes\.js\?v=20261111\.1/);
+  assert.match(index, /js\/almacenes\.js\?v=20261125\.1/);
+  assert.match(sw, /js\/almacenes\.js\?v=20261125\.1/);
 });

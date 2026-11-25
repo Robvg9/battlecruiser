@@ -11,6 +11,8 @@ const THEME=read("public/js/m27-5-theme-dark-reset.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
 const REVIEW=read("public/js/jornada-owner-review.js");
+const SALARY_MIG=read("supabase/migrations/20261125224135_warehouse_dependent_salary_configuration.sql");
+const WAREHOUSES=read("public/js/almacenes.js");
 const APP=read("public/app.js"),SW=read("public/service-worker.js"),INDEX=read("public/index.html");
 
 test("A pending owner approval never blocks a new non-overlapping Jornada schedule",()=>{

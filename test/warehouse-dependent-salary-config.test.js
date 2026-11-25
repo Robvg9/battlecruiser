@@ -81,7 +81,7 @@ test("the Jornada dashboard no longer duplicates Phase 2 financial calculations"
 test("PostgreSQL 17 runner applies and exercises the new production migration", () => {
   assert.ok(postgresRunner.includes('applySql("supabase/migrations/20261125224135_warehouse_dependent_salary_configuration.sql")'));
   assert.ok(postgresRunner.includes('applySql("test/warehouse-dependent-salary-config-contract.sql")'));
-  assert.match(read("test/warehouse-dependent-salary-config-contract.sql"), /one-time 8% salary was not stamped/i);
+  assert.match(read("test/warehouse-dependent-salary-config-contract.sql"), /one-time 8%% salary was not stamped/i);
   assert.match(read("test/warehouse-dependent-salary-config-contract.sql"), /already-started Jornada snapshot/i);
 });
 
