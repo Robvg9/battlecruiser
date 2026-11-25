@@ -48,8 +48,9 @@
     if(!row||row.trabaja===false||status==='DESCANSO')return {kind:'rest',short:'Descanso',label:'Descanso'};
     if(status==='EN_CURSO')return {kind:'running',short:'En curso',label:'En curso'};
     if(status==='CERRADA_OPERATIVAMENTE')return {kind:'sealed',short:'Pendiente de cuadre',label:'Pendiente de cuadre · cierre operativo realizado'};
-    if(status==='COMPLETADA'&&['EN_CURSO','PENDIENTE_APROBACION'].includes(String(row.turno_estado_maestro||'').toUpperCase()))return {kind:'review',short:'Pendiente de cierre',label:'Jornada completada · pendiente de revisión y cierre del Turno maestro'};
-    if(['COMPLETADA','CERRADA','CERRADO','CANCELADA','CANCELADO'].includes(status))return {kind:'closed',short:'Archivada',label:humanStatus(status)};
+    const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();
+    if(['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(master))return {kind:'review',short:'Pendiente de cierre',label:'Jornada completada · pendiente de revisión y cierre del Turno maestro'};
+    if((['COMPLETADA','CERRADA','CERRADO'].includes(status)&&master==='CERRADO')||['CANCELADA','CANCELADO'].includes(status))return {kind:'closed',short:'Archivada',label:humanStatus(status)};
     if(['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status))return {kind:'scheduled',short:'Programada',label:'Programada'};
     return {kind:'other',short:humanStatus(status),label:humanStatus(status)};
   }
@@ -989,7 +990,7 @@
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
     const masterStatus=String(r.turno_estado_maestro||'').toUpperCase();
-    const pendingMasterClose=status==='COMPLETADA'&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
+    const pendingMasterClose=['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
     const pill=rest?'<span class="bc7-pill">Descanso</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
     const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
     const viewable=status==='COMPLETADA'||isOperationallySealed;
@@ -1014,7 +1015,7 @@
     const renderRows=data=>{
       if(String($('bc7-calendar-month')?.value||month)!==month)return;
       const archived=[],visible=[];
-      data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(st==='COMPLETADA'&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
+      data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(['COMPLETADA','CERRADA','CERRADO'].includes(st)&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
       const rank=row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();return st==='EN_CURSO'?0:st==='CERRADA_OPERATIVAMENTE'?1:(st==='COMPLETADA'?2:3);};
       visible.sort((a,b)=>rank(a)-rank(b)||String(a.fecha||'').localeCompare(String(b.fecha||''))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
       archived.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
