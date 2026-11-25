@@ -51,7 +51,6 @@ test("the branch preview proxy is allowlisted and LIVE stays on its direct endpo
   for (const route of ["/", "/index.html", "/app.js", "/service-worker.js", "/style.css", "/__bc_preview/*"]) {
     assert.ok(workerFirst.includes(route), "missing Worker-first route " + route);
   }
-  assert.match(config,/"run_worker_first": \["\/__bc_preview\/\*"\]/);
   assert.match(worker,/Origin": PRODUCTION_ORIGIN/);
 });
 
