@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.63 — Mis jornadas nunca queda vacía durante la validación o un fallo de carga.
+// v7.64 — auth profile resolver reads the authenticated global lexical context.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -318,7 +318,12 @@
   }
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
   function money(v){return typeof window.money==='function'?window.money(Number(v||0)):Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});}
-  function currentUser(){return window._usuarioActual||window.__bcUser||window.usuarioActual||null;}
+  function currentUser(){
+    // auth.js declares _usuarioActual as a global lexical binding (let), not window._usuarioActual.
+    // Read that authenticated context first; keep window aliases for offline/legacy integrations.
+    try{if(typeof _usuarioActual!=='undefined'&&_usuarioActual)return _usuarioActual;}catch(_){}
+    return window._usuarioActual||window.__bcUser||window.usuarioActual||null;
+  }
   function catalogCache(){
     try{if(typeof _cache!=='undefined'&&_cache)return _cache;}catch(_){}
     return window._cache||null;

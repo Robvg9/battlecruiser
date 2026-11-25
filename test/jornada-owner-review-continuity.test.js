@@ -101,9 +101,11 @@ test("Owner review product inventory is collapsed behind an explicit detail cont
 test("Post-cutoff classification controls remain visible and usable on mobile without a wide table",()=>{
   assert.match(REVIEW,/bcjr-movement-card/);
   assert.match(REVIEW,/bcjr-movement-decision/);
-  assert.match(REVIEW,/Antes del inventario final/);
-  assert.match(REVIEW,/Después del inventario final/);
+  assert.match(REVIEW,/Antes del cierre operativo/);
+  assert.match(REVIEW,/Después del cierre operativo/);
   assert.match(REVIEW,/Guardar clasificación auditada/);
+  assert.match(REVIEW,/Corte operativo registrado/);
+  assert.match(REVIEW,/pendingPostCount=Math.max/);
   assert.doesNotMatch(REVIEW,/bcjr-movement-list.*<table/);
 });
 
@@ -172,8 +174,8 @@ test("Jornada review keeps physical stock visible and reports negative-product d
   assert.match(REVIEW,/Periodo del turno/);
   assert.match(REVIEW,/Entregas diarias de efectivo/);
   assert.match(REVIEW,/Efectivo total recogido/);
-  assert.match(REVIEW,/Marcar todas: antes del corte/);
-  assert.match(REVIEW,/Marcar todas: después del corte/);
+  assert.match(REVIEW,/Marcar todas: antes del cierre/);
+  assert.match(REVIEW,/Marcar todas: después del cierre/);
   assert.match(REVIEW,/valor_estimado/);
   assert.match(MIGRATION,/valor_estimado/);
   assert.match(MIGRATION,/turno_jornada_inventario_correcciones/);

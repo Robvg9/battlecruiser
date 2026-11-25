@@ -10,6 +10,8 @@ if (!previewName || !/^[a-z0-9-]+$/.test(previewName)) {
 const base = "https://" + previewName + ".robvg9.workers.dev";
 const appSource = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
 const swSource = fs.readFileSync(path.join(__dirname, "..", "public", "service-worker.js"), "utf8");
+const indexSource = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+const sha256 = (value) => require("node:crypto").createHash("sha256").update(String(value).replace(/\r\n/g, "\n")).digest("hex");
 const expectedAppVersion = (appSource.match(/const VERSION="([^"]*)"/) || [])[1];
 const expectedSwVersion = (swSource.match(/BC_SW_VERSION = "([^"]*)"/) || [])[1];
 if (!expectedAppVersion || !expectedSwVersion) {
@@ -80,20 +82,27 @@ async function verifyPreviewAuthProxies() {
 (async () => {
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
-      const [index, app, sw] = await Promise.all([
+      const [root, index, app, sw] = await Promise.all([
+        fetchText("/", attempt),
         fetchText("/index.html", attempt),
         fetchText("/app.js", attempt),
         fetchText("/service-worker.js", attempt),
       ]);
+      const indexShellAligned =
+        index.body.includes('<script src="app.js?v=' + expectedAppVersion + '"></script>') &&
+        index.body.includes('v' + expectedAppVersion + ' — BattleCruiser');
+      const rootMatchesIndex = root.status === 200 && index.status === 200 &&
+        sha256(root.body) === sha256(index.body);
       const aligned =
-        index.status === 200 &&
+        rootMatchesIndex &&
+        indexShellAligned &&
         app.status === 200 &&
         sw.status === 200 &&
         app.body.includes('const VERSION="' + expectedAppVersion + '"') &&
         sw.body.includes('BC_SW_VERSION = "' + expectedSwVersion + '"');
       if (aligned) {
         console.log(
-          "[preview] PASS — index.html, app.js and Service Worker HTTP 200; app=" +
+          "[preview] PASS — / and /index.html share the exact shell; app.js and Service Worker HTTP 200; app=" +
           expectedAppVersion + " sw=" + expectedSwVersion
         );
         await verifyPreviewAuthProxies();
@@ -101,7 +110,8 @@ async function verifyPreviewAuthProxies() {
         return;
       }
       console.log(
-        "[preview] attempt " + attempt + "/30: index=" + index.status +
+        "[preview] attempt " + attempt + "/30: root=" + root.status +
+        " index=" + index.status + " root_matches_index=" + rootMatchesIndex +
         " app=" + app.status + " service-worker=" + sw.status +
         " expected app=" + expectedAppVersion + " sw=" + expectedSwVersion
       );

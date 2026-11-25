@@ -7,6 +7,7 @@ const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
 const RECOVERY_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-password-recovery-admin";
 const RECOVERY_PROXY_PATH = "/__bc_preview/functions/v1/bc-password-recovery-admin";
+const PREVIEW_CORE_ASSETS = new Set(["/", "/index.html", "/app.js", "/service-worker.js", "/style.css"]);
 
 function json(body, status) {
   return new Response(JSON.stringify(body), {
@@ -28,6 +29,33 @@ export default {
     if (!PREVIEW_ORIGINS.has(url.origin)) {
       return env.ASSETS.fetch(request);
     }
+    // Force the preview shell and versioned core assets through the same
+    // Worker asset manifest. Cloudflare may otherwise serve a cached bare "/"
+    // separately from a fresh "/index.html" or query-versioned script.
+    if (PREVIEW_CORE_ASSETS.has(url.pathname)) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return json({ error: "Método no permitido." }, 405);
+      }
+      const assetPath = url.pathname === "/" ? "/index.html" : url.pathname;
+      const assetUrl = new URL(assetPath, url.origin);
+      url.searchParams.forEach((value, key) => assetUrl.searchParams.set(key, value));
+      assetUrl.searchParams.set("__bc_preview_asset", Date.now() + "-" + Math.random().toString(36).slice(2));
+      const assetRequest = new Request(assetUrl.toString(), {
+        method: request.method,
+        headers: request.headers,
+        redirect: "follow",
+      });
+      const asset = await env.ASSETS.fetch(assetRequest);
+      const headers = new Headers(asset.headers);
+      headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      headers.set("Pragma", "no-cache");
+      return new Response(asset.body, {
+        status: asset.status,
+        statusText: asset.statusText,
+        headers,
+      });
+    }
+
     const upstreamFunction = url.pathname === LOGIN_PROXY_PATH
       ? LOGIN_FUNCTION_URL
       : url.pathname === RECOVERY_PROXY_PATH

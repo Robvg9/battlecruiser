@@ -55,6 +55,6 @@ test("successor UI shows SQLSTATE details but keeps network failures user-friend
 });
 
 test("the updated Jornada UI is invalidated in the online loader and offline shell",()=>{
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.63"]'));
-  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.63"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.64"]'));
+  assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=7.64"));
 });

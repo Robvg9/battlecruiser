@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
@@ -35,6 +36,27 @@ test("permission controller removes the native hidden attribute only when access
   assert.match(hiddenBranch[1], /btn\.hidden\s*=\s*true/);
 });
 
+
+test("worker dashboard resolves the authenticated lexical user context created by auth.js", () => {
+  const start = jornada.indexOf("function currentUser(){");
+  const end = jornada.indexOf("function catalogCache()", start);
+  assert.ok(start >= 0 && end > start, "currentUser must exist before catalogCache");
+  const currentUserSource = jornada.slice(start, end);
+  const lexicalUser = vm.runInNewContext(
+    'let _usuarioActual={id:"worker-lexical",rol:"Dependienta"};\n' +
+      currentUserSource + '\ncurrentUser();',
+    { window: {} }
+  );
+  assert.equal(lexicalUser.id, "worker-lexical");
+  assert.equal(lexicalUser.rol, "Dependienta");
+  const legacyUser = vm.runInNewContext(
+    'let _usuarioActual=null;\n' +
+      currentUserSource + '\ncurrentUser();',
+    { window: { __bcUser: { id: "worker-legacy", rol: "Dependienta" } } }
+  );
+  assert.equal(legacyUser.id, "worker-legacy");
+});
+
 test("worker dashboard shows the signed-in worker's own jornada list and direct open actions", () => {
   const start = jornada.indexOf("function renderWorkerDashboard()");
   const end = jornada.indexOf("function checklistConfirmButtonHtml", start);
@@ -54,13 +76,13 @@ test("worker dashboard shows the signed-in worker's own jornada list and direct 
 test("worker dashboard and owner review release versions are aligned with the precache", () => {
   assert.match(app, /\["permisos-navegacion\.js","67\.9"\]/);
   assert.match(serviceWorker, /permisos-navegacion\.js\?v=67\.9/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.63"\]/);
-  assert.match(app, /\["jornada-owner-review\.js","1\.15"\]/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.158"/);
-  assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.63/);
-  assert.match(serviceWorker, /jornada-owner-review\.js\?v=1\.15/);
-  assert.match(index, /style\.css\?v=9\.5\.158/);
-  assert.match(index, /app\.js\?v=9\.5\.158/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.64"\]/);
+  assert.match(app, /\["jornada-owner-review\.js","1\.16"\]/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.159"/);
+  assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.64/);
+  assert.match(serviceWorker, /jornada-owner-review\.js\?v=1\.16/);
+  assert.match(index, /style\.css\?v=9\.5\.159/);
+  assert.match(index, /app\.js\?v=9\.5\.159/);
 });
 
 test("Mis jornadas shows an explicit state while session and calendar startup are pending or failing", () => {
@@ -123,7 +145,7 @@ test("dependienta home route stays visible and shows a startup state before BC7 
 test("owner review never says there are no blockers while calculation is still incomplete", () => {
   assert.match(ownerReview, /Liquidación calculable · sin bloqueos/);
   assert.match(ownerReview, /Liquidación todavía no calculable/);
-  assert.match(ownerReview, /pendingPostCount=Number/);
+  assert.match(ownerReview, /pendingPostCount=Math\.max/);
   assert.match(ownerReview, /movimientos posteriores sin clasificar/);
   assert.doesNotMatch(ownerReview, /Sin bloqueos de cálculo/);
 });

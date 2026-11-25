@@ -35,7 +35,8 @@ test("preview auth routing targets the isolated PR Worker while LIVE remains dir
  assert.ok(auth.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));assert.ok(auth.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
  assert.match(auth,/\/__bc_preview\/functions\/v1\/bc-password-recovery-admin/);
  assert.match(worker,/const PREVIEW_ORIGINS = new Set/);assert.match(worker,/ux-jornada-status-colors-transfer-modern-picker-battlecruiser/);
- assert.match(config,/run_worker_first = \["\/__bc_preview\/\*"\]/);
+ assert.match(config,/run_worker_first = \[.*"\/__bc_preview\/\*".*\]/);
+ assert.match(config,/run_worker_first = \[.*"\/".*"\/index\.html".*"\/app\.js".*\]/);
  assert.match(edge,/const APP_ORIGIN = "https:\/\/battlecruiser\.robvg9\.workers\.dev"/);assert.doesNotMatch(edge,/bc-pr-224-battlecruiser/);
 });
 test("non-proxy assets pass through the configured Worker Assets binding",async()=>{
