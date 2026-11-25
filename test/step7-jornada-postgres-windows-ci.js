@@ -421,6 +421,8 @@ function applySql(file) {
     applySql("test/jornada-linked-postcut-transfer-contract.sql");
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
+    applySql("supabase/migrations/20261125130000_jornada_zero_stock_skip_and_settlement_diagnostics.sql");
+    applySql("test/jornada-zero-stock-final-skip-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
     log("\\r\\n=== Verify sealed Jornada late-Baja functional behavior (saldo, retry, reservations and master-Turn gate) ===");
     applySql("test/jornada-sealed-baja-balance-functional.sql");
