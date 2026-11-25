@@ -1154,7 +1154,7 @@
     }
     return html+'</section>';
   }
-  // Retail Jornada Step 5 is date-based: never mount a second period-total declaration.
+  // Retail Jornada Step 1 is date-based: never mount a second period-total declaration.
   function cashDaysManagerShellHtml(detail,isAssigned,status){
     if(!detail||detail.sesion?.es_minorista!==true)return '';
     const sessionId=String(detail.sesion.id||'');
@@ -2231,7 +2231,7 @@
       if(Number(settlement.familias_sin_precio||0)>0)reasons.push('hay productos sin precio');
       if(Number(settlement.familias_con_vendidas_negativas||0)>0)reasons.push('hay diferencias negativas de inventario');
       return '<section class="bc7-calculation-phase is-waiting"><h4>Fase 2 · Preparando cálculos</h4>'+
-        fifthCheck+'<p>Las entregas diarias de efectivo ya quedaron registradas en el paso 5. El conteo físico independiente se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
+        fifthCheck+'<p>Las entregas diarias de efectivo ya quedaron registradas en el paso 1. El conteo físico independiente se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
         (reasons.length?'<small>'+esc(reasons.join(' · '))+'</small>':'')+'</section>';
     }
     if(settlement.calculable!==true)return '';
@@ -3152,7 +3152,7 @@
       :(key==='bajas'?'Envía primero la lista completa de bajas o mermas. Después confirma que no faltan más registros.':'Completa este apartado y envía su evidencia a Administración.');
     const actionLabel=key==='inventario_final'
       ?'Guardar inventario final'
-      :(key==='declaracion_dinero'?'Enviar paso 5 a Administración':(completed?'Reabrir sección':(key==='bajas'?'Confirmar que no faltan más bajas':'Enviar evidencia a Administración')));
+      :(key==='declaracion_dinero'?'Enviar paso 1 a Administración':(completed?'Reabrir sección':(key==='bajas'?'Confirmar que no faltan más bajas':'Enviar evidencia a Administración')));
     root.innerHTML='<div class="bc7-checklist-modal-panel">'+
       '<header class="bc7-checklist-modal-head"><div><p>JORNADA · '+esc(labels[key].toUpperCase())+'</p><h3>'+esc(labels[key])+'</h3><small>'+headerNote+'</small></div><button type="button" class="bc7-btn" data-bc7-checklist-modal-close aria-label="Cerrar">Cerrar ✕</button></header>'+
       '<div class="bc7-checklist-modal-body" data-bc7-checklist-modal-body></div>'+
