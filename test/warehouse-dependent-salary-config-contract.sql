@@ -76,7 +76,7 @@ BEGIN
   v_result := public.bc5_crear_jornada_unica(
     v_perm_store,v_base,2,
     jsonb_build_array(
-      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_temp_worker),
+      jsonb_build_object('numero_dia',1,'trabaja',true,'responsable_id',v_perm_worker),
       jsonb_build_object('numero_dia',2,'trabaja',false,'responsable_id',NULL)
     ),
     'Salary permanent contract'
@@ -117,7 +117,7 @@ BEGIN
 
   SELECT count(*) INTO v_event_count
   FROM public.almacen_dependienta_eventos
-  WHERE usuario_id=v_temp_worker
+  WHERE usuario_id IN (v_temp_worker,v_perm_worker)
     AND almacen_id IN (v_temp_store,v_perm_store);
   IF v_event_count<4 THEN
     RAISE EXCEPTION 'FAIL: individual salary actions were not audited; events=%',v_event_count;
