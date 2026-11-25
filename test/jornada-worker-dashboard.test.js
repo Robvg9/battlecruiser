@@ -40,6 +40,7 @@ test("worker dashboard shows the signed-in worker's own jornada list and direct 
   assert.ok(start >= 0 && end > start, "worker dashboard renderer must exist");
   const render = jornada.slice(start, end);
   assert.match(render, /role\.includes\('dependienta'\)/);
+  assert.match(render, /renderWorkerDashboardState\('No pudimos identificar tu perfil'/);
   assert.match(render, /row\.responsable_id[\s\S]*?user\.id/);
   assert.doesNotMatch(render, /role\.includes\('dependienta'\)\s*\|\|\s*state\.admin/);
   assert.match(render, /Mis jornadas/);
