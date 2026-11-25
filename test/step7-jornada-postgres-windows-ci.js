@@ -422,7 +422,7 @@ function applySql(file) {
     applySql("test/jornada-daily-cash-owner-count-removed-contract.sql");
     applySql("test/jornada-responsible-five-step-contract.sql");
     applySql("supabase/migrations/20261125033000_jornada_dashboard_checklist_final_product_set.sql");
-    applySql("supabase/migrations/20261125130000_jornada_zero_stock_skip_and_settlement_diagnostics.sql");
+    applySql("supabase/migrations/20261125130000_jornada_zero_stock_skip_and_settlement_diagnostics.sql");\n    log("Align Owner movement visibility and classification with the immutable operational Jornada cutoff.");\n    applySql("supabase/migrations/20261125170000_jornada_owner_review_operational_cut_classification.sql");\n    applySql("test/jornada-operational-cut-review-contract.sql");
     applySql("test/jornada-zero-stock-final-skip-contract.sql");
     applySql("test/jornada-sealed-final-inventory-admin-functional.sql");
     log("\\r\\n=== Verify sealed Jornada late-Baja functional behavior (saldo, retry, reservations and master-Turn gate) ===");
