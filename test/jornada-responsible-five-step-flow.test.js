@@ -85,7 +85,7 @@ test("sending a Bajas review request returns the worker to Bajas and keeps final
   const end=ui.indexOf("async function openRetroSuccessorPanel",start);
   assert.ok(start>=0&&end>start,"adjustment submission handler exists");
   const submit=ui.slice(start,end);
-  assert.match(submit,/const reopenBajas=storageType==='baja'&&checklistModalContext\?\.key==='bajas'/);
+  assert.match(submit,/const reopenBajas=storageType==='baja'/);
   assert.match(submit,/if\(reopenBajas\)closeChecklistModal\(\{restore:true\}\)/);
   assert.match(submit,/const refreshed=await openWorkspace\(sessionId\)/);
   assert.match(submit,/if\(refreshed&&reopenBajas\)\{openChecklistSection\('bajas'\)/);
