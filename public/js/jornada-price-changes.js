@@ -44,7 +44,7 @@
   function normalizeProductSearchText(value) {
     return String(value == null ? '' : value)
       .normalize('NFD')
-      .replace(/[\\u0300-\\u036f]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .toLocaleLowerCase()
       .trim();
   }
