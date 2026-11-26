@@ -183,7 +183,27 @@ button[type="submit"]:disabled { opacity: 0.6; cursor: default; transform: none;
   border: 1px solid var(--gold-dim); border-radius: 5px; font-size: 12.5px; cursor: pointer;
 }
 .header-right button:hover { border-color: var(--gold); }
-.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.header-left .bc-active-user {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(220px, 24vw);
+  margin-left: 2px;
+  padding: 4px 10px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 999px;
+  background: var(--stone-2);
+  color: var(--gold-bright);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header-left .bc-active-user:empty { display: none; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; padding: 0; background: var(--stone-2); color: var(--text);
@@ -459,6 +479,12 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     font-size: clamp(16px, 5vw, 20px);
     overflow-wrap: anywhere;
   }
+  .header-left .bc-active-user {
+    max-width: 27vw;
+    margin-left: 0;
+    padding: 4px 7px;
+    font-size: 10.5px;
+  }
   .header-right {
     display: contents;
   }
@@ -471,11 +497,15 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     justify-self: start;
   }
   #user-email {
-    grid-area: user;
-    justify-self: end;
     max-width: 62vw;
-    text-align: right;
+    text-align: left;
     overflow-wrap: anywhere;
+  }
+  .header-left #user-email {
+    max-width: 27vw;
+    margin-left: 0;
+    justify-self: auto;
+    text-align: left;
   }
   #mi-cuenta-btn {
     grid-area: account;

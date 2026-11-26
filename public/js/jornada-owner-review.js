@@ -4,6 +4,18 @@
   const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   const money=v=>v==null?'—':Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
   const qty=v=>v==null?'—':Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:3});
+  const differenceStatus=value=>{
+    if(value==null||!Number.isFinite(Number(value)))return 'No calculable';
+    const n=Number(value);
+    if(n < -0.005){
+      const amount=Math.abs(n);
+      return 'Sobrante '+(Number.isInteger(amount)?amount.toLocaleString('es-ES',{maximumFractionDigits:0}):money(amount))+' CUP';
+    }
+    if(n > 0.005){
+      return 'Faltante '+(Number.isInteger(n)?n.toLocaleString('es-ES',{maximumFractionDigits:0}):money(n))+' CUP';
+    }
+    return 'Cuadrada 0 CUP';
+  };
   const rpc=async(name,args)=>{
     const api=window.client||(typeof client!=='undefined'?client:null);
     if(!api||typeof api.rpc!=='function')throw new Error('Backend no disponible.');
@@ -172,7 +184,7 @@
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
       ['Efectivo esperado (sin salario)',pendingPost?blocked:((l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP')],
-      ['Sobrante / faltante (− sobrante · + faltante)',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
+      ['Resultado de caja',pendingPost?blocked:differenceStatus(l.diferencia)],
       ['Costo documentado',pendingPost?blocked:(qty(l.costos_con_cobertura)+' / '+qty(l.familias_total_costo)+' familias')]
     ];
     const entries=x=>Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0);
@@ -206,6 +218,18 @@
     const movements=!turnClosed&&post.length?'<div class="bcjr-alert"><b>Bajas y mermas registradas después del cierre operativo</b><p>'+esc(post.length)+' bajas/mermas · cantidad total '+esc(qty(post.reduce((v,m)=>v+Number(m.cantidad||0),0)))+' · valor referencial a precio actual '+(postValueKnown?esc(money(postValue)+' CUP'):'incompleto')+'. El valor es orientativo, no un gasto de caja.</p><p>Corte operativo registrado: '+esc(operationalCut)+'. La fecha de aprobación no demuestra cuándo ocurrió la baja; contrasta con la hoja del turno y decide si ocurrió antes o después de este cierre.</p><div class="bcjr-field"><button type="button" class="bcjr-btn" data-bcjr-action="classify-all-before">Marcar todas: antes del cierre</button><button type="button" class="bcjr-btn" data-bcjr-action="classify-all-after">Marcar todas: después del cierre</button></div><div class="bcjr-movement-list">'+
        post.map(m=>'<article class="bcjr-movement-card" data-bcjr-movement-row data-type="'+esc(m.tipo)+'" data-id="'+esc(m.id)+'"><div class="bcjr-movement-title"><b>'+esc(m.tipo)+' · '+esc(m.producto)+'</b><strong>'+esc(qty(m.cantidad))+'</strong></div><div class="bcjr-movement-meta"><span>Registrado: '+esc(m.creado_en?new Date(m.creado_en).toLocaleString():'—')+'</span><span>Aprobado: '+esc(m.fecha_revision?new Date(m.fecha_revision).toLocaleString():'—')+'</span><span>Valor referencial: '+esc(m.valor_estimado==null?'Sin precio':money(m.valor_estimado)+' CUP')+'</span><span>Estado: '+esc(m.estado)+'</span></div><label class="bcjr-movement-decision">¿Cuándo ocurrió respecto al cierre operativo?<select data-bcjr-classification><option value="">Seleccionar momento real…</option><option value="ANTES_CORTE" '+(m.clasificacion==='ANTES_CORTE'?'selected':'')+'>Antes del cierre operativo (se incluye en esta jornada)</option><option value="DESPUES_CORTE" '+(m.clasificacion==='DESPUES_CORTE'?'selected':'')+'>Después del cierre operativo (queda fuera de esta jornada)</option></select></label><small class="bcjr-movement-reason">Motivo registrado: '+esc(m.motivo||'Sin motivo')+(m.comentario_revision?' · '+esc(m.comentario_revision):'')+'</small></article>').join('')+
        '</div><div class="bcjr-field"><label>Motivo general de la clasificación<input type="text" maxlength="500" data-bcjr-movement-comment placeholder="Ej.: conciliado con la hoja manual del 9–10 de noviembre"></label><button type="button" class="bcjr-btn" data-bcjr-action="classify" data-session="'+esc(s.id)+'">Guardar clasificación auditada</button></div></div>':'';
+    const successor = s.successor_reconciliation || null;
+    const successorRows = Array.isArray(successor?.lines) ? successor.lines : [];
+    const successorPanel = successor?.has_reconciliation === true
+      ? '<details class="bcjr-detail" open><summary>Recepción física de la jornada sucesora · conciliación</summary><div class="bcjr-detail-body"><p>Compara el FINAL confirmado de esta jornada con el INICIAL físico que recibió la jornada siguiente. Solo se pueden atribuir diferencias cuando la evidencia coincide y no hubo movimientos registrados de esos productos entre el corte y la recepción.</p><div class="bcjr-table-wrap"><table class="bcjr-table"><thead><tr><th>Producto</th><th>FINAL anterior</th><th>INICIAL recibido</th><th>Diferencia</th><th>Validación</th></tr></thead><tbody>'+
+        successorRows.map(x=>'<tr><td>'+esc(x.producto)+'</td><td>'+esc(qty(x.cantidad_final_anterior))+'</td><td>'+esc(qty(x.cantidad_recibida_sucesora))+'</td><td>'+esc(x.diferencia_unidades==null?'—':qty(x.diferencia_unidades))+'</td><td>'+(x.elegible===true?'<span class="bcjr-pill ok">Sin movimientos</span>':'<span class="bcjr-pill warn">'+esc((x.bloqueos||[]).join(', ')||'Revisión necesaria')+'</span>')+'</td></tr>').join('')+
+        '</tbody></table></div>'+
+        (successor.already_applied===true
+          ? '<p class="bcjr-pill ok">Conciliación aplicada y auditada. Los cortes originales y la recepción permanecen intactos.</p>'
+          : successor.can_apply===true
+            ? '<p class="bcjr-muted">La operación añadirá una superposición auditada al FINAL anterior. No modifica las líneas originales, el INICIAL recibido, la recepción, el stock global ni el catálogo.</p><label>Motivo y fuente de la conciliación<textarea rows="2" maxlength="500" data-bcjr-successor-comment>Conciliación física del FINAL anterior contra el INICIAL recibido por la jornada sucesora; no constan movimientos intermedios de estos productos.</textarea></label><button type="button" class="bcjr-btn primary" data-bcjr-action="apply-successor-reconciliation" data-session="'+esc(s.id)+'">Aplicar conciliación auditada</button>'
+            : '<p class="bcjr-alert"><b>No se puede aplicar automáticamente.</b> '+esc(successor.products_blocked||0)+' producto(s) tienen evidencia incompleta o movimientos intermedios. No se modificó ningún dato.</p>')+'</div></details>'
+      : '';
     const correctionForm=!turnClosed&&negative.length?'<div class="bcjr-alert"><b>Corregir un conteo final equivocado</b><p>Si al cotejar el conteo físico confirmas que la cantidad final se escribió mal, introduce aquí la cantidad correcta. El corte original no se borra: la corrección queda registrada con usuario, fecha y motivo. Si la cantidad física sí es correcta, no la cambies; registra la entrada faltante.</p><div class="bcjr-field">'+negative.map(x=>'<label>'+esc(x.nombre)+' · final guardado '+esc(qty(x.inventario_final))+'<input type="number" min="0" step="0.001" data-bcjr-final-correction data-product="'+esc(x.producto_id)+'" value="'+esc(x.inventario_final)+'"></label>').join('')+'<label>Motivo obligatorio<input type="text" maxlength="500" data-bcjr-final-correction-comment placeholder="Ej.: cotejado con el inventario físico y la hoja del turno"></label><button type="button" class="bcjr-btn primary" data-bcjr-action="correct-final-counts" data-session="'+esc(s.id)+'">Guardar corrección auditada</button></div></div>':'';
     const daily=Array.isArray(s.entregas_diarias)?s.entregas_diarias:[];
     const periodDays=Math.max(1,Number(turn?.dias_turno||1));
@@ -233,7 +257,7 @@
     const cleanProfitLabel=pendingPost?'Pendiente de clasificación':(l.ganancia_limpia==null?'Fórmula pendiente de definir':money(l.ganancia_limpia)+' CUP');
     const profitHighlight='<section class="bcjr-profit-highlight" aria-label="Ganancias de la jornada"><div class="bcjr-profit-gross"><small>Ganancia bruta estimada</small><strong>'+esc(grossProfitLabel)+'</strong></div><div class="bcjr-profit-clean"><small>Ganancia limpia</small><b>'+esc(cleanProfitLabel)+'</b></div></section>';
     const financePanel='<details class="bcjr-detail"><summary>Liquidación y desglose financiero</summary><div class="bcjr-detail-body">'+profitHighlight+'<div class="bcjr-cards">'+cards.map(x=>card(x[0],x[1])).join('')+'</div><p class="bcjr-muted">Efectivo esperado (sin salario) = ventas − gastos aprobados − reinversiones aprobadas. El salario se acumula en CuevaCoin y se paga por separado. Convención de caja unificada con la hoja de cuadre: negativo = sobrante; positivo = faltante.</p></div></details>';
-    return '<section class="bcjr-session"><h3>'+esc(periodTitle)+(rectifications.length?' · RECTIFICACIÓN AUDITADA':'')+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · '+esc(isRetail?'efectivo diario aprobado':'efectivo físico')+' '+esc(money(isRetail?l.dinero_recogido_total:s.efectivo?.contado))+' CUP · '+esc((isRetail?l.estado_dinero_final:s.efectivo?.estado)||'sin conteo')+'</p>'+dailyCash+rectificationPanel+financePanel+warningsPanel+correctionPanel+movementPanel+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+('Productos en los cortes · '+(lines.length?esc(lines.length):'Pendiente de cortes de inventario confirmados'))+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?tableSwitch+table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details></section>';
+    return '<section class="bcjr-session"><h3>'+esc(periodTitle)+(rectifications.length?' · RECTIFICACIÓN AUDITADA':'')+'</h3><p class="bcjr-muted">Estado de la sesión: '+esc(s.estado)+' · '+esc(isRetail?'efectivo diario aprobado':'efectivo físico')+' '+esc(money(isRetail?l.dinero_recogido_total:s.efectivo?.contado))+' CUP · '+esc((isRetail?l.estado_dinero_final:s.efectivo?.estado)||'sin conteo')+'</p>'+dailyCash+rectificationPanel+financePanel+warningsPanel+correctionPanel+movementPanel+successorPanel+'<details class="bcjr-inventory"><summary><span>Ver inventario y liquidación por producto</span><small>'+('Productos en los cortes · '+(lines.length?esc(lines.length):'Pendiente de cortes de inventario confirmados'))+'</small></summary><div class="bcjr-inventory-body">'+(lines.length?tableSwitch+table:'<p class="bcjr-muted">Todavía no hay líneas físicas de inventario confirmadas. Comprueba los cortes inicial y final para mostrar la tabla por producto.</p>')+'</div></details></section>';
   }
   function render(data){
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
@@ -255,7 +279,7 @@
       card('Estado',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
       card('Ventas estimadas',sessions.length&&sessions.every(s=>s.liquidacion?.ventas_estimadas!=null)?money(totalSales)+' CUP':'Pendiente'),
       card('Efectivo total recogido',cashLabel),
-      card('Sobrante / faltante (− sobrante · + faltante)',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?money(totalDifference)+' CUP':'Pendiente')
+      card('Resultado de caja',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?differenceStatus(totalDifference):'Pendiente')
     ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{
@@ -282,8 +306,17 @@
     document.getElementById('bcjr-title').textContent='Revisión integral del turno';
     document.getElementById('bcjr-subtitle').textContent='Recuperando liquidación…';
     document.getElementById('bcjr-content').innerHTML='<p>Consultando inventario, ventas, costos, efectivo y movimientos…</p>';
-    try{const data=await rpc('bc7_obtener_revision_jornada_rectificada',{p_turno_id:turnId});render(data);return true;}
-    catch(e){document.getElementById('bcjr-content').innerHTML='<div class="bcjr-alert">'+esc(e.message||e)+'</div>';document.getElementById('bcjr-message').textContent='No se pudo cargar el expediente.';return false;}
+    try{
+      const data=await rpc('bc7_obtener_revision_jornada_rectificada',{p_turno_id:turnId});
+      const sessions=Array.isArray(data.sesiones)?data.sesiones:[];
+      const previews=await Promise.all(sessions.map(async session=>{
+        if(session.estado!=='COMPLETADA')return null;
+        try{return await rpc('bc7_previsualizar_reconciliacion_final_sucesora',{p_sesion_origen_id:session.id});}
+        catch(error){console.warn('[BattleCruiser] No se pudo revisar la recepción sucesora',error);return null;}
+      }));
+      sessions.forEach((session,index)=>{session.successor_reconciliation=previews[index];});
+      render(data);return true;
+    }catch(e){document.getElementById('bcjr-content').innerHTML='<div class="bcjr-alert">'+esc(e.message||e)+'</div>';document.getElementById('bcjr-message').textContent='No se pudo cargar el expediente.';return false;}
   }
   function close(){const m=document.getElementById('bc-jornada-review-modal');if(m)m.hidden=true;document.querySelector('.bcjr-values-modal')?.remove();document.body.classList.remove('bc-jornada-review-open');}
   function openValuesEditor(button){
@@ -502,6 +535,30 @@
     if(t.hasAttribute('data-bcjr-count-save')){await saveCountEditor(t);return;}
     const action=t.dataset.bcjrAction;
     if(busy)return;
+    if(action==='apply-successor-reconciliation'){
+      const section=t.closest('.bcjr-session');
+      const comment=(section?.querySelector('[data-bcjr-successor-comment]')?.value||'').trim();
+      if(comment.length<5||comment.length>500){
+        document.getElementById('bcjr-message').textContent='Explica la fuente física de la conciliación (5–500 caracteres).';
+        return;
+      }
+      if(!confirm('Se añadirá una corrección auditada al FINAL histórico de esta jornada para los productos sin movimientos intermedios. Los cortes originales, la recepción de la jornada sucesora, el stock global y el catálogo no se modificarán. ¿Confirmas?'))return;
+      await run(async()=>{
+        const key=window.crypto&&typeof window.crypto.randomUUID==='function'
+          ?window.crypto.randomUUID()
+          :String(Date.now())+'-'+Math.random().toString(16).slice(2);
+        const result=await rpc('bc7_aplicar_reconciliacion_final_sucesora',{
+          p_sesion_origen_id:t.dataset.session,
+          p_comentario:comment,
+          p_idempotency_key:key
+        });
+        if(!result||result.ok!==true)throw new Error('El servidor no confirmó la conciliación.');
+        await openReview(activeTurnId);
+        if(typeof window.refrescarAprobacionesAdmin==='function')await window.refrescarAprobacionesAdmin();
+        if(typeof window.refrescarCentroControl==='function')await window.refrescarCentroControl();
+      });
+      return;
+    }
     if(action==='correct-final-counts'){
       const section=t.closest('.bcjr-session');
       const comment=(section?.querySelector('[data-bcjr-final-correction-comment]')?.value||'').trim();
