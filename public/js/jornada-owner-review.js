@@ -4,6 +4,18 @@
   const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   const money=v=>v==null?'—':Number(v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
   const qty=v=>v==null?'—':Number(v||0).toLocaleString('es-ES',{maximumFractionDigits:3});
+  const differenceStatus=value=>{
+    if(value==null||!Number.isFinite(Number(value)))return 'No calculable';
+    const n=Number(value);
+    if(n < -0.005){
+      const amount=Math.abs(n);
+      return 'Sobrante '+(Number.isInteger(amount)?amount.toLocaleString('es-ES',{maximumFractionDigits:0}):money(amount))+' CUP';
+    }
+    if(n > 0.005){
+      return 'Faltante '+(Number.isInteger(n)?n.toLocaleString('es-ES',{maximumFractionDigits:0}):money(n))+' CUP';
+    }
+    return 'Cuadrada 0 CUP';
+  };
   const rpc=async(name,args)=>{
     const api=window.client||(typeof client!=='undefined'?client:null);
     if(!api||typeof api.rpc!=='function')throw new Error('Backend no disponible.');
@@ -172,7 +184,7 @@
       ['Gastos aprobados',money(l.gastos_aprobados)+' CUP'],
       ['Reinversiones',money(l.reinversiones_aprobadas)+' CUP'],
       ['Efectivo esperado (sin salario)',pendingPost?blocked:((l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)==null?'No calculable':money(l.efectivo_esperado_despues_de_gastos_reinversiones??l.efectivo_esperado_despues_de_gastos_reinversiones_salario)+' CUP')],
-      ['Sobrante / faltante (− sobrante · + faltante)',pendingPost?blocked:(l.diferencia==null?'No calculable':money(l.diferencia)+' CUP')],
+      ['Resultado de caja',pendingPost?blocked:differenceStatus(l.diferencia)],
       ['Costo documentado',pendingPost?blocked:(qty(l.costos_con_cobertura)+' / '+qty(l.familias_total_costo)+' familias')]
     ];
     const entries=x=>Number(x.transferencias_entrada||0)+Number(x.compras||0)+Number(x.reinversiones_entrada||0);
@@ -267,7 +279,7 @@
       card('Estado',turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO'?'APROBADO':'PENDIENTE DE REVISIÓN'),
       card('Ventas estimadas',sessions.length&&sessions.every(s=>s.liquidacion?.ventas_estimadas!=null)?money(totalSales)+' CUP':'Pendiente'),
       card('Efectivo total recogido',cashLabel),
-      card('Sobrante / faltante (− sobrante · + faltante)',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?money(totalDifference)+' CUP':'Pendiente')
+      card('Resultado de caja',sessions.length&&sessions.every(s=>s.liquidacion?.diferencia!=null)?differenceStatus(totalDifference):'Pendiente')
     ].join('')+'</div>'+sessions.map(s=>sessionHtml(s,turn)).join('');
     const blockers=[];
     sessions.forEach(s=>{
