@@ -541,15 +541,18 @@ function mostrarInfoUsuarioEnHeader() {
     el.textContent = "Cargando usuario…";
     return;
   }
+  var rol = _usuarioActual.rol ? String(_usuarioActual.rol).trim().toLowerCase() : "";
+  if (rol === "dueño" || rol === "dueno" || rol === "admin" || rol === "administrador") {
+    el.textContent = "Admin";
+    return;
+  }
   var nombre = _usuarioActual.nombre ? String(_usuarioActual.nombre).trim() : "";
   if (nombre && !esIdentidadInternaOTemporal(nombre)) {
-    var rol = _usuarioActual.rol ? " · " + _usuarioActual.rol : "";
-    el.textContent = nombre + rol;
+    el.textContent = nombre;
     return;
   }
   if (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa) {
-    var rolSolo = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
-    el.textContent = rolSolo;
+    el.textContent = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
     return;
   }
   if (typeof _permisosCargaFallidaRed !== "undefined" && _permisosCargaFallidaRed) {
@@ -560,8 +563,7 @@ function mostrarInfoUsuarioEnHeader() {
     el.textContent = "Sin permisos cargados — reintentá";
     return;
   }
-  var rolFallback = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
-  el.textContent = rolFallback;
+  el.textContent = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
 }
 
 try {
