@@ -434,6 +434,9 @@ function applySql(file) {
     log("\\r\\n=== Apply per-dependent warehouse salary configuration and verify temporary, permanent and snapshot contracts ===");
     applySql("supabase/migrations/20261125224135_warehouse_dependent_salary_configuration.sql");
     applySql("test/warehouse-dependent-salary-config-contract.sql");
+    log("\\r\\n=== Apply owner-only successor-receipt reconciliation and verify cut, receipt, audit and ACL invariants ===");
+    applySql("supabase/migrations/20261126120000_jornada_successor_receipt_safe_reconciliation.sql");
+    applySql("test/jornada-successor-receipt-safe-reconciliation-contract.sql");
     log("\\r\\nPASS Jornada period rescheduling: overlapping shifts, conflicts, inventory/activity freeze, audit, idempotency and RBAC.");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with daily cash approvals as retail verification and no second Owner count.");
   } catch (error) {
