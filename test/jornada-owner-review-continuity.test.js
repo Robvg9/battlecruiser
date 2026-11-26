@@ -116,7 +116,7 @@ test("Post-cutoff classification controls remain visible and usable on mobile wi
   assert.match(REVIEW,/Después del cierre operativo/);
   assert.match(REVIEW,/Guardar clasificación auditada/);
   assert.match(REVIEW,/Corte operativo registrado/);
-  assert.match(REVIEW,/pendingPostCount=Math.max/);
+  assert.match(REVIEW,/countPendingPostMovements/);
   assert.doesNotMatch(REVIEW,/bcjr-movement-list.*<table/);
 });
 
@@ -151,7 +151,7 @@ test("Unclassified post-cutoff movements preserve physical stock and block deriv
   assert.match(REVIEW,/El inventario físico sí está disponible/);
   assert.match(REVIEW,/Pendiente de clasificación/);
   assert.match(REVIEW,/Inventario inicial/);
-  assert.match(REVIEW,/hasPendingPost/);
+  assert.match(REVIEW,/countPendingPostMovements/);
   assert.match(REVIEW,/<details class="bcjr-inventory"><summary>/);
 });
 

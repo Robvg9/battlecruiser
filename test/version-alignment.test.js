@@ -147,8 +147,8 @@ test('movement operations load multi-product transfer before the compact modal',
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(app.includes('["permisos-navegacion.js","67.9"]'));
   assert.ok(sw.includes("./js/permisos-navegacion.js?v=67.9"));
-  assert.ok(app.includes('const VERSION="9.5.167"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.167"'));
+  assert.ok(app.includes('const VERSION="9.5.168"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.168"'));
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
@@ -164,7 +164,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.167"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.168"'));
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261105\.4/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.2/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -204,10 +204,10 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.ok(app.includes("// v9.5.167 — Keep active identity visible; propagate audited successor INITIAL corrections; hide resolved post-cut alerts."));
-  assert.ok(index.includes('<script src="app.js?v=9.5.167"></script>'));
+  assert.ok(app.includes("// v9.5.168 — derive post-cut blockers from audited movement rows; preserve successor handover continuity."));
+  assert.ok(index.includes('<script src="app.js?v=9.5.168"></script>'));
   for (const asset of [
-    'style.css?v=9.5.167',
+    'style.css?v=9.5.168',
     'js/centro-control.js?v=9.5.71',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.139',
@@ -238,7 +238,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(config, /cfg-backend-probe-note/);
   assert.match(config, /await sondearBackend\(\)/);
   assert.match(config, /no incluye credenciales ni tokens/);
-  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.167');"));
+  assert.ok(m68.includes("const VER = String(window.__BC_VERSION__ || '9.5.168');"));
 });
 
 
@@ -248,7 +248,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
   assert.ok(sw.includes("./js/venta-turno-ui.js?v=9.4.46"));
   assert.ok(sw.includes("./js/m27-6b-venta-payload-pres.js?v=27.6b2"));
   assert.ok(sw.includes("./js/ventas.js?v=20261105.2"));
-  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.167"));
+  assert.ok(sw.includes("./js/m68-ventas-pos-definitivo.js?v=9.5.168"));
   assert.ok(index.includes('id="venta-metodo-pago"'));
   assert.ok(index.includes('id="venta-jornada-payment-wrap"'));
 });
@@ -290,16 +290,16 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.13"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.13/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.ok(app.includes('const VERSION="9.5.167"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.167"'));
+  assert.ok(app.includes('const VERSION="9.5.168"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.168"'));
 });
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.167'));
-  assert.ok(index.includes('app.js?v=9.5.167'));
-  assert.ok(sw.includes('./style.css?v=9.5.167'));
-  assert.ok(sw.includes('./app.js?v=9.5.167'));
+  assert.ok(index.includes('style.css?v=9.5.168'));
+  assert.ok(index.includes('app.js?v=9.5.168'));
+  assert.ok(sw.includes('./style.css?v=9.5.168'));
+  assert.ok(sw.includes('./app.js?v=9.5.168'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });

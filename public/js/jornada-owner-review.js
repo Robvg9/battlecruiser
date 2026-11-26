@@ -1,5 +1,5 @@
 /* BattleCruiser — revisión integral de jornadas, Owner-only · daily approvals are retail cash proof */
-// v1.20 — hide post-cut movement cards as soon as every movement has an audited classification.
+// v1.21 — use audited movement rows as authority for resolved post-cut blockers.
 (function(){
   'use strict';
   const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
@@ -168,13 +168,22 @@
   }
   function fmtDate(value){if(!value)return '—';try{return new Date(value+'T12:00:00').toLocaleDateString('es-ES')}catch(_){return String(value)}}
   function card(label,value){return '<div class="bcjr-card"><small>'+esc(label)+'</small><b>'+esc(value==null?'Pendiente':value)+'</b></div>'}
+  function countPendingPostMovements(liquidacion){
+    const l=liquidacion||{};
+    const post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:null;
+    // When the RPC supplies movement rows, their audited classifications are authoritative.
+    // Summary counters can be stale during the refresh immediately after saving a classification.
+    if(post&&post.length>0)return post.filter(m=>!String(m.clasificacion||'').trim()).length;
+    const pending=l.pendientes||{};
+    return Math.max(0,Number(l.movimientos_posteriores_pendientes)||0,Number(pending.movimientos_posteriores_corte)||0,post?post.length:0);
+  }
   function sessionHtml(s,turn){
     const l=s.liquidacion||{},lines=Array.isArray(l.lineas)?l.lineas:[];
     const rectifications=Array.isArray(l.rectificaciones_post_cierre)?l.rectificaciones_post_cierre:[];
     const turnClosed=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';
     const pending=l.pendientes||{},post=Array.isArray(l.movimientos_posteriores_corte)?l.movimientos_posteriores_corte:[];
     const pendingPostRows=post.filter(m=>!String(m.clasificacion||'').trim());
-    const pendingPostCount=Math.max(0,Number(l.movimientos_posteriores_pendientes)||0,Number(pending.movimientos_posteriores_corte)||0,pendingPostRows.length);
+    const pendingPostCount=countPendingPostMovements(l);
     const pendingPost=pendingPostCount>0;
     const blocked='Pendiente de clasificación';
     const cards=[
@@ -265,7 +274,6 @@
     report=data;const modal=ensure(),turn=data.turno||{},sessions=Array.isArray(data.sesiones)?data.sesiones:[];
     const sub=document.getElementById('bcjr-subtitle');if(sub)sub.textContent=(turn.almacen_nombre||'Almacén')+' · '+fmtDate(turn.fecha)+' – '+fmtDate(sessions.reduce((latest,x)=>!latest||String(x.fecha_fin||x.fecha)>String(latest)?(x.fecha_fin||x.fecha):latest,null)||turn.fecha)+' · '+String(turn.dias_turno||1)+' día(s) · PENDIENTE DE REVISIÓN';
     const body=document.getElementById('bcjr-content');
-    const hasPendingPost=sessions.some(s=>Number(s.liquidacion?.movimientos_posteriores_pendientes??s.liquidacion?.pendientes?.movimientos_posteriores_corte??s.liquidacion?.movimientos_posteriores_corte?.length??0)>0);
     const grossProfit=sessions.reduce((v,s)=>v+Number(s.liquidacion?.ganancia_bruta_parcial||0),0);
     const costOfSales=sessions.reduce((v,s)=>v+(s.liquidacion?.lineas||[]).reduce((w,x)=>w+Number(x.costo_vendido_estimado||0),0),0);
     const completedSessions=sessions.filter(s=>s.estado==='COMPLETADA');
@@ -288,7 +296,7 @@
       const l=s.liquidacion||{};
       if(!['COMPLETADA','CANCELADA','CERRADA_OPERATIVAMENTE'].includes(s.estado))blockers.push('Jornada '+fmtDate(s.fecha)+': todavía está operativamente abierta.');
       if(['COMPLETADA','CERRADA_OPERATIVAMENTE'].includes(s.estado)&&l.calculable!==true)blockers.push('Jornada '+fmtDate(s.fecha)+': liquidación todavía no calculable');
-      const pendingPostCount=Number(l.movimientos_posteriores_pendientes??l.pendientes?.movimientos_posteriores_corte??l.movimientos_posteriores_corte?.length??0);
+      const pendingPostCount=countPendingPostMovements(l);
       if(pendingPostCount>0)blockers.push('Jornada '+fmtDate(s.fecha)+': '+pendingPostCount+' movimientos posteriores sin clasificar');
     });
     const approved=turn.estado_maestro==='CERRADO'||turn.estado==='CERRADO';

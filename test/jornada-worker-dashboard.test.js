@@ -77,12 +77,12 @@ test("worker dashboard and owner review release versions are aligned with the pr
   assert.match(app, /\["permisos-navegacion\.js","67\.9"\]/);
   assert.match(serviceWorker, /permisos-navegacion\.js\?v=67\.9/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.68"\]/);
-  assert.match(app, /\["jornada-owner-review\.js","1.20"\]/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.167"/);
+  assert.match(app, /\["jornada-owner-review\.js","1.21"\]/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.168"/);
   assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.68/);
-  assert.match(serviceWorker, /jornada-owner-review\.js\?v=1.20/);
-  assert.match(index, /style\.css\?v=9\.5\.167/);
-  assert.match(index, /app\.js\?v=9\.5\.167/);
+  assert.match(serviceWorker, /jornada-owner-review\.js\?v=1.21/);
+  assert.match(index, /style\.css\?v=9\.5\.168/);
+  assert.match(index, /app\.js\?v=9\.5\.168/);
 });
 
 test("Mis jornadas shows an explicit state while session and calendar startup are pending or failing", () => {
@@ -145,7 +145,7 @@ test("dependienta home route stays visible and shows a startup state before BC7 
 test("owner review never says there are no blockers while calculation is still incomplete", () => {
   assert.match(ownerReview, /Liquidación calculable · sin bloqueos/);
   assert.match(ownerReview, /Liquidación todavía no calculable/);
-  assert.match(ownerReview, /pendingPostCount=Math\.max/);
+  assert.match(ownerReview, /countPendingPostMovements/);
   assert.match(ownerReview, /movimientos posteriores sin clasificar/);
   assert.doesNotMatch(ownerReview, /Sin bloqueos de cálculo/);
 });
