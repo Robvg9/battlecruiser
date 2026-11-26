@@ -104,17 +104,27 @@ test("PWA loader: direct HTML module versions agree with the app registry", () =
     "existing scripts must be matched by exact pathname, not substring");
 });
 
-test("PWA loader: UI_READY waits for actual module load attempts and reports degraded loads", () => {
+test("PWA loader: critical modules unblock the shell while supporting modules continue in order", () => {
   assert.doesNotMatch(app, /setTimeout\(terminarBootUI,\s*1500\)/,
-    "UI_READY must not be resolved by an optimistic 1.5 second timer");
-  assert.match(app, /Promise\.all\(pendientes\)\.then\(terminarBootUI\)/,
-    "UI_READY must wait for module load attempts");
+    "UI_READY must not be resolved by an optimistic timer");
+  assert.match(app, /const CORE_MODULE_COUNT=23/,
+    "the core shell dependency boundary must be explicit");
+  assert.match(app, /const coreEntries=modules\.slice\(0,CORE_MODULE_COUNT\)/,
+    "core modules must remain the first ordered module group");
+  assert.match(app, /const backgroundEntries=modules\.slice\(CORE_MODULE_COUNT\)/,
+    "supporting modules must load after the core readiness gate");
+  assert.match(app, /Promise\.all\(pendingCore\)\.then\(terminarBootUI\)/,
+    "the authenticated shell must wait for the core modules");
+  assert.match(app, /__BC_BACKGROUND_MODULES_READY__/,
+    "background completion must remain observable");
+  assert.match(app, /bc:background-modules-ready/,
+    "the application must publish background module completion");
+  assert.match(app, /Promise\.all\(\[window\.__BC_UI_READY__,window\.__BC_BACKGROUND_MODULES_READY__\]\)/,
+    "old release caches must not be pruned before all supporting modules finish");
   assert.match(app, /__BC_MODULE_LOAD_STATE__/,
     "module readiness diagnostics must be available to the application");
-  assert.match(app, /status:failed\|\|timedOut\?"degraded":"ready"/,
-    "failed or timed-out modules must produce an explicit degraded state");
   assert.match(app, /__BC_UI_READY_DEGRADED__/,
-    "the degraded readiness state must be externally observable");
+    "critical readiness degradation must remain externally observable");
 });
 
 test("Jornada: operation-only RPCs load on demand and keep retry available", () => {
