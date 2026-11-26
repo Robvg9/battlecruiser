@@ -9,7 +9,7 @@ DECLARE
   v_oid oid;
   v_definition text;
   v_updated text;
-  v_pattern text := 'v_s\\.estado\\s*<>\\s*''COMPLETADA''';
+  v_pattern text := 'v_s[.]estado[[:space:]]*<>[[:space:]]*''COMPLETADA''';
 BEGIN
   SELECT p.oid,pg_get_functiondef(p.oid)
     INTO v_oid,v_definition
@@ -39,7 +39,7 @@ BEGIN
       'v_s.estado NOT IN (''COMPLETADA'',''EN_CURSO'',''CERRADA_OPERATIVAMENTE'')'
     );
   ELSE
-    v_pattern := 'v_s\\.estado\\s*!=\\s*''COMPLETADA''';
+    v_pattern := 'v_s[.]estado[[:space:]]*!=[[:space:]]*''COMPLETADA''';
     IF regexp_count(v_definition,v_pattern)<>1 THEN
       RAISE EXCEPTION 'No se encontró exactamente una guarda de estado COMPLETADA en la función FINAL.';
     END IF;
