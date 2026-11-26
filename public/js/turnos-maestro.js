@@ -575,6 +575,7 @@ function money(v) {
         const obs = (document.getElementById('tm-apr-obs') || {}).value || null;
         try {
           await API().aprobarTurno(turnoId, obs);
+          window.dispatchEvent(new CustomEvent('bc:jornada-aprobada', { detail: { turnoId: turnoId } }));
           closeModal();
           msg('✓ Turno aprobado / cerrado.', true);
           await openTurno(turnoId, false);
