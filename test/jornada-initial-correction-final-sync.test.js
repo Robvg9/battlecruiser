@@ -46,7 +46,9 @@ test("the initial correction RPC invokes predecessor synchronization and reports
   assert.match(rpc, /bc7_sync_previous_final_from_successor_initial\(\s*v_s\.id,v_product_id,v_new_qty,auth\.uid\(\)/);
   assert.match(rpc, /finales_anteriores_sincronizados',v_final_syncs/);
   assert.match(rpc, /finales_anteriores_requieren_revision',v_final_sync_blocked/);
-  assert.match(rpc, /JORNADA_FINAL_RECTIFICADO_DESDE_INICIAL_SUCESOR/);
+  assert.match(helper, /JORNADA_FINAL_RECTIFICADO_DESDE_INICIAL_SUCESOR/);
+  assert.match(rpc, /finales_anteriores_no_sincronizados',v_final_sync_skipped/);
+  assert.match(rpc, /finales_anteriores_ya_alineados',v_final_sync_aligned/);
 });
 
 test("a blocked propagation writes continuity evidence on both jornadas instead of silently changing the predecessor", () => {
