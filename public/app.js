@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.164 — Fast authenticated shell; supporting modules continue loading in order.
+// v9.5.165 — Active-user name takes priority for every role; supporting modules continue loading in order.
 (function hotfixV9475(){
-  const VERSION="9.5.164";
+  const VERSION="9.5.165";
   window.__BC_VERSION__=VERSION;
   document.addEventListener("wheel",function(event){var input=event.target&&event.target.closest?event.target.closest("input[type=number]"):null;if(input)event.preventDefault();},{capture:true,passive:false});
   function aplicarVersion(){
