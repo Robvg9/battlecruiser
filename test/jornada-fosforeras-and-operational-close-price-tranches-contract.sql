@@ -45,6 +45,13 @@ BEGIN
     RAISE EXCEPTION 'FAIL: historical price-tranche table must retain RLS.';
   END IF;
 
-  RAISE NOTICE 'PASS Jornada Fosforeras restore + operationally closed historical price-tranche Admin correction; exact units, master-Turn freeze, ACL and RLS preserved.';
+  IF position('jsonb_array_length(p_tramos)<1' IN v_price_function)=0
+     OR position('Indica entre uno y treinta tramos.' IN v_price_function)=0
+     OR position('jsonb_array_length(p_tramos)<2' IN v_price_function)>0
+     OR position('Indica entre dos y treinta tramos.' IN v_price_function)>0 THEN
+    RAISE EXCEPTION 'FAIL: an Owner must be able to record a single real price tranche while the backend still validates the array.';
+  END IF;
+
+  RAISE NOTICE 'PASS Jornada single-price tranche + operational close Admin correction; exact units, master-Turn freeze, ACL and RLS preserved.';
 END
 $test$;
