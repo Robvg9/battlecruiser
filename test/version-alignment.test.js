@@ -86,7 +86,7 @@ test('M74 keeps Ventas navigable and applies the session guard inside the panel'
   assert.ok(app.includes('["hotfix-turno-forceclose-20260902.js","20261030.1"]'), 'the overdue-turn recovery control must load after M33');
   assert.ok(sw.includes("./js/hotfix-turno-forceclose-20260902.js?v=20261030.1"), 'the recovery control must be available in the offline shell');
   assert.ok(app.includes('["m74-pos-archive-retail.js","74.6"]'), 'M74 must load after the existing modules');
-  assert.ok(app.includes('["turno-api.js","9.4.9"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
+  assert.ok(app.includes('["turno-api.js","9.4.8"]'), 'the turn API cache key must invalidate the new recovery RPC wrapper');
   assert.ok(app.includes('["m33-turnos-final.js","33.21"]'), 'the turn detail modal cache key must load the audited recovery action');
   assert.ok(app.includes('["m29-turnos-organizacion.js","29.22"]'), 'M29 full-day default flow must be loaded dynamically');
   assert.ok(sw.includes("./js/m29-turnos-organizacion.js?v=29.22"), 'M29 full-day default flow must be available offline');
@@ -255,7 +255,7 @@ test("Jornada POS payments, exact session provenance and offline queue are versi
 
 test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precache offline", () => {
   const assets = [
-    "./js/turno-api.js?v=9.4.9",
+    "./js/turno-api.js?v=9.4.8",
     "./js/turnos-maestro.js?v=9.4.9",
     "./js/m29-turnos-organizacion.js?v=29.22",
     "./js/m33-turnos-final.js?v=33.21",
@@ -270,7 +270,7 @@ test("Paso 4 Turnos: el archivo y sus dependencias críticas están en el precac
   ];
   for (const asset of assets) assert.ok(sw.includes(asset), "faltó el precache offline de " + asset);
   for (const key of [
-    '["turno-api.js","9.4.9"]',
+    '["turno-api.js","9.4.8"]',
     '["turnos-maestro.js","9.4.9"]',
     '["m29-turnos-organizacion.js","29.22"]',
     '["m33-turnos-final.js","33.21"]',
