@@ -78,11 +78,11 @@ test("worker dashboard and owner review release versions are aligned with the pr
   assert.match(serviceWorker, /permisos-navegacion\.js\?v=67\.9/);
   assert.match(app, /\["bc7-jornada-ui\.js","7\.68"\]/);
   assert.match(app, /\["jornada-owner-review\.js","1.20"\]/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.166"/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.167"/);
   assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.68/);
   assert.match(serviceWorker, /jornada-owner-review\.js\?v=1.20/);
-  assert.match(index, /style\.css\?v=9\.5\.166/);
-  assert.match(index, /app\.js\?v=9\.5\.166/);
+  assert.match(index, /style\.css\?v=9\.5\.167/);
+  assert.match(index, /app\.js\?v=9\.5\.167/);
 });
 
 test("Mis jornadas shows an explicit state while session and calendar startup are pending or failing", () => {
