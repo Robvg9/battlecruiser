@@ -542,23 +542,23 @@ function mostrarInfoUsuarioEnHeader() {
     return;
   }
 
-  // The role is returned by perfil_usuario_actual() for this authenticated session.
-  // Owner accounts are intentionally displayed as the short operational label "Admin".
+  // The name is the primary identity for every signed-in account, including the Owner.
+  // The role remains available in the tooltip; "Admin" is only a fallback when no name exists.
   var rol = _usuarioActual.rol ? String(_usuarioActual.rol).trim() : "";
   var rolNormalizado = rol.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  if (rolNormalizado === "dueno" || rolNormalizado === "admin" ||
-      rolNormalizado === "administrador" || rolNormalizado === "owner") {
-    el.textContent = "Admin";
-    el.title = "Usuario activo: Admin";
-    return;
-  }
-
+  var esRolAdmin = rolNormalizado === "dueno" || rolNormalizado === "admin" ||
+    rolNormalizado === "administrador" || rolNormalizado === "owner";
   var nombre = _usuarioActual.nombre ? String(_usuarioActual.nombre).trim() : "";
   if (nombre && !esIdentidadInternaOTemporal(nombre)) {
-    // The compact header uses the first given name (Sheyla, Adriana, etc.).
+    // The compact header uses the first given name (Roberto, Sheyla, Adriana, etc.).
     var nombreCorto = nombre.split(/\s+/)[0];
     el.textContent = nombreCorto;
-    el.title = "Usuario activo: " + nombre;
+    el.title = "Usuario activo: " + nombre + (esRolAdmin ? " · Admin" : (rol ? " · " + rol : ""));
+    return;
+  }
+  if (esRolAdmin) {
+    el.textContent = "Admin";
+    el.title = "Usuario activo: Admin";
     return;
   }
   if (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa) {
