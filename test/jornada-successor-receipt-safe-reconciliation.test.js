@@ -30,7 +30,8 @@ test("the preview checks product-family movements across the real cutoff-to-rece
   assert.match(migration,/coalesce\(mp\.producto_padre_id,mp\.id\) = v_item\.familia_id/);
   assert.match(migration,/'MOVIMIENTO_DEL_PRODUCTO_EN_INTERVALO'/);
   assert.match(migration,/'CANTIDADES_DE_EVIDENCIA_NO_COINCIDEN'/);
-  assert.match(migration,/other_delivery\.destino_sesion_id IS DISTINCT FROM v_source\.id/);
+  assert.match(migration,/other_delivery\.destino_sesion_id = v_source\.id/);
+  assert.match(migration,/opening_cut\.origen_corte_id = other_delivery\.origen_corte_id/);
   assert.match(migration,/inherited_final\.turno_sesion_id = ic\.turno_sesion_id/);
   assert.match(migration,/opening_cut\.origen_corte_id/);
 
