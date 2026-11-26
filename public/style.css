@@ -497,11 +497,15 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
     justify-self: start;
   }
   #user-email {
-    grid-area: user;
-    justify-self: end;
     max-width: 62vw;
-    text-align: right;
+    text-align: left;
     overflow-wrap: anywhere;
+  }
+  .header-left #user-email {
+    max-width: 27vw;
+    margin-left: 0;
+    justify-self: auto;
+    text-align: left;
   }
   #mi-cuenta-btn {
     grid-area: account;
