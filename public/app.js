@@ -302,20 +302,25 @@
     // original registry order, without blocking login or the first dashboard paint.
     const backgroundEntries=modules.slice(CORE_MODULE_COUNT);
     const backgroundPromises=backgroundEntries.map(([name,version])=>cargarUno(name,version));
-    Promise.all(backgroundPromises).then(backgroundResults=>{
+    function terminarCargaComplementaria(backgroundResults){
       const complete=moduleSummary(safeCore,backgroundResults,false);
-      complete.headerActions=summary.headerActions;
+      // Supporting modules may decorate the header after the core shell is ready.
+      // Restore its icon-only contract once every dynamic module has settled.
+      try {
+        complete.headerActions=normalizarAccionesHeader();
+      } catch(error) {
+        complete.headerActions={error:String(error&&error.message||error)};
+        console.error("[BattleCruiser] No se pudieron normalizar los iconos tras la carga complementaria:",error);
+        if(complete.status==="ready")complete.status="degraded";
+      }
       window.__BC_MODULE_LOAD_STATE__=complete;
-      window.__BC_UI_READY_DEGRADED__=coreFailed;
+      window.__BC_UI_READY_DEGRADED__=coreFailed||complete.status==="degraded";
       window.dispatchEvent(new Event("bc:background-modules-ready"));
       resolveBackgroundModules(complete);
-    }).catch(error=>{
+    }
+    Promise.all(backgroundPromises).then(terminarCargaComplementaria).catch(error=>{
       const failed=[{name:"background-module-loader",status:"failed",reason:String(error&&error.message||error)}];
-      const complete=moduleSummary(safeCore,failed,false);
-      complete.headerActions=summary.headerActions;
-      window.__BC_MODULE_LOAD_STATE__=complete;
-      window.dispatchEvent(new Event("bc:background-modules-ready"));
-      resolveBackgroundModules(complete);
+      terminarCargaComplementaria(failed);
     });
   }
 
