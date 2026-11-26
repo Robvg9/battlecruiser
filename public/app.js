@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.167 — Hide resolved post-cut classifications from the integral Jornada review.
+// v9.5.167 — Keep active identity visible; propagate audited successor INITIAL corrections; hide resolved post-cut alerts.
 (function hotfixV9475(){
   const VERSION="9.5.167";
   window.__BC_VERSION__=VERSION;
