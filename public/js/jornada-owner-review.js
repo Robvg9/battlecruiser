@@ -343,7 +343,7 @@
   function openTranchesEditor(button){
     document.querySelector('.bcjr-values-modal')?.remove();
     const box=document.createElement('div');box.className='bcjr-values-modal';
-    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Precios por tramos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Un renglón por precio real: cantidad x precio. Las cantidades deben sumar exactamente '+esc(button.dataset.sold)+' unidades vendidas. Solo afecta esta jornada.</p><label>Tramos (cantidad x precio CUP), uno por línea<textarea rows="5" data-bcjr-tranches placeholder="12 x 50&#10;4 x 60"></textarea></label><label>Fuente de verificación<textarea rows="2" maxlength="500" data-bcjr-tranches-reason placeholder="Ej.: conciliado con Excel manual de la jornada"></textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-tranches-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'" data-sold="'+esc(button.dataset.sold)+'">Guardar tramos auditados</button></div></section>';
+    box.innerHTML='<section class="bcjr-values-dialog" role="dialog" aria-modal="true"><h3>Precios por tramos · '+esc(button.dataset.name)+'</h3><p class="bcjr-muted">Una línea por cada precio real: cantidad x precio. Si todas las unidades se vendieron al mismo precio, basta una sola línea. Las cantidades deben sumar exactamente '+esc(button.dataset.sold)+' unidades vendidas. Solo afecta esta jornada.</p><label>Tramos (cantidad x precio CUP), uno por línea<textarea rows="5" data-bcjr-tranches placeholder="0.95 x 1400&#10;0.50 x 1600"></textarea></label><label>Fuente de verificación<textarea rows="2" maxlength="500" data-bcjr-tranches-reason placeholder="Ej.: conciliado con Excel manual de la jornada"></textarea></label><p class="bcjr-values-status" data-bcjr-values-status role="status" aria-live="polite"></p><div class="bcjr-values-actions"><button type="button" class="bcjr-btn" data-bcjr-values-cancel>Cancelar</button><button type="button" class="bcjr-btn primary" data-bcjr-tranches-save data-session="'+esc(button.dataset.session)+'" data-product="'+esc(button.dataset.product)+'" data-sold="'+esc(button.dataset.sold)+'">Guardar tramos auditados</button></div></section>';
     document.body.appendChild(box);box.querySelector('[data-bcjr-tranches]')?.focus();
   }
   async function saveTranchesEditor(button){
@@ -358,8 +358,11 @@
       tramos.push({cantidad:Number(m[1].replace(',','.')),precio_unitario:Number(m[2].replace(',','.'))});
     }
     const sum=tramos.reduce((a,x)=>a+x.cantidad,0),sold=Number(button.dataset.sold);
-    if(tramos.length<2||Math.abs(sum-sold)>0.0001||reason.length<5){
-      setStatus('Se requieren al menos dos tramos, cantidades que sumen '+sold+' y una fuente de 5 caracteres o más.','error');return;
+    const invalidTranche=tramos.some(x=>!Number.isFinite(x.cantidad)||x.cantidad<=0||!Number.isFinite(x.precio_unitario)||x.precio_unitario<0);
+    if(tramos.length<1||tramos.length>30||invalidTranche||!Number.isFinite(sold)||sold<0||Math.abs(sum-sold)>0.0001||reason.length<5){
+      setStatus(invalidTranche
+        ?'Cada cantidad debe ser mayor que cero y cada precio debe ser cero o mayor.'
+        :'Indica entre uno y treinta precios, cantidades que sumen '+sold+' y una fuente de 5 caracteres o más.','error');return;
     }
     if(busy){setStatus('Ya hay otra operación guardándose.','error');return;}
     busy=true;button.disabled=true;button.textContent='Guardando…';setStatus('Guardando tramos y auditoría…');
