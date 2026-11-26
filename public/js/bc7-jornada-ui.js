@@ -48,7 +48,7 @@
     const master=String(row&&(row.turno_estado_maestro||row.turno_estado)||'').toUpperCase();
     if(!row||row.trabaja===false||status==='DESCANSO')return {kind:'rest',short:'Descanso',label:'Descanso'};
     if(status==='EN_CURSO')return {kind:'running',short:'En curso',label:'En curso'};
-    if(status==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO')return {kind:'closed',short:'Aprobada',label:'Aprobada y cerrada por el Dueño'};
+    if(['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status)&&master==='CERRADO')return {kind:'closed',short:'Aprobada',label:'Aprobada y cerrada por el Dueño'};
     if(status==='CERRADA_OPERATIVAMENTE')return {kind:'sealed',short:'Pendiente de cuadre',label:'Pendiente de cuadre · cierre operativo realizado'};
     if(['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(master))return {kind:'review',short:'Pendiente de cierre',label:'Jornada completada · pendiente de revisión y cierre del Turno maestro'};
     if((['COMPLETADA','CERRADA','CERRADO'].includes(status)&&master==='CERRADO')||['CANCELADA','CANCELADO'].includes(status))return {kind:'closed',short:'Archivada',label:humanStatus(status)};
@@ -1025,11 +1025,11 @@
     const rest=!r.trabaja||r.estado==='DESCANSO';
     const isOperationallySealed=status==='CERRADA_OPERATIVAMENTE';
     const masterStatus=String(r.turno_estado_maestro||r.turno_estado||'').toUpperCase();
-    const isApprovedOperationalClose=isOperationallySealed&&masterStatus==='CERRADO';
+    const isApprovedMasterClose=masterStatus==='CERRADO'&&['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status);
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
     const pendingMasterClose=['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':isApprovedOperationalClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const pill=rest?'<span class="bc7-pill">Descanso</span>':isApprovedMasterClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
     const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
     const viewable=status==='COMPLETADA'||isOperationallySealed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
