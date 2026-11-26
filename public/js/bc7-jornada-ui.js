@@ -3494,10 +3494,21 @@
           ?'Lista de '+lines.length+' producto(s) registrada y aprobada por los permisos de esta cuenta. El inventario fue actualizado por el servidor.'
           :'Lista de '+lines.length+' producto(s) enviada como un solo expediente. Está pendiente de una única aprobación administrativa.'
         :'Solicitud de merma guardada y ligada a esta jornada. Está pendiente de revisión; no se marcó como aprobada.';
-      msg(msgEl,successMessage,'ok');
-      setStatus(successMessage,'ok');
       const reopenBajas=storageType==='baja';
-      keyField.value='';form.reset();
+      const keepBajasPanelOpen=checklistModalContext?.key==='bajas'&&!!checklistModalContext.root?.isConnected;
+      keyField.value='';
+      form.reset();
+      // Clear extra cloned rows after a successful list submission, but keep the
+      // current Bajas modal mounted so the worker can immediately confirm Step 4.
+      Array.from(form.querySelectorAll('[data-bc7-adjustment-row]')).slice(1).forEach(row=>row.remove());
+      syncAdjustmentRows(form);
+      if(keepBajasPanelOpen){
+        msg(msgEl,successMessage,'ok');
+        const modalState=checklistModalContext.root.querySelector('[data-bc7-checklist-modal-state]');
+        if(modalState)modalState.textContent='Solicitud enviada. Revisa si falta otra baja y confirma el cierre del paso cuando termines.';
+        setStatus(successMessage+' La sección Bajas sigue abierta. Puedes pulsar ahora «Confirmar que no faltan más bajas».','ok');
+        return;
+      }
       if(reopenBajas)closeChecklistModal({restore:true});
       const refreshed=await openWorkspace(sessionId);
       if(refreshed&&reopenBajas){openChecklistSection('bajas');setStatus(successMessage+' Sigues en Bajas: revisa si falta registrar otra y después pulsa «Confirmar que no faltan más bajas».','ok');}
