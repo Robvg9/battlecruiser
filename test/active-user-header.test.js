@@ -39,9 +39,10 @@ test("the active-user chip remains visible and compact in the Android header",()
   assert.match(css,/\.header-left \.bc-active-user/);
   assert.match(css,/@media \(max-width: 759px\), \(hover: none\) and \(pointer: coarse\)/);
   assert.match(css,/\.header-left #user-email\s*\{[\s\S]*?max-width: 27vw/);
-  const narrowHeader = css.slice(css.lastIndexOf("@media(max-width:759px)"));
-  assert.match(narrowHeader,/#user-email:not\(:empty\)\{display:inline-flex!important/);
-  assert.doesNotMatch(narrowHeader,/#user-email\{display:none!important\}/);
+  const visibleRule = css.lastIndexOf("#app-shell.visible > header.app-header.app-header #user-email:not(:empty)");
+  const hiddenRule = css.lastIndexOf("#user-email{display:none!important}");
+  assert.ok(visibleRule>=0 && visibleRule>hiddenRule,"the final compact-header override must keep the nonempty identity visible");
+  assert.match(css.slice(visibleRule),/display:inline-flex!important/);
 });
 
 test("PWA 9.5.166 serves the refreshed compact header and synchronized cache",()=>{
