@@ -273,6 +273,9 @@ BEGIN
       JOIN public.productos mp ON mp.id = other_line.producto_id
       WHERE other_delivery.almacen_id = v_source.almacen_id
         AND other_delivery.id <> v_delivery.id
+        -- A delivery that formed this Jornada's own INICIAL is opening stock,
+        -- not an intermediate movement after this Jornada's operational cutoff.
+        AND other_delivery.destino_sesion_id IS DISTINCT FROM v_source.id
         AND other_delivery.creado_en > v_start AND other_delivery.creado_en <= v_end
         AND coalesce(mp.producto_padre_id,mp.id) = v_item.familia_id
     ) INTO v_has_movement;
