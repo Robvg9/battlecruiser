@@ -95,8 +95,8 @@ test("price-change eligibility remains unchanged in this mission",()=>{
 });
 
 test("PWA asset versions are aligned",()=>{
-  assert.match(APP,/9\.5\.164/);
-  assert.match(SW,/9\.5\.164/);
+  assert.match(APP,/9\.5\.165/);
+  assert.match(SW,/9\.5\.165/);
   assert.match(APP,/bc7-jornada-ui\.js","7\.67"/);
   assert.match(SW,/bc7-jornada-ui\.js\?v=7\.67/);
   assert.match(INDEX,/bc7-jornada-inventory-mobile\.css\?v=20261116\.3/);
