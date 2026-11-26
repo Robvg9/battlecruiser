@@ -16,14 +16,13 @@ test("the header displays one active identity beside the BattleCruiser title",()
   assert.doesNotMatch(index,/<div class="header-right">[\s\S]*?<span id="user-email"/);
 });
 
-test("every signed-in account displays its actual first name before role fallback",()=>{
-  const nameStart=user.indexOf("var nombre = _usuarioActual.nombre");
-  const nameBranch=user.indexOf("if (nombre && !esIdentidadInternaOTemporal(nombre))",nameStart);
-  const adminFallback=user.indexOf("if (esRolAdmin)",nameBranch);
-  assert.ok(nameStart>=0 && nameBranch>nameStart && adminFallback>nameBranch);
-  assert.match(user,/el\.textContent = nombreCorto/);
-  assert.match(user,/el\.title = "Usuario activo: " \+ nombre \+ \(esRolAdmin \? " · Admin"/);
+test("Owner/Admin displays Admin; dependiente profiles display their first name",()=>{
+  const adminBranch=user.indexOf("if (esRolAdmin)");
+  const nameBranch=user.indexOf("if (nombre && !esIdentidadInternaOTemporal(nombre))");
+  assert.ok(adminBranch>=0 && nameBranch>adminBranch);
   assert.match(user,/el\.textContent = "Admin"/);
+  assert.match(user,/nombre \+ " · Admin"/);
+  assert.match(user,/el\.textContent = nombreCorto/);
 });
 
 test("the identity comes from the active authenticated profile and offline snapshot",()=>{
@@ -49,7 +48,7 @@ test("PWA 9.5.166 serves the refreshed compact header and synchronized cache",()
   assert.match(app,/const VERSION="9\.5\.166"/);
   assert.match(index,/style\.css\?v=9\.5\.166/);
   assert.match(index,/app\.js\?v=9\.5\.166/);
-  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.165/);
+  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.166/);
   assert.match(sw,/BC_SW_VERSION = "9\.5\.166"/);
-  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.165/);
+  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.166/);
 });
