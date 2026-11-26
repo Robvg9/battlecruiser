@@ -28,7 +28,7 @@ test("approved operationally-closed Jornada is no longer labeled pending", () =>
   assert.match(jornada, /isApprovedOperationalClose=isOperationallySealed&&masterStatus==='CERRADO'/);
   assert.match(jornada, /Aprobada/);
   assert.match(jornada, /st==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO'/);
-  assert.match(jornada, /requestRevision!==(state\.calendarRevision\|\|0)/);
+  assert.ok(jornada.includes("requestRevision!==(state.calendarRevision||0)"));
 });
 
 test("calendar re-reads after same-tab approvals and RLS-visible realtime events", () => {
