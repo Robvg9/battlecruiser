@@ -76,8 +76,8 @@ test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
   assert.match(ui,/\/\/ v7\.68 — keep Bajas checklist mounted after review submission/);
   assert.match(app,/\["bc7-jornada-ui\.js","7\.68"\]/);
   assert.match(sw,/bc7-jornada-ui\.js\?v=7\.68/);
-  assert.match(app,/9\.5\.166/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.166"/);
+  assert.match(app,/9\.5\.167/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.167"/);
 });
 
 
