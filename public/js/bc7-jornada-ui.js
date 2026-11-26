@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.67 — approved Jornada status and realtime calendar refresh.
+// v7.68 — keep Bajas checklist mounted after review submission; explicit final confirmation.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
