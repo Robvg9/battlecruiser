@@ -2066,3 +2066,258 @@ html[data-bc-theme="light"] select optgroup {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* BC 9.5.163 — almacenes compactos: resumen, equipo y tabla sin scroll horizontal */
+.alm-info-panel {
+  margin: 8px 0 10px;
+  padding: 10px 12px;
+}
+.alm-info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 7px 12px;
+}
+.alm-info-label { font-size: 9px; }
+.alm-info-valor { font-size: 12px; line-height: 1.25; }
+.alm-productos-titulo { margin: 10px 0 7px; font-size: 15px; }
+.bc-alm-empty,
+.bc-alm-stock-empty,
+.bc-alm-equipo-empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--mist);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.bc-alm-empty { display: grid; gap: 3px; }
+.bc-alm-empty strong { color: var(--text); font-size: 14px; }
+.bc-alm-equipo {
+  margin-top: 10px;
+  padding-top: 10px;
+}
+.bc-alm-equipo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bc-alm-equipo-head h4 {
+  margin: 0;
+  font-size: 13px;
+}
+.bc-alm-equipo-add-trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: 1px solid var(--gold-dim);
+  border-radius: 9px;
+  background: var(--stone);
+  color: var(--gold);
+}
+.bc-alm-equipo-add-trigger svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bc-alm-equipo-add-trigger:disabled { opacity: .4; }
+.bc-alm-equipo-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(min(100%,190px),1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+.bc-alm-equipo-persona {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid rgba(212,176,92,.18);
+  border-radius: 8px;
+  background: rgba(0,0,0,.12);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.bc-alm-equipo-persona-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.bc-alm-equipo-persona-copy b {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bc-alm-equipo-persona-copy small {
+  overflow: hidden;
+  color: var(--mist);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bc-alm-equipo-persona-edit {
+  flex: 0 0 auto;
+  color: var(--gold);
+  font-size: 14px;
+}
+.bc-alm-equipo-persona:disabled { opacity: .5; cursor: not-allowed; }
+.bc-alm-equipo-status { min-height: 0; margin-top: 5px; font-size: 11px; }
+.bc-alm-modal-backdrop[hidden] { display: none !important; }
+.bc-alm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(5,12,10,.78);
+}
+.bc-alm-modal {
+  width: min(100%,420px);
+  max-height: min(86vh,680px);
+  overflow-y: auto;
+  padding: 15px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 13px;
+  background: var(--stone);
+  box-shadow: 0 18px 55px rgba(0,0,0,.38);
+}
+.bc-alm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.bc-alm-modal-head h5 { margin: 0; color: var(--text); font-size: 15px; }
+.bc-alm-modal-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+}
+.bc-alm-modal-fields { display: grid; gap: 10px; }
+.bc-alm-modal-fields label {
+  display: grid;
+  gap: 4px;
+  color: var(--mist);
+  font-size: 11px;
+}
+.bc-alm-modal-fields input,
+.bc-alm-modal-fields select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 7px;
+  background: var(--stone);
+  color: var(--text);
+}
+.bc-alm-modal-person { display: grid; gap: 2px; }
+.bc-alm-modal-person strong { color: var(--text); font-size: 13px; }
+.bc-alm-modal-person small,
+.bc-alm-modal-note { margin: 0; color: var(--mist); font-size: 11px; }
+.bc-alm-modal-error { min-height: 0; margin: 7px 0 0; color: var(--wine); font-size: 11px; }
+.bc-alm-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+.bc-alm-modal-actions button { min-height: 34px; padding: 7px 10px; font-size: 11px; }
+.bc-alm-modal-actions .danger { border-color: var(--wine); color: var(--wine); }
+.alm-productos-lista { display: block; width: 100%; padding: 0; }
+.bc-alm-stock-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 7px;
+}
+.bc-alm-stock-count { color: var(--mist); font-size: 10px; white-space: nowrap; }
+.bc-alm-stock-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--mist);
+  font-size: 10px;
+}
+.bc-alm-stock-filter select {
+  width: auto;
+  max-width: min(60vw,230px);
+  min-height: 30px;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 7px;
+  background: var(--stone);
+  color: var(--text);
+  font-size: 10px;
+}
+.bc-alm-stock-table-wrap {
+  width: 100%;
+  overflow-x: hidden;
+  border: 1px solid rgba(212,176,92,.18);
+  border-radius: 8px;
+}
+.bc-alm-stock-table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.bc-alm-stock-table th,
+.bc-alm-stock-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(212,176,92,.12);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bc-alm-stock-table th {
+  color: var(--mist);
+  background: rgba(0,0,0,.12);
+  font-size: 9px;
+  font-weight: 600;
+  text-align: left;
+}
+.bc-alm-stock-table th:nth-child(1) { width: 43%; }
+.bc-alm-stock-table th:nth-child(2) { width: 31%; }
+.bc-alm-stock-table th:nth-child(3) { width: 26%; text-align: right; }
+.bc-alm-stock-table td { color: var(--text); }
+.bc-alm-stock-table td:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
+.bc-alm-stock-table .bc-alm-stock-quantity small {
+  display: block;
+  color: var(--gold);
+  font-size: 9px;
+  line-height: 1.2;
+}
+.bc-alm-stock-table .bc-alm-stock-quantity.is-alert { color: var(--gold); }
+.bc-alm-stock-table tr:last-child td { border-bottom: 0; }
+@media (max-width: 420px) {
+  .alm-info-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .bc-alm-stock-table th,
+  .bc-alm-stock-table td { padding: 6px 5px; font-size: 10px; }
+  .bc-alm-stock-table th:nth-child(1) { width: 42%; }
+  .bc-alm-stock-table th:nth-child(2) { width: 30%; }
+  .bc-alm-stock-table th:nth-child(3) { width: 28%; }
+  .bc-alm-stock-filter { gap: 4px; }
+  .bc-alm-stock-filter select { max-width: 60vw; }
+}
