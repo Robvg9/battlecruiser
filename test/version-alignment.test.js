@@ -127,7 +127,7 @@ test('movement operations load multi-product transfer before the compact modal',
   assert.ok(app.includes('["bc-owner-quick-actions.js","1.1"]'), 'the Control Center shortcuts must load');
   assert.ok(sw.includes("./js/bc-owner-quick-actions.js?v=1.1"), 'the Control Center shortcuts must be available offline');
   assert.ok(index.includes('js/productos.js?v=20261118.1'), 'the product editor must refresh saved mixed-family state');
-  assert.ok(index.includes('js/almacenes.js?v=20261126.1'), 'the warehouse view must refresh its tab subscriber');
+  assert.ok(index.includes('js/almacenes.js?v=20261126.2'), 'the warehouse view must refresh its tab subscriber');
   assert.ok(sw.includes("./js/productos.js?v=20261118.1"), 'the product view must refresh offline');
   assert.ok(sw.includes("./js/catalogos.js?v=20261106.1"), 'the category editor must refresh offline');
   assert.ok(m68.includes("bc:data-changed"), "the sales POS must subscribe to stock, product and category changes");
