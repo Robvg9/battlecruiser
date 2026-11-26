@@ -52,14 +52,16 @@ test("legacy history remains nested in canonical Jornada while legacy turn creat
   assert.match(legacyTurns, /var btnHtml = ''/);
 });
 
-test("warehouse detail reads jornada-projected balances without changing the raw transaction cache", () => {
-  assert.match(warehouses, /client\\.rpc\\("inventario_enriquecido", \\{ p_almacen_id: warehouseId \\}\\)/);
-  assert.match(warehouses, /client\\.rpc\\("inventario_mixto_enriquecido", \\{ p_almacen_id: warehouseId \\}\\)/);
-  assert.match(warehouses, /var warehouseId = _almacenSeleccionadoId \\|\\| null/);\n  assert.match(warehouses, /bcConTimeoutLocal\\(Promise\\.all/);
+test("warehouse detail loads only the selected warehouse projection without changing the raw transaction cache", () => {
+  assert.match(warehouses, /client\.rpc\("inventario_enriquecido", \{ p_almacen_id: warehouseId \}\)/);
+  assert.match(warehouses, /client\.rpc\("inventario_mixto_enriquecido", \{ p_almacen_id: warehouseId \}\)/);
+  assert.match(warehouses, /var warehouseId = _almacenSeleccionadoId \|\| null/);
+  assert.doesNotMatch(warehouses, /p_almacen_id: null/);
+  assert.match(warehouses, /bcConTimeoutLocal\(Promise\.all/);
   assert.match(warehouses, /_cache\.stock_visual/);
-  assert.match(warehouses, /const name = [\\s\\S]*?row\\.producto \\|\\| "—"/);
-  assert.match(warehouses, /const unit = row\\.unidad \\|\\| \\(product && product\\.unidad\\) \\|\\| "unidad"/);
-  assert.match(warehouses, /const category = product && product\\.categorias/);
+  assert.match(warehouses, /const name = [\s\S]*?row\.producto \|\| "—"/);
+  assert.match(warehouses, /const unit = row\.unidad \|\| \(product && product\.unidad\) \|\| "unidad"/);
+  assert.match(warehouses, /const category = product && product\.categorias/);
   assert.match(warehouses, /function stockDelAlmacen\(almacenId\)[\s\S]*_cache\.stock/);
   assert.match(warehouses, /function stockVisualDelAlmacen\(almacenId\)[\s\S]*_cache\.stock_visual/);
   assert.match(warehouses, /client\.from\("stock"\)\.select\("producto_id, almacen_id, cantidad, minimo"\)/);
@@ -67,4 +69,4 @@ test("warehouse detail reads jornada-projected balances without changing the raw
   assert.match(warehouses, /return \(_cache\.stock \|\| \[\]\)\.filter/);
   assert.match(index, /js\/almacenes\.js\?v=20261126\.2/);
   assert.match(sw, /js\/almacenes\.js\?v=20261126\.2/);
-});
+});;
