@@ -23,13 +23,13 @@ test("PWA 9.5.163 keeps shell, app and service-worker versions aligned", () => {
   assert.match(sw, /style\.css\?v=9\.5\.163/);
 });
 
-test("approved operationally-closed Jornada is no longer labeled pending", () => {
-  assert.match(jornada, /status==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO'/);
-  assert.match(jornada, /isApprovedOperationalClose=isOperationallySealed&&masterStatus==='CERRADO'/);
-  assert.match(jornada, /Aprobada/);
+test("a completed Jornada with a closed master Turno is labeled approved, not pending or archived", () => {
+  assert.match(jornada, /\['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'\]\.includes\(status\)&&master==='CERRADO'/);
+  assert.match(jornada, /isApprovedMasterClose=masterStatus==='CERRADO'/);
+  assert.match(jornada, /isApprovedMasterClose\?'<span class="bc7-pill closed">Aprobada<\/span>'/);
   assert.match(jornada, /st==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO'/);
   assert.ok(jornada.includes("requestRevision!==(state.calendarRevision||0)"));
-});
+});;
 
 test("calendar re-reads after same-tab approvals and RLS-visible realtime events", () => {
   assert.match(approvals, /bc:jornada-aprobada/);
