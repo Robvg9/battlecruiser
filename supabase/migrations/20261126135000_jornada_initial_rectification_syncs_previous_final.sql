@@ -370,6 +370,8 @@ DECLARE
   v_final_sync_result jsonb;
   v_final_syncs jsonb:='[]'::jsonb;
   v_final_sync_blocked jsonb:='[]'::jsonb;
+  v_final_sync_skipped jsonb:='[]'::jsonb;
+  v_final_sync_aligned jsonb:='[]'::jsonb;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.bc_actor_is_admin() THEN
     RAISE EXCEPTION 'Solo el Dueño/Admin puede rectificar un inventario inicial histórico.' USING ERRCODE='42501';
@@ -462,6 +464,12 @@ BEGIN
       v_final_syncs:=v_final_syncs||jsonb_build_array(v_final_sync_result);
     ELSIF coalesce((v_final_sync_result->>'blocked')::boolean,false) THEN
       v_final_sync_blocked:=v_final_sync_blocked||jsonb_build_array(v_final_sync_result);
+    ELSIF coalesce((v_final_sync_result->>'already_aligned')::boolean,false) THEN
+      v_final_sync_aligned:=v_final_sync_aligned||jsonb_build_array(v_final_sync_result||jsonb_build_object('producto_id',v_product_id));
+    ELSE
+      -- A correction with no exact accepted handover must never look fully
+      -- reconciled. Return the reason to the caller and retain it in the audit.
+      v_final_sync_skipped:=v_final_sync_skipped||jsonb_build_array(v_final_sync_result||jsonb_build_object('producto_id',v_product_id));
     END IF;
 
     v_count:=v_count+1;
@@ -486,6 +494,8 @@ BEGIN
       'correcciones',v_changes,
       'finales_anteriores_sincronizados',v_final_syncs,
       'finales_anteriores_requieren_revision',v_final_sync_blocked,
+      'finales_anteriores_no_sincronizados',v_final_sync_skipped,
+      'finales_anteriores_ya_alineados',v_final_sync_aligned,
       'recepcion_original_conservada',true,
       'stock_global_modificado',false
     )
@@ -498,7 +508,9 @@ BEGIN
     'recepcion_original_conservada',true,
     'correcciones',v_changes,
     'finales_anteriores_sincronizados',v_final_syncs,
-    'finales_anteriores_requieren_revision',v_final_sync_blocked
+    'finales_anteriores_requieren_revision',v_final_sync_blocked,
+    'finales_anteriores_no_sincronizados',v_final_sync_skipped,
+    'finales_anteriores_ya_alineados',v_final_sync_aligned
   );
 END;
 $function$
