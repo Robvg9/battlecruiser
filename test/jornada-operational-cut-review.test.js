@@ -14,11 +14,14 @@ const INDEX=read("public/index.html");
 const MIG=read("supabase/migrations/20261125170000_jornada_owner_review_operational_cut_classification.sql");
 const RUNNER=read("test/step7-jornada-postgres-windows-ci.js");
 
-test("Owner movement summary cannot hide the pending count returned by nested liquidation",()=>{
-  assert.match(OWNER,/pendingPostCount=Math\.max\(0,Number\(l\.movimientos_posteriores_pendientes\)\|\|0,Number\(pending\.movimientos_posteriores_corte\)\|\|0,post\.length\)/);
+test("Owner movement summary counts only unclassified records and hides resolved cards",()=>{
+  assert.ok(OWNER.includes("pendingPostRows=post.filter(m=>!String(m.clasificacion||'').trim())"));
+  assert.ok(OWNER.includes("pendingPostCount=Math.max(0,Number(l.movimientos_posteriores_pendientes)||0,Number(pending.movimientos_posteriores_corte)||0,pendingPostRows.length)"));
+  assert.ok(OWNER.includes("const movements=!turnClosed&&pendingPostRows.length"));
+  assert.ok(OWNER.includes("pendingPostRows.map(m=>"));
+  assert.ok(!OWNER.includes("pendingPostCount=Math.max(0,Number(l.movimientos_posteriores_pendientes)||0,Number(pending.movimientos_posteriores_corte)||0,post.length)"));
   assert.match(OWNER,/Bajas y mermas registradas después del cierre operativo/);
 });
-
 test("Owner movement decisions are framed against the operational close, not FINAL confirmation time",()=>{
   assert.match(OWNER,/Corte operativo registrado/);
   assert.match(OWNER,/¿Cuándo ocurrió respecto al cierre operativo\?/);
@@ -31,13 +34,13 @@ test("Owner movement decisions are framed against the operational close, not FIN
 });
 
 test("PWA app, Service Worker, module URLs and HTML shell remain release-aligned",()=>{
-  assert.match(APP,/const VERSION="9\.5\.166"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.166"/);
+  assert.match(APP,/const VERSION="9\.5\.167"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.167"/);
   assert.match(APP,/\["bc7-jornada-ui\.js","7\.68"\]/);
   assert.match(SW,/bc7-jornada-ui\.js\?v=7\.68/);
   assert.match(APP,/\["jornada-owner-review\.js","1.19"\]/);
   assert.match(SW,/jornada-owner-review\.js\?v=1.19/);
-  assert.match(INDEX,/app\.js\?v=9\.5\.166/);
-  assert.match(INDEX,/style\.css\?v=9\.5\.166/);
+  assert.match(INDEX,/app\.js\?v=9\.5\.167/);
+  assert.match(INDEX,/style\.css\?v=9\.5\.167/);
   assert.match(RUNNER,/jornada_owner_review_operational_cut_classification\.sql/);
 });
