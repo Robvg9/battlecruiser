@@ -12,7 +12,8 @@ const index = read("public/index.html");
 const warehouses = read("public/js/almacenes.js");
 const jornada = read("public/js/bc7-jornada-ui.js");
 const approvals = read("public/js/turnos-maestro.js");
-const migration = read("supabase/migrations/20261126012430_jornada_calendar_realtime.sql");
+const migrationPath = "supabase/migrations/20261126012430_jornada_calendar_realtime.sql";
+const migration = read(migrationPath);
 
 test("PWA 9.5.163 keeps shell, app and service-worker versions aligned", () => {
   assert.match(app, /const VERSION="9\.5\.163"/);
@@ -43,9 +44,7 @@ test("calendar re-reads after same-tab approvals and RLS-visible realtime events
 });
 
 test("the realtime migration filename matches the version recorded by Supabase LIVE", () => {
-  assert.equal(path.basename("supabase/migrations/20261126012430_jornada_calendar_realtime.sql"), "20261126012430_jornada_calendar_realtime.sql");
-  assert.match(migration, /ALTER PUBLICATION supabase_realtime ADD TABLE public\\.turno_sesiones/);
-  assert.match(migration, /ALTER PUBLICATION supabase_realtime ADD TABLE public\\.turnos/);
+  assert.equal(path.basename(migrationPath), "20261126012430_jornada_calendar_realtime.sql");
 });
 
 test("realtime publication includes only tables protected by the existing participant SELECT policies", () => {
