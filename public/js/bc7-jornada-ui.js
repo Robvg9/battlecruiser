@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.66 — warehouse-scoped salary rules and the current Jornada handover contract.
+// v7.67 — approved Jornada status and realtime calendar refresh.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
