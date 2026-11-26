@@ -74,8 +74,16 @@ function cargarStockVisualAlmacenes(force) {
     return Promise.resolve(_cache.stock_visual || []);
   }
 
-  var requestId = ++_stockVistaRequestId;
   var warehouseId = _almacenSeleccionadoId || null;
+  if (!warehouseId) {
+    _stockVistaRequestId++;
+    _stockVistaCargaPromise = null;
+    _stockVistaCargaEstado = "ok";
+    _stockVistaCargaError = null;
+    _cache.stock_visual = [];
+    return Promise.resolve([]);
+  }
+  var requestId = ++_stockVistaRequestId;
   _stockVistaCargaEstado = "loading";
   _stockVistaCargaError = null;
   renderPanelAlmacenSeleccionado();
@@ -549,7 +557,9 @@ function renderProductosDelAlmacen(almacen_id) {
     const product = productsById[String(row.producto_id)];
     const name = (product && product.variante_nombre) || (row.productos && row.productos.nombre) ||
       (product && product.nombre) || row.producto || "—";
-    const category = product && product.categorias && product.categorias.nombre || "Sin categoría";
+    const category = product && product.categorias && product.categorias.nombre ||
+      product && product.categoria && (product.categoria.nombre || product.categoria) ||
+      row.categoria || row.categoria_nombre || "Sin categoría";
     const quantity = Number(row.cantidad) || 0;
     const unit = row.unidad || (product && product.unidad) || "unidad";
     const minimum = row.minimo != null && Number(row.minimo) > 0 ? Number(row.minimo) : null;
