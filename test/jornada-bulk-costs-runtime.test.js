@@ -85,6 +85,9 @@ function setup(t, { adjustmentResult, reviewFailsOn = 0 } = {}) {
   window.client = {
     rpc: async (name, args) => {
       calls.push({ name, args });
+      if (name === "bc7_previsualizar_reconciliacion_final_sucesora") {
+        return { data: { has_reconciliation: false, reason: "NO_SUCCESSOR_RECEIPT" }, error: null };
+      }
       if (name === "bc7_obtener_revision_jornada_rectificada") {
         reviewCount += 1;
         if (reviewFailsOn === reviewCount) {
