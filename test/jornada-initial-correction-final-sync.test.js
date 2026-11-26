@@ -30,7 +30,7 @@ test("only stock movement of the corrected product family within the actual hand
 });
 
 test("a safe correction appends a FINAL overlay and preserves original cuts, receipt and global stock", () => {
-  assert.match(helper, /INSERT INTO public\.turno_jornada_inventario_correcciones\([\s\S]*?tipo,cantidad_original,cantidad_corregida/);
+  assert.match(helper, /INSERT INTO public\.turno_jornada_inventario_correcciones\([\s\S]*?tipo,producto_id,cantidad_original,cantidad_corregida/);
   assert.match(helper, /source_cut_rows_modified',false/);
   assert.match(helper, /successor_initial_rows_modified',false/);
   assert.match(helper, /receipt_rows_modified',false/);
