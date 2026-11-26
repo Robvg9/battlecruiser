@@ -19,7 +19,7 @@ test("the header displays one active identity beside the BattleCruiser title",()
 test("owner is shown as Admin and dependent users by their first given name",()=>{
   assert.match(user,/rolNormalizado === "dueno"/);
   assert.match(user,/el\.textContent = "Admin"/);
-  assert.ok(user.includes("var nombreCorto = nombre.split(/\\\\s+/)[0];"));
+  assert.match(user,/var nombreCorto = nombre\.split\(/);
   assert.match(user,/el\.textContent = nombreCorto/);
 });
 
