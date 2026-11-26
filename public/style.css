@@ -2321,3 +2321,28 @@ html[data-bc-theme="light"] select optgroup {
   .bc-alm-stock-filter { gap: 4px; }
   .bc-alm-stock-filter select { max-width: 60vw; }
 }
+
+/* BC 9.5.163 — paginación para que el catálogo no convierta Almacenes en una lista larga */
+.bc-alm-stock-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin: 7px 0 1px;
+}
+.bc-alm-stock-pagination span {
+  color: var(--mist);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bc-alm-stock-page-btn {
+  min-height: 29px;
+  padding: 5px 9px;
+  border: 1px solid rgba(212,176,92,.25);
+  border-radius: 7px;
+  background: rgba(0,0,0,.12);
+  color: var(--text);
+  font-size: 10px;
+}
+.bc-alm-stock-page-btn:disabled { opacity: .35; cursor: not-allowed; }
