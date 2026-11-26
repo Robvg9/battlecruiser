@@ -4,6 +4,7 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
+const vm=require("node:vm");
 
 const migration=fs.readFileSync("supabase/migrations/20261119000000_jornada_persistent_price_changes.sql","utf8");
 const costMigration=fs.readFileSync("supabase/migrations/20261119193000_jornada_price_change_optional_cost.sql","utf8");
@@ -85,8 +86,8 @@ test("Movimientos exposes bulk price changes and the assigned worker cannot dism
 
 test("Price-change UI is versioned, loaded in the app and precached for PWA startup",()=>{
   assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
-  assert.match(app,/\["jornada-price-changes.js","1.0.4"\]/);
-  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.4/);
+  assert.match(app,/\["jornada-price-changes.js","1.0.5"\]/);
+  assert.match(sw,/\.\/js\/jornada-price-changes\.js\?v=1\.0\.5/);
 });
 
 test("Cambios de precio usa dos pasos y muestra solo productos elegidos en el segundo", () => {
@@ -140,4 +141,16 @@ test("Owner review and offline precache use the same new tranche editor cache ke
   const swVersion = sw.match(/\.\/js\/jornada-owner-review\.js\?v=([^"]+)/)?.[1];
   assert.equal(appVersion, "1.22");
   assert.equal(swVersion, appVersion);
+});
+
+test("Price-change search ignores Spanish diacritics and finds Maní Grande without a tilde", () => {
+  const helper = ui.match(/function normalizeProductSearchText\\(value\\)\\s*\\{[\\s\\S]*?\\n  \\}/);
+  assert.ok(helper, "accent-insensitive normalizer is defined");
+  const normalize = vm.runInNewContext("(" + helper[0].replace(/^function normalizeProductSearchText/, "function") + ")");
+  assert.equal(normalize("Maní Grande"), "mani grande");
+  assert.equal(normalize("MANI GRANDE"), "mani grande");
+  assert.equal(normalize("  Mañí  "), "mani");
+  const ownerRows = ui.slice(ui.indexOf("function renderOwnerProducts"), ui.indexOf("function ownerModalHtml"));
+  assert.match(ownerRows, /const query = normalizeProductSearchText\\(filter\\)/);
+  assert.match(ownerRows, /normalizeProductSearchText\\(item\\.nombre\\)\\.includes\\(query\\)/);
 });
