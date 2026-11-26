@@ -144,13 +144,13 @@ test("Owner review and offline precache use the same new tranche editor cache ke
 });
 
 test("Price-change search ignores Spanish diacritics and finds Maní Grande without a tilde", () => {
-  const helper = ui.match(/function normalizeProductSearchText\\(value\\)\\s*\\{[\\s\\S]*?\\n  \\}/);
+  const helper = ui.match(/function normalizeProductSearchText\(value\)\s*\{[\s\S]*?\n  \}/);
   assert.ok(helper, "accent-insensitive normalizer is defined");
   const normalize = vm.runInNewContext("(" + helper[0].replace(/^function normalizeProductSearchText/, "function") + ")");
   assert.equal(normalize("Maní Grande"), "mani grande");
   assert.equal(normalize("MANI GRANDE"), "mani grande");
   assert.equal(normalize("  Mañí  "), "mani");
   const ownerRows = ui.slice(ui.indexOf("function renderOwnerProducts"), ui.indexOf("function ownerModalHtml"));
-  assert.match(ownerRows, /const query = normalizeProductSearchText\\(filter\\)/);
-  assert.match(ownerRows, /normalizeProductSearchText\\(item\\.nombre\\)\\.includes\\(query\\)/);
+  assert.match(ownerRows, /const query = normalizeProductSearchText\(filter\)/);
+  assert.match(ownerRows, /normalizeProductSearchText\(item\.nombre\)\.includes\(query\)/);
 });
