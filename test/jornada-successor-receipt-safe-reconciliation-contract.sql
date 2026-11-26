@@ -11,8 +11,7 @@ BEGIN
   END IF;
   IF has_function_privilege('anon',v_preview,'EXECUTE')
      OR has_function_privilege('anon',v_apply,'EXECUTE')
-     OR has_function_privilege('public',v_preview,'EXECUTE')
-     OR has_function_privilege('public',v_apply,'EXECUTE') THEN
+ THEN
     RAISE EXCEPTION 'Anonymous/public access to successor reconciliation RPCs is forbidden.';
   END IF;
   SELECT pg_get_functiondef(v_preview) INTO v_preview_def;
