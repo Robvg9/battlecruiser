@@ -56,6 +56,9 @@ test("warehouse inventory is fetched for the selected warehouse and displayed in
   assert.match(warehouses, /data-bc-alm-category-filter/);
   assert.match(warehouses, /bc-alm-stock-table/);
   assert.match(warehouses, /data-bc-alm-stock-row/);
+  assert.match(warehouses, /aplicarPaginacionStockAlmacen/);
+  assert.match(warehouses, /data-bc-alm-stock-page/);
+  assert.match(warehouses, /max-width: 520px/);
   assert.match(warehouses, /data-bc-alm-equipo-open-modal/);
   assert.match(warehouses, /data-bc-alm-modal/);
   assert.match(warehouses, /data-bc-alm-equipo-action/);
