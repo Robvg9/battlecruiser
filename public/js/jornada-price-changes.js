@@ -41,6 +41,14 @@
     catch (_) { return String(n); }
   }
 
+  function normalizeProductSearchText(value) {
+    return String(value == null ? '' : value)
+      .normalize('NFD')
+      .replace(/[\\u0300-\\u036f]/g, '')
+      .toLocaleLowerCase()
+      .trim();
+  }
+
   function rpc(name, params) {
     const db = getDbClient();
     if (!db) return Promise.reject(new Error('La conexión de BattleCruiser aún no está preparada.'));
@@ -258,13 +266,13 @@
   function renderOwnerProducts(context, filter) {
     const host = document.getElementById('bc-jpc-products');
     if (!host) return;
-    const query = String(filter || '').trim().toLocaleLowerCase();
+    const query = normalizeProductSearchText(filter);
     const products = Array.isArray(context && context.productos) ? context.productos : [];
     const selected = products.filter(function(item) { return !!ownerSelectedIds[String(item.producto_id)]; });
 
     if (ownerStep === 1) {
       const visible = products.filter(function(item) {
-        return !query || String(item.nombre || '').toLocaleLowerCase().includes(query);
+        return !query || normalizeProductSearchText(item.nombre).includes(query);
       });
       host.classList.add('bc-jpc-select-list');
       host.classList.remove('bc-jpc-detail-list');
