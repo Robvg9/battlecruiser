@@ -538,30 +538,46 @@ function mostrarInfoUsuarioEnHeader() {
     return;
   }
   if (typeof _cargandoUsuario !== "undefined" && _cargandoUsuario) {
-    el.textContent = "Cargando usuario…";
+    el.textContent = "Cargando…";
     return;
   }
+
+  // The role is returned by perfil_usuario_actual() for this authenticated session.
+  // Owner accounts are intentionally displayed as the short operational label "Admin".
+  var rol = _usuarioActual.rol ? String(_usuarioActual.rol).trim() : "";
+  var rolNormalizado = rol.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (rolNormalizado === "dueno" || rolNormalizado === "admin" ||
+      rolNormalizado === "administrador" || rolNormalizado === "owner") {
+    el.textContent = "Admin";
+    el.title = "Usuario activo: Admin";
+    return;
+  }
+
   var nombre = _usuarioActual.nombre ? String(_usuarioActual.nombre).trim() : "";
   if (nombre && !esIdentidadInternaOTemporal(nombre)) {
-    var rol = _usuarioActual.rol ? " · " + _usuarioActual.rol : "";
-    el.textContent = nombre + rol;
+    // The compact header uses the first given name (Sheyla, Adriana, etc.).
+    var nombreCorto = nombre.split(/\s+/)[0];
+    el.textContent = nombreCorto;
+    el.title = "Usuario activo: " + nombre;
     return;
   }
   if (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa) {
-    var rolSolo = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
-    el.textContent = rolSolo;
+    el.textContent = rol || "Usuario";
+    el.title = "Usuario activo";
     return;
   }
   if (typeof _permisosCargaFallidaRed !== "undefined" && _permisosCargaFallidaRed) {
-    el.textContent = "Sin conexión — reintentá";
+    el.textContent = "Sin conexión";
+    el.title = "Perfil sin conexión; se conserva el último contexto validado";
     return;
   }
   if (typeof _permisosCargaExitosa !== "undefined" && !_permisosCargaExitosa) {
-    el.textContent = "Sin permisos cargados — reintentá";
+    el.textContent = "Sin permisos";
+    el.title = "No se pudieron cargar los permisos del usuario";
     return;
   }
-  var rolFallback = _usuarioActual.rol ? String(_usuarioActual.rol) : "Usuario";
-  el.textContent = rolFallback;
+  el.textContent = rol || "Usuario";
+  el.title = "Usuario activo";
 }
 
 try {
