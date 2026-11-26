@@ -36,15 +36,20 @@ test("the identity comes from the active authenticated profile and offline snaps
   assert.match(auth,/_usuarioActualId = session\.user\.id/);
 });
 
-test("the active-user chip remains compact in the Android header",()=>{
+test("the active-user chip remains visible and compact in the Android header",()=>{
   assert.match(css,/\.header-left \.bc-active-user/);
   assert.match(css,/@media \(max-width: 759px\), \(hover: none\) and \(pointer: coarse\)/);
   assert.match(css,/\.header-left #user-email\s*\{[\s\S]*?max-width: 27vw/);
+  const narrowHeader = css.slice(css.lastIndexOf("@media(max-width:759px)"));
+  assert.match(narrowHeader,/#user-email:not\(:empty\)\{display:inline-flex!important/);
+  assert.doesNotMatch(narrowHeader,/#user-email\{display:none!important\}/);
 });
 
-test("PWA 9.5.165 serves the refreshed identity profile module",()=>{
-  assert.match(app,/const VERSION="9\.5\.165"/);
+test("PWA 9.5.166 serves the refreshed compact header and synchronized cache",()=>{
+  assert.match(app,/const VERSION="9\.5\.166"/);
+  assert.match(index,/style\.css\?v=9\.5\.166/);
+  assert.match(index,/app\.js\?v=9\.5\.166/);
   assert.match(index,/usuarios-permisos\.js\?v=9\.5\.165/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.165"/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.166"/);
   assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.165/);
 });
