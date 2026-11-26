@@ -139,6 +139,10 @@ on:
       - 'test/bc7-turno-movimientos-sesion-contract.test.js'
       - 'test/step7-jornada-postgres-windows-ci.js'
       - '.github/workflows/step7-jornada-postgres.yml'
+      - 'supabase/migrations/20261126120000_jornada_successor_receipt_safe_reconciliation.sql'
+      - 'test/jornada-successor-receipt-safe-reconciliation-contract.sql'
+      - 'test/jornada-successor-receipt-safe-reconciliation.test.js'
+      - 'test/active-user-header.test.js'
   workflow_dispatch:
 concurrency:
   group: battlecruiser-step7-${{ github.event.pull_request.number || github.ref }}
