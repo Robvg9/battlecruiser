@@ -43,8 +43,8 @@ test("the active-user chip remains compact in the Android header",()=>{
 });
 
 test("PWA 9.5.165 serves the refreshed identity profile module",()=>{
-  assert.match(app,/const VERSION="9\.5\.164"/);
-  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.164/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.164"/);
-  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.164/);
+  assert.match(app,/const VERSION="9\.5\.165"/);
+  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.165/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.165"/);
+  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.165/);
 });
