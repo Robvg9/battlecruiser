@@ -1414,8 +1414,8 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
     grid-template-areas:
       "brand logout"
       "status status"
-      "account user"
-      "queue settings" !important;
+      "queue queue"
+      "account settings" !important;
     align-items: center !important;
     gap: 8px 10px !important;
     width: 100%;
@@ -1452,11 +1452,15 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
     white-space: nowrap;
   }
   #app-shell.visible > .app-header #user-email {
-    grid-area: user !important;
-    justify-self: end !important;
-    max-width: 62vw;
-    text-align: right;
-    overflow-wrap: anywhere;
+    grid-area: auto !important;
+    flex: 0 1 auto !important;
+    max-width: clamp(58px, 22vw, 92px) !important;
+    padding: 4px 6px;
+    font-size: 10px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   #app-shell.visible > .app-header #cola-pendientes-badge { grid-area: queue !important; }
   #app-shell.visible > .app-header .ajustes-wrap {
@@ -1610,7 +1614,7 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
  #app-shell.visible > header.app-header.app-header #mi-cuenta-btn,#app-shell.visible > header.app-header.app-header #logout-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;order:initial!important;grid-area:auto!important;min-width:0!important;max-width:none!important;white-space:nowrap!important}
  #app-shell.visible > header.app-header.app-header #mi-cuenta-btn{margin:0!important}
  #app-shell.visible > header.app-header.app-header #logout-btn{margin:0!important}
- #app-shell.visible > header.app-header.app-header #user-email{display:none!important}
+ #app-shell.visible > header.app-header.app-header #user-email{display:inline-flex!important;align-items:center!important;flex:0 1 auto!important;max-width:clamp(58px,22vw,92px)!important;min-width:0!important}
  #app-shell.visible > header.app-header.app-header #conn-status-app{display:none!important}
  #app-shell.visible > header.app-header.app-header #cola-pendientes-badge{display:none!important}
  #tab-jornada .bc7-note{padding:10px}
