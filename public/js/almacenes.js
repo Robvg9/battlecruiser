@@ -335,7 +335,7 @@ function abrirModalEquipoAlmacen(section, mode, userId) {
       '<div class="bc-alm-modal-fields">' + form + '</div>' +
       '<p class="bc-alm-modal-error" data-bc-alm-modal-error role="alert"></p>' +
       '<div class="bc-alm-modal-actions">' +
-        (isAssign && !available.length ? '' : '<button type="button" class="cc-accion" data-bc-alm-equipo-action="' + (isAssign ? 'assign' : 'save') + '"' + (section.dataset.almacenActivo === 'true' ? '' : ' disabled') + '>' + (isAssign ? 'Asignar' : 'Guardar') + '</button>') +
+        (isAssign && !available.length ? '' : '<button type="button" class="cc-accion" data-bc-alm-equipo-action="' + (isAssign ? 'assign' : 'save') + '" data-user-id="' + (isAssign ? '' : escHtml(userId)) + '"' + (section.dataset.almacenActivo === 'true' ? '' : ' disabled') + '>' + (isAssign ? 'Asignar' : 'Guardar') + '</button>') +
         (!isAssign ? '<button type="button" class="cc-accion danger" data-bc-alm-equipo-action="remove" data-user-id="' + escHtml(userId) + '"' + (section.dataset.almacenActivo === 'true' ? '' : ' disabled') + '>Quitar del almacén</button>' : '') +
         '<button type="button" class="cc-accion" data-bc-alm-equipo-modal-close>Cancelar</button>' +
       '</div></section>';
