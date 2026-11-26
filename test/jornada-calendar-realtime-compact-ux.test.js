@@ -15,7 +15,7 @@ const approvals = read("public/js/turnos-maestro.js");
 const migrationPath = "supabase/migrations/20261126012430_jornada_calendar_realtime.sql";
 const migration = read(migrationPath);
 
-test("PWA 9.5.166 keeps shell, app and service-worker versions aligned", () => {
+test("PWA 9.5.167 keeps shell, app and service-worker versions aligned", () => {
   assert.match(app, /const VERSION="9\.5\.166"/);
   assert.match(index, /app\.js\?v=9\.5\.166/);
   assert.match(index, /style\.css\?v=9\.5\.166/);
