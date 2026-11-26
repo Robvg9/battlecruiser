@@ -50,6 +50,10 @@ BEGIN
   IF NOT FOUND THEN
     RETURN jsonb_build_object('has_reconciliation',false,'reason','TURNO_ORIGEN_NO_ENCONTRADO');
   END IF;
+  IF v_source.estado <> 'COMPLETADA'
+     OR coalesce(v_source_turn.estado_maestro,v_source_turn.estado) <> 'CERRADO' THEN
+    RETURN jsonb_build_object('has_reconciliation',false,'reason','JORNADA_ORIGEN_NO_COMPLETADA_O_TURNO_NO_CERRADO');
+  END IF;
 
   SELECT * INTO v_source_cut
   FROM public.turno_jornada_inventario_cortes
@@ -155,19 +159,27 @@ BEGIN
   LOOP
     v_old_qty := coalesce(v_item.source_corrected_qty,v_item.source_original_qty);
     v_new_qty := v_item.receipt_received_qty;
-    v_delta := CASE WHEN v_old_qty IS NOT NULL AND v_new_qty IS NOT NULL
-      THEN round(v_new_qty - v_old_qty,3) ELSE NULL END;
-
-    IF v_delta IS NULL OR v_delta = 0 THEN
+    v_blockers := '[]'::jsonb;
+    IF v_item.source_original_qty IS NULL OR v_item.successor_initial_qty IS NULL
+       OR v_item.receipt_declared_qty IS NULL OR v_item.receipt_received_qty IS NULL
+       OR v_old_qty IS NULL THEN
+      v_diff_count := v_diff_count + 1;
+      v_blockers := jsonb_build_array('FALTA_LINEA_DE_CORTE_O_RECEPCION');
+      v_blocked_count := v_blocked_count + 1;
+      v_lines := v_lines || jsonb_build_array(jsonb_build_object(
+        'producto_id',v_item.producto_id,'producto',v_item.producto,
+        'cantidad_final_anterior',v_old_qty,
+        'cantidad_recibida_sucesora',v_new_qty,
+        'diferencia_unidades',null,'elegible',false,'bloqueos',v_blockers
+      ));
+      CONTINUE;
+    END IF;
+    v_delta := round(v_new_qty - v_old_qty,3);
+    IF v_delta = 0 THEN
       CONTINUE;
     END IF;
 
     v_diff_count := v_diff_count + 1;
-    v_blockers := '[]'::jsonb;
-    IF v_item.source_original_qty IS NULL OR v_item.successor_initial_qty IS NULL
-       OR v_item.receipt_declared_qty IS NULL OR v_item.receipt_received_qty IS NULL THEN
-      v_blockers := v_blockers || jsonb_build_array('FALTA_LINEA_DE_CORTE_O_RECEPCION');
-    END IF;
     IF v_old_qty IS DISTINCT FROM v_item.cantidad_declarada
        OR v_item.receipt_declared_qty IS DISTINCT FROM v_item.cantidad_declarada
        OR v_item.cantidad_efectiva IS DISTINCT FROM v_item.receipt_received_qty
