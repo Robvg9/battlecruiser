@@ -48,7 +48,11 @@ test("warehouse panel lets the Owner assign, unassign and configure each depende
   for (const marker of [
     "Personal y salarios",
     "Asignar dependienta",
-    "Guardar porcentaje",
+    "Guardar",
+    "data-bc-alm-equipo-open-modal",
+    "data-bc-alm-modal",
+    "data-bc-alm-equipo-new-user",
+    "data-bc-alm-equipo-rate",
     "Quitar del almacén",
     "Permanente · futuras jornadas",
     "Solo próxima jornada",
