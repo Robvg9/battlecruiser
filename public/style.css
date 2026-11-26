@@ -1949,3 +1949,120 @@ html[data-bc-theme="light"] select optgroup {
     text-align: left;
   }
 }
+
+
+/* Equipo del almacén y porcentajes salariales por dependienta */
+.bc-alm-equipo {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(212,176,92,.22);
+}
+.bc-alm-equipo-head h4,
+.bc-alm-equipo-add h5 {
+  margin: 0 0 5px;
+  color: var(--text);
+}
+.bc-alm-equipo-head p,
+.bc-alm-equipo-persona small,
+.bc-alm-equipo-add p {
+  margin: 0;
+  color: var(--mist);
+  font-size: 12px;
+}
+.bc-alm-equipo-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.bc-alm-equipo-persona,
+.bc-alm-equipo-add {
+  padding: 12px;
+  background: rgba(0,0,0,.12);
+  border: 1px solid rgba(212,176,92,.18);
+  border-radius: 8px;
+}
+.bc-alm-equipo-persona-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.bc-alm-equipo-persona-head > div {
+  display: grid;
+  gap: 3px;
+}
+.bc-alm-equipo-persona-head b {
+  color: var(--text);
+}
+.bc-alm-equipo-pill {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 1px solid var(--gold-dim);
+  border-radius: 99px;
+  color: var(--sage);
+  font-size: 10px;
+}
+.bc-alm-equipo-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(160px,1fr));
+  gap: 9px;
+  align-items: end;
+}
+.bc-alm-equipo-controls label {
+  display: grid;
+  gap: 4px;
+  color: var(--mist);
+  font-size: 11px;
+}
+.bc-alm-equipo-controls input,
+.bc-alm-equipo-controls select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--stone);
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+}
+.bc-alm-equipo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.bc-alm-equipo-actions button,
+.bc-alm-equipo-controls > button {
+  min-height: 36px;
+}
+.bc-alm-equipo-add {
+  margin-top: 12px;
+}
+.bc-alm-equipo-add h5 {
+  margin-bottom: 10px;
+}
+.bc-alm-equipo-status {
+  min-height: 18px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--sage);
+}
+.bc-alm-equipo-status.is-error {
+  color: var(--wine);
+}
+.bc-alm-equipo-status.is-ok {
+  color: var(--sage);
+}
+.bc-alm-equipo button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+@media (max-width: 600px) {
+  .bc-alm-equipo-persona-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bc-alm-equipo-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

@@ -12,6 +12,11 @@ $roles$;
 
 \i test/step5-jornada-fixture.sql
 
+-- Production usuario metadata used by warehouse team management RPCs.
+ALTER TABLE public.usuarios
+  ADD COLUMN IF NOT EXISTS nombre text NOT NULL DEFAULT 'Usuario de prueba',
+  ADD COLUMN IF NOT EXISTS archivado boolean NOT NULL DEFAULT false;
+
 -- Production owner-review ledger: one immutable review row per Turn master.
 CREATE TABLE public.turno_revisiones (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

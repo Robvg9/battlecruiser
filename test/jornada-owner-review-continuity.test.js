@@ -11,6 +11,8 @@ const THEME=read("public/js/m27-5-theme-dark-reset.js");
 const ADMIN=read("public/js/aprobaciones-admin.js");
 const JOURNEY=read("public/js/bc7-jornada-ui.js");
 const REVIEW=read("public/js/jornada-owner-review.js");
+const SALARY_MIG=read("supabase/migrations/20261125224135_warehouse_dependent_salary_configuration.sql");
+const WAREHOUSES=read("public/js/almacenes.js");
 const APP=read("public/app.js"),SW=read("public/service-worker.js"),INDEX=read("public/index.html");
 
 test("A pending owner approval never blocks a new non-overlapping Jornada schedule",()=>{
@@ -57,11 +59,20 @@ test("The Owner review does not display zero profit or cost when provisional row
   assert.ok(REVIEW.includes("Las ventas, costos y ganancias quedan ocultos hasta clasificar los movimientos posteriores al corte."));
   assert.ok(REVIEW.includes("liquidación todavía no calculable"));
 });
-test("Salary percentage can be explicitly set after a completed session but before master approval",()=>{
-  assert.match(MIG,/v_master_estado IN \('CERRADO','CANCELADO'\)/);
-  assert.match(MIG,/bc7_configurar_salario_porcentaje_jornada/);
-  assert.match(REVIEW,/bc7_configurar_salario_porcentaje_jornada/);
-  assert.match(REVIEW,/Es una decisión del Dueño; no se aplica un valor predeterminado/);
+test("Salary percentages are configured per dependent from the warehouse and stay frozen in started or historical sessions",()=>{
+  assert.match(SALARY_MIG,/CREATE TABLE IF NOT EXISTS public\.almacen_dependienta_configuracion/);
+  assert.match(SALARY_MIG,/salario_porcentaje_permanente/);
+  assert.match(SALARY_MIG,/salario_porcentaje_temporal/);
+  assert.match(SALARY_MIG,/PERMANENTE/);
+  assert.match(SALARY_MIG,/PROXIMA_JORNADA/);
+  assert.match(SALARY_MIG,/p\.fecha >= v_local_today/);
+  assert.match(SALARY_MIG,/s\.estado IN \('PENDIENTE','PROGRAMADA'\)/);
+  assert.match(SALARY_MIG,/bc8_aplicar_salario_dependienta_programada/);
+  assert.match(WAREHOUSES,/bc8_listar_dependientas_almacen/);
+  assert.match(WAREHOUSES,/bc8_configurar_dependienta_almacen/);
+  assert.doesNotMatch(REVIEW,/bc7_configurar_salario_porcentaje_jornada/);
+  assert.doesNotMatch(REVIEW,/Porcentaje salarial y cálculo/);
+  assert.doesNotMatch(REVIEW,/data-bcjr-salary-input/);
 });
 test("The disposable PostgreSQL contract asserts RLS, operational guards, RPC grants and queue wiring",()=>{
   for(const token of ["ux_turnos_maestro_unico_activo_por_almacen","ux_turno_sesion_activa_almacen","turno_tramo_activo_unico","jornada_revision","bc7_obtener_revision_jornada","bc7_clasificar_movimientos_fuera_corte","bc7_resolver_revision_jornada"])assert.ok(SQL_CONTRACT.includes(token),token);

@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.65 — Adriana quick-action recovery and session-only historical value corrections.
+// v7.66 — warehouse-scoped salary rules and the current Jornada handover contract.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
@@ -1188,7 +1188,6 @@
     // the immutable opening inventory is not a product catalogue.
     const products=Array.isArray(detail.productos_ajuste)?detail.productos_ajuste:arr(detail.productos);
     const isRetail=detail.sesion.es_minorista===true;
-    const isOwner=can('reinversiones','editar_any');
     const showExpenses=state.admin||isAssigned;
     const showReinvestments=state.admin||isAssigned;
     const showSales=!isRetail&&(state.admin||can('ventas','ver'));
@@ -1197,20 +1196,13 @@
     const hasWritableTranche=status==='EN_CURSO'?!!detail.tramo_activo:true;
     const createExpenses=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('gastos','crear')&&detail.checklist?.gastos?.completado!==true;
     const createReinvestments=isAssigned&&acceptsPendingOps&&hasWritableTranche&&can('reinversiones','crear')&&detail.checklist?.reinversiones?.completado!==true;
-    const manageSalary=isRetail&&isOwner;
-    if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments&&!manageSalary)return '';
+    if(!showExpenses&&!showReinvestments&&!showSales&&!showSettlement&&!createExpenses&&!createReinvestments)return '';
     let html='<section class="bc7-card" id="bc7-finance-section"><h4>Finanzas y liquidación de la jornada</h4>';
     if(isRetail){
       html+='<p class="bc7-muted">La Cueva calcula las unidades vendidas por diferencia entre inventarios y movimientos aprobados. No utiliza ventas individuales de POS ni reparte existencias por sabores.</p>';
       if(String(status||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&(createExpenses||createReinvestments))
         html+='<div class="bc7-note"><b>Registro tardío de esta Jornada</b><p>Puedes añadir gastos o reinversiones que quedaron pendientes. Se guardarán con la fecha y el responsable de esta Jornada, quedarán sujetos a validación del servidor y aprobación del Dueño y no cambiarán caja ni inventario antes de aprobarse.</p></div>';
       if(showSettlement)html+='<div id="bc7-inventory-settlement"><div class="bc7-empty">Calculando liquidación por inventario…</div></div>';
-      if(manageSalary){
-        html+='<details class="bc7-finance-fold"><summary>Configurar porcentaje salarial</summary><form data-bc7-salary-rate-form="'+esc(sessionId)+'"><h4>Porcentaje salarial de La Cueva</h4>'+
-          '<div class="bc7-grid"><label class="bc7-field">Porcentaje sobre venta comprobada<input data-bc7-salary-percent type="number" min="0" max="100" step="0.001" inputmode="decimal" placeholder="Configurar porcentaje"></label></div>'+
-          '<p class="bc7-muted">La tasa no se presupone a partir del reglamento histórico. Este valor queda registrado por el Dueño y se utiliza en la liquidación de esta tienda.</p>'+
-          '<div class="bc7-actions"><button class="bc7-btn" type="submit">Guardar porcentaje</button></div><p class="bc7-msg" data-bc7-salary-rate-msg></p></form></details>';
-      }
     }else{
       html+='<p class="bc7-muted">Las ventas se muestran solo cuando están vinculadas al ID exacto de esta jornada. El efectivo declarado y contado se presenta por separado.</p>';
     }
@@ -1611,15 +1603,14 @@
     if(result.faltan_cortes)blockers.push('Falta confirmar el inventario inicial o final.');
     if(Number(result.familias_sin_precio||0)>0)blockers.push(Number(result.familias_sin_precio)+' familias no tienen un precio de venta único y válido.');
     if(Number(result.familias_con_vendidas_negativas||0)>0)blockers.push(Number(result.familias_con_vendidas_negativas)+' familias presentan unidades vendidas negativas; revisa sus movimientos y conteos.');
-    if(result.salario_porcentaje==null)blockers.push('El Dueño debe configurar el porcentaje salarial.');
+    if(result.salario_porcentaje==null)blockers.push('Configura el porcentaje salarial individual de esta dependienta desde Almacenes.');
     if(Number(pending.entregas_diarias||0)>0)blockers.push(Number(pending.entregas_diarias)+' entregas diarias pendientes de aprobación.');
     if(Number(pending.entregas_diarias_faltantes||result.entregas_diarias_faltantes||0)>0)blockers.push(Number(pending.entregas_diarias_faltantes||result.entregas_diarias_faltantes)+' días sin entrega diaria aprobada.');
     if(Number(pending.gastos||0)>0)blockers.push(Number(pending.gastos)+' gastos pendientes de aprobación.');
     if(Number(pending.reinversiones||0)>0)blockers.push(Number(pending.reinversiones)+' reinversiones pendientes de aprobación.');
     if(Number(pending.ajustes||0)>0)blockers.push(Number(pending.ajustes)+' bajas pendientes de aprobación.');
-    const rate=result.salario_porcentaje==null?'No configurado':qty(result.salario_porcentaje)+'%';
     host.innerHTML='<div class="bc7-jornada" id="bc7-inventory-settlement-summary"><h4>Liquidación por diferencia de inventario</h4>'+
-      '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. Salario: '+esc(rate)+'.</p>'+
+      '<p class="bc7-muted">Inicial + entradas − salidas aprobadas − final = unidades vendidas. Precio normal de la familia o precio uniforme de sus variantes. El salario usa el porcentaje individual configurado para esta dependienta en Almacenes.</p>'+
       '<p class="bc7-muted">El salario se acumula en CuevaCoin y se paga después; no se descuenta del efectivo de esta jornada.</p>'+
       '<span class="bc7-pill '+(calculable?'ok':'warn')+'">'+(calculable?'Liquidación calculable':'Liquidación provisional · faltan validaciones')+'</span>'+
       cards+(rows.length?'<details class="bc7-finance-fold"><summary>Desglose por producto</summary>'+table+'</details>':table)+
@@ -1781,30 +1772,6 @@
     }finally{busy(btn,false);}
   }
 
-  async function submitSalaryRate(form){
-    const sessionId=form.dataset.bc7SalaryRateForm;
-    const input=form.querySelector('[data-bc7-salary-percent]');
-    const message=form.querySelector('[data-bc7-salary-rate-msg]');
-    const raw=input?.value.trim();
-    const rate=Number(raw);
-    if(!sessionId||raw===''||!Number.isFinite(rate)||rate<0||rate>100){
-      msg(message,'Indica un porcentaje entre 0 y 100.','error');return;
-    }
-    if(!state.detail?.sesion?.almacen_id){msg(message,'No se pudo identificar el almacén de esta jornada.','error');return;}
-    if(!confirm('Se guardará un salario de '+qty(rate)+'% sobre las ventas calculadas por inventario de esta jornada y quedará como predeterminado para futuras jornadas de La Cueva. ¿Confirmas?'))return;
-    const btn=form.querySelector('button[type="submit"]');
-    if(!busy(btn,true))return;
-    try{
-      await rpc('bc7_configurar_salario_porcentaje_jornada',{
-        p_turno_sesion_id:sessionId,p_porcentaje:rate
-      });
-      await loadFinances(state.detail);
-      msg(message,'Porcentaje salarial guardado y aplicado a la liquidación.','ok');
-      setStatus('Porcentaje salarial de La Cueva actualizado.','ok');
-    }catch(e){
-      msg(message,friendlyError(e,'create')+' No se confirmó el cambio.','error');
-    }finally{busy(btn,false);}
-  }
   function cutHtml(cut,products,delivery){
     if(!cut)return '<div class="bc7-empty">Aún no hay conteo confirmado.</div>';
     const lines=arr(cut.lineas);
@@ -2284,53 +2251,9 @@
     '</section>';
   }
   function calculationPhaseHtml(detail){
-    if(detail.sesion?.es_minorista!==true)return '';
-    const checks=detail.checklist||{};
-    const phase=checks.fase||'OPERACION';
-    const settlement=detail.liquidacion||{};
-    if(!checks.lista_para_conteo)return '';
-    const cashDone=String(checks.estado_efectivo_final||'').toUpperCase()==='APROBADA';
-    const cashState=String(checks.estado_efectivo_final||'').toUpperCase();
-    const fifthCheck='<div class="bc7-checklist-row '+(cashDone?'is-done':'is-pending')+'">'+
-      '<span class="bc7-checklist-mark">'+(cashDone?'✓':'↻')+'</span>'+
-      '<div class="bc7-checklist-copy"><b>Conteo físico independiente</b><small>'+(cashDone?'Efectivo contado y aprobado':cashState==='CON_DIFERENCIA'?'Conteo realizado · diferencia pendiente de revisión':'Esperando conteo físico del efectivo recibido por el Dueño')+'</small></div>'+
-      '<span class="bc7-pill '+(cashDone?'ok':'')+'">'+(cashDone?'Aprobado':'Pendiente')+'</span>'+
-    '</div>';
-    if(!checks.lista_para_calcular){
-      if(phase==='LISTA_PARA_ENTREGA'){
-        return '<section class="bc7-calculation-phase is-waiting"><h4>Entrega al Dueño</h4>'+fifthCheck+'<p>Los cinco pasos de la jornada están completos. Entrega la jornada para habilitar el conteo físico del Dueño. El Turno maestro seguirá abierto.</p></section>';
-      }
-      if(phase==='PENDIENTE_CONTEO_DUENO'){
-        return '<section class="bc7-calculation-phase is-waiting"><h4>Conteo físico · paso posterior</h4>'+
-          fifthCheck+'<p>Los cinco pasos de la jornada están completos. El Dueño debe registrar el conteo físico independiente del total de entregas diarias aprobadas antes de iniciar los cálculos.</p></section>';
-      }
-      const pending=settlement.pendientes||{};
-      const reasons=[];
-      if(Number(pending.gastos||0)>0)reasons.push(Number(pending.gastos)+' gasto(s) pendientes');
-      if(Number(pending.reinversiones||0)>0)reasons.push(Number(pending.reinversiones)+' reinversión(es) pendientes');
-      if(Number(pending.ajustes||0)>0)reasons.push(Number(pending.ajustes)+' bajas pendientes');
-      if(Number(pending.entregas_diarias||0)>0||Number(pending.entregas_diarias_faltantes||0)>0)reasons.push('entregas diarias de efectivo pendientes');
-      if(cashState==='CON_DIFERENCIA')reasons.push('el conteo de efectivo tiene una diferencia pendiente de revisión');
-      if(settlement.salario_porcentaje==null)reasons.push('falta configurar el porcentaje salarial');
-      if(Number(settlement.familias_sin_precio||0)>0)reasons.push('hay productos sin precio');
-      if(Number(settlement.familias_con_vendidas_negativas||0)>0)reasons.push('hay diferencias negativas de inventario');
-      return '<section class="bc7-calculation-phase is-waiting"><h4>Fase 2 · Preparando cálculos</h4>'+
-        fifthCheck+'<p>Las entregas diarias de efectivo ya quedaron registradas en el paso 1. El conteo físico independiente se realiza después de entregar la jornada; BattleCruiser habilitará los cálculos al resolver también las pendientes y configurar lo necesario.</p>'+
-        (reasons.length?'<small>'+esc(reasons.join(' · '))+'</small>':'')+'</section>';
-    }
-    if(settlement.calculable!==true)return '';
-    const metrics=[
-      ['Ventas estimadas',settlement.ventas_estimadas],
-      ['Salario calculado',settlement.salario_calculado],
-      ['Gastos aprobados',settlement.gastos_aprobados],
-      ['Reinversiones aprobadas',settlement.reinversiones_aprobadas],
-      ['Efectivo esperado (sin salario)',(settlement.efectivo_esperado_despues_de_gastos_reinversiones??settlement.efectivo_esperado_despues_de_gastos_reinversiones_salario)],
-      ['Sobrante / faltante (− sobrante · + faltante)',settlement.diferencia]
-    ];
-    return '<section class="bc7-calculation-phase is-ready"><h4>Fase 2 · Cálculos automáticos completados</h4>'+
-      fifthCheck+'<div class="bc7-calculation-grid">'+
-      metrics.map(([label,value])=>'<div><small>'+esc(label)+'</small><b>'+(value==null?'—':money(value)+' CUP')+'</b></div>').join('')+
-      '</div><p>La jornada queda lista para la revisión final. El Turno todavía no está cerrado: el Dueño debe revisar el expediente, dejar su observación y pulsar «Aprobar turno» en Turnos.</p></section>';
+    // La revisión integral del turno es la fuente única de los cálculos financieros.
+    // No duplicar este resumen en la pantalla de captura de la Jornada.
+    return '';
   }
   function previewValue(value){return value==null?'—':esc(String(value));}
   function previewTable(headers,rows,primaryCount=3){
@@ -3914,7 +3837,6 @@
     else if(f.matches('[data-bc7-close-form]')){e.preventDefault();await closeSession(f);}
     else if(f.matches('[data-bc7-adjust-form]')){e.preventDefault();await submitAdjustment(f);}
     else if(f.matches('[data-bc7-finance-form]')){e.preventDefault();await submitFinance(f);}
-    else if(f.matches('[data-bc7-salary-rate-form]')){e.preventDefault();await submitSalaryRate(f);}
     else if(f.matches('[data-bc7-admin-cash-declaration]')){e.preventDefault();await saveAdminCashDeclaration(f);}
     else if(f.matches('[data-bc7-rectify-cash-declaration]')){e.preventDefault();await rectifyAdminCashDeclaration(f);}
   });

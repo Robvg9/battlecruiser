@@ -76,13 +76,13 @@ test("worker dashboard shows the signed-in worker's own jornada list and direct 
 test("worker dashboard and owner review release versions are aligned with the precache", () => {
   assert.match(app, /\["permisos-navegacion\.js","67\.9"\]/);
   assert.match(serviceWorker, /permisos-navegacion\.js\?v=67\.9/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.65"\]/);
-  assert.match(app, /\["jornada-owner-review\.js","1\.16"\]/);
-  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.160"/);
-  assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.65/);
-  assert.match(serviceWorker, /jornada-owner-review\.js\?v=1\.16/);
-  assert.match(index, /style\.css\?v=9\.5\.160/);
-  assert.match(index, /app\.js\?v=9\.5\.160/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.66"\]/);
+  assert.match(app, /\["jornada-owner-review\.js","1.18"\]/);
+  assert.match(serviceWorker, /BC_SW_VERSION = "9\.5\.162"/);
+  assert.match(serviceWorker, /bc7-jornada-ui\.js\?v=7\.66/);
+  assert.match(serviceWorker, /jornada-owner-review\.js\?v=1.18/);
+  assert.match(index, /style\.css\?v=9\.5\.162/);
+  assert.match(index, /app\.js\?v=9\.5\.162/);
 });
 
 test("Mis jornadas shows an explicit state while session and calendar startup are pending or failing", () => {
