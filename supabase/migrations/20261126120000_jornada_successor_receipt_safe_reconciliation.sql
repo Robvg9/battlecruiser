@@ -263,6 +263,23 @@ BEGIN
       FROM public.turno_jornada_inventario_correcciones ic
       JOIN public.productos mp ON mp.id = ic.producto_id
       WHERE ic.turno_sesion_id <> v_source.id
+        -- Exclude a late-recorded correction to the exact previous FINAL cut
+        -- from which this source Jornada's INITIAL was inherited. It belongs
+        -- to opening stock before this Jornada, not an intermediate movement.
+        AND NOT (
+          ic.tipo = 'FINAL'
+          AND EXISTS (
+            SELECT 1
+            FROM public.turno_jornada_inventario_cortes opening_cut
+            JOIN public.turno_jornada_inventario_cortes inherited_final
+              ON inherited_final.id = opening_cut.origen_corte_id
+             AND inherited_final.turno_sesion_id = ic.turno_sesion_id
+             AND inherited_final.tipo = 'FINAL'
+            WHERE opening_cut.turno_sesion_id = v_source.id
+              AND opening_cut.tipo = 'INICIAL'
+              AND opening_cut.estado = 'CONFIRMADO'
+          )
+        )
         AND ic.creado_en > v_start AND ic.creado_en <= v_end
         AND coalesce(mp.producto_padre_id,mp.id) = v_item.familia_id
       UNION ALL
