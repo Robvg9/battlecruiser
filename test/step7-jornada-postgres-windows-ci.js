@@ -407,6 +407,7 @@ function applySql(file) {
     applySql("supabase/migrations/20261124180000_jornada_linked_transfer_cutoff_override.sql");
     applySql("supabase/migrations/20261124200000_jornada_session_inventory_attribution_hardening.sql");
     applySql("supabase/migrations/20261124220000_jornada_fosforeras_restore_and_operationally_closed_price_tranches.sql");
+    applySql("supabase/migrations/20261126173319_jornada_allow_single_price_tranche.sql");
     applySql("test/jornada-fosforeras-and-operational-close-price-tranches-contract.sql");
     log("Apply source-FINAL successor snapshot synchronization and verify historical product-set immutability.");
     applySql("supabase/migrations/20261124230000_jornada_successor_final_snapshot_sync.sql");

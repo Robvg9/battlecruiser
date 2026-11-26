@@ -89,8 +89,8 @@ test("the historical accounting sign is preserved: a 3,480 CUP revenue reduction
 });
 
 test("PWA caches the updated owner review module and Step 7 applies the new migration",()=>{
-  assert.match(app,/\["jornada-owner-review\.js","1\.21"\]/);
-  assert.match(sw,/jornada-owner-review\.js\?v=1\.21/);
+  assert.match(app,/\["jornada-owner-review\.js","1\.22"\]/);
+  assert.match(sw,/jornada-owner-review\.js\?v=1\.22/);
   assert.match(workflow,/20261126035000_jornada_successor_receipt_safe_reconciliation\.sql/);
   assert.match(workflow,/jornada-successor-receipt-safe-reconciliation-contract\.sql/);
   assert.match(runner,/applySql\("supabase\/migrations\/20261126035000_jornada_successor_receipt_safe_reconciliation\.sql"\)/);
