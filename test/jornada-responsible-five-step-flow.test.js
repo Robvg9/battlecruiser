@@ -73,22 +73,25 @@ test("sealed step 5 is mounted only inside the checklist source container",()=>{
   assert.match(ui,/const op=.*cashDaysManagerShellHtml/);
 });
 test("dynamic Jornada assets and PWA shell versions are aligned",()=>{
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.67"\]/);
-  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.67/);
-  assert.match(app,/9\.5\.165/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.165"/);
+  assert.match(ui,/\/\/ v7\.68 — keep Bajas checklist mounted after review submission/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.68"\]/);
+  assert.match(sw,/bc7-jornada-ui\.js\?v=7\.68/);
+  assert.match(app,/9\.5\.166/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.166"/);
 });
 
 
-test("sending a Bajas review request returns the worker to Bajas and keeps final confirmation explicit",()=>{
+test("sending a Bajas review request keeps the active Bajas modal open for explicit final confirmation",()=>{
   const start=ui.indexOf("async function submitAdjustment(form){");
   const end=ui.indexOf("async function openRetroSuccessorPanel",start);
   assert.ok(start>=0&&end>start,"adjustment submission handler exists");
   const submit=ui.slice(start,end);
-  assert.match(submit,/const reopenBajas=storageType==='baja'/);
-  assert.match(submit,/if\(reopenBajas\)closeChecklistModal\(\{restore:true\}\)/);
-  assert.match(submit,/const refreshed=await openWorkspace\(sessionId\)/);
-  assert.match(submit,/if\(refreshed&&reopenBajas\)\{openChecklistSection\('bajas'\)/);
+  assert.match(submit,/const keepBajasPanelOpen=checklistModalContext\?\.key==='bajas'&&!!checklistModalContext\.root\?\.isConnected/);
+  assert.match(submit,/if\(keepBajasPanelOpen\)\{/);
+  assert.match(submit,/form\.reset\(\);[\s\S]*?syncAdjustmentRows\(form\)/);
+  assert.match(submit,/if\(keepBajasPanelOpen\)\{[\s\S]*?modalState\.textContent=[\s\S]*?return;[\s\S]*?if\(reopenBajas\)closeChecklistModal/);
+  assert.match(submit,/La sección Bajas sigue abierta/);
+  assert.match(submit,/Confirmar que no faltan más bajas/);
   assert.doesNotMatch(submit,/bc7_confirmar_bloque_jornada/,
     "sending the list must never auto-confirm that there are no more Bajas");
   const modalStart=ui.indexOf("function openChecklistSection(key){");

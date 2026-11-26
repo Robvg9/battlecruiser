@@ -1620,7 +1620,8 @@ body.bc-admin-approval-open{overflow:hidden;overscroll-behavior:none}
  #app-shell.visible > header.app-header.app-header #mi-cuenta-btn,#app-shell.visible > header.app-header.app-header #logout-btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;order:initial!important;grid-area:auto!important;min-width:0!important;max-width:none!important;white-space:nowrap!important}
  #app-shell.visible > header.app-header.app-header #mi-cuenta-btn{margin:0!important}
  #app-shell.visible > header.app-header.app-header #logout-btn{margin:0!important}
- #app-shell.visible > header.app-header.app-header #user-email{display:none!important}
+ /* Keep the signed-in identity visible in the compact header; never render an empty chip. */
+ #app-shell.visible > header.app-header.app-header #user-email:not(:empty){display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 1 auto!important;min-width:0!important;max-width:clamp(48px,18vw,108px)!important;margin:0 2px!important;padding:3px 6px!important;font-size:10px!important;line-height:1.1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;visibility:visible!important;opacity:1!important}
  #app-shell.visible > header.app-header.app-header #conn-status-app{display:none!important}
  #app-shell.visible > header.app-header.app-header #cola-pendientes-badge{display:none!important}
  #tab-jornada .bc7-note{padding:10px}

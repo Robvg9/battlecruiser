@@ -549,16 +549,17 @@ function mostrarInfoUsuarioEnHeader() {
   var esRolAdmin = rolNormalizado === "dueno" || rolNormalizado === "admin" ||
     rolNormalizado === "administrador" || rolNormalizado === "owner";
   var nombre = _usuarioActual.nombre ? String(_usuarioActual.nombre).trim() : "";
-  if (nombre && !esIdentidadInternaOTemporal(nombre)) {
-    // The compact header uses the first given name (Roberto, Sheyla, Adriana, etc.).
-    var nombreCorto = nombre.split(/\s+/)[0];
-    el.textContent = nombreCorto;
-    el.title = "Usuario activo: " + nombre + (esRolAdmin ? " · Admin" : (rol ? " · " + rol : ""));
-    return;
-  }
+  // Owner/Admin is explicitly labelled Admin; the full profile remains in the tooltip.
   if (esRolAdmin) {
     el.textContent = "Admin";
-    el.title = "Usuario activo: Admin";
+    el.title = "Usuario activo: " + (nombre && !esIdentidadInternaOTemporal(nombre) ? nombre + " · Admin" : "Admin");
+    return;
+  }
+  if (nombre && !esIdentidadInternaOTemporal(nombre)) {
+    // Dependienta profiles use their first given name (Sheyla, Adriana, etc.).
+    var nombreCorto = nombre.split(/\s+/)[0];
+    el.textContent = nombreCorto;
+    el.title = "Usuario activo: " + nombre + (rol ? " · " + rol : "");
     return;
   }
   if (typeof _permisosCargaExitosa !== "undefined" && _permisosCargaExitosa) {

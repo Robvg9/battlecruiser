@@ -58,14 +58,18 @@ test("movement attribution table supports select-all and fits its container",()=
   assert.match(CSS,/width:16px!important/);
 });
 
-test("Baja submission reopens Bajas without confirming there are no more entries",()=>{
-  assert.match(UI,/const reopenBajas=storageType==='baja'/);
-  assert.match(UI,/openChecklistSection\('bajas'\)/);
-  assert.match(UI,/Confirmar que no faltan más bajas/);
+test("Baja submission preserves the already-open checklist so the worker can confirm immediately",()=>{
   const start=UI.indexOf("async function submitAdjustment(form){");
   const end=UI.indexOf("async function openRetroSuccessorPanel",start);
   assert.ok(start>=0&&end>start);
-  assert.doesNotMatch(UI.slice(start,end),/bc7_confirmar_bloque_jornada/);
+  const submit=UI.slice(start,end);
+  assert.match(submit,/checklistModalContext\?\.key==='bajas'/);
+  assert.match(submit,/if\(keepBajasPanelOpen\)\{/);
+  assert.match(submit,/form\.reset\(\);[\s\S]*?syncAdjustmentRows\(form\)/);
+  assert.match(submit,/La sección Bajas sigue abierta/);
+  assert.match(submit,/Confirmar que no faltan más bajas/);
+  assert.doesNotMatch(submit,/bc7_confirmar_bloque_jornada/,
+    "sending a request must never mark the Bajas checklist complete");
 });
 
 test("sealed FINAL uses period products while preserving INICIAL and global stock",()=>{
@@ -95,10 +99,10 @@ test("price-change eligibility remains unchanged in this mission",()=>{
 });
 
 test("PWA asset versions are aligned",()=>{
-  assert.match(APP,/9\.5\.165/);
-  assert.match(SW,/9\.5\.165/);
-  assert.match(APP,/bc7-jornada-ui\.js","7\.67"/);
-  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.67/);
+  assert.match(APP,/9\.5\.166/);
+  assert.match(SW,/9\.5\.166/);
+  assert.match(APP,/bc7-jornada-ui\.js","7\.68"/);
+  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.68/);
   assert.match(INDEX,/bc7-jornada-inventory-mobile\.css\?v=20261116\.3/);
   assert.match(SW,/bc7-jornada-inventory-mobile\.css\?v=20261116\.3/);
 });

@@ -16,14 +16,13 @@ test("the header displays one active identity beside the BattleCruiser title",()
   assert.doesNotMatch(index,/<div class="header-right">[\s\S]*?<span id="user-email"/);
 });
 
-test("every signed-in account displays its actual first name before role fallback",()=>{
-  const nameStart=user.indexOf("var nombre = _usuarioActual.nombre");
-  const nameBranch=user.indexOf("if (nombre && !esIdentidadInternaOTemporal(nombre))",nameStart);
-  const adminFallback=user.indexOf("if (esRolAdmin)",nameBranch);
-  assert.ok(nameStart>=0 && nameBranch>nameStart && adminFallback>nameBranch);
-  assert.match(user,/el\.textContent = nombreCorto/);
-  assert.match(user,/el\.title = "Usuario activo: " \+ nombre \+ \(esRolAdmin \? " · Admin"/);
+test("Owner/Admin displays Admin; dependiente profiles display their first name",()=>{
+  const adminBranch=user.indexOf("if (esRolAdmin)");
+  const nameBranch=user.indexOf("if (nombre && !esIdentidadInternaOTemporal(nombre))");
+  assert.ok(adminBranch>=0 && nameBranch>adminBranch);
   assert.match(user,/el\.textContent = "Admin"/);
+  assert.match(user,/nombre \+ " · Admin"/);
+  assert.match(user,/el\.textContent = nombreCorto/);
 });
 
 test("the identity comes from the active authenticated profile and offline snapshot",()=>{
@@ -36,15 +35,21 @@ test("the identity comes from the active authenticated profile and offline snaps
   assert.match(auth,/_usuarioActualId = session\.user\.id/);
 });
 
-test("the active-user chip remains compact in the Android header",()=>{
+test("the active-user chip remains visible and compact in the Android header",()=>{
   assert.match(css,/\.header-left \.bc-active-user/);
   assert.match(css,/@media \(max-width: 759px\), \(hover: none\) and \(pointer: coarse\)/);
   assert.match(css,/\.header-left #user-email\s*\{[\s\S]*?max-width: 27vw/);
+  const visibleRule = css.lastIndexOf("#app-shell.visible > header.app-header.app-header #user-email:not(:empty)");
+  const hiddenRule = css.lastIndexOf("#user-email{display:none!important}");
+  assert.ok(visibleRule>=0 && visibleRule>hiddenRule,"the final compact-header override must keep the nonempty identity visible");
+  assert.match(css.slice(visibleRule),/display:inline-flex!important/);
 });
 
-test("PWA 9.5.165 serves the refreshed identity profile module",()=>{
-  assert.match(app,/const VERSION="9\.5\.165"/);
-  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.165/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.165"/);
-  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.165/);
+test("PWA 9.5.166 serves the refreshed compact header and synchronized cache",()=>{
+  assert.match(app,/const VERSION="9\.5\.166"/);
+  assert.match(index,/style\.css\?v=9\.5\.166/);
+  assert.match(index,/app\.js\?v=9\.5\.166/);
+  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.166/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.166"/);
+  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.166/);
 });

@@ -31,13 +31,13 @@ test("Owner movement decisions are framed against the operational close, not FIN
 });
 
 test("PWA app, Service Worker, module URLs and HTML shell remain release-aligned",()=>{
-  assert.match(APP,/const VERSION="9\.5\.165"/);
-  assert.match(SW,/BC_SW_VERSION = "9\.5\.165"/);
-  assert.match(APP,/\["bc7-jornada-ui\.js","7\.67"\]/);
-  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.67/);
+  assert.match(APP,/const VERSION="9\.5\.166"/);
+  assert.match(SW,/BC_SW_VERSION = "9\.5\.166"/);
+  assert.match(APP,/\["bc7-jornada-ui\.js","7\.68"\]/);
+  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.68/);
   assert.match(APP,/\["jornada-owner-review\.js","1.19"\]/);
   assert.match(SW,/jornada-owner-review\.js\?v=1.19/);
-  assert.match(INDEX,/app\.js\?v=9\.5\.165/);
-  assert.match(INDEX,/style\.css\?v=9\.5\.165/);
+  assert.match(INDEX,/app\.js\?v=9\.5\.166/);
+  assert.match(INDEX,/style\.css\?v=9\.5\.166/);
   assert.match(RUNNER,/jornada_owner_review_operational_cut_classification\.sql/);
 });
