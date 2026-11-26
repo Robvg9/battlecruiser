@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.162 — Warehouse per-dependent salary settings; Jornada financial summary stays in Owner review.
+// v9.5.163 — Fast authenticated shell; supporting modules continue loading in order.
 (function hotfixV9475(){
-  const VERSION="9.5.162";
+  const VERSION="9.5.163";
   window.__BC_VERSION__=VERSION;
   document.addEventListener("wheel",function(event){var input=event.target&&event.target.closest?event.target.closest("input[type=number]"):null;if(input)event.preventDefault();},{capture:true,passive:false});
   function aplicarVersion(){
@@ -258,37 +258,72 @@
     return state;
   }
 
-  function terminarBootUI(results){
-    if(window.__BC_UI_READY_RESOLVED__)return;
-    const safeResults=Array.isArray(results)?results:[];
-    const failed=safeResults.filter(item=>item.status==="failed").length;
-    const timedOut=safeResults.filter(item=>item.status==="timed_out").length;
-    const loaded=safeResults.length-failed-timedOut;
-    const summary={
-      status:failed||timedOut?"degraded":"ready",
+  const CORE_MODULE_COUNT=23;
+  let resolveBackgroundModules;
+  window.__BC_BACKGROUND_MODULES_READY__=new Promise(resolve=>{
+    resolveBackgroundModules=resolve;
+  });
+
+  function moduleSummary(coreResults,backgroundResults,backgroundPending){
+    const core=Array.isArray(coreResults)?coreResults:[];
+    const background=Array.isArray(backgroundResults)?backgroundResults:[];
+    const all=core.concat(background);
+    const countFailed=items=>items.filter(item=>item.status==="failed").length;
+    const countTimedOut=items=>items.filter(item=>item.status==="timed_out").length;
+    return {
+      status:backgroundPending?"core_ready_background_loading":(countFailed(all)||countTimedOut(all)?"degraded":"ready"),
       total:modules.length,
-      loaded,
-      failed,
-      timedOut,
-      results:safeResults
+      loaded:all.filter(item=>!["failed","timed_out"].includes(item.status)).length,
+      failed:countFailed(all),
+      timedOut:countTimedOut(all),
+      core:{total:core.length,loaded:core.filter(item=>!["failed","timed_out"].includes(item.status)).length,failed:countFailed(core),timedOut:countTimedOut(core),results:core},
+      background:{total:modules.length-core.length,loaded:background.filter(item=>!["failed","timed_out"].includes(item.status)).length,failed:countFailed(background),timedOut:countTimedOut(background),pending:backgroundPending,results:background}
     };
-    window.__BC_MODULE_LOAD_STATE__=summary;
+  }
+
+  function terminarBootUI(coreResults){
+    if(window.__BC_UI_READY_RESOLVED__)return;
+    const safeCore=Array.isArray(coreResults)?coreResults:[];
+    const coreFailed=safeCore.some(item=>item.status==="failed"||item.status==="timed_out");
+    let summary=moduleSummary(safeCore,[],true);
     try {
       summary.headerActions=normalizarAccionesHeader();
     } catch(error) {
       summary.headerActions={error:String(error&&error.message||error)};
       console.error("[BattleCruiser] No se pudieron normalizar los iconos del encabezado:",error);
     }
-    window.__BC_UI_READY_DEGRADED__=summary.status==="degraded";
+    window.__BC_MODULE_LOAD_STATE__=summary;
+    window.__BC_UI_READY_DEGRADED__=coreFailed;
     window.__BC_UI_READY_RESOLVED__=true;
     resolveUIReady(summary);
     window.dispatchEvent(new Event("bc:ui-ready"));
+
+    // The authenticated shell is now usable. Supporting modules continue in the
+    // original registry order, without blocking login or the first dashboard paint.
+    const backgroundEntries=modules.slice(CORE_MODULE_COUNT);
+    const backgroundPromises=backgroundEntries.map(([name,version])=>cargarUno(name,version));
+    Promise.all(backgroundPromises).then(backgroundResults=>{
+      const complete=moduleSummary(safeCore,backgroundResults,false);
+      complete.headerActions=summary.headerActions;
+      window.__BC_MODULE_LOAD_STATE__=complete;
+      window.__BC_UI_READY_DEGRADED__=coreFailed;
+      window.dispatchEvent(new Event("bc:background-modules-ready"));
+      resolveBackgroundModules(complete);
+    }).catch(error=>{
+      const failed=[{name:"background-module-loader",status:"failed",reason:String(error&&error.message||error)}];
+      const complete=moduleSummary(safeCore,failed,false);
+      complete.headerActions=summary.headerActions;
+      window.__BC_MODULE_LOAD_STATE__=complete;
+      window.dispatchEvent(new Event("bc:background-modules-ready"));
+      resolveBackgroundModules(complete);
+    });
   }
 
-  const pendientes=modules.map(([name,version])=>cargarUno(name,version));
-  Promise.all(pendientes).then(terminarBootUI).catch(error=>{
-    console.error("[BattleCruiser] Falló la coordinación de carga de módulos:",error);
-    terminarBootUI([{name:"module-loader",status:"failed",reason:String(error&&error.message||error)}]);
+  const coreEntries=modules.slice(0,CORE_MODULE_COUNT);
+  const pendingCore=coreEntries.map(([name,version])=>cargarUno(name,version));
+  Promise.all(pendingCore).then(terminarBootUI).catch(error=>{
+    console.error("[BattleCruiser] Falló la coordinación de módulos críticos:",error);
+    terminarBootUI([{name:"core-module-loader",status:"failed",reason:String(error&&error.message||error)}]);
   });
 })();
 
@@ -296,7 +331,7 @@
 // The active worker retains prior release caches while multiple tabs are open.
 (function liberarCachesObsoletasTrasBoot(){
   if (!("serviceWorker" in navigator)) return;
-  Promise.resolve(window.__BC_UI_READY__).then(function() {
+  Promise.all([window.__BC_UI_READY__,window.__BC_BACKGROUND_MODULES_READY__]).then(function() {
     return navigator.serviceWorker.ready;
   }).then(function(registration) {
     var worker = navigator.serviceWorker.controller || registration.active;
