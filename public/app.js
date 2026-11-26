@@ -199,7 +199,7 @@
     })||null;
   }
 
-  function cargarUno(name,version){
+  function cargarUno(name,version,timeoutMs){
     return new Promise(resolve=>{
       const existing=findModuleScript(name);
       if(existing){
@@ -225,7 +225,7 @@
       };
       script.onload=()=>finish("loaded");
       script.onerror=()=>finish("failed");
-      timer=setTimeout(()=>finish("timed_out"),12000);
+      timer=setTimeout(()=>finish("timed_out"),Number(timeoutMs)||12000);
       document.body.appendChild(script);
     });
   }
@@ -320,7 +320,7 @@
   }
 
   const coreEntries=modules.slice(0,CORE_MODULE_COUNT);
-  const pendingCore=coreEntries.map(([name,version])=>cargarUno(name,version));
+  const pendingCore=coreEntries.map(([name,version])=>cargarUno(name,version,8000));
   Promise.all(pendingCore).then(terminarBootUI).catch(error=>{
     console.error("[BattleCruiser] Falló la coordinación de módulos críticos:",error);
     terminarBootUI([{name:"core-module-loader",status:"failed",reason:String(error&&error.message||error)}]);
