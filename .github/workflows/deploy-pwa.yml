@@ -15,6 +15,8 @@ on:
       # Any test-only commit changes the canonical main SHA used by release provenance.
       # Redeploy on all test changes so the LIVE manifest can certify that exact commit.
       - 'test/**'
+      # Keep the PWA's deployed source SHA aligned when a Supabase migration is merged.
+      - 'supabase/migrations/**'
   workflow_dispatch:
 
 concurrency:
