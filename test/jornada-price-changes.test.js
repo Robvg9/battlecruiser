@@ -10,6 +10,7 @@ const costMigration=fs.readFileSync("supabase/migrations/20261119193000_jornada_
 const ui=fs.readFileSync("public/js/jornada-price-changes.js","utf8");
 const app=fs.readFileSync("public/app.js","utf8");
 const sw=fs.readFileSync("public/service-worker.js","utf8");
+const ownerReview=fs.readFileSync("public/js/jornada-owner-review.js","utf8");
 const index=fs.readFileSync("public/index.html","utf8");
 
 test("Jornada price changes are server-owned, audited, and wait for a physical count",()=>{
@@ -117,4 +118,26 @@ test("Price-change preview uses the existing read-only Jornada schedule RPC when
   assert.match(ui, /p_fecha_inicio: shiftDate\(day, -30\)/);
   assert.match(ui, /p_fecha_fin: shiftDate\(day, 30\)/);
   assert.match(ui, /item\.estado !== 'CANCELADA'/);
+});
+
+
+test("Owner review accepts one real price tranche and rejects invalid quantities/prices before RPC", () => {
+  const editor = ownerReview.slice(ownerReview.indexOf("function openTranchesEditor"), ownerReview.indexOf("async function saveValuesEditor"));
+  assert.ok(editor.includes("placeholder=\\"0.95 x 1400"), "the example shows a valid single-line correction");
+  assert.match(editor, /tramos\.length<1/);
+  assert.match(editor, /tramos\.length>30/);
+  assert.match(editor, /invalidTranche/);
+  assert.match(editor, /Number\.isFinite\(x\.cantidad\)/);
+  assert.match(editor, /x\.cantidad<=0/);
+  assert.match(editor, /Number\.isFinite\(x\.precio_unitario\)/);
+  assert.match(editor, /x\.precio_unitario<0/);
+  assert.match(editor, /Una línea por cada precio real/);
+  assert.doesNotMatch(editor, /tramos\.length<2/);
+});
+
+test("Owner review and offline precache use the same new tranche editor cache key", () => {
+  const appVersion = app.match(/\["jornada-owner-review\.js","([^"]+)"\]/)?.[1];
+  const swVersion = sw.match(/\.\/js\/jornada-owner-review\.js\?v=([^"]+)/)?.[1];
+  assert.equal(appVersion, "1.22");
+  assert.equal(swVersion, appVersion);
 });
