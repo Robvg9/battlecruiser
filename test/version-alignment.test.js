@@ -204,7 +204,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.ok(app.includes("// v9.5.167 — Keep active identity visible in compact layouts; propagate audited successor INITIAL corrections."));
+  assert.ok(app.includes("// v9.5.167 — Keep active identity visible; propagate audited successor INITIAL corrections; hide resolved post-cut alerts."));
   assert.ok(index.includes('<script src="app.js?v=9.5.167"></script>'));
   for (const asset of [
     'style.css?v=9.5.167',
