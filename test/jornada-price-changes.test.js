@@ -123,7 +123,7 @@ test("Price-change preview uses the existing read-only Jornada schedule RPC when
 
 test("Owner review accepts one real price tranche and rejects invalid quantities/prices before RPC", () => {
   const editor = ownerReview.slice(ownerReview.indexOf("function openTranchesEditor"), ownerReview.indexOf("async function saveValuesEditor"));
-  assert.ok(editor.includes("placeholder=\\"0.95 x 1400"), "the example shows a valid single-line correction");
+  assert.ok(editor.includes('placeholder="0.95 x 1400'), "the example shows a valid single-line correction");
   assert.match(editor, /tramos\.length<1/);
   assert.match(editor, /tramos\.length>30/);
   assert.match(editor, /invalidTranche/);
