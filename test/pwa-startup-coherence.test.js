@@ -125,6 +125,13 @@ test("PWA loader: critical modules unblock the shell while supporting modules co
     "module readiness diagnostics must be available to the application");
   assert.match(app, /__BC_UI_READY_DEGRADED__/,
     "critical readiness degradation must remain externally observable");
+  const backgroundFinishStart = app.indexOf("function terminarCargaComplementaria");
+  const backgroundFinishEnd = app.indexOf("Promise.all(backgroundPromises).then(terminarCargaComplementaria)", backgroundFinishStart);
+  assert.ok(backgroundFinishStart >= 0 && backgroundFinishEnd > backgroundFinishStart,
+    "background completion must have one finalization point");
+  const backgroundFinish = app.slice(backgroundFinishStart, backgroundFinishEnd);
+  assert.match(backgroundFinish, /complete\.headerActions\s*=\s*normalizarAccionesHeader\(\)/,
+    "header actions must be normalized again after supporting modules settle");
 });
 
 test("Jornada: operation-only RPCs load on demand and keep retry available", () => {
