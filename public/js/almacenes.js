@@ -74,6 +74,15 @@ function cargarStockVisualAlmacenes(force) {
     return Promise.resolve(_cache.stock_visual || []);
   }
 
+  var warehouseId = _almacenSeleccionadoId || null;
+  if (!warehouseId) {
+    _stockVistaRequestId++;
+    _stockVistaCargaPromise = null;
+    _stockVistaCargaEstado = "ok";
+    _stockVistaCargaError = null;
+    _cache.stock_visual = [];
+    return Promise.resolve([]);
+  }
   var requestId = ++_stockVistaRequestId;
   _stockVistaCargaEstado = "loading";
   _stockVistaCargaError = null;
@@ -85,8 +94,8 @@ function cargarStockVisualAlmacenes(force) {
         throw new Error("Cliente de inventario no disponible.");
       }
       var pair = await bcConTimeoutLocal(Promise.all([
-        client.rpc("inventario_enriquecido", { p_almacen_id: null }),
-        client.rpc("inventario_mixto_enriquecido", { p_almacen_id: null })
+        client.rpc("inventario_enriquecido", { p_almacen_id: warehouseId }),
+        client.rpc("inventario_mixto_enriquecido", { p_almacen_id: warehouseId })
       ]), BC_STOCK_TIMEOUT_MS, "inventario visual");
       var ordinaryResult = pair[0];
       var mixedResult = pair[1];
@@ -252,8 +261,12 @@ let _bcAlmacenEquipoRequestId = 0;
 
 function bcAlmacenEquipoSectionHtml(almacenId, almacenActivo) {
   return '<section class="bc-alm-equipo" data-bc-alm-equipo data-almacen-id="' + escHtml(almacenId) + '" data-almacen-activo="' + (almacenActivo ? 'true' : 'false') + '">' +
-    '<div class="bc-alm-equipo-head"><div><h4>Personal y salarios</h4><p>Asigna las dependientas que trabajan en este almacén y define el porcentaje individual de su salario.</p></div></div>' +
-    '<div class="bc-alm-equipo-body" data-bc-alm-equipo-body><p class="lista-estado">Consultando el equipo del almacén…</p></div>' +
+    '<div class="bc-alm-equipo-head"><h4>Personal y salarios</h4>' +
+      '<button type="button" class="bc-alm-equipo-add-trigger" data-bc-alm-equipo-open-modal="assign" title="Asignar dependienta" aria-label="Asignar dependienta" disabled>' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M16 11h6"/></svg>' +
+      '</button></div>' +
+    '<div class="bc-alm-equipo-body" data-bc-alm-equipo-body><p class="lista-estado">Consultando el equipo…</p></div>' +
+    '<div class="bc-alm-modal-backdrop" data-bc-alm-modal hidden></div>' +
     '<p class="bc-alm-equipo-status" data-bc-alm-equipo-status role="status" aria-live="polite"></p></section>';
 }
 
@@ -267,44 +280,85 @@ function bcAlmacenEquipoStatus(section, message, isError) {
 
 function bcAlmacenEquipoBodyHtml(data, almacenActivo) {
   const assigned = Array.isArray(data && data.dependientas) ? data.dependientas : [];
-  const available = Array.isArray(data && data.disponibles) ? data.disponibles : [];
-  const assignedHtml = assigned.length ? assigned.map(function (person) {
+  const warehouse = (_cache.almacenes || []).find(function (item) {
+    return mismoIdAlmacen(item.id, _almacenSeleccionadoId);
+  });
+  const warehouseName = warehouse && warehouse.nombre || 'Este almacén';
+  if (!assigned.length) {
+    return '<p class="bc-alm-equipo-empty">Todavía no hay dependientas asignadas.</p>';
+  }
+  return '<div class="bc-alm-equipo-list">' + assigned.map(function (person) {
     const userId = escHtml(person.usuario_id);
     const name = escHtml(person.nombre || 'Dependienta');
     const permanent = person.salario_porcentaje_permanente;
-    const temporary = person.salario_porcentaje_temporal;
-    let temporaryLabel = 'Sin porcentaje temporal pendiente.';
-    if (temporary != null && person.salario_temporal_consumido_en) {
-      temporaryLabel = 'Temporal ' + escHtml(String(temporary)) + '% aplicado; el porcentaje de esa jornada quedó congelado.';
-    } else if (temporary != null && person.salario_temporal_fecha) {
-      temporaryLabel = 'Temporal ' + escHtml(String(temporary)) + '% reservado para el ' + escHtml(person.salario_temporal_fecha) + '.';
-    } else if (temporary != null) {
-      temporaryLabel = 'Temporal ' + escHtml(String(temporary)) + '% pendiente: se aplicará a la próxima jornada programada.';
-    }
-    return '<article class="bc-alm-equipo-persona" data-bc-alm-equipo-card>' +
-      '<div class="bc-alm-equipo-persona-head"><div><b>' + name + '</b><small>' +
-        (permanent == null ? 'Porcentaje permanente sin configurar' : 'Permanente actual: ' + escHtml(String(permanent)) + '%') +
-      '</small><small>' + temporaryLabel + '</small></div><span class="bc-alm-equipo-pill">Asignada</span></div>' +
-      '<div class="bc-alm-equipo-controls">' +
-        '<label>Porcentaje (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bc-alm-equipo-rate value="' + escHtml(permanent == null ? '' : String(permanent)) + '" placeholder="Ej. 5"></label>' +
-        '<label>Vigencia<select data-bc-alm-equipo-scope><option value="PERMANENTE">Permanente · futuras jornadas</option><option value="PROXIMA_JORNADA">Solo próxima jornada</option></select></label>' +
-        '<div class="bc-alm-equipo-actions"><button type="button" class="cc-accion" data-bc-alm-equipo-action="save" data-user-id="' + userId + '"' + (almacenActivo ? '' : ' disabled') + '>Guardar porcentaje</button>' +
-        '<button type="button" class="cc-accion" data-bc-alm-equipo-action="remove" data-user-id="' + userId + '"' + (almacenActivo ? '' : ' disabled') + '>Quitar del almacén</button></div>' +
-      '</div></article>';
-  }).join('') : '<p class="lista-estado">Todavía no hay dependientas asignadas a este almacén.</p>';
-  const options = available.map(function (person) {
-    return '<option value="' + escHtml(person.usuario_id) + '">' + escHtml(person.nombre || 'Dependienta') + '</option>';
+    const rate = permanent == null ? 'Sin porcentaje' : escHtml(String(permanent)) + '%';
+    return '<button type="button" class="bc-alm-equipo-persona" data-bc-alm-equipo-open-modal="edit" data-user-id="' + userId + '"' +
+      (almacenActivo ? '' : ' disabled') + '>' +
+      '<span class="bc-alm-equipo-persona-copy"><b>' + name + '</b><small>' + escHtml(warehouseName) + ' · ' + rate + '</small></span>' +
+      '<span class="bc-alm-equipo-persona-edit" aria-hidden="true">✎</span></button>';
+  }).join('') + '</div>';
+}
+
+function abrirModalEquipoAlmacen(section, mode, userId) {
+  const host = section && section.querySelector('[data-bc-alm-modal]');
+  if (!host) return;
+  const data = section.__bcEquipoData || {};
+  const assigned = Array.isArray(data.dependientas) ? data.dependientas : [];
+  const available = Array.isArray(data.disponibles) ? data.disponibles : [];
+  const person = mode === 'edit' ? assigned.find(function (item) {
+    return String(item.usuario_id) === String(userId);
+  }) : null;
+  if (mode === 'edit' && !person) return;
+  const options = available.map(function (item) {
+    return '<option value="' + escHtml(item.usuario_id) + '">' + escHtml(item.nombre || 'Dependienta') + '</option>';
   }).join('');
-  const addHtml = '<div class="bc-alm-equipo-add"><h5>Asignar dependienta</h5>' +
-    (available.length
-      ? '<div class="bc-alm-equipo-controls">' +
-          '<label>Dependienta<select data-bc-alm-equipo-new-user><option value="">Selecciona una dependienta</option>' + options + '</select></label>' +
-          '<label>Porcentaje (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bc-alm-equipo-new-rate placeholder="Ej. 5"></label>' +
-          '<label>Vigencia<select data-bc-alm-equipo-new-scope><option value="PERMANENTE">Permanente · futuras jornadas</option><option value="PROXIMA_JORNADA">Solo próxima jornada</option></select></label>' +
-          '<button type="button" class="cc-accion" data-bc-alm-equipo-action="assign"' + (almacenActivo ? '' : ' disabled') + '>Asignar al almacén</button></div>'
-      : '<p class="lista-estado">Todas las dependientas activas ya están asignadas a este almacén.</p>') +
-    '</div>';
-  return '<div class="bc-alm-equipo-list">' + assignedHtml + '</div>' + addHtml;
+  const permanent = person && person.salario_porcentaje_permanente;
+  const temporary = person && person.salario_porcentaje_temporal;
+  let temporaryNote = '';
+  if (temporary != null) {
+    let detail = 'Porcentaje temporal: ' + escHtml(String(temporary)) + '%.';
+    if (person.salario_temporal_consumido_en) detail += ' Ya fue aplicado y la jornada conserva su porcentaje congelado.';
+    else if (person.salario_temporal_fecha) detail += ' Reservado para ' + escHtml(person.salario_temporal_fecha) + '.';
+    else detail += ' Se aplicará a la próxima jornada elegible.';
+    temporaryNote = '<p class="bc-alm-modal-note">' + detail + '</p>';
+  }
+  const isAssign = mode === 'assign';
+  const title = isAssign ? 'Asignar dependienta' : 'Editar asignación';
+  const content = isAssign
+    ? (available.length
+      ? '<label>Dependienta<select data-bc-alm-equipo-new-user><option value="">Selecciona una dependienta</option>' + options + '</select></label>'
+      : '<p class="bc-alm-equipo-empty">Todas las dependientas activas ya están asignadas a este almacén.</p>')
+    : '<div class="bc-alm-modal-person"><strong>' + escHtml(person.nombre || 'Dependienta') + '</strong><small>Configuración para este almacén</small></div>' + temporaryNote;
+  const form = (isAssign && !available.length) ? '' :
+    content +
+    '<label>Porcentaje salarial (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bc-alm-equipo-rate ' +
+      (isAssign ? 'data-bc-alm-equipo-new-rate ' : '') +
+      'value="' + escHtml(permanent == null ? '' : String(permanent)) + '" placeholder="Ej. 5" required></label>' +
+    '<label>Vigencia<select data-bc-alm-equipo-scope ' + (isAssign ? 'data-bc-alm-equipo-new-scope ' : '') + '>' +
+      '<option value="PERMANENTE">Permanente · futuras jornadas</option>' +
+      '<option value="PROXIMA_JORNADA">Solo próxima jornada</option></select></label>';
+  host.innerHTML =
+    '<section class="bc-alm-modal" role="dialog" aria-modal="true" aria-label="' + title + '">' +
+      '<div class="bc-alm-modal-head"><h5>' + title + '</h5><button type="button" class="bc-alm-modal-close" data-bc-alm-equipo-modal-close aria-label="Cerrar">×</button></div>' +
+      '<div class="bc-alm-modal-fields">' + form + '</div>' +
+      '<p class="bc-alm-modal-error" data-bc-alm-modal-error role="alert"></p>' +
+      '<div class="bc-alm-modal-actions">' +
+        (isAssign && !available.length ? '' : '<button type="button" class="cc-accion" data-bc-alm-equipo-action="' + (isAssign ? 'assign' : 'save') + '" data-user-id="' + (isAssign ? '' : escHtml(userId)) + '"' + (section.dataset.almacenActivo === 'true' ? '' : ' disabled') + '>' + (isAssign ? 'Asignar' : 'Guardar') + '</button>') +
+        (!isAssign ? '<button type="button" class="cc-accion danger" data-bc-alm-equipo-action="remove" data-user-id="' + escHtml(userId) + '"' + (section.dataset.almacenActivo === 'true' ? '' : ' disabled') + '>Quitar del almacén</button>' : '') +
+        '<button type="button" class="cc-accion" data-bc-alm-equipo-modal-close>Cancelar</button>' +
+      '</div></section>';
+  host.hidden = false;
+  host.setAttribute('aria-hidden', 'false');
+  const focus = host.querySelector('input,select,button');
+  if (focus && focus.focus) focus.focus();
+}
+
+function cerrarModalEquipoAlmacen(section) {
+  const host = section && section.querySelector('[data-bc-alm-modal]');
+  if (!host) return;
+  host.hidden = true;
+  host.setAttribute('aria-hidden', 'true');
+  host.innerHTML = '';
 }
 
 async function cargarEquipoAlmacen(almacenId) {
@@ -322,7 +376,10 @@ async function cargarEquipoAlmacen(almacenId) {
     const result = await api.rpc('bc8_listar_dependientas_almacen', { p_almacen_id: almacenId });
     if (requestId !== _bcAlmacenEquipoRequestId || !section.isConnected || String(_almacenSeleccionadoId) !== String(almacenId)) return;
     if (result && result.error) throw result.error;
-    body.innerHTML = bcAlmacenEquipoBodyHtml(result && result.data || {}, section.dataset.almacenActivo === 'true');
+    section.__bcEquipoData = result && result.data || {};
+    body.innerHTML = bcAlmacenEquipoBodyHtml(section.__bcEquipoData, section.dataset.almacenActivo === 'true');
+    const addButton = section.querySelector('[data-bc-alm-equipo-open-modal="assign"]');
+    if (addButton) addButton.disabled = section.dataset.almacenActivo !== 'true' || !Array.isArray(section.__bcEquipoData.disponibles) || !section.__bcEquipoData.disponibles.length;
   } catch (error) {
     if (requestId !== _bcAlmacenEquipoRequestId || !section.isConnected) return;
     const message = error && (error.message || error.details) || 'No se pudo consultar el equipo del almacén.';
@@ -334,31 +391,32 @@ async function guardarConfiguracionDependientaAlmacen(section, actionButton) {
   const almacenId = section.dataset.almacenId;
   const action = actionButton.dataset.bcAlmEquipoAction;
   const isAssign = action === 'assign';
-  const card = actionButton.closest('[data-bc-alm-equipo-card]');
+  const modal = section.querySelector('[data-bc-alm-modal]');
   const userId = isAssign
-    ? (section.querySelector('[data-bc-alm-equipo-new-user]') || {}).value
-    : actionButton.dataset.userId;
-  const rateInput = isAssign ? section.querySelector('[data-bc-alm-equipo-new-rate]') : card && card.querySelector('[data-bc-alm-equipo-rate]');
-  const scopeInput = isAssign ? section.querySelector('[data-bc-alm-equipo-new-scope]') : card && card.querySelector('[data-bc-alm-equipo-scope]');
+    ? (modal.querySelector('[data-bc-alm-equipo-new-user]') || {}).value
+    : actionButton.dataset.userId || (section.querySelector('[data-bc-alm-equipo-open-modal="edit"][data-user-id]') || {}).dataset.userId;
+  const rateInput = modal && modal.querySelector('[data-bc-alm-equipo-rate]');
+  const scopeInput = modal && modal.querySelector('[data-bc-alm-equipo-scope]');
+  const modalError = modal && modal.querySelector('[data-bc-alm-modal-error]');
   if (action === 'remove') {
     if (!confirm('¿Quitar esta dependienta del equipo del almacén? Las jornadas ya programadas conservarán su porcentaje registrado.')) return;
   } else {
     const raw = rateInput && String(rateInput.value || '').trim();
     const rate = Number(raw);
-    if (!userId) { bcAlmacenEquipoStatus(section, 'Selecciona una dependienta.', true); return; }
+    if (!userId) { if (modalError) modalError.textContent = 'Selecciona una dependienta.'; return; }
     if (!raw || !Number.isFinite(rate) || rate < 0 || rate > 100) {
-      bcAlmacenEquipoStatus(section, 'Escribe un porcentaje entre 0 y 100.', true);
+      if (modalError) modalError.textContent = 'Escribe un porcentaje entre 0 y 100.';
       if (rateInput) rateInput.focus();
       return;
     }
     if (!scopeInput || !['PERMANENTE', 'PROXIMA_JORNADA'].includes(scopeInput.value)) {
-      bcAlmacenEquipoStatus(section, 'Selecciona la vigencia del porcentaje.', true);
+      if (modalError) modalError.textContent = 'Selecciona la vigencia del porcentaje.';
       return;
     }
   }
-  if (!navigator.onLine) { bcAlmacenEquipoStatus(section, 'Necesitas conexión para guardar la configuración salarial.', true); return; }
+  if (!navigator.onLine) { if (modalError) modalError.textContent = 'Necesitas conexión para guardar la configuración salarial.'; return; }
   const api = window.client || (typeof client !== 'undefined' ? client : null);
-  if (!api || typeof api.rpc !== 'function') { bcAlmacenEquipoStatus(section, 'Backend no disponible.', true); return; }
+  if (!api || typeof api.rpc !== 'function') { if (modalError) modalError.textContent = 'Backend no disponible.'; return; }
   const originalLabel = actionButton.textContent;
   actionButton.disabled = true;
   actionButton.textContent = 'Guardando…';
@@ -372,6 +430,7 @@ async function guardarConfiguracionDependientaAlmacen(section, actionButton) {
       p_vigencia_tipo: action === 'remove' ? null : scopeInput.value
     });
     if (result && result.error) throw result.error;
+    cerrarModalEquipoAlmacen(section);
     await cargarEquipoAlmacen(almacenId);
     const currentSection = document.querySelector('[data-bc-alm-equipo][data-almacen-id="' + String(almacenId).replace(/"/g, '') + '"]');
     if (currentSection) bcAlmacenEquipoStatus(currentSection, action === 'remove'
@@ -379,6 +438,7 @@ async function guardarConfiguracionDependientaAlmacen(section, actionButton) {
       : 'Configuración salarial guardada.', false);
   } catch (error) {
     const message = error && (error.message || error.details) || 'No se pudo guardar la configuración.';
+    if (modalError) modalError.textContent = message;
     bcAlmacenEquipoStatus(section, message, true);
   } finally {
     if (actionButton.isConnected) { actionButton.disabled = false; actionButton.textContent = originalLabel; }
@@ -390,11 +450,15 @@ function renderPanelAlmacenSeleccionado() {
   if (!panel) return;
   const id = _almacenSeleccionadoId;
   if (!id) {
-    panel.innerHTML = '<p class="lista-estado">Elegí un almacén para ver su información y productos.</p>';
+    panel.innerHTML = '<div class="bc-alm-empty"><strong>Almacenes</strong><span>Selecciona un almacén para consultar su personal, salarios e inventario.</span></div>';
+    const productsTitle = document.querySelector(".alm-productos-titulo");
+    if (productsTitle) productsTitle.hidden = true;
     renderProductosDelAlmacen(null);
     actualizarBotonesAccionesAlmacen();
     return;
   }
+  const productsTitle = document.querySelector(".alm-productos-titulo");
+  if (productsTitle) productsTitle.hidden = false;
   const a = (_cache.almacenes || []).find((x) => mismoIdAlmacen(x.id, id));
   if (!a) {
     panel.innerHTML = '<p class="lista-estado">Almacén no encontrado.</p>';
@@ -457,16 +521,43 @@ function renderPanelAlmacenSeleccionado() {
   actualizarBotonesAccionesAlmacen();
 }
 
+function aplicarPaginacionStockAlmacen(lista, requestedPage) {
+  if (!lista) return;
+  const filter = lista.querySelector("[data-bc-alm-category-filter]");
+  const selectedCategory = filter ? String(filter.value || "") : "";
+  const allRows = Array.from(lista.querySelectorAll("[data-bc-alm-stock-row]"));
+  const matchingRows = allRows.filter(function (row) {
+    return !selectedCategory || row.dataset.category === selectedCategory;
+  });
+  const pageSize = window.matchMedia && window.matchMedia("(max-width: 520px)").matches ? 7 : 10;
+  const pageCount = Math.max(1, Math.ceil(matchingRows.length / pageSize));
+  const page = Math.max(0, Math.min(pageCount - 1, Number.isFinite(Number(requestedPage)) ? Math.floor(Number(requestedPage)) : 0));
+  const start = page * pageSize;
+  const end = Math.min(start + pageSize, matchingRows.length);
+  const visibleRows = new Set(matchingRows.slice(start, end));
+  allRows.forEach(function (row) { row.hidden = !visibleRows.has(row); });
+  const count = lista.querySelector("[data-bc-alm-stock-count]");
+  if (count) count.textContent = matchingRows.length
+    ? "Mostrando " + (start + 1) + "–" + end + " de " + matchingRows.length
+    : "0 productos";
+  const pageLabel = lista.querySelector("[data-bc-alm-stock-page-label]");
+  if (pageLabel) pageLabel.textContent = "Página " + (page + 1) + " de " + pageCount;
+  const previous = lista.querySelector('[data-bc-alm-stock-page="prev"]');
+  const next = lista.querySelector('[data-bc-alm-stock-page="next"]');
+  if (previous) previous.disabled = page <= 0;
+  if (next) next.disabled = page >= pageCount - 1;
+  lista.dataset.pageIndex = String(page);
+}
+
 function renderProductosDelAlmacen(almacen_id) {
   const lista = document.getElementById("lista-stock");
   if (!lista) return;
   if (!almacen_id) {
-    lista.innerHTML = '<p class="lista-estado">Elegí un almacén para ver sus productos.</p>';
+    lista.innerHTML = '<p class="bc-alm-stock-empty">El inventario aparecerá aquí al seleccionar un almacén.</p>';
     return;
   }
-
   if (_stockVistaCargaEstado === "idle" || _stockVistaCargaEstado === "loading") {
-    lista.innerHTML = '<p class="lista-estado">Calculando saldo actual de la jornada…</p>';
+    lista.innerHTML = '<p class="lista-estado">Cargando inventario del almacén…</p>';
     if (_stockVistaCargaEstado === "idle" && almacenPanelVisible()) cargarStockVisualAlmacenes(false);
     return;
   }
@@ -476,68 +567,75 @@ function renderProductosDelAlmacen(almacen_id) {
       (_stockVistaCargaError ? ": " + escHtml(String(_stockVistaCargaError).slice(0, 120)) : ".") +
       "</p>" +
       '<button type="button" class="cc-accion" id="bc-alm-stock-reintentar">Reintentar</button>';
-    var btn = document.getElementById("bc-alm-stock-reintentar");
-    if (btn && !btn.dataset.bound) {
-      btn.dataset.bound = "1";
-      btn.addEventListener("click", function () {
-        cargarStockVisualAlmacenes(true);
-      });
+    var retry = document.getElementById("bc-alm-stock-reintentar");
+    if (retry && !retry.dataset.bound) {
+      retry.dataset.bound = "1";
+      retry.addEventListener("click", function () { cargarStockVisualAlmacenes(true); });
     }
     return;
   }
-
   const stock = stockVisualDelAlmacen(almacen_id);
   if (stock.length === 0) {
     lista.innerHTML = '<p class="lista-estado">Este almacén no tiene productos ni saldos de jornada registrados.</p>';
     return;
   }
-
-  const productosById = {};
-  (_cache.productos || []).forEach((p) => { productosById[String(p.id)] = p; });
-  lista.innerHTML = "";
-  stock
-    .slice()
-    .sort((a, b) => {
-      const pa = productosById[String(a.producto_id)];
-      const pb = productosById[String(b.producto_id)];
-      const na = (a.productos && a.productos.nombre) || (pa && pa.nombre) || a.producto || "";
-      const nb = (b.productos && b.productos.nombre) || (pb && pb.nombre) || b.producto || "";
-      return na.localeCompare(nb, "es");
-    })
-    .forEach((s) => {
-      const p = productosById[String(s.producto_id)];
-      const nombre = (s.productos && s.productos.nombre) || (p && p.nombre) || s.producto || "—";
-      const cat = p && p.categorias && p.categorias.nombre ? p.categorias.nombre : "";
-      const imagen = p && p.imagen_url
-        ? '<img src="' + escHtml(p.imagen_url) + '" alt="" class="producto-thumb" loading="lazy">'
-        : '<span class="producto-thumb producto-thumb-vacia" aria-hidden="true"></span>';
-      const cant = Number(s.cantidad) || 0;
-      const unidad = s.unidad || (p && p.unidad) || "unidad";
-      const cantidadTexto = (typeof window.numberFmt === "function" ? window.numberFmt(cant) : money(cant)) + " " + unidad;
-      const bajo = s.minimo != null && Number(s.minimo) > 0 && cant <= Number(s.minimo);
-      const sinMinimo = s.estado === "sin_minimo" || (!s.__bc_sin_producto && (s.minimo == null || Number(s.minimo) <= 0));
-      const estadoStock = sinMinimo ? "Sin mínimo" : cant <= 0 ? "Agotado" : bajo ? "Bajo mínimo" : "";
-      const div = document.createElement("div");
-      div.className = "lista-item alm-producto-item" + (cant <= 0 ? " lista-item-inactivo" : "");
-      div.innerHTML =
-        imagen +
-        '<span class="alm-prod-info"><span class="alm-prod-nombre">' + escHtml(nombre) + "</span>" +
-        (cat ? '<span class="muted"> · ' + escHtml(cat) + "</span>" : "") +
-        "</span>" +
-        '<span class="muted alm-prod-cant"' + (bajo || cant <= 0 ? ' style="color:var(--wine)"' : "") + ">" +
-        cantidadTexto + (estadoStock ? " · " + estadoStock : "") +
-        "</span>";
-      lista.appendChild(div);
-    });
+  const productsById = {};
+  (_cache.productos || []).forEach((item) => { productsById[String(item.id)] = item; });
+  const rows = stock.slice().map(function (row) {
+    const product = productsById[String(row.producto_id)];
+    const name = (product && product.variante_nombre) || (row.productos && row.productos.nombre) ||
+      (product && product.nombre) || row.producto || "—";
+    const category = product && product.categorias && product.categorias.nombre ||
+      product && product.categoria && (product.categoria.nombre || product.categoria) ||
+      row.categoria || row.categoria_nombre || "Sin categoría";
+    const quantity = Number(row.cantidad) || 0;
+    const unit = row.unidad || (product && product.unidad) || "unidad";
+    const minimum = row.minimo != null && Number(row.minimo) > 0 ? Number(row.minimo) : null;
+    const status = row.estado === "sin_minimo" || minimum == null
+      ? "Sin mínimo" : quantity <= 0 ? "Agotado" : quantity <= minimum ? "Bajo mínimo" : "";
+    const quantityText = (typeof window.numberFmt === "function" ? window.numberFmt(quantity) : money(quantity)) + " " + unit;
+    return { name, category, quantity, quantityText, status };
+  }).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+  const categories = Array.from(new Set(rows.map(row=>row.category))).sort((a,b)=>a.localeCompare(b,"es"));
+  const options = ['<option value="">Todas las categorías</option>'].concat(categories.map(category =>
+    '<option value="' + escHtml(category) + '">' + escHtml(category) + '</option>'
+  )).join('');
+  lista.innerHTML =
+    '<div class="bc-alm-stock-toolbar"><span class="bc-alm-stock-count" data-bc-alm-stock-count>' + rows.length + ' productos</span>' +
+      '<label class="bc-alm-stock-filter"><span>Categoría</span><select data-bc-alm-category-filter aria-label="Filtrar productos por categoría">' + options + '</select></label></div>' +
+    '<div class="bc-alm-stock-table-wrap"><table class="bc-alm-stock-table"><thead><tr><th scope="col">Producto</th><th scope="col">Categoría</th><th scope="col">Cantidad</th></tr></thead><tbody>' +
+    rows.map(row =>
+      '<tr data-bc-alm-stock-row data-category="' + escHtml(row.category) + '">' +
+        '<td class="bc-alm-stock-name" title="' + escHtml(row.name) + '">' + escHtml(row.name) + '</td>' +
+        '<td class="bc-alm-stock-category" title="' + escHtml(row.category) + '">' + escHtml(row.category) + '</td>' +
+        '<td class="bc-alm-stock-quantity' + (row.status ? ' is-alert' : '') + '" title="' + escHtml(row.status) + '">' +
+          escHtml(row.quantityText) + (row.status ? '<small>' + escHtml(row.status) + '</small>' : '') +
+        '</td></tr>'
+    ).join('') +
+    '</tbody></table></div>' +
+    '<div class="bc-alm-stock-pagination">' +
+      '<button type="button" class="bc-alm-stock-page-btn" data-bc-alm-stock-page="prev" disabled>Anterior</button>' +
+      '<span data-bc-alm-stock-page-label>Página 1 de 1</span>' +
+      '<button type="button" class="bc-alm-stock-page-btn" data-bc-alm-stock-page="next" disabled>Siguiente</button>' +
+    '</div>';
+  aplicarPaginacionStockAlmacen(lista, 0);
 }
 
 function seleccionarAlmacen(id) {
-  _almacenSeleccionadoId = id || null;
+  const nextId = id || null;
+  const changed = String(nextId || '') !== String(_almacenSeleccionadoId || '');
+  if (changed) {
+    invalidarStockVisualAlmacenes();
+    _cache.stock_visual = [];
+  }
+  _almacenSeleccionadoId = nextId;
   const sel = document.getElementById("alm-selector");
-  if (sel) sel.value = id || "";
+  if (sel) sel.value = nextId || "";
   renderPanelAlmacenSeleccionado();
-  if (id && _stockCargaEstado !== "ok" && _stockCargaEstado !== "loading") {
+  if (nextId && _stockCargaEstado !== "ok" && _stockCargaEstado !== "loading") {
     cargarStockAlmacenes(false);
+  } else if (nextId) {
+    cargarStockVisualAlmacenes(false);
   }
 }
 
@@ -861,14 +959,40 @@ safeInit("almacenes-ui", () => {
   if (equipoPanel && !equipoPanel.dataset.bcAlmEquipoBound) {
     equipoPanel.dataset.bcAlmEquipoBound = "1";
     equipoPanel.addEventListener("click", function (event) {
-      const button = event.target && event.target.closest ? event.target.closest("[data-bc-alm-equipo-action]") : null;
-      if (!button) return;
-      const section = button.closest("[data-bc-alm-equipo]");
+      const section = event.target && event.target.closest ? event.target.closest("[data-bc-alm-equipo]") : null;
       if (!section) return;
+      const close = event.target.closest("[data-bc-alm-equipo-modal-close]");
+      const modalBackdrop = event.target.closest("[data-bc-alm-modal]");
+      if (close || (modalBackdrop && event.target === modalBackdrop)) {
+        cerrarModalEquipoAlmacen(section);
+        return;
+      }
+      const open = event.target.closest("[data-bc-alm-equipo-open-modal]");
+      if (open) {
+        abrirModalEquipoAlmacen(section, open.dataset.bcAlmEquipoOpenModal, open.dataset.userId || null);
+        return;
+      }
+      const button = event.target.closest("[data-bc-alm-equipo-action]");
+      if (!button) return;
       const action = button.dataset.bcAlmEquipoAction;
       if (action === "retry") { cargarEquipoAlmacen(section.dataset.almacenId); return; }
       if (!["assign", "save", "remove"].includes(action)) return;
       guardarConfiguracionDependientaAlmacen(section, button);
+    });
+  }
+  const stockList = document.getElementById("lista-stock");
+  if (stockList && !stockList.dataset.bcCategoryBound) {
+    stockList.dataset.bcCategoryBound = "1";
+    stockList.addEventListener("change", function (event) {
+      const filter = event.target && event.target.closest ? event.target.closest("[data-bc-alm-category-filter]") : null;
+      if (!filter) return;
+      aplicarPaginacionStockAlmacen(stockList, 0);
+    });
+    stockList.addEventListener("click", function (event) {
+      const button = event.target && event.target.closest ? event.target.closest("[data-bc-alm-stock-page]") : null;
+      if (!button || button.disabled) return;
+      const current = Number(stockList.dataset.pageIndex || 0);
+      aplicarPaginacionStockAlmacen(stockList, current + (button.dataset.bcAlmStockPage === "next" ? 1 : -1));
     });
   }
 });

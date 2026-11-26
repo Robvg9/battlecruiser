@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.66 — warehouse-scoped salary rules and the current Jornada handover contract.
+// v7.67 — approved Jornada status and realtime calendar refresh.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map()};
+  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -44,11 +44,12 @@
       .format(new Date(Date.UTC(parts.year,parts.month-1,1,12)));
   }
   function calendarStatus(row){
-    const status=String(row&& (row.sesion_estado||row.estado)||'').toUpperCase();
+    const status=String(row&&(row.sesion_estado||row.estado)||'').toUpperCase();
+    const master=String(row&&(row.turno_estado_maestro||row.turno_estado)||'').toUpperCase();
     if(!row||row.trabaja===false||status==='DESCANSO')return {kind:'rest',short:'Descanso',label:'Descanso'};
     if(status==='EN_CURSO')return {kind:'running',short:'En curso',label:'En curso'};
+    if(['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status)&&master==='CERRADO')return {kind:'closed',short:'Aprobada',label:'Aprobada y cerrada por el Dueño'};
     if(status==='CERRADA_OPERATIVAMENTE')return {kind:'sealed',short:'Pendiente de cuadre',label:'Pendiente de cuadre · cierre operativo realizado'};
-    const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();
     if(['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(master))return {kind:'review',short:'Pendiente de cierre',label:'Jornada completada · pendiente de revisión y cierre del Turno maestro'};
     if((['COMPLETADA','CERRADA','CERRADO'].includes(status)&&master==='CERRADO')||['CANCELADA','CANCELADO'].includes(status))return {kind:'closed',short:'Archivada',label:humanStatus(status)};
     if(['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status))return {kind:'scheduled',short:'Programada',label:'Programada'};
@@ -1023,11 +1024,12 @@
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
     const rest=!r.trabaja||r.estado==='DESCANSO';
     const isOperationallySealed=status==='CERRADA_OPERATIVAMENTE';
+    const masterStatus=String(r.turno_estado_maestro||r.turno_estado||'').toUpperCase();
+    const isApprovedMasterClose=masterStatus==='CERRADO'&&['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status);
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
-    const masterStatus=String(r.turno_estado_maestro||'').toUpperCase();
     const pendingMasterClose=['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const pill=rest?'<span class="bc7-pill">Descanso</span>':isApprovedMasterClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
     const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
     const viewable=status==='COMPLETADA'||isOperationallySealed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
@@ -1038,6 +1040,75 @@
     }
     return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+periodMove+'</div>'+reschedule+'</article>';
   }
+  let calendarRefreshTimer=null;
+  let calendarRealtimeChannel=null;
+  let calendarRealtimeUserId=null;
+  let calendarRealtimeConnected=false;
+
+  function refreshCalendarAfterChange(reason){
+    state.calendarRevision=(state.calendarRevision||0)+1;
+    state.calendarCache.clear();
+    state.calendarPromises.clear();
+    if(calendarRefreshTimer!==null)window.clearTimeout(calendarRefreshTimer);
+    calendarRefreshTimer=window.setTimeout(function(){
+      calendarRefreshTimer=null;
+      if(!bootStarted)return;
+      if(!$('bc7-month-board')&&!$('bc7-schedule-list'))return;
+      loadCalendar({force:true}).catch(function(error){
+        console.warn('[BC7] No se pudo actualizar el calendario tras '+String(reason||'un cambio')+':',error);
+      });
+    },120);
+  }
+
+  function stopCalendarRealtimeSubscription(){
+    const previous=calendarRealtimeChannel;
+    calendarRealtimeChannel=null;
+    calendarRealtimeUserId=null;
+    calendarRealtimeConnected=false;
+    if(!previous)return;
+    try{
+      const api=(typeof client!=='undefined'&&client)||window.client;
+      if(api&&typeof api.removeChannel==='function')api.removeChannel(previous);
+      else if(typeof previous.unsubscribe==='function')previous.unsubscribe();
+    }catch(error){console.warn('[BC7] No se pudo cerrar el canal Realtime:',error);}
+  }
+
+  function ensureCalendarRealtimeSubscription(){
+    const user=currentUser()||{};
+    const userId=String(user.id||'');
+    const api=(typeof client!=='undefined'&&client)||window.client;
+    if(!userId||!api||typeof api.channel!=='function')return false;
+    if(calendarRealtimeChannel&&calendarRealtimeUserId===userId)return true;
+    stopCalendarRealtimeSubscription();
+    try{
+      const channel=api.channel('bc-jornada-calendar-'+userId);
+      const onChange=function(){refreshCalendarAfterChange('sincronización Realtime');};
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'turno_sesiones'},onChange);
+      channel.on('postgres_changes',{event:'*',schema:'public',table:'turnos'},onChange);
+      calendarRealtimeChannel=channel;
+      calendarRealtimeUserId=userId;
+      channel.subscribe(function(status){
+        if(status==='SUBSCRIBED'){
+          if(calendarRealtimeConnected)refreshCalendarAfterChange('reconexión Realtime');
+          calendarRealtimeConnected=true;
+        }
+      });
+      return true;
+    }catch(error){
+      stopCalendarRealtimeSubscription();
+      console.warn('[BC7] No se pudo iniciar la sincronización Realtime:',error);
+      return false;
+    }
+  }
+
+  window.addEventListener('bc:jornada-aprobada',function(){
+    refreshCalendarAfterChange('aprobación de jornada');
+  });
+  window.addEventListener('online',function(){
+    if(calendarRealtimeChannel)refreshCalendarAfterChange('reconexión de red');
+    ensureCalendarRealtimeSubscription();
+  });
+
   async function loadCalendar(options){
     options=options||{};const force=options.force===true;
     const board=$('bc7-month-board'),list=$('bc7-schedule-list');
@@ -1049,11 +1120,13 @@
     const hiddenDays=$('bc7-list-days');if(hiddenDays)hiddenDays.value=String(days);
     const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
     const user=currentUser()||{},key=String(user.id||user.username||user.email||'authenticated-user')+'|'+month;
+    const requestRevision=state.calendarRevision||0;
     const renderRows=data=>{
+      if(requestRevision!==(state.calendarRevision||0))return;
       if(String($('bc7-calendar-month')?.value||month)!==month)return;
       state.calendarLoading=false;state.calendarLoadError='';
       const archived=[],visible=[];
-      data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(['COMPLETADA','CERRADA','CERRADO'].includes(st)&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
+      data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(['COMPLETADA','CERRADA','CERRADO'].includes(st)&&master==='CERRADO')||(st==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
       const rank=row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();return st==='EN_CURSO'?0:st==='CERRADA_OPERATIVAMENTE'?1:(st==='COMPLETADA'?2:3);};
       visible.sort((a,b)=>rank(a)-rank(b)||String(a.fecha||'').localeCompare(String(b.fecha||''))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
       archived.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
@@ -1075,6 +1148,7 @@
     msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
     request=(async()=>{try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
+      if(requestRevision!==(state.calendarRevision||0))return false;
       state.calendarCache.set(key,{at:Date.now(),rows:data});while(state.calendarCache.size>6)state.calendarCache.delete(state.calendarCache.keys().next().value);
       renderRows(data);msg($('bc7-list-msg'),'');return true;
     }catch(e){
@@ -1134,7 +1208,7 @@
       row&&String(row.responsable_id||'')===String(user.id||'')&&row.trabaja!==false
     );
     const activeRows=ownRows.filter(row=>
-      row.sesion_id&&['EN_CURSO','CERRADA_OPERATIVAMENTE'].includes(String(row.sesion_estado||'').toUpperCase())
+      row.sesion_id&&(String(row.sesion_estado||'').toUpperCase()==='EN_CURSO'||(String(row.sesion_estado||'').toUpperCase()==='CERRADA_OPERATIVAMENTE'&&String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase()!=='CERRADO'))
     ).sort((a,b)=>{
       const aToday=String(a.fecha||'').slice(0,10)<=today&&String(a.fecha_fin||a.fecha||'').slice(0,10)>=today;
       const bToday=String(b.fecha||'').slice(0,10)<=today&&String(b.fecha_fin||b.fecha||'').slice(0,10)>=today;
@@ -3923,6 +3997,7 @@
       if(bootStarted)return;
       if(authenticatedContextReady()){
         bootStarted=true;
+        ensureCalendarRealtimeSubscription();
         Promise.resolve().then(boot).then(function(ready){
           if(ready===false){
             bootStarted=false;
@@ -3950,6 +4025,8 @@
     if(typeof client!=='undefined'&&client&&client.auth&&typeof client.auth.onAuthStateChange==='function'){
       client.auth.onAuthStateChange(function(event,session){
         if(event==='SIGNED_OUT'){
+          stopCalendarRealtimeSubscription();
+          state.calendarCache.clear();state.calendarPromises.clear();state.calendarRevision=(state.calendarRevision||0)+1;
           if(authWaitTimer!==null)window.clearTimeout(authWaitTimer);
           authWaitTimer=null;bootStarted=false;
           return;
