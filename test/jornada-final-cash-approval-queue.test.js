@@ -130,7 +130,7 @@ test("Owner review reports the approved daily sum for retail without a second ph
   assert.doesNotMatch(OWNER_REVIEW,/l\.dinero_final_contado/);
   assert.match(APP,/jornada-owner-review\.js","1.20"/);
   assert.match(SW,/jornada-owner-review\.js\?v=1.20/);
-  assert.match(APP,/9\.5\.166/);
+  assert.match(APP,/9\.5\.167/);
   assert.match(DAILY_APPROVALS,/CERRADA_OPERATIVAMENTE/);
   assert.match(DAILY_APPROVALS,/v_daily_cash/);
   assert.doesNotMatch(DAILY_APPROVALS,/turno_jornada_conteos_caja/);
