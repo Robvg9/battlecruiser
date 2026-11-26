@@ -445,4 +445,7 @@ test("B3 cabecera: la etiqueta activa conserva estilos compactos y no ocupa una 
   assert.match(css, /\.header-user-name\s*\{/);
   assert.match(css, /"queue queue"/);
   assert.doesNotMatch(css, /#user-email\s*\{\s*grid-area:\s*user/);
+  assert.match(css, /header\.app-header\.app-header #user-email\{display:inline-flex!important/);
+  assert.doesNotMatch(css, /header\.app-header\.app-header #user-email\{display:none!important/);
+  assert.doesNotMatch(css, /grid-template-areas:[\s\S]{0,100}"account user"/);
 });
