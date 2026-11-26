@@ -71,6 +71,15 @@ test("owner review loads the preview and requires a deliberate audited apply act
   assert.match(owner,/idempotency_key:key/);
 });
 
+test("Owner review labels negative, positive and zero cash differences explicitly",()=>{
+  assert.match(owner,/const differenceStatus=value=>/);
+  assert.match(owner,/return 'Sobrante '\+/);
+  assert.match(owner,/return 'Faltante '\+/);
+  assert.match(owner,/return 'Cuadrada 0 CUP'/);
+  assert.match(owner,/\['Resultado de caja',pendingPost\?blocked:differenceStatus\(l\.diferencia\)\]/);
+  assert.match(owner,/card\('Resultado de caja',[\s\S]*differenceStatus\(totalDifference\)/);
+});
+
 test("the historical accounting sign is preserved: a 3,480 CUP revenue reduction changes +700 faltante to -2,780 sobrante",()=>{
   const differenceBefore=700;
   const receiptValueChange=(3*1000)+(1*700)-(1*220);
