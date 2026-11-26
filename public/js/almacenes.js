@@ -521,6 +521,34 @@ function renderPanelAlmacenSeleccionado() {
   actualizarBotonesAccionesAlmacen();
 }
 
+function aplicarPaginacionStockAlmacen(lista, requestedPage) {
+  if (!lista) return;
+  const filter = lista.querySelector("[data-bc-alm-category-filter]");
+  const selectedCategory = filter ? String(filter.value || "") : "";
+  const allRows = Array.from(lista.querySelectorAll("[data-bc-alm-stock-row]"));
+  const matchingRows = allRows.filter(function (row) {
+    return !selectedCategory || row.dataset.category === selectedCategory;
+  });
+  const pageSize = window.matchMedia && window.matchMedia("(max-width: 520px)").matches ? 7 : 10;
+  const pageCount = Math.max(1, Math.ceil(matchingRows.length / pageSize));
+  const page = Math.max(0, Math.min(pageCount - 1, Number.isFinite(Number(requestedPage)) ? Math.floor(Number(requestedPage)) : 0));
+  const start = page * pageSize;
+  const end = Math.min(start + pageSize, matchingRows.length);
+  const visibleRows = new Set(matchingRows.slice(start, end));
+  allRows.forEach(function (row) { row.hidden = !visibleRows.has(row); });
+  const count = lista.querySelector("[data-bc-alm-stock-count]");
+  if (count) count.textContent = matchingRows.length
+    ? "Mostrando " + (start + 1) + "–" + end + " de " + matchingRows.length
+    : "0 productos";
+  const pageLabel = lista.querySelector("[data-bc-alm-stock-page-label]");
+  if (pageLabel) pageLabel.textContent = "Página " + (page + 1) + " de " + pageCount;
+  const previous = lista.querySelector('[data-bc-alm-stock-page="prev"]');
+  const next = lista.querySelector('[data-bc-alm-stock-page="next"]');
+  if (previous) previous.disabled = page <= 0;
+  if (next) next.disabled = page >= pageCount - 1;
+  lista.dataset.pageIndex = String(page);
+}
+
 function renderProductosDelAlmacen(almacen_id) {
   const lista = document.getElementById("lista-stock");
   if (!lista) return;
@@ -584,7 +612,13 @@ function renderProductosDelAlmacen(almacen_id) {
           escHtml(row.quantityText) + (row.status ? '<small>' + escHtml(row.status) + '</small>' : '') +
         '</td></tr>'
     ).join('') +
-    '</tbody></table></div>';
+    '</tbody></table></div>' +
+    '<div class="bc-alm-stock-pagination">' +
+      '<button type="button" class="bc-alm-stock-page-btn" data-bc-alm-stock-page="prev" disabled>Anterior</button>' +
+      '<span data-bc-alm-stock-page-label>Página 1 de 1</span>' +
+      '<button type="button" class="bc-alm-stock-page-btn" data-bc-alm-stock-page="next" disabled>Siguiente</button>' +
+    '</div>';
+  aplicarPaginacionStockAlmacen(lista, 0);
 }
 
 function seleccionarAlmacen(id) {
@@ -952,15 +986,13 @@ safeInit("almacenes-ui", () => {
     stockList.addEventListener("change", function (event) {
       const filter = event.target && event.target.closest ? event.target.closest("[data-bc-alm-category-filter]") : null;
       if (!filter) return;
-      const value = String(filter.value || "");
-      let shown = 0;
-      stockList.querySelectorAll("[data-bc-alm-stock-row]").forEach(function (row) {
-        const visible = !value || row.dataset.category === value;
-        row.hidden = !visible;
-        if (visible) shown++;
-      });
-      const count = stockList.querySelector("[data-bc-alm-stock-count]");
-      if (count) count.textContent = shown + (shown === 1 ? " producto" : " productos");
+      aplicarPaginacionStockAlmacen(stockList, 0);
+    });
+    stockList.addEventListener("click", function (event) {
+      const button = event.target && event.target.closest ? event.target.closest("[data-bc-alm-stock-page]") : null;
+      if (!button || button.disabled) return;
+      const current = Number(stockList.dataset.pageIndex || 0);
+      aplicarPaginacionStockAlmacen(stockList, current + (button.dataset.bcAlmStockPage === "next" ? 1 : -1));
     });
   }
 });
