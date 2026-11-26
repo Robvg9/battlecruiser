@@ -96,6 +96,6 @@ test("PWA shell and module cache versions are aligned for the new release", () =
   assert.match(sw, /BC_SW_VERSION = "9\.5\.166"/);
   assert.match(sw, /jornada-owner-review\.js\?v=1\.19/);
   assert.match(sw, /almacenes\.js\?v=20261126\.2/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.67"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.68"\]/);
   assert.match(app, /\["jornada-owner-review\.js","1\.19"\]/);
 });
