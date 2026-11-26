@@ -413,3 +413,36 @@ test("B3.3 (cierre): usuario inactivo bloqueado via usuario_esta_activo online (
   assert.strictEqual(res.ok, false, "operación rechazada para usuario inactivo");
   assert.ok(/inactivo/i.test(res.error.message), "mensaje claro de inactivo");
 });
+
+
+test("B3 cabecera: muestra Admin para Dueño y el nombre activo sin repetir el rol para dependientas", async () => {
+  const owner = montarEntorno({
+    perfil: [{ id: "u-owner", nombre: "Roberto Carlos", activo: true, role_id: "r-owner", rol: "Dueño" }],
+    permisos: [{ seccion: "productos", accion: "ver" }],
+  });
+  marcarOnline(owner.window);
+  await esperarContextoYPermisos(owner.window);
+  const ownerLabel = owner.document.getElementById("user-email");
+  assert.strictEqual(ownerLabel.textContent, "Admin");
+  assert.strictEqual(ownerLabel.parentElement.classList.contains("header-left"), true);
+
+  const employee = montarEntorno({
+    perfil: [{ id: "u-sheyla", nombre: "Sheyla", activo: true, role_id: "r-employee", rol: "Dependienta" }],
+    permisos: [{ seccion: "productos", accion: "ver" }],
+  });
+  marcarOnline(employee.window);
+  await esperarContextoYPermisos(employee.window);
+  const employeeLabel = employee.document.getElementById("user-email");
+  assert.strictEqual(employeeLabel.textContent, "Sheyla");
+  assert.strictEqual(employeeLabel.parentElement.classList.contains("header-left"), true);
+  assert.ok(!employeeLabel.textContent.includes("Dependienta"));
+});
+
+test("B3 cabecera: la etiqueta activa conserva estilos compactos y no ocupa una fila aparte en móvil", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
+  assert.match(html, /<span id="user-email" class="header-user-name" aria-live="polite"/);
+  assert.match(css, /\.header-user-name\s*\{/);
+  assert.match(css, /"queue queue"/);
+  assert.doesNotMatch(css, /#user-email\s*\{\s*grid-area:\s*user/);
+});
