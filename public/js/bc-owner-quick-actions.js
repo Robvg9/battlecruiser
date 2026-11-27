@@ -38,12 +38,12 @@
     return true;
   }
   async function openMovementModal(kind, label, root) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    navigate('movimientos');
+    for (let attempt = 0; attempt < 7; attempt += 1) {
       if (typeof window.__BC165_open === 'function') {
-        window.__BC165_open(kind);
+        try { window.__BC165_open(kind); } catch (_) { /* the overlay may not be mounted yet */ }
       }
-      if (attempt === 0) navigate('movimientos');
-      await wait(65 + attempt * 60);
+      await wait(80 + attempt * 80);
       const modal = document.getElementById('bc165-overlay');
       if (modal && modal.dataset.type === kind) {
         setStatus(root, '');
@@ -53,21 +53,25 @@
     throw new Error('El formulario de ' + label + ' todavía no está preparado. Abre Movimientos y vuelve a intentarlo.');
   }
   async function openLowStock(root) {
-    if (typeof window.__BC_openStockBajo === 'function') window.__BC_openStockBajo();
-    await wait(60);
-    let modal = document.getElementById('bc-stock-bajo-modal');
-    if (!modal || !modal.classList.contains('open')) {
-      navigate('inventario');
-      await wait(90);
+    navigate('inventario');
+    if (typeof window.__BC_openStockBajo === 'function') {
+      try { window.__BC_openStockBajo(); } catch (_) { /* keep checking the mounted button fallback */ }
+    }
+    let buttonClicked = false;
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      await wait(80 + attempt * 80);
+      const modal = document.getElementById('bc-stock-bajo-modal');
+      if (modal && modal.classList.contains('open')) {
+        setStatus(root, '');
+        return true;
+      }
       const button = document.getElementById('bc-stock-bajo-btn');
-      if (button) button.click();
-      await wait(70);
-      modal = document.getElementById('bc-stock-bajo-modal');
+      if (!buttonClicked && button) {
+        buttonClicked = true;
+        button.click();
+      }
     }
-    if (!modal || !modal.classList.contains('open')) {
-      throw new Error('No se pudo abrir Stock bajo. Entra en Inventario y vuelve a intentarlo.');
-    }
-    setStatus(root, '');
+    throw new Error('No se pudo abrir Stock bajo. Entra en Inventario y vuelve a intentarlo.');
   }
 
   async function ensure() {
