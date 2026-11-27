@@ -314,7 +314,8 @@ test("a multi-day Jornada spans every covered date and appears in the inspector 
 
 test("manual scheduling preview is local and a changed assignment must be reviewed again", async (t) => {
   const { window, calls } = setup(t, { admin: true, rows: [] });
-  await waitFor(() => calls.some(call => call.name === "listar_usuarios_admin"));
+  await waitFor(() => window.document.querySelector("#bc7-staff-status")?.textContent?.includes("responsables"));
+
   const havanaToday = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date());
@@ -323,7 +324,7 @@ test("manual scheduling preview is local and a changed assignment must be review
   window.document.getElementById("bc7-start-date").value = tomorrow;
   window.document.getElementById("bc7-days-count").value = "2";
   window.document.querySelector("[data-bc7-build]").click();
-  await waitFor(() => window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]").length === 2);
+  await waitFor(() => window.document.querySelectorAll("#bc7-day-rows [data-bc7-person] option[value=\"dep-1\"]").length === 2);
   window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]").forEach(select => {
     select.value = "dep-1";
     select.dispatchEvent(new window.Event("change", { bubbles: true }));
