@@ -3755,7 +3755,7 @@
       if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días de descanso debe quedar vacía la persona asignada.','error');return false;}
     }else{
       if(!state.lastPreview||state.lastPreview.mode!=='pattern'||state.lastPreview.start!==start||state.lastPreview.warehouse!==warehouse||state.lastPreview.days!==n){
-        msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return;
+        msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return false;
       }
       if(state.lastPreview.rows.some(r=>r.conflicto)){msg($('bc7-create-msg'),'La revisión muestra fechas ocupadas o personas con otro turno. Corrige esos avisos antes de crear la programación. No se creó ningún cambio.','error');return false;}
     }
@@ -3898,7 +3898,7 @@
     const days=Number(payload&&payload.days);
     const schedule=arr(payload&&payload.schedule);
     if(!warehouses().some(item=>String(item.id)===warehouseId))throw new Error('Selecciona un almacén activo disponible.');
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(startDate)||startDate<dateHavana())throw new Error('La fecha inicial debe ser hoy o futura.');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||startDate<dateHavana())throw new Error('La fecha inicial debe ser hoy o futura.');
     if(!Number.isInteger(days)||days<2||days>31||schedule.length!==days)throw new Error('El período debe tener entre 2 y 31 días asignados.');
     if(!staffCatalogReady())await ensureResponsibleCatalog(false);
     const people=new Map(eligibleStaff().map(person=>[String(person.id),person]));
