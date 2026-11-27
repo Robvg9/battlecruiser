@@ -155,6 +155,7 @@
       '.bc7-vp-draft-segment{position:relative;display:flex;align-items:center;gap:3px;min-height:22px;margin:2px 0;padding:3px 5px;border:1px solid rgba(123,205,226,.7);border-radius:5px;background:rgba(57,160,184,.25);color:var(--text);font-size:9px;font-weight:800;cursor:grab;overflow:visible;z-index:2}',
       '.bc7-vp-draft-segment.is-rest{border-color:rgba(201,162,77,.7);background:rgba(201,162,77,.17)}',
       '.bc7-vp-draft-segment.is-unassigned{border-style:dashed;border-color:#e2ae58;background:rgba(201,145,52,.18)}',
+      '.bc7-vp-drag-source{opacity:.34!important;filter:saturate(.42);transform:scale(.985)}',
       '.bc7-vp-draft-label{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.bc7-vp-resize-handle{flex:0 0 10px;width:10px;height:15px;padding:0;border:0;border-radius:3px;background:rgba(255,255,255,.23);color:var(--text);font-size:9px;cursor:ew-resize}',
       '.bc7-vp-ghost-segment{min-height:20px;margin:2px 0;padding:3px 5px;border:1px dashed #67d4e9;border-radius:5px;background:rgba(65,183,207,.2);color:var(--text);font-size:9px;font-weight:800;pointer-events:none}',
@@ -586,6 +587,11 @@
       data.setData('text/plain','bc7-visual-planner:'+type);
     }catch(_){}
   }
+  function clearDrag(){
+    state.drag=null;
+    document.querySelectorAll('.bc7-vp-drag-source').forEach(node=>node.classList.remove('bc7-vp-drag-source'));
+    clearGhost();
+  }
   function onDragStart(event){
     const target=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-tool],[data-bc7-vp-staff],[data-bc7-vp-resize],[data-bc7-vp-draft-segment]'):null;
     if(!target)return;
@@ -598,6 +604,8 @@
     }else if(target.hasAttribute('data-bc7-vp-draft-segment')){
       state.drag={type:'move'};createTransfer(event,'move');
     }else return;
+    const source=target.closest('[data-bc7-vp-draft-segment],[data-bc7-vp-tool],[data-bc7-vp-staff]')||target;
+    source.classList.add('bc7-vp-drag-source');
     event.stopPropagation();
   }
   function onDragOver(event){
@@ -642,7 +650,10 @@
     renderDraftSegments(snapshot());
   }
   function onDragEnd(){
-    if(state.drag){state.drag=null;clearGhost();renderDraftSegments(snapshot());}
+    if(state.drag||document.querySelector('.bc7-vp-drag-source')){
+      clearDrag();
+      renderDraftSegments(snapshot());
+    }
   }
   function onClick(event){
     const tool=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-tool="new"]'):null;
@@ -663,6 +674,34 @@
     if(discard){state.draft=null;clearGhost();render();return;}
     const open=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-open-session]'):null;
     if(open){api().openSessionMovements(open.dataset.bc7VpOpenSession);return;}
+  }
+  function onKeyDown(event){
+    const segment=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-draft-segment]'):null;
+    if(!segment||!state.draft)return;
+    const offsets={ArrowRight:1,ArrowLeft:-1,ArrowDown:7,ArrowUp:-7};
+    const offset=offsets[event.key];
+    if(!offset)return;
+    event.preventDefault();
+    const draft=state.draft;
+    let kind='move',targetDate=draft.startDate;
+    if(event.altKey){
+      kind='resize-start';
+      targetDate=addDays(draft.startDate,offset);
+    }else if(event.shiftKey){
+      kind='resize-end';
+      targetDate=addDays(draft.startDate,draft.days-1+offset);
+    }else{
+      kind='move';
+      targetDate=addDays(draft.startDate,offset);
+    }
+    if(!adjustRange(kind,targetDate)){
+      announce('Ese movimiento dejaría el período fuera del rango permitido de 2 a 31 días o en una fecha pasada.','error');
+      return;
+    }
+    render();
+    const first=$('[data-bc7-vp-draft-segment="1"]');
+    if(first)first.focus();
+    else $('[data-bc7-vp-start]')?.focus();
   }
   function onChange(event){
     const target=event.target;
@@ -702,6 +741,7 @@
     document.addEventListener('drop',onDrop);
     document.addEventListener('dragend',onDragEnd);
     document.addEventListener('click',onClick);
+    document.addEventListener('keydown',onKeyDown);
     document.addEventListener('change',onChange);
     render();
   }
