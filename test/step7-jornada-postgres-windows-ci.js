@@ -438,6 +438,10 @@ function applySql(file) {
     log("\\r\\n=== Apply owner-only successor-receipt reconciliation and verify cut, receipt, audit and ACL invariants ===");
     applySql("supabase/migrations/20261126035000_jornada_successor_receipt_safe_reconciliation.sql");
     applySql("test/jornada-successor-receipt-safe-reconciliation-contract.sql");
+    log("\\r\\n=== Apply payroll bridge and verify dependent-only identity mapping and sequential handover release ===");
+    applySql("supabase/migrations/20261126162000_jornada_payroll_hold_cuevacoin_bridge.sql");
+    applySql("supabase/migrations/20261127060000_payroll_mapping_dependienta_only.sql");
+    applySql("test/payroll-mapping-eligibility-contract.sql");
     log("\\r\\nPASS Jornada period rescheduling: overlapping shifts, conflicts, inventory/activity freeze, audit, idempotency and RBAC.");
     log("\\r\\nPASS Step 7 + La Cueva settlement + owner checklist + persistent price/cost changes with daily cash approvals as retail verification and no second Owner count.");
   } catch (error) {
