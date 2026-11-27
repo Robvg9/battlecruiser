@@ -115,6 +115,7 @@ test("Empty dashboard queues disappear, but live approval, cash and communicatio
   assert.match(centerControl, /if \(total === 0\)[\s\S]*setDashboardBlockVisible\(el, false\)/);
   assert.match(centerControl, /if \(importantes\.length === 0\)[\s\S]*setDashboardBlockVisible\(el, false\)/);
   assert.match(approvals, /Promise\.allSettled\(jobs\.map\(job=>job\.promise\)\)/);
+  assert.doesNotMatch(approvals, /bc-payroll-admin-host|mountAdminPanel/, "Nómina must stay outside administrative approvals");
   assert.match(approvals, /setApprovalPanelVisible\(panel,false\)/);
   assert.match(approvals, /function hideApprovalPanel\(\)/);
   assert.match(approvals, /if\(!canAdmin\(\)\)\{hideApprovalPanel\(\);return\}/);
