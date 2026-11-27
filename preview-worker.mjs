@@ -3,7 +3,7 @@ const PREVIEW_ORIGINS = new Set([
   "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"
 ]);
 
-const VERSIONED_PREVIEW_ORIGIN_RE = /^https:\/\/[a-f0-9]{8}-battlecruiser\.robvg9\.workers\.dev$/i;
+const VERSIONED_PREVIEW_ORIGIN_RE = /^https:\/\/[a-z0-9]+(?:-[a-z0-9]+)*-battlecruiser\.robvg9\.workers\.dev$/i;
 
 function isPreviewOrigin(origin) {
   return PREVIEW_ORIGINS.has(origin) ||
