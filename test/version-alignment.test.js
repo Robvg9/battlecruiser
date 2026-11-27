@@ -147,8 +147,8 @@ test('movement operations load multi-product transfer before the compact modal',
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(app.includes('["permisos-navegacion.js","67.9"]'));
   assert.ok(sw.includes("./js/permisos-navegacion.js?v=67.9"));
-  assert.ok(app.includes('const VERSION="9.5.172"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.172"'));
+  assert.ok(app.includes('const VERSION="9.5.173"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.173"'));
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
