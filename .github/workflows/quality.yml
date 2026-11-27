@@ -120,6 +120,69 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           path: test-results
 
+      - name: Select exact LIVE Worker Version URL
+        if: github.event_name == 'workflow_run'
+        shell: pwsh
+        run: |
+          $deployment = Get-Content 'test-results/release/deployment.json' -Raw | ConvertFrom-Json
+          if ($deployment.worker_version_url -notmatch '^https://[0-9a-f]{8}-battlecruiser\\.robvg9\\.workers\\.dev
+        env:
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: cmd
+        run: node test/verify-production-version.js
+
+      # Reuse the existing free-tier preview Worker for all PRs.
+      # Pull-request quality runs share one concurrency group above, so deployments
+      # to this Worker remain serialized and do not consume one Worker per PR.
+      - name: Deploy isolated PR preview
+        if: github.event_name == 'pull_request'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BC_PREVIEW_NAME: bc-pr-224-battlecruiser
+        shell: cmd
+        run: |
+          if not defined CLOUDFLARE_API_TOKEN exit /b 1
+          if not defined BC_PREVIEW_NAME exit /b 1
+          node_modules\.bin\wrangler.cmd deploy --config wrangler.preview.toml --name "%BC_PREVIEW_NAME%"
+          if errorlevel 1 exit /b 1
+
+      - name: Wait for isolated preview assets
+        if: github.event_name == 'pull_request'
+        env:
+          BC_PREVIEW_NAME: bc-pr-224-battlecruiser
+        shell: cmd
+        run: node test/verify-pr-preview-assets.js
+
+      - name: Run real-browser offline recovery E2E
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+        env:
+          BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
+          BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+        shell: cmd
+        run: node test/live-offline-e2e.js
+
+      - name: Persist LIVE offline E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battlecruiser-live-offline-e2e-${{ github.run_id }}
+          path: |
+            test-results/quality-suite.log
+            test-results/battlecruiser-live-offline-e2e.json
+            test-results/battlecruiser-live-offline-e2e.png
+            test-results/battlecruiser-android-header-layout.png
+          if-no-files-found: warn
+          retention-days: 90
+) { throw 'Invalid exact Worker Version URL in deployment.json.' }
+          "BC_LIVE_BASE_URL=$($deployment.worker_version_url)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Select isolated preview URL
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          "BC_LIVE_BASE_URL=https://bc-pr-224-battlecruiser.robvg9.workers.dev" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Verify production serves exact application release provenance
         if: github.event_name == 'workflow_run'
         env:

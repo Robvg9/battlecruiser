@@ -7,14 +7,22 @@ const crypto = require("node:crypto");
 const { spawn, execFileSync } = require("node:child_process");
 const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
 const expectedDeployRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
-const LIVE_VERSION_AFFINITY_KEY = /^\d+$/.test(expectedDeployRunId)
-  ? "battlecruiser-release-" + expectedDeployRunId
-  : null;
-
-const BASE_URL = (process.env.BC_LIVE_BASE_URL || "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");
+const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
 const PREVIEW_BASE_URL = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 const OUTPUT_DIR = path.join(process.cwd(), "test-results");
+const deploymentPath = path.join(OUTPUT_DIR, "release", "deployment.json");
+let deployment = null;
+if (expectedReleaseSha) {
+  assert(/^[0-9a-f]{40}$/.test(expectedReleaseSha), "BC_EXPECTED_RELEASE_SHA no es un SHA Git completo para LIVE.");
+  assert(/^\d+$/.test(expectedDeployRunId), "BC_EXPECTED_DEPLOY_RUN_ID debe ser numérico para LIVE.");
+  assert(fs.existsSync(deploymentPath), "No se descargó deployment.json del deploy LIVE.");
+  deployment = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
+  assert(deployment.source_sha === expectedReleaseSha, "deployment.json no corresponde al SHA LIVE esperado.");
+  assert(String(deployment.workflow_run_id) === expectedDeployRunId, "deployment.json no corresponde al workflow LIVE esperado.");
+}
+const BASE_URL = (process.env.BC_LIVE_BASE_URL || (deployment && deployment.worker_version_url) ||
+  "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");
 const REPORT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.json");
 const SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-live-offline-e2e.png");
 const ANDROID_HEADER_SCREENSHOT_PATH = path.join(OUTPUT_DIR, "battlecruiser-android-header-layout.png");
@@ -102,9 +110,6 @@ async function fetchText(url, timeoutMs = 20000) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const headers = { "cache-control": "no-cache", pragma: "no-cache" };
-    if (LIVE_VERSION_AFFINITY_KEY && new URL(url).origin === new URL(BASE_URL).origin) {
-      headers["Cloudflare-Workers-Version-Key"] = LIVE_VERSION_AFFINITY_KEY;
-    }
     const response = await fetch(url, {
       cache: "no-store",
       headers,
@@ -426,12 +431,11 @@ async function main() {
   const sourceCss = fs.readFileSync(path.join(PUBLIC_DIR, "style.css"), "utf8");
   const assetPaths = ["/index.html", "/app.js", "/service-worker.js", "/style.css"];
   const liveAssetEvidence = {};
-  const isProductionBase = BASE_URL === "https://battlecruiser.robvg9.workers.dev";
+  const isProductionBase = Boolean(deployment && BASE_URL === deployment.worker_version_url);
   const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
   if (isProductionBase) {
-    assert(/^[0-9a-f]{40}$/.test(expectedReleaseSha), "BC_EXPECTED_RELEASE_SHA no es un SHA Git completo para LIVE.");
+    assert(deployment && deployment.worker_version_id, "deployment.json no incluye el ID exacto de Worker.");
     assert(/^\d+$/.test(expectedDeployRunId), "BC_EXPECTED_DEPLOY_RUN_ID debe ser el ID numérico del deploy LIVE.");
-    assert(LIVE_VERSION_AFFINITY_KEY, "No se pudo formar la clave de afinidad del release LIVE.");
   }
 
   for (const assetPath of assetPaths) {
@@ -486,6 +490,8 @@ async function main() {
     const expectedRunId = expectedDeployRunId;
     const releasePath = path.join(OUTPUT_DIR, "release", releaseFilename);
     assert(fs.existsSync(releasePath), "No se descargó el artefacto validado por Deploy: " + releasePath);
+    assert(deployment && deployment.worker_version_id && deployment.worker_version_url === BASE_URL,
+      "El navegador LIVE no está fijado al Worker Version URL verificado por Deploy.");
     let release;
     try {
       release = JSON.parse(fs.readFileSync(releasePath, "utf8"));
@@ -607,19 +613,7 @@ async function main() {
         else pending.resolve(message.result || {});
         return;
       }
-      if (message.method === "Fetch.requestPaused") {
-        const headers = Object.entries(message.params.request.headers || {})
-          .filter(([name]) => name.toLowerCase() !== "cloudflare-workers-version-key")
-          .map(([name, value]) => ({ name, value: String(value) }));
-        headers.push({
-          name: "Cloudflare-Workers-Version-Key",
-          value: LIVE_VERSION_AFFINITY_KEY,
-        });
-        cdpCommand("Fetch.continueRequest", {
-          requestId: message.params.requestId,
-          headers,
-        }).catch(error => report.errors.push("No se pudo continuar la solicitud LIVE con afinidad: " + error.message));
-      } else if (message.method === "Network.requestWillBeSent") {
+      if (message.method === "Network.requestWillBeSent") {
         requestsById.set(message.params.requestId, {
           url: message.params.request.url,
           type: message.params.type || null,
@@ -732,11 +726,6 @@ async function main() {
   };
 
   await cdpCommand("Network.enable");
-  if (isProductionBase) {
-    await cdpCommand("Fetch.enable", {
-      patterns: [{ urlPattern: BASE_URL + "/*", requestStage: "Request" }],
-    });
-  }
   await cdpCommand("Log.enable");
   await cdpCommand("Network.setCacheDisabled", { cacheDisabled: true });
   await cdpCommand("Network.setBypassServiceWorker", { bypass: false });

@@ -5,15 +5,29 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildAssetInventory, buildReleaseManifest, collectPublicAssets, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { extractWorkerVersionId, buildWorkerVersionBaseUrl } = require("../scripts/cloudflare-worker-version.js");
 
 const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
 const deployScript = fs.readFileSync(path.join(__dirname, "deploy-production-pwa.js"), "utf8");
 const releaseWriterSource = fs.readFileSync(path.join(root, "scripts", "write-release-manifest.js"), "utf8");
+const workerVersionSource = fs.readFileSync(path.join(root, "scripts", "cloudflare-worker-version.js"), "utf8");
 const quality = fs.readFileSync(path.join(root, ".github/workflows/quality.yml"), "utf8");
 const selfHosted = fs.readFileSync(path.join(root, ".github/workflows/selfhosted-windows-test.yml"), "utf8");
 const verifier = fs.readFileSync(path.join(__dirname, "verify-production-version.js"), "utf8");
 const liveOfflineE2e = fs.readFileSync(path.join(__dirname, "live-offline-e2e.js"), "utf8");
+
+test("Cloudflare deploy smoke pins every live check to the exact Wrangler Worker Version URL", () => {
+  const versionId = "e8034d32-4cc9-4e1d-b491-6458d9fd2673";
+  const output = "Deployed battlecruiser triggers (0.31 sec)\\nCurrent Version ID: " + versionId;
+  assert.equal(extractWorkerVersionId(output), versionId);
+  assert.equal(buildWorkerVersionBaseUrl("https://battlecruiser.robvg9.workers.dev", versionId),
+    "https://e8034d32-battlecruiser.robvg9.workers.dev");
+  assert.throws(() => extractWorkerVersionId("Deployed without a version id"), /Current Version ID/);
+  assert.throws(() => buildWorkerVersionBaseUrl("http://battlecruiser.robvg9.workers.dev", versionId), /HTTPS/);
+  assert.throws(() => buildWorkerVersionBaseUrl("https://battlecruiser.robvg9.workers.dev", "bad"), /full Cloudflare UUID/);
+  assert.match(workerVersionSource, /Current Version ID:/);
+});
 
 test("release manifest records exact source SHA, numeric run ID and aligned app/SW versions", () => {
   const sha = "abcdef0123456789abcdef0123456789abcdef01";
@@ -103,6 +117,7 @@ test("production deploy uses standard hosted Windows and persists the exact LIVE
   assert.match(deploy, /^    runs-on: windows-latest$/m);
   assert.ok(deploy.includes("run: node test/deploy-production-pwa.js"));
   assert.ok(deploy.includes("test-results/release/release-*.json"));
+  assert.ok(deploy.includes("test-results/release/deployment.json"));
   assert.ok(deploy.includes("name: battlecruiser-release-provenance-${{ github.run_id }}"));
   assert.ok(deploy.includes("test-results/deploy-pwa-log.txt"));
   assert.ok(deploy.includes("if-no-files-found: warn"));
@@ -110,7 +125,9 @@ test("production deploy uses standard hosted Windows and persists the exact LIVE
   assert.ok(deployScript.includes("releaseManifestFilename(expected.source_sha)"));
   assert.ok(deployScript.includes("liveManifest = JSON.parse(manifest.body);"));
   assert.ok(deployScript.includes("LIVE release manifest invalid"));
-  assert.ok(deployScript.includes("Cloudflare-Workers-Version-Key"));
+  assert.ok(deployScript.includes("buildWorkerVersionBaseUrl(PROD_BASE, workerVersionId)"));
+  assert.ok(deployScript.includes("worker_version_url: versionBaseUrl"));
+  assert.ok(deployScript.includes("deployment.json"));
   assert.ok(deployScript.includes("battlecruiser-release-"));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
   assert.ok(deployScript.includes("workflow_run_id"));
@@ -137,8 +154,8 @@ test("LIVE release verifier checks the downloaded artifact against exact SHA, ve
   assert.match(verifier, /test-results", "release", releaseFilename/);
   assert.match(verifier, /source_sha: expectedSha/);
   assert.match(verifier, /workflow_run_id: expectedRunId/);
-  assert.ok(verifier.includes("Cloudflare-Workers-Version-Key"));
-  assert.ok(verifier.includes("battlecruiser-release-"));
+  assert.ok(verifier.includes("buildWorkerVersionBaseUrl(productionBaseUrl, deployment.worker_version_id)"));
+  assert.ok(verifier.includes("deployment.worker_version_url"));
   assert.match(verifier, /indexFooterMatch/);
   assert.match(verifier, /EXACT_SHA=PASS/);
   assert.ok(verifier.includes("release.asset_inventory"));
@@ -178,10 +195,9 @@ test("post-deploy verifier uses the exact no-store URL and cache-header contract
 });
 
 test("deploy smoke and post-deploy LIVE verifier pin related requests to the same Cloudflare Worker version", () => {
-  assert.ok(deployScript.includes('"Cloudflare-Workers-Version-Key": versionKey'));
-  assert.ok(verifier.includes('"Cloudflare-Workers-Version-Key": versionAffinityKey'));
-  assert.ok(deployScript.includes('"battlecruiser-release-" + String(process.env.GITHUB_RUN_ID || "")'));
-  assert.ok(verifier.includes('"battlecruiser-release-" + expectedRunId'));
+  assert.ok(deployScript.includes("const workerVersionBaseUrl = buildWorkerVersionBaseUrl(PROD_BASE, workerVersionId)"));
+  assert.ok(verifier.includes("const baseUrl = deployment.worker_version_url"));
+  assert.doesNotMatch(deployScript + verifier, /Cloudflare-Workers-Version-Key|versionAffinityKey/);
 });
 
 test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact core asset checks", () => {
@@ -189,8 +205,9 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.match(liveOfflineE2e, /path\.join\(OUTPUT_DIR, "release", releaseFilename\)/);
   assert.match(liveOfflineE2e, /workflow_run_id: expectedRunId/);
   assert.ok(liveOfflineE2e.includes("releaseManifestFilename(expectedReleaseSha)"));
-  assert.ok(liveOfflineE2e.includes("Cloudflare-Workers-Version-Key"));
-  assert.ok(liveOfflineE2e.includes("battlecruiser-release-"));
+  assert.ok(liveOfflineE2e.includes("deployment.worker_version_url"));
+  assert.ok(liveOfflineE2e.includes("deployment.json"));
+  assert.doesNotMatch(liveOfflineE2e, /Cloudflare-Workers-Version-Key|LIVE_VERSION_AFFINITY_KEY/);
   assert.ok(liveOfflineE2e.includes('Fetch.enable", {'));
   assert.ok(liveOfflineE2e.includes('Fetch.continueRequest'));
   assert.doesNotMatch(liveOfflineE2e, /Network\.setExtraHTTPHeaders/,
