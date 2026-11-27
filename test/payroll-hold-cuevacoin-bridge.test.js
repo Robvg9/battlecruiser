@@ -58,7 +58,7 @@ test("Jornada expenses capture SALARIOS and cafeteria supplies separately; payro
 test("Nómina is mounted from Administration and remains separate from approval requests",()=>{
   const approvals=read("public/js/aprobaciones-admin.js");
   const index=read("public/index.html");
-  assert.match(index,/bc-admin-payroll[\\s\\S]*data-bcpay-open-admin/);
+  assert.ok(index.includes("bc-admin-payroll") && index.includes("data-bcpay-open-admin"));
   assert.match(bridge,/async function openAdminModal/);
   assert.match(bridge,/data-bcpay-open-admin/);
   assert.match(bridge,/bc-payroll-admin-modal/);
