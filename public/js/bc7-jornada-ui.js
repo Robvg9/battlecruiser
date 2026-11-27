@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.68 — keep Bajas checklist mounted after review submission; explicit final confirmation.
+// v7.71 — restore archived and multi-day calendar periods; simplify Jornada planning.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
+  const state={admin:false,rows:[],calendarRows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -55,6 +55,9 @@
     if(['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status))return {kind:'scheduled',short:'Programada',label:'Programada'};
     return {kind:'other',short:humanStatus(status),label:humanStatus(status)};
   }
+  function jornadaRangeStart(row){return String(row&&row.fecha||'').slice(0,10);}
+  function jornadaRangeEnd(row){const start=jornadaRangeStart(row),candidate=String(row&&(row.fecha_fin||row.fecha)||start).slice(0,10);return candidate>=start?candidate:start;}
+  function jornadaCoversDate(row,date){const start=jornadaRangeStart(row),end=jornadaRangeEnd(row);return !!start&&start<=date&&end>=date;}
   function renderMonthCalendar(month,rows){
     const host=$('bc7-month-board');
     if(!host)return;
@@ -70,7 +73,7 @@
     for(let index=0;index<cells;index++){
       const date=new Date(Date.UTC(parts.year,parts.month-1,1+index-offset,12));
       const iso=date.toISOString().slice(0,10);
-      const dayRows=rows.filter(row=>String(row&&row.fecha||'').slice(0,10)===iso);
+      const dayRows=rows.filter(row=>jornadaCoversDate(row,iso)).sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||jornadaRangeEnd(a).localeCompare(jornadaRangeEnd(b))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
       const inside=iso.slice(0,7)===month;
       const selected=state.calendarSelectedDate===iso;
       const classes=['bc7-month-day'];
@@ -78,11 +81,18 @@
       if(selected)classes.push('bc7-month-day--selected');
       if(today===iso)classes.push('bc7-month-day--today');
       const chips=dayRows.slice(0,2).map(row=>{
-        const stateInfo=calendarStatus(row);
-        const person=row.trabaja===false?'Descanso':userName(row.responsable_id);
-        const title=fmtDateHuman(iso)+' · '+person+' · '+stateInfo.label;
+        const stateInfo=calendarStatus(row),person=row.trabaja===false?'Descanso':userName(row.responsable_id);
+        const rangeStart=jornadaRangeStart(row),rangeEnd=jornadaRangeEnd(row),multiDay=rangeEnd>rangeStart;
+        const weekContinuation=multiDay&&iso>rangeStart&&new Date(iso+'T12:00:00Z').getUTCDay()===1;
+        const segmentStart=iso===rangeStart||weekContinuation,segmentEnd=iso===rangeEnd;
+        const chipClasses=['bc7-month-chip','is-'+stateInfo.kind];
+        if(multiDay)chipClasses.push('is-multi-day',segmentStart?'is-range-start':(segmentEnd?'is-range-end':'is-range-middle'));
+        if(weekContinuation)chipClasses.push('is-range-week-continuation');
+        const periodLabel=fmtDateHuman(rangeStart)+(multiDay?' — '+fmtDateHuman(rangeEnd):'');
+        const title=periodLabel+' · '+person+' · '+stateInfo.label;
         const drag=canOfferPeriodMove(row)?' draggable="true" data-bc7-period-drag="'+esc(row.id)+'" title="'+esc(title+' · Arrastra para proponer el traslado de todo el período')+'" aria-grabbed="false"':' title="'+esc(title)+'"';
-        return '<button type="button" class="bc7-month-chip is-'+stateInfo.kind+'" data-bc7-calendar-select="'+iso+'"'+drag+' aria-label="'+esc(title+(canOfferPeriodMove(row)?' · Arrastrable; también puedes usar el botón Mover período completo':'') )+'"><span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(person)+'</span><span class="bc7-month-chip-status">'+esc(stateInfo.short)+'</span></button>';
+        const visibleName=!multiDay||segmentStart?person:'';
+        return '<button type="button" class="'+chipClasses.join(' ')+'" data-bc7-calendar-select="'+iso+'"'+drag+' aria-label="'+esc(title+(canOfferPeriodMove(row)?' · Arrastrable; también puedes usar el botón Mover período completo':''))+'"><span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(visibleName)+'</span><span class="bc7-month-chip-status">'+esc(stateInfo.short)+'</span></button>';
       }).join('');
       const more=dayRows.length>2?'<button type="button" class="bc7-month-more" data-bc7-calendar-select="'+iso+'">+'+(dayRows.length-2)+' más</button>':'';
       const empty=inside&&!dayRows.length?'<span class="bc7-month-empty">—</span>':'';
@@ -99,7 +109,7 @@
   function renderCalendarDetail(date,rows){
     const host=$('bc7-calendar-detail');
     if(!host)return;
-    const dayRows=rows.filter(row=>String(row&&row.fecha||'').slice(0,10)===date);
+    const dayRows=rows.filter(row=>jornadaCoversDate(row,date)).sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||jornadaRangeEnd(a).localeCompare(jornadaRangeEnd(b)));
     const title=fmtDateHuman(date);
     host.innerHTML='<div class="bc7-calendar-detail-head"><div><span class="bc7-muted">DÍA SELECCIONADO</span><h4>'+esc(title)+'</h4></div><span class="bc7-calendar-detail-count">'+dayRows.length+' '+(dayRows.length===1?'registro':'registros')+'</span></div>'+(dayRows.length?'<div class="bc7-calendar-detail-list">'+dayRows.map(rowHtml).join('')+'</div>':'<div class="bc7-empty">No hay una jornada programada para esta fecha. Puedes elegir otro día o crear una programación desde el panel de administrador.</div>');
     renderPeriodMovePreview();
@@ -108,8 +118,8 @@
     const month=$('bc7-calendar-month')?.value||dateHavana().slice(0,7);
     if(String(date||'').slice(0,7)!==month)return;
     state.calendarSelectedDate=date;
-    renderMonthCalendar(month,state.rows);
-    renderCalendarDetail(date,state.rows);
+    renderMonthCalendar(month,state.calendarRows||state.rows);
+    renderCalendarDetail(date,state.calendarRows||state.rows);
   }
   function periodStartForRow(row){
     const day=Number(row&&row.numero_dia);
@@ -683,6 +693,12 @@
         "#tab-jornada .bc7-month-chip-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--gold)}",
         "#tab-jornada .bc7-month-chip-person{overflow:hidden;min-width:0;color:var(--text);font-size:9px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}",
         "#tab-jornada .bc7-month-chip-status{display:none}",
+        "#tab-jornada .bc7-month-chip.is-multi-day{position:relative;z-index:3;gap:4px;border-top-width:1px;border-bottom-width:1px}",
+        "#tab-jornada .bc7-month-chip.is-range-start{margin-left:0;margin-right:-7px;width:calc(100% + 7px);border-right:0;border-radius:6px 0 0 6px}",
+        "#tab-jornada .bc7-month-chip.is-range-middle{margin-left:-7px;margin-right:-7px;width:calc(100% + 14px);border-right:0;border-left:0;border-radius:0}",
+        "#tab-jornada .bc7-month-chip.is-range-end{margin-left:-7px;margin-right:0;width:calc(100% + 7px);border-left:0;border-radius:0 6px 6px 0}",
+        "#tab-jornada .bc7-month-chip.is-range-week-continuation .bc7-month-chip-person{font-weight:800}",
+        "#tab-jornada .bc7-month-day-events{overflow:visible}",
         "#tab-jornada .bc7-month-chip.is-running{border-color:rgba(95,174,127,.44);background:rgba(95,174,127,.10)}",
         "#tab-jornada .bc7-month-chip.is-running .bc7-month-chip-dot{background:#7fc99a}",
         "#tab-jornada .bc7-month-chip.is-scheduled{border-color:rgba(216,181,92,.48);background:rgba(216,181,92,.09)}",
@@ -803,14 +819,7 @@
       '<header class="bc7-hero"><div><h2>Jornada e inventario</h2></div><div class="bc7-hero-actions"><button type="button" class="bc7-help-icon" data-bc7-help-open aria-label="Abrir guía de Jornada" title="Guía de Jornada">?</button><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></div></header>'+
       '<section id="bc7-current-session-card" class="bc7-card" hidden aria-live="polite"></section>'+
       '<div id="bc7-help-modal" class="bc7-help-modal" hidden><button type="button" class="bc7-help-backdrop" data-bc7-help-close aria-label="Cerrar guía"></button><section class="bc7-help-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-help-title"><header><div><span>GUÍA OPERATIVA</span><h3 id="bc7-help-title">Jornada e inventario</h3></div><button type="button" class="bc7-btn" data-bc7-help-close aria-label="Cerrar">✕</button></header><div class="bc7-help-content"><p><b>Esta sección organiza cada período de trabajo y conserva la evidencia física y administrativa.</b></p><h4>¿Para qué sirve esta sección?</h4><p>Aquí organizas quién trabaja cada día. Cada responsable inicia su jornada, confirma el inventario físico inicial y final, y registra sus operaciones. Esta sección no es el historial general; para consultar todos los movimientos, entra en Movimientos → Historial.</p><p>Si no aparece una jornada, prueba otro mes y pulsa «Actualizar calendario». Una asignación solo queda confirmada cuando la valida el servidor.</p><h4>Estados de una jornada</h4><ul><li><b>Programada:</b> tiene fecha y responsable, pero aún no comienza.</li><li><b>En curso:</b> la responsable está trabajando y puede registrar operaciones.</li><li><b>Pendiente de cuadre:</b> la operación se selló; falta completar o revisar los datos físicos y administrativos. El sello no cierra el Turno maestro.</li><li><b>Pendiente de cierre maestro:</b> la jornada terminó, pero el Dueño aún debe revisar el período y aprobar el cierre definitivo.</li><li><b>Archivada:</b> el Turno maestro ya se cerró o la programación se canceló. Se conserva para consulta, fuera de la lista principal.</li></ul><h4>Los cinco pasos de la responsable</h4><ol><li><b>Entregas diarias de efectivo:</b> una entrega por cada fecha del período; registra 0 CUP si ese día no se entregó efectivo.</li><li><b>Gastos:</b> registrar todos los gastos reales.</li><li><b>Reinversiones:</b> registrar las compras/reinversiones correspondientes.</li><li><b>Bajas:</b> enviar todas las bajas y mermas y confirmar expresamente que no faltan más.</li><li><b>Inventario final:</b> contar físicamente cada producto del período y guardar el corte.</li></ol><h4>Reglas de seguridad</h4><ul><li>Enviar un bloque no aprueba automáticamente su contenido; Administración lo revisa por separado.</li><li>Una discrepancia de inventario queda auditada; no se reescribe el conteo inicial ni se ajusta el stock global automáticamente.</li><li>Los movimientos posteriores al corte deben atribuirse con evidencia; no se cargan a una persona solo por coincidir en fecha.</li><li>La jornada y el Turno maestro son estados distintos. El cierre operativo no equivale a aprobación administrativa.</li></ul><p>El historial archivado permanece disponible en el desplegable «Jornadas archivadas».</p></div></section></div>'+
-      '<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Organizar jornadas · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">'+
-       '<h3>Crear y organizar jornadas</h3><p class="bc7-muted">Elige el almacén, la fecha y quién trabaja cada día. Puedes asignar las personas una por una o repetir una rotación que hayas guardado.</p>'+
-       '<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">¿Cómo quieres organizar los días?<select id="bc7-plan-mode"><option value="explicit">Elegir responsables día por día</option><option value="pattern">Repetir una rotación guardada</option></select></label></div>'+
-       '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Hora local del almacén<input type="hidden" id="bc7-timezone" value="America/Havana"><span id="bc7-timezone-label" class="bc7-muted">Hora de Cuba (La Habana)</span></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
-       '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej. 5" inputmode="numeric"></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
-       '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+'<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar una jornada atrasada · Entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Prepara una sucesora cuya fecha de inicio ya pasó, aunque el período siga en curso, usando el inventario final del turno ya cerrado. Conserva la duración del período anterior. No se modifica el stock global ni se inventa un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>'+
-      '</section></details>'+
-      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Jornadas programadas</h3><span class="bc7-muted">Tu vista habitual se mantiene aquí. El tablero visual avanzado se abre aparte en computadora.</span></div><button class="bc7-btn primary bc7-visual-calendar-open" type="button" data-bc7-open-visual-calendar aria-haspopup="dialog" aria-controls="bc7-visual-calendar-modal">✦ Abrir tablero visual</button></div>'+
+      "<details id=\"bc7-admin-details\" class=\"bc7-admin-details\" hidden><summary>Organizar jornadas · Administrador</summary><section id=\"bc7-admin-panel\" class=\"bc7-card\">\n<h3>Nueva programación</h3><p class=\"bc7-muted\">Elige el almacén, el período y quién trabaja cada día. La disponibilidad se valida al guardar.</p>\n<div class=\"bc7-grid\"><div><label class=\"bc7-field\">Almacén<select id=\"bc7-warehouse\"></select></label><p class=\"bc7-msg\" id=\"bc7-warehouse-msg\" role=\"status\" aria-live=\"polite\"></p><button class=\"bc7-btn\" type=\"button\" id=\"bc7-warehouse-retry\" hidden>Reintentar carga de almacenes</button></div><label class=\"bc7-field\">Asignación<select id=\"bc7-plan-mode\"><option value=\"explicit\">Día por día</option><option value=\"pattern\">Rotación guardada</option></select></label></div>\n<form id=\"bc7-pattern-form\"><h4>Período y responsables</h4><div class=\"bc7-grid\"><label class=\"bc7-field\">Primera fecha<input id=\"bc7-start-date\" type=\"date\" required></label><label class=\"bc7-field\">Duración (días)<input id=\"bc7-days-count\" type=\"number\" min=\"2\" max=\"31\" placeholder=\"2–31\" inputmode=\"numeric\"></label></div>\n<div class=\"bc7-actions\"><button class=\"bc7-btn\" type=\"button\" data-bc7-build>Mostrar días</button></div>\n<p class=\"bc7-msg\" id=\"bc7-staff-status\" role=\"status\" aria-live=\"polite\">Cargando responsables activos…</p><button class=\"bc7-btn\" type=\"button\" id=\"bc7-staff-retry\" hidden>Reintentar carga de responsables</button><div id=\"bc7-day-rows\" class=\"bc7-day-rows\"></div>\n<details class=\"bc7-detail\" id=\"bc7-rotation-details\"><summary>Opciones de rotación recurrente</summary><div class=\"bc7-detail-body\"><label class=\"bc7-field\">Nombre de la rotación<input id=\"bc7-pattern-name\" maxlength=\"100\" placeholder=\"Ej. 5 días de trabajo y 2 de descanso\"></label><label class=\"bc7-field\">Fecha ancla de la rotación<input id=\"bc7-anchor\" type=\"date\"></label><button class=\"bc7-btn\" type=\"submit\">Guardar rotación</button></div></details><p class=\"bc7-msg\" id=\"bc7-pattern-msg\"></p></form>\n<div class=\"bc7-actions\"><button class=\"bc7-btn\" type=\"button\" data-bc7-preview>Vista previa</button><button class=\"bc7-btn primary\" type=\"button\" data-bc7-create>Crear programación</button></div>\n<details class=\"bc7-detail\" id=\"bc7-schedule-note-details\"><summary>Nota opcional</summary><div class=\"bc7-detail-body\"><label class=\"bc7-field\">Motivo administrativo o nota<input id=\"bc7-schedule-note\" maxlength=\"1000\" placeholder=\"Nota (opcional)\"></label></div></details>\n<div id=\"bc7-preview\" class=\"bc7-list\"></div><p class=\"bc7-msg\" id=\"bc7-create-msg\"></p>\n<details class=\"bc7-detail\" id=\"bc7-hours-details\"><summary>Horario operativo · opciones avanzadas</summary><div class=\"bc7-detail-body\"><form id=\"bc7-hours-form\"><div class=\"bc7-grid\"><label class=\"bc7-field\">Apertura<input type=\"time\" id=\"bc7-hour-start\" value=\"07:00\" required></label><label class=\"bc7-field\">Cierre<input type=\"time\" id=\"bc7-hour-end\" value=\"23:00\" required></label></div><label class=\"bc7-field\">Zona horaria<input type=\"hidden\" id=\"bc7-timezone\" value=\"America/Havana\"><span id=\"bc7-timezone-label\" class=\"bc7-muted\">Hora de Cuba (La Habana)</span></label><button class=\"bc7-btn\" type=\"submit\">Guardar horario</button><p class=\"bc7-msg\" id=\"bc7-hours-msg\"></p></form></div></details>\n<details class=\"bc7-detail\" id=\"bc7-retro-successor-box\"><summary>Recuperar jornada atrasada · entrega pendiente</summary><div class=\"bc7-detail-body\"><p class=\"bc7-muted\">Usa esta opción solo para recuperar una sucesora cuya fecha inicial ya pasó y que dispone de una entrega pendiente. Hereda el inventario disponible; no inventa ni recaptura un inventario inicial.</p><div class=\"bc7-actions\"><button class=\"bc7-btn primary\" type=\"button\" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id=\"bc7-retro-handover-content\"><p class=\"bc7-muted\">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>\n</section></details>"+'<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Jornadas programadas</h3><span class="bc7-muted">Tu vista habitual se mantiene aquí. El tablero visual avanzado se abre aparte en computadora.</span></div><button class="bc7-btn primary bc7-visual-calendar-open" type="button" data-bc7-open-visual-calendar aria-haspopup="dialog" aria-controls="bc7-visual-calendar-modal">✦ Abrir tablero visual</button></div>'+
       '<div id="bc7-visual-calendar-modal" class="bc7-visual-calendar-modal" hidden>'+
       '<button type="button" class="bc7-visual-calendar-backdrop" data-bc7-close-visual-calendar aria-label="Cerrar calendario visual"></button>'+
       '<section class="bc7-visual-calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-visual-calendar-title">'+
@@ -1030,7 +1039,7 @@
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
     const pendingMasterClose=['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
     const pill=rest?'<span class="bc7-pill">Descanso</span>':isApprovedMasterClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
+    const isTerminal=['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status)||masterStatus==='CERRADO';
     const viewable=status==='COMPLETADA'||isOperationallySealed;
     const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     const periodMove=canOfferPeriodMove(r)?'<button class="bc7-btn" type="button" data-bc7-period-move="'+esc(r.id)+'">Mover período completo</button>':'';
@@ -1131,8 +1140,10 @@
       visible.sort((a,b)=>rank(a)-rank(b)||String(a.fecha||'').localeCompare(String(b.fecha||''))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
       archived.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
       state.rows=visible;state.archivedRows=archived;
+      const calendarRows=[...visible,...archived].sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
+      state.calendarRows=calendarRows;
       if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;}
-      if(board)renderMonthCalendar(month,visible);renderCalendarDetail(state.calendarSelectedDate,visible);
+      if(board)renderMonthCalendar(month,calendarRows);renderCalendarDetail(state.calendarSelectedDate,calendarRows);
       if(list)list.innerHTML=visible.length?visible.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango.</strong><p>Prueba otro mes. Las jornadas cerradas aparecen archivadas abajo. Una lista vacía no demuestra que el servidor esté caído. Una asignación solo queda confirmada cuando la valida el servidor.</p></div>';
       const archive=$('bc7-archived-schedule'),archiveList=$('bc7-archived-schedule-list'),archiveCount=$('bc7-archived-schedule-count');
       if(archive&&state.admin){archive.hidden=!archived.length;if(archiveCount)archiveCount.textContent=String(archived.length);if(archiveList)archiveList.innerHTML=archived.map(rowHtml).join('');}
@@ -1154,7 +1165,7 @@
     }catch(e){
       if(String($('bc7-calendar-month')?.value||month)===month){
         state.calendarLoading=false;state.calendarLoadError=friendlyError(e,'calendar');
-        if(!cached){state.rows=[];
+        if(!cached){state.rows=[];state.calendarRows=[];
           if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
           if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
           const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
@@ -3634,16 +3645,31 @@
     finally{busy(btn,false);}
   }
   async function previewPattern(btn){
-    const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount();
+    const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount(),mode=$('bc7-plan-mode')?.value||'explicit';
     if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
-    if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha que quieres programar.','error');return;}
+    if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha.','error');return;}
     if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return;}
+    if(mode==='explicit'){
+      if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de responsables.','error');return;}
+      let schedule=readDayRows();if(schedule.length!==n){buildDayRows();schedule=readDayRows();}
+      const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
+      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como laborable, pero no tiene responsable.','error');return;}
+      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días de descanso debe quedar vacía la persona asignada.','error');return;}
+      if(!busy(btn,true))return;
+      try{
+        const rows=schedule.map((row,index)=>({...row,fecha:addDays(start,index),hora_inicio_prevista:$('bc7-hour-start')?.value||'07:00',hora_fin_prevista:$('bc7-hour-end')?.value||'23:00'}));
+        state.lastPreview={start,warehouse,days:n,rows,mode:'explicit'};
+        $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong></article>').join('');
+        msg($('bc7-create-msg'),'Vista previa de tu asignación. No se ha guardado nada. El servidor comprobará fechas ocupadas y conflictos de responsables al crear.','');
+      }finally{busy(btn,false);}
+      return;
+    }
     if(!busy(btn,true))return;
     try{
       const rows=arr(await rpc('bc5_previsualizar_jornada',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n}));
       state.lastPreview={start,warehouse,days:n,rows,mode:'pattern'};
       $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong><p>'+esc(String(r.hora_inicio_prevista).slice(0,5))+'–'+esc(String(r.hora_fin_prevista).slice(0,5))+'</p></div>'+(r.conflicto?'<span class="bc7-pill warn">Revisar</span>':'<span class="bc7-pill ok">Disponible</span>')+'</div>'+(r.motivo_conflicto?'<p>'+esc(friendlyError(r.motivo_conflicto,'preview'))+'</p>':'')+'</article>').join('');
-      msg($('bc7-create-msg'),rows.some(r=>r.conflicto)?'La vista previa contiene conflictos. Corrígelos antes de crear.':'Vista previa sin conflictos detectados. Aún falta confirmar la creación.','');
+      msg($('bc7-create-msg'),rows.some(r=>r.conflicto)?'La vista previa contiene conflictos. Corrígelos antes de crear.':'Rotación verificada sin conflictos. Aún falta confirmar la creación.','');
     }catch(e){state.lastPreview=null;msg($('bc7-create-msg'),friendlyError(e,'preview'),'error');}
     finally{busy(btn,false);}
   }
@@ -3657,13 +3683,12 @@
     if(mode==='explicit'&&!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de personas disponibles antes de crear las jornadas.','error');return;}
     if(mode==='explicit'){
       schedule=readDayRows();
-      if(schedule.length!==n){buildDayRows();schedule=readDayRows();}
+      if(schedule.length!==n){msg($('bc7-create-msg'),'Pulsa «Mostrar días» para generar todas las asignaciones y vuelve a revisar.','error');return;}
       const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
-      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como día de trabajo, pero todavía no tiene una persona asignada.','error');return;}
-      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días marcados como descanso, borra la persona que aparece asignada.','error');return;}
-      const dates=schedule.map((r,i)=>addDays(start,i));
-      state.lastPreview={start,warehouse,days:n,mode:'explicit',rows:schedule.map((r,i)=>({...r,fecha:dates[i],conflicto:false}))};
-      $('bc7-preview').innerHTML=state.lastPreview.rows.map(r=>'<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong></article>').join('');
+      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como laborable, pero no tiene responsable.','error');return;}
+      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días de descanso debe quedar vacía la persona asignada.','error');return;}
+      const sameAssignment=state.lastPreview&&state.lastPreview.mode==='explicit'&&state.lastPreview.start===start&&state.lastPreview.warehouse===warehouse&&state.lastPreview.days===n&&JSON.stringify(state.lastPreview.rows.map(r=>({numero_dia:r.numero_dia,trabaja:r.trabaja,responsable_id:r.responsable_id})))===JSON.stringify(schedule);
+      if(!sameAssignment){msg($('bc7-create-msg'),'La asignación cambió o no tiene vista previa. Pulsa «Vista previa» y revisa los días antes de guardar.','error');return;}
     }else{
       if(!state.lastPreview||state.lastPreview.mode!=='pattern'||state.lastPreview.start!==start||state.lastPreview.warehouse!==warehouse||state.lastPreview.days!==n){
         msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return;
@@ -3947,6 +3972,7 @@
   });
   document.addEventListener('change',function(e){
     const t=e.target;
+    if(t&&t.matches('#bc7-warehouse,#bc7-plan-mode,#bc7-start-date,#bc7-days-count,#bc7-day-rows [data-bc7-works],#bc7-day-rows [data-bc7-person]')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';if(t.id==='bc7-plan-mode'&&t.value==='pattern'&&$('bc7-rotation-details'))$('bc7-rotation-details').open=true;}
     if(t&&(t.matches('[data-bc7-receive-attest-fast]')||t.matches('[data-bc7-receive-attest-diff]'))){
       const f=t.closest('form[data-bc7-receive-form]'); if(f)syncReceiveFormState(f);
     }
@@ -3957,6 +3983,7 @@
   });
   document.addEventListener('input',function(e){
     const t=e.target;
+    if(t&&t.matches('#bc7-start-date,#bc7-days-count')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';}
     if(t&&(t.matches('[data-bc7-receive-count]')||t.matches('[data-bc7-receive-search]')||t.matches('[data-bc7-receive-note]'))){
       const receiveForm=t.closest('form[data-bc7-receive-form]');
       if(receiveForm)syncReceiveFormState(receiveForm);
