@@ -388,8 +388,9 @@ h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 17px
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading-overlay {
   position: fixed; inset: 0; background: rgba(10, 22, 19, 0.85);
-  display: flex; align-items: center; justify-content: center; z-index: 10000;
+  display: none; align-items: center; justify-content: center; z-index: 10000;
 }
+.loading-overlay.visible { display: flex; }
 .loading-overlay .spinner { width: 40px; height: 40px; border-width: 3px; }
 .pendientes-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .pendiente-detalle {
