@@ -51,8 +51,8 @@ test("Jornada expenses capture SALARIOS and cafeteria supplies separately; payro
   assert.match(bridge,/No modifica CuevaCoin/);
   assert.match(app,/\["payroll-bridge\.js","1\.2"\]/);
   assert.match(sw,/\.\/js\/payroll-bridge\.js\?v=1\.2/);
-  assert.match(app,/\["bc7-jornada-ui\.js","7\.70"\]/);
-  assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.70/);
+  assert.match(app,/\["bc7-jornada-ui\.js","7\.71"\]/);
+  assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.71/);
 });
 
 test("Nómina is mounted from Administration and remains separate from approval requests",()=>{
