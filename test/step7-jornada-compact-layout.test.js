@@ -17,7 +17,7 @@ test("Step 7 uses a compact help modal and places the active Jornada before plan
  assert.match(mobileCss,/#tab-jornada #bc7-calendar-section\{order:2\}/);
  assert.match(mobileCss,/#tab-jornada #bc7-admin-details\{order:3\}/);
  assert.match(mobileCss,/#tab-jornada #bc7-workspace\{order:4\}/);
- assert.match(ui,/<details id="bc7-admin-details" class="bc7-admin-details" hidden>/);
+ assert.match(ui,/<details id=\\?"bc7-admin-details\\?" class=\\?"bc7-admin-details\\?" hidden>/);
  assert.match(ui,/id="bc7-calendar-section"/);
  assert.match(ui,/function setPageMode\(workspace\)/);
  assert.match(ui,/admin\.hidden=!!workspace\|\|!state\.admin/);
@@ -39,7 +39,7 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
 test("compact Step 7 updates app loader and offline cache",()=>{
  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
- assert.match(ui,/^\/\/ v7\.68 — keep Bajas checklist mounted after review submission; explicit final confirmation/m);
+ assert.match(ui,/^\/\/ v7\.71 — restore archived and multi-day calendar periods; simplify Jornada planning\./m);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
