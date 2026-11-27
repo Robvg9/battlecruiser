@@ -2,7 +2,7 @@ name: BattleCruiser Step 4 Movement Modal Regression
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/jornada-planner-calendar-history-ux-20261127]
     paths:
       - 'public/app.js'
       - 'public/index.html'
