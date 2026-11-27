@@ -352,7 +352,7 @@
       const oldEnd=addDays(oldStart,draft.days-1);
       const count=dayDelta(targetDate,oldEnd)+1;
       if(targetDate<today()||count<2||count>31)return false;
-      const shift=dayDelta(targetDate,oldStart);
+      const shift=dayDelta(oldStart,targetDate);
       // Moving the start later removes leading days; moving it earlier prepends new blank days.
       if(shift>0)draft.schedule=draft.schedule.slice(shift);
       if(shift<0)draft.schedule=Array.from({length:Math.abs(shift)},(_,index)=>makeDay(index)).concat(draft.schedule);
