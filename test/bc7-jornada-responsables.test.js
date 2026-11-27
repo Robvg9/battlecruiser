@@ -245,6 +245,9 @@ test("Step 7 scheduling success is shown in plain language without IDs or JSON",
   const secondDay = window.document.querySelectorAll("#bc7-day-rows .bc7-day-row")[1];
   secondDay.querySelector("[data-bc7-works]").click();
   assert.equal(secondDay.querySelector("[data-bc7-person]").disabled, true);
+  window.document.querySelector("[data-bc7-preview]").click();
+  const previewed = await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
+  assert.ok(previewed, "the day-by-day assignment should be reviewed locally before creation");
   window.document.querySelector("[data-bc7-create]").click();
   const done = await waitFor(() => /Se programaron 2 días: 1 de trabajo y 1 de descanso/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
   assert.ok(done, "show human confirmation after the server confirms creation");
@@ -278,6 +281,9 @@ test("Step 7 known scheduling conflicts are translated into human guidance", asy
   assert.equal(person.value, "dep-2");
   const secondDay = window.document.querySelectorAll("#bc7-day-rows .bc7-day-row")[1];
   secondDay.querySelector("[data-bc7-works]").click();
+  window.document.querySelector("[data-bc7-preview]").click();
+  const previewed = await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
+  assert.ok(previewed, "the day-by-day assignment should be reviewed locally before creation");
   window.document.querySelector("[data-bc7-create]").click();
   const failed = await waitFor(() => /Ya hay una jornada programada/.test(window.document.getElementById("bc7-create-msg")?.textContent || ""));
   assert.ok(failed, "the duplicate date should explain what needs correction");
