@@ -3218,6 +3218,10 @@
       setStatus('Este acceso rápido no corresponde a una sección disponible.','error');
       return false;
     }
+    // Worker shortcuts originate in #tab-mi-jornada. The workspace and its
+    // checklist dialog live in #tab-jornada, so activate that tab before
+    // opening the session; otherwise the dialog is mounted inside a hidden tab.
+    navTo('jornada');
     if(!await openWorkspace(sessionId))return false;
     const completed=state.detail?.checklist?.[section]?.completado===true;
     if(editableSections.includes(section)&&completed){
@@ -3916,7 +3920,7 @@
     if(t.hasAttribute('data-bc7-create')){await createSchedule(t);return;}
     if(t.hasAttribute('data-bc7-retro-handover-open')){await openRetroSuccessorPanel(t);return;}
     if(t.hasAttribute('data-bc7-start-retro')){await startRetroSuccessor(t);return;}
-    if(t.hasAttribute('data-bc7-open')){await openWorkspace(t.dataset.bc7Open);return;}
+    if(t.hasAttribute('data-bc7-open')){navTo('jornada');await openWorkspace(t.dataset.bc7Open);return;}
     if(t.hasAttribute('data-bc7-operational-close')){await closeOperationalSession(t);return;}
     if(t.hasAttribute('data-bc7-start')){await startSession(t);return;}
     if(t.hasAttribute('data-bc7-link-delivery')){await linkSharedDelivery(t);return;}
