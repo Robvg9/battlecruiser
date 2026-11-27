@@ -16,12 +16,12 @@ const migrationPath = "supabase/migrations/20261126012430_jornada_calendar_realt
 const migration = read(migrationPath);
 
 test("PWA 9.5.172 keeps shell, app and service-worker versions aligned", () => {
-  assert.match(app, /const VERSION="9\.5\.171"/);
-  assert.match(index, /app\.js\?v=9\.5\.171/);
-  assert.match(index, /style\.css\?v=9\.5\.171/);
-  assert.match(sw, /BC_SW_VERSION = "9\.5\.171"/);
-  assert.match(sw, /app\.js\?v=9\.5\.171/);
-  assert.match(sw, /style\.css\?v=9\.5\.171/);
+  assert.match(app, /const VERSION="9\.5\.172"/);
+  assert.match(index, /app\.js\?v=9\.5\.172/);
+  assert.match(index, /style\.css\?v=9\.5\.172/);
+  assert.match(sw, /BC_SW_VERSION = "9\.5\.172"/);
+  assert.match(sw, /app\.js\?v=9\.5\.172/);
+  assert.match(sw, /style\.css\?v=9\.5\.172/);
 });
 
 test("a completed Jornada with a closed master Turno is labeled approved, not pending or archived", () => {
