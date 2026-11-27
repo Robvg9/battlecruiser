@@ -3687,8 +3687,6 @@
       const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
       if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como laborable, pero no tiene responsable.','error');return;}
       if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días de descanso debe quedar vacía la persona asignada.','error');return;}
-      const sameAssignment=state.lastPreview&&state.lastPreview.mode==='explicit'&&state.lastPreview.start===start&&state.lastPreview.warehouse===warehouse&&state.lastPreview.days===n&&JSON.stringify(state.lastPreview.rows.map(r=>({numero_dia:r.numero_dia,trabaja:r.trabaja,responsable_id:r.responsable_id})))===JSON.stringify(schedule);
-      if(!sameAssignment){msg($('bc7-create-msg'),'La asignación cambió o no tiene vista previa. Pulsa «Vista previa» y revisa los días antes de guardar.','error');return;}
     }else{
       if(!state.lastPreview||state.lastPreview.mode!=='pattern'||state.lastPreview.start!==start||state.lastPreview.warehouse!==warehouse||state.lastPreview.days!==n){
         msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return;
