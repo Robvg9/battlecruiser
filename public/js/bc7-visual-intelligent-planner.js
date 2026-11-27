@@ -588,6 +588,8 @@
     }catch(_){}
   }
   function clearDrag(){
+    const source=state.drag&&state.drag.sourceElement;
+    if(source&&source.classList)source.classList.remove('bc7-vp-drag-source');
     state.drag=null;
     document.querySelectorAll('.bc7-vp-drag-source').forEach(node=>node.classList.remove('bc7-vp-drag-source'));
     clearGhost();
@@ -605,6 +607,7 @@
       state.drag={type:'move'};createTransfer(event,'move');
     }else return;
     const source=target.closest('[data-bc7-vp-draft-segment],[data-bc7-vp-tool],[data-bc7-vp-staff]')||target;
+    state.drag.sourceElement=source;
     source.classList.add('bc7-vp-drag-source');
     event.stopPropagation();
   }
