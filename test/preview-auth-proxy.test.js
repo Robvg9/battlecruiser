@@ -11,6 +11,7 @@ const productionWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wra
 
 const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const VERSIONED_PREVIEW_ORIGIN = "https://5584a3ac-battlecruiser.robvg9.workers.dev";
+const BRANCH_PREVIEW_ORIGIN = "https://feat-intelligent-visual-planner-v1-20261127-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
@@ -200,6 +201,29 @@ test("versioned Cloudflare preview host passes preflight through its isolated Wo
   assert.equal(upstreamCalls, 0, "preflight must not reach Supabase");
 });
 
+test("Cloudflare branch preview host passes preflight through its isolated Worker", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response("unexpected", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request(BRANCH_PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
+    method: "OPTIONS",
+    headers: {
+      Origin: BRANCH_PREVIEW_ORIGIN,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "apikey,content-type",
+    },
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-origin"), BRANCH_PREVIEW_ORIGIN);
+  assert.equal(upstreamCalls, 0, "branch preview preflight must not reach Supabase");
+});
+
 test("versioned Cloudflare preview login POST reaches Supabase through the production-origin proxy", async (t) => {
   const originalFetch = globalThis.fetch;
   let capturedUrl = null;
@@ -259,7 +283,7 @@ test("frontend uses the exact preview-only same-origin login endpoint and keeps 
   assert.ok(authSource.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("function bcUsesPreviewAuthProxy()"));
-  assert.ok(authSource.includes("[a-f0-9]{8}-battlecruiser"));
+  assert.ok(authSource.includes("[a-z0-9]+(?:-[a-z0-9]+)*-battlecruiser"));
   assert.ok(authSource.includes("return bcUsesPreviewAuthProxy()"));
   assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
