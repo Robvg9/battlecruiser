@@ -71,7 +71,7 @@ test("PWA release and cache manifest stay aligned", () => {
   assert.ok(appVersion, "app.js must declare a PWA release version");
   assert.ok(index.includes('style.css?v=' + appVersion), "the primary stylesheet must use the app release cache key");
   assert.match(sw, /inventario-detalle\.js\?v=72/);
-  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261124.1"));
+  assert.ok(sw.includes("./js/aprobaciones-admin.js?v=20261126.1"));
   assert.ok(app.includes('["bajas-multiple.js","1.8"]'));
   assert.ok(sw.includes('./js/bajas-multiple.js?v=1.8'));
   assert.match(sw, /productos\.js\?v=20261118\.1/);

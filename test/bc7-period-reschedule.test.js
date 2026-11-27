@@ -149,6 +149,13 @@ async function openMonthAndSelectSource(env, rows, expectMove = true) {
     });
     assert.ok(authorized, "wait for the ADMIN role check before asserting calendar controls");
   }
+  // Non-admin tests do not wait for the planner shortcut. Wait for the first
+  // calendar read so init has attached the month-change listener before this
+  // helper changes the selected month.
+  const initialLoad = await waitFor(() =>
+    env.calls.some(call => call.name === "bc5_mis_jornadas")
+  );
+  assert.ok(initialLoad, "wait for the initial calendar read before changing the month");
   const monthInput = env.window.document.getElementById("bc7-calendar-month");
   monthInput.value = rows[0].fecha.slice(0, 7);
   monthInput.dispatchEvent(new env.window.Event("change", { bubbles: true }));
