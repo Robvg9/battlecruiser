@@ -1106,13 +1106,23 @@ async function main() {
   const operationsTabClicked = await evaluate("(()=>{const b=document.querySelector('#tabs .tab-btn[data-tab=operacion]');if(!b)return false;b.click();return true})()");
   assert(operationsTabClicked, "No se pudo abrir Operaciones con el permiso sintético.");
   await waitUntil("Operaciones y acción primaria Agregar gasto visibles", "(()=>{const t=document.querySelector('#tab-operacion');const b=t&&t.querySelector('[data-op-action=gasto]');return !!(t&&t.classList.contains('visible')&&b&&b.isConnected&&getComputedStyle(b).display!=='none')})()", 10000);
-  const gastoPoint = await evaluate("(()=>{const b=document.querySelector('#tab-operacion [data-op-action=gasto]');if(!b)return null;b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height,connected:b.isConnected}})()");
+  const gastoClickSurface = await waitUntil(
+    "tarjeta Agregar gasto libre de superposición y lista para recibir el clic físico",
+    "(()=>{const b=document.querySelector('#tab-operacion [data-op-action=gasto]');if(!b||!b.isConnected)return false;const r=b.getBoundingClientRect();if(r.width<=0||r.height<=0)return false;const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!(hit&&(hit===b||b.contains(hit)))})()",
+    5000
+  );
+  report.evidence.operationsPrimaryClickSurface = gastoClickSurface;
+  const gastoPoint = await evaluate("(()=>{const b=document.querySelector('#tab-operacion [data-op-action=gasto]');if(!b)return null;b.scrollIntoView({block:'center'});const r=b.getBoundingClientRect();const hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {x:r.left+r.width/2,y:r.top+r.height/2,width:r.width,height:r.height,connected:b.isConnected,hitTarget:hit?{tag:hit.tagName,id:hit.id||null,className:typeof hit.className==='string'?hit.className:null,action:hit.getAttribute('data-op-action')}:null,sidebarOpen:!!(document.querySelector('#sidebar')&&document.querySelector('#sidebar').classList.contains('open')),backdropVisible:!!(document.querySelector('#sidebar-backdrop')&&document.querySelector('#sidebar-backdrop').classList.contains('visible')),onclickType:typeof b.onclick,canView:typeof tienePermiso==='function'?tienePermiso('gastos','ver'):null,canCreate:typeof tienePermiso==='function'?tienePermiso('gastos','crear'):null}})()");
   report.evidence.operationsPrimaryTarget = gastoPoint;
-  assert(gastoPoint && gastoPoint.connected && gastoPoint.width > 0 && gastoPoint.height > 0,
-    "La acción primaria Agregar gasto no tiene un objetivo de clic visible: " + JSON.stringify(gastoPoint));
+  assert(gastoPoint && gastoPoint.connected && gastoPoint.width > 0 && gastoPoint.height > 0 &&
+         gastoPoint.hitTarget && gastoPoint.hitTarget.action === 'gasto',
+    "La acción primaria Agregar gasto no está recibiendo el clic físico en su superficie: " + JSON.stringify(gastoPoint));
+  await evaluate("(()=>{const b=document.querySelector('#tab-operacion [data-op-action=gasto]');if(!b)return false;b.addEventListener('click',()=>{window.__BC_E2E_GASTO_CLICK_RECEIVED__=true},{once:true});window.__BC_E2E_GASTO_CLICK_RECEIVED__=false;return true})()");
   await cdpCommand("Input.dispatchMouseEvent", { type: "mouseMoved", x: gastoPoint.x, y: gastoPoint.y });
   await cdpCommand("Input.dispatchMouseEvent", { type: "mousePressed", x: gastoPoint.x, y: gastoPoint.y, button: "left", clickCount: 1 });
   await cdpCommand("Input.dispatchMouseEvent", { type: "mouseReleased", x: gastoPoint.x, y: gastoPoint.y, button: "left", clickCount: 1 });
+  await delay(100);
+  report.evidence.operationsPrimaryClickDispatch = await evaluate("(()=>({clickReceived:window.__BC_E2E_GASTO_CLICK_RECEIVED__===true,modalExists:!!document.querySelector('#bc-op-modal'),modalText:document.querySelector('#bc-op-modal')?(document.querySelector('#bc-op-modal').textContent||'').trim().slice(0,300):null,sidebarOpen:!!(document.querySelector('#sidebar')&&document.querySelector('#sidebar').classList.contains('open')),backdropVisible:!!(document.querySelector('#sidebar-backdrop')&&document.querySelector('#sidebar-backdrop').classList.contains('visible'))}))()");
   const gastoFirstClick = await waitUntil(
     "modal Agregar gasto después del primer clic real",
     "(()=>{const m=document.querySelector('#bc-op-modal');return !!(m&&/Registrar gasto/.test(m.textContent||'')&&getComputedStyle(m).display!=='none')})()",
