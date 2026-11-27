@@ -11,7 +11,7 @@ const MODULE = fs.readFileSync(MODULE_PATH, "utf8");
 const APP = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
 const SW = fs.readFileSync(path.join(__dirname, "..", "public", "service-worker.js"), "utf8");
 
-const DAYS = ["2026-11-28","2026-11-29","2026-11-30","2026-12-01","2026-12-02","2026-12-03"];
+const DAYS = ["2099-01-05","2099-01-06","2099-01-07","2099-01-08","2099-01-09","2099-01-10"];
 
 function setup(t, overrides = {}) {
   const dom = new JSDOM(
@@ -37,8 +37,8 @@ function setup(t, overrides = {}) {
   const model = {
     admin: overrides.admin !== false,
     online: overrides.online !== false,
-    month: "2026-11",
-    selectedDate: "2026-11-28",
+    month: "2099-01",
+    selectedDate: "2099-01-05",
     warehouseId: "warehouse-1",
     warehouses: [{ id: "warehouse-1", name: "La Cueva" }],
     staff: [
@@ -128,7 +128,7 @@ test("desktop palette creates an ephemeral two-day draft when dragged onto a cal
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   assert.ok(tool, "ADMIN should see the New Jornada amulet");
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
 
   assert.equal(window.document.getElementById("bc7-visual-draft-panel").hidden, false);
   assert.equal(draftSegments(window).length, 2);
@@ -141,14 +141,14 @@ test("draft end handle resizes the range live without a server write", (t) => {
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
   const last = draftSegments(window).at(-1);
   const handle = last.querySelector('[data-bc7-vp-resize="end"]');
   assert.ok(handle, "the final segment exposes a resize handle");
   startDrag(window, handle);
-  dragOver(window, window.document.querySelector('[data-date="2026-12-01"]'));
+  dragOver(window, window.document.querySelector('[data-date="2099-01-08"]'));
   assert.ok(window.document.querySelector('[data-bc7-vp-ghost]'), "a ghost range is drawn during the gesture");
-  drop(window, window.document.querySelector('[data-date="2026-12-01"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-08"]'));
   assert.equal(draftSegments(window).length, 4);
   assert.equal(calls.create.length, 0);
   assert.equal(calls.preview.length, 0);
@@ -158,18 +158,18 @@ test("draft start handle resizes the beginning while preserving the final date",
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
   const lastHandle = draftSegments(window).at(-1).querySelector('[data-bc7-vp-resize="end"]');
   startDrag(window, lastHandle);
-  drop(window, window.document.querySelector('[data-date="2026-11-30"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-07"]'));
   const firstHandle = draftSegments(window)[0].querySelector('[data-bc7-vp-resize="start"]');
   assert.ok(firstHandle);
   startDrag(window, firstHandle);
-  dragOver(window, window.document.querySelector('[data-date="2026-11-29"]'));
-  drop(window, window.document.querySelector('[data-date="2026-11-29"]'));
+  dragOver(window, window.document.querySelector('[data-date="2099-01-06"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-06"]'));
   assert.equal(draftSegments(window).length, 2);
-  assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2026-11-29");
-  assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2026-11-30");
+  assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2099-01-06");
+  assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2099-01-07");
   assert.equal(calls.create.length, 0);
 });
 
@@ -177,13 +177,13 @@ test("dragging a draft segment moves the whole period without changing its durat
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
   startDrag(window, draftSegments(window)[0]);
-  dragOver(window, window.document.querySelector('[data-date="2026-11-30"]'));
-  drop(window, window.document.querySelector('[data-date="2026-11-30"]'));
+  dragOver(window, window.document.querySelector('[data-date="2099-01-07"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-07"]'));
   assert.equal(draftSegments(window).length, 2);
-  assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2026-11-30");
-  assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2026-12-01");
+  assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2099-01-07");
+  assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2099-01-08");
   assert.equal(calls.create.length, 0);
 });
 
@@ -191,7 +191,7 @@ test("keyboard form controls can change the first date, duration, work/rest and 
   const { window, calls } = setup(t);
   window.document.querySelector('[data-bc7-vp-tool="new"]').click();
   const start = window.document.querySelector("[data-bc7-vp-start]");
-  start.value = "2026-11-29";
+  start.value = "2099-01-06";
   start.dispatchEvent(new window.Event("change", { bubbles: true }));
   const days = window.document.querySelector("[data-bc7-vp-days]");
   days.value = "3";
@@ -201,7 +201,7 @@ test("keyboard form controls can change the first date, duration, work/rest and 
   person.dispatchEvent(new window.Event("change", { bubbles: true }));
   window.document.querySelector('[data-bc7-vp-toggle-rest="1"]').click();
   assert.equal(draftSegments(window).length, 3);
-  assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date, "2026-11-29");
+  assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date, "2099-01-06");
   assert.equal(window.document.querySelector('[data-bc7-vp-responsible="0"]').value, "staff-2");
   assert.equal(window.document.querySelector('[data-bc7-vp-responsible="1"]').disabled, true);
   assert.equal(calls.create.length, 0, "editing the keyboard-accessible form never writes");
@@ -211,13 +211,13 @@ test("a server preflight conflict keeps the draft local and disables confirmatio
   const { window, calls } = setup(t, {
     preview: {
       valid: false,
-      conflicts: [{ date: "2026-11-28", kind: "warehouse", detail: "El almacén ya está ocupado." }],
+      conflicts: [{ date: "2099-01-05", kind: "warehouse", detail: "El almacén ya está ocupado." }],
       note: "Conflicto de programación."
     }
   });
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
   for (const [index, personId] of [[0,"staff-1"],[1,"staff-2"]]) {
     const select = window.document.querySelector('[data-bc7-vp-responsible="' + index + '"]');
     select.value = personId;
@@ -234,7 +234,7 @@ test("responsible amulets can be dropped onto an individual draft day", (t) => {
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
 
   const person = window.document.querySelector('[data-bc7-vp-staff="staff-1"]');
   const slot = window.document.querySelector('[data-bc7-vp-day-slot="0"]');
@@ -251,7 +251,7 @@ test("explicit preview and confirmation delegate to the existing Jornada creatio
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
-  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
 
   for (const [index, personId] of [[0,"staff-1"],[1,"staff-2"]]) {
     const select = window.document.querySelector('[data-bc7-vp-responsible="' + index + '"]');
@@ -281,7 +281,7 @@ test("movement amulets show only real session rows and provide a read-only open 
     model: {
       selectedRows: [{
         id: "program-1", turno_id: "turn-1", almacen_id: "warehouse-1",
-        numero_dia: 1, fecha: "2026-11-28", trabaja: true,
+        numero_dia: 1, fecha: "2099-01-05", trabaja: true,
         responsable_id: "staff-1", estado: "PROGRAMADA",
         sesion_id: "session-1", sesion_estado: "EN_CURSO"
       }]
