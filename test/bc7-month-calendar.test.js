@@ -234,14 +234,32 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
 });
 
 test("desktop visual calendar keeps a balanced board beside its right-hand inspector", async (t) => {
-  const { window } = setup(t, { admin: true, rows: [] });
+  const { window, calls } = setup(t, { admin: true, rows: [] });
   const trigger = window.document.querySelector("[data-bc7-open-visual-calendar]");
   const modal = window.document.getElementById("bc7-visual-calendar-modal");
   assert.ok(trigger && modal, "desktop visual-calendar entry and modal must exist");
 
+  // Complete the initial authenticated boot before opening the async desktop view.
+  const bootReady = await waitFor(() =>
+    calls.some(call => call.name === "turno_actual_usuario") &&
+    calls.some(call => call.name === "bc5_mis_jornadas") &&
+    window.document.getElementById("bc7-admin-details")?.hidden === false &&
+    window.document.querySelector("#bc7-month-board .bc7-month-day")
+  );
+  assert.ok(bootReady, "the Jornada admin boot and first calendar read must finish before opening the visual view");
+  await new Promise(resolve => setTimeout(resolve, 20));
+
   window.matchMedia = () => ({ matches: true });
+  let visualReadyEvents = 0;
+  window.addEventListener("bc7:visual-calendar-updated", () => { visualReadyEvents += 1; });
   trigger.click();
   assert.equal(modal.hidden, false, "desktop activation should open the visual calendar");
+  const visualReady = await waitFor(() =>
+    visualReadyEvents > 0 &&
+    window.document.getElementById("bc7-visual-warehouse")?.value === "warehouse-1"
+  );
+  assert.ok(visualReady, "the asynchronous visual-calendar warehouse and board refresh must finish before the test exits");
+  await new Promise(resolve => setTimeout(resolve, 20));
 
   const layout = modal.querySelector(".bc7-visual-calendar-layout");
   assert.ok(layout.querySelector(".bc7-visual-calendar-main #bc7-month-board"),
