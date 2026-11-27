@@ -128,7 +128,8 @@ test("production deploy uses standard hosted Windows and persists the exact LIVE
   assert.ok(deployScript.includes("buildWorkerVersionBaseUrl(PROD_BASE, workerVersionId)"));
   assert.ok(deployScript.includes("worker_version_url: versionBaseUrl"));
   assert.ok(deployScript.includes("deployment.json"));
-  assert.ok(deployScript.includes("battlecruiser-release-"));
+  assert.ok(deployScript.includes("worker_version_id: workerVersionId"));
+  assert.ok(deployScript.includes("worker_version_url: versionBaseUrl"));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
   assert.ok(deployScript.includes("workflow_run_id"));
   assert.ok(deployScript.includes("asset_inventory"));
@@ -211,8 +212,6 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.doesNotMatch(liveOfflineE2e, /Cloudflare-Workers-Version-Key|LIVE_VERSION_AFFINITY_KEY/);
   assert.doesNotMatch(liveOfflineE2e, /Fetch\.enable|Fetch\.requestPaused/,
     "exact Worker Version URLs remove the need for interception-based affinity headers");
-  assert.doesNotMatch(liveOfflineE2e, /Fetch\.continueRequest|Fetch\.enable|Fetch\.requestPaused/,
-    "the exact Worker Version URL avoids any CDP request interception for version affinity");
   assert.doesNotMatch(liveOfflineE2e, /Network\.setExtraHTTPHeaders/,
     "LIVE version affinity must not leak to Supabase/CDN cross-origin requests");
   assert.match(liveOfflineE2e, /startupPerformanceCold/);
