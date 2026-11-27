@@ -90,12 +90,12 @@ test("PostgreSQL 17 runner applies and exercises the new production migration", 
 });
 
 test("PWA shell and module cache versions are aligned for the new release", () => {
-  assert.match(index, /v9\.5\.168 — BattleCruiser/);
-  assert.match(index, /app\.js\?v=9\.5\.168/);
+  assert.match(index, /v9\.5\.170 — BattleCruiser/);
+  assert.match(index, /app\.js\?v=9\.5\.170/);
   assert.match(index, /almacenes\.js\?v=20261126\.2/);
-  assert.match(sw, /BC_SW_VERSION = "9\.5\.168"/);
+  assert.match(sw, /BC_SW_VERSION = "9\.5\.170"/);
   assert.match(sw, /jornada-owner-review\.js\?v=1\.22/);
   assert.match(sw, /almacenes\.js\?v=20261126\.2/);
-  assert.match(app, /\["bc7-jornada-ui\.js","7\.68"\]/);
+  assert.match(app, /\["bc7-jornada-ui\.js","7\.69"\]/);
   assert.match(app, /\["jornada-owner-review\.js","1\.22"\]/);
 });
