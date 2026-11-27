@@ -162,9 +162,14 @@ test("draft start handle resizes the beginning while preserving the final date",
   const lastHandle = draftSegments(window).at(-1).querySelector('[data-bc7-vp-resize="end"]');
   startDrag(window, lastHandle);
   drop(window, window.document.querySelector('[data-date="2099-01-07"]'));
-  const secondDay = window.document.querySelector('[data-bc7-vp-responsible="1"]');
-  secondDay.value = "staff-2";
-  secondDay.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const staffAmulet = window.document.querySelector('[data-bc7-vp-staff="staff-2"]');
+  const secondDaySlot = window.document.querySelector('[data-bc7-vp-day-slot="1"]');
+  startDrag(window, staffAmulet);
+  dragOver(window, secondDaySlot);
+  drop(window, secondDaySlot);
+  const assignedSecondDay = window.document.querySelector('[data-bc7-vp-responsible="1"]');
+  assert.equal(assignedSecondDay.value, "staff-2",
+    "the original second day must receive the dropped responsible amulet before resize");
   const firstHandle = draftSegments(window)[0].querySelector('[data-bc7-vp-resize="start"]');
   assert.ok(firstHandle);
   startDrag(window, firstHandle);
@@ -278,7 +283,11 @@ test("explicit preview and confirmation delegate to the existing Jornada creatio
   assert.equal(await waitFor(() => calls.create.length === 1), true);
   assert.equal(await waitFor(() => window.document.getElementById("bc7-visual-draft-panel").hidden), true,
     "a successful server result should clear the ephemeral draft");
-  assert.deepEqual(calls.create[0].schedule.map(row => row.responsable_id), ["staff-1","staff-2"]);
+  assert.equal(
+    calls.create[0].schedule.map(row => row.responsable_id).join(","),
+    "staff-1,staff-2",
+    "the server bridge receives the exact two responsible IDs in day order"
+  );
   assert.equal(window.document.getElementById("bc7-visual-draft-panel").hidden, true,
     "the draft disappears only after the bridge confirms creation");
 });
