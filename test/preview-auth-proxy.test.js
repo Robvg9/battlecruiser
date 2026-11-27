@@ -4,6 +4,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const worker = require("../preview-worker.mjs").default;
 const authSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public", "js", "auth.js"), "utf8");
+const indexSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public", "index.html"), "utf8");
+const serviceWorkerSource = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "public", "service-worker.js"), "utf8");
 const fs = require("node:fs");
 const path = require("node:path");
 const previewWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wrangler.preview.toml"), "utf8");
@@ -277,6 +279,14 @@ test("versioned preview Worker does not accept a different preview's Origin", as
 
   assert.equal(response.status, 403);
   assert.equal(upstreamCalls, 0);
+});
+
+test("preview auth proxy repair uses a fresh cache-busted script URL in HTML and the Service Worker", () => {
+  const asset = "auth.js?v=9.5.174-auth-proxy-20261127";
+  assert.ok(indexSource.includes('src="js/' + asset + '"'));
+  assert.ok(serviceWorkerSource.includes('"./js/' + asset + '"'));
+  assert.doesNotMatch(indexSource, /js\/auth\.js\?v=9\.5\.120/);
+  assert.doesNotMatch(serviceWorkerSource, /js\/auth\.js\?v=9\.5\.120/);
 });
 
 test("frontend uses the exact preview-only same-origin login endpoint and keeps LIVE direct", () => {
