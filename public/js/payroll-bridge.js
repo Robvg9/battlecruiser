@@ -91,7 +91,7 @@
     const mappings='<details class="bc-payroll-mappings"><summary>Vincular cuentas de nómina · confirmación manual</summary>'+
       '<p class="muted">Cada vínculo debe confirmarlo el Dueño. Solo aparecen perfiles activos marcados como dependientes en CuevaCoin; no se vincula por nombre automáticamente.</p>'+
       (dependents.length?'':'<p class="lista-estado">No hay cuentas dependientes activas disponibles en CuevaCoin.</p>')+
-      +(employeeRows||'<p class="lista-estado">No hay dependientas activas en BattleCruiser.</p>')+'</details>';
+      (employeeRows||'<p class="lista-estado">No hay dependientas activas en BattleCruiser.</p>')+'</details>';
     const mode=String(data.configuracion?.modo_pago||'MANUAL').toUpperCase();
     const salaries=(data.salarios||[]).map(item=>salaryCard(item,mode)).join('')||'<p class="lista-estado">Todavía no hay liquidaciones salariales congeladas.</p>';
     const withdrawals=(data.retiros||[]).map(withdrawalCard).join('')||'<p class="lista-estado">No hay retiros de salario pendientes.</p>';
