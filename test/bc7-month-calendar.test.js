@@ -331,10 +331,12 @@ test("manual scheduling preview is local and a changed assignment must be review
     select.value = "dep-1";
     select.dispatchEvent(new window.Event("change", { bubbles: true }));
   });
-  const dayCards = Array.from(window.document.querySelectorAll("#bc7-day-rows .bc7-day-row"));
-  assert.equal(dayCards.length, 2, "the planner must expose two rows to the same reader used by the preview");
-  assert.deepEqual(dayCards.map(row => row.querySelector("[data-bc7-works]")?.checked), [true, true]);
-  assert.deepEqual(dayCards.map(row => row.querySelector("[data-bc7-person]")?.value), ["dep-1", "dep-1"]);
+  const workInputs = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-works]"));
+  const personSelects = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]"));
+  assert.equal(workInputs.length, 2, "the planner must expose both daily work/rest controls");
+  assert.equal(personSelects.length, 2, "the planner must expose both responsible selectors");
+  assert.deepEqual(workInputs.map(input => input.checked), [true, true]);
+  assert.deepEqual(personSelects.map(select => select.value), ["dep-1", "dep-1"]);
   window.document.querySelector("[data-bc7-preview]").click();
   await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
   assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
