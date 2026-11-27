@@ -258,9 +258,9 @@ test("versioned preview Worker does not accept a different preview's Origin", as
 test("frontend uses the exact preview-only same-origin login endpoint and keeps LIVE direct", () => {
   assert.ok(authSource.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
-  assert.match(authSource, /function bcUsesPreviewAuthProxy\\(\\)/);
-  assert.match(authSource, /\\[a-f0-9\\]\\{8\\}-battlecruiser/);
-  assert.match(authSource, /return bcUsesPreviewAuthProxy\\(\\)\\s*\\?/);
+  assert.ok(authSource.includes("function bcUsesPreviewAuthProxy()"));
+  assert.ok(authSource.includes("[a-f0-9]{8}-battlecruiser"));
+  assert.ok(authSource.includes("return bcUsesPreviewAuthProxy()"));
   assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
   assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 2,
