@@ -101,13 +101,13 @@ async function verifyLiveRelease(expected) {
       } else {
         let liveManifest;
         try {
-          const pwaManifest = JSON.parse(manifest.body);
-          if (!pwaManifest || pwaManifest.name !== "BattleCruiser" || !pwaManifest.build_provenance) {
-            throw new Error("Existing PWA manifest is missing its exact build_provenance object.");
+          liveManifest = JSON.parse(manifest.body);
+          if (!liveManifest || liveManifest.source_sha !== expected.source_sha ||
+              !liveManifest.asset_inventory || typeof liveManifest.asset_inventory !== "object") {
+            throw new Error("SHA-addressed release manifest is missing its exact source SHA or asset inventory.");
           }
-          liveManifest = pwaManifest.build_provenance;
         } catch (error) {
-          log("[deploy smoke] attempt " + attempt + "/30: LIVE PWA manifest/provenance invalid: " + error.message);
+          log("[deploy smoke] attempt " + attempt + "/30: LIVE release manifest invalid: " + error.message);
           await delay(2000);
           continue;
         }
@@ -156,7 +156,7 @@ async function verifyLiveRelease(expected) {
     }
     if (attempt < 30) await delay(2000);
   }
-  throw new Error("Production did not serve the exact build provenance inside the existing PWA manifest and aligned assets within 60 seconds.");
+  throw new Error("Production did not serve the exact SHA-addressed release manifest and aligned assets within 60 seconds.");
 }
 
 (async () => {

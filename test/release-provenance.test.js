@@ -4,11 +4,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { buildAssetInventory, buildReleaseManifest, collectPublicAssets, embedReleaseProvenance, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { buildAssetInventory, buildReleaseManifest, collectPublicAssets, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
 
 const root = path.join(__dirname, "..");
 const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy-pwa.yml"), "utf8");
 const deployScript = fs.readFileSync(path.join(__dirname, "deploy-production-pwa.js"), "utf8");
+const releaseWriterSource = fs.readFileSync(path.join(root, "scripts", "write-release-manifest.js"), "utf8");
 const quality = fs.readFileSync(path.join(root, ".github/workflows/quality.yml"), "utf8");
 const selfHosted = fs.readFileSync(path.join(root, ".github/workflows/selfhosted-windows-test.yml"), "utf8");
 const verifier = fs.readFileSync(path.join(__dirname, "verify-production-version.js"), "utf8");
@@ -69,20 +70,18 @@ test("asset collection reads the full public tree and excludes the PWA manifest 
     "a generated manifest must not hash itself or prior manifests");
 });
 
-test("build provenance is embedded in the existing LIVE PWA manifest and remains bound to the full commit SHA", () => {
+test("release provenance uses an immutable SHA-addressed JSON file and leaves the installable PWA manifest untouched", () => {
   const sha = "fedcba9876543210fedcba9876543210fedcba98";
-  assert.equal(releaseManifestFilename(sha), "manifest.json");
-  assert.equal(releaseManifestFilename("abcdef0123456789abcdef0123456789abcdef01"), "manifest.json");
+  const otherSha = "abcdef0123456789abcdef0123456789abcdef01";
+  assert.equal(releaseManifestFilename(sha), "release-" + sha + ".json");
+  assert.equal(releaseManifestFilename(otherSha), "release-" + otherSha + ".json");
+  assert.notEqual(releaseManifestFilename(sha), releaseManifestFilename(otherSha));
   assert.throws(() => releaseManifestFilename("short"), /40-character git SHA/);
   assert.throws(() => releaseManifestFilename("../" + "a".repeat(40)), /40-character git SHA/);
-  const original = { name: "BattleCruiser", start_url: "./", icons: [{ src: "icons/icon.svg" }] };
-  const provenance = { source_sha: sha, app_version: "9.5.124", workflow_run_id: "44000000000" };
-  const combined = embedReleaseProvenance(original, provenance);
-  assert.equal(combined.name, "BattleCruiser");
-  assert.equal(combined.start_url, "./");
-  assert.deepEqual(combined.icons, original.icons);
-  assert.deepEqual(combined.build_provenance, provenance);
-  assert.throws(() => embedReleaseProvenance([], provenance), /PWA manifest must be a JSON object/);
+  assert.match(releaseWriterSource, /const releasePath = path\.join\(publicDir, filename\)/);
+  assert.match(releaseWriterSource, /fs\.writeFileSync\(releasePath, JSON\.stringify\(manifest/);
+  assert.doesNotMatch(releaseWriterSource, /embedReleaseProvenance|build_provenance|pwaManifestPath/,
+    "release provenance must not overwrite the installable public/manifest.json");
 });
 
 test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run ID", () => {
@@ -103,13 +102,14 @@ test("manifest rejects mismatched app/SW versions, non-full SHA and invalid run 
 test("production deploy uses standard hosted Windows and persists the exact LIVE release manifest", () => {
   assert.match(deploy, /^    runs-on: windows-latest$/m);
   assert.ok(deploy.includes("run: node test/deploy-production-pwa.js"));
-  assert.ok(deploy.includes("test-results/release/manifest.json"));
+  assert.ok(deploy.includes("test-results/release/release-*.json"));
   assert.ok(deploy.includes("name: battlecruiser-release-provenance-${{ github.run_id }}"));
   assert.ok(deploy.includes("test-results/deploy-pwa-log.txt"));
   assert.ok(deploy.includes("if-no-files-found: warn"));
   assert.ok(deployScript.includes("writeReleaseManifest()"));
   assert.ok(deployScript.includes("releaseManifestFilename(expected.source_sha)"));
-  assert.ok(deployScript.includes("pwaManifest.build_provenance"));
+  assert.ok(deployScript.includes("liveManifest = JSON.parse(manifest.body);"));
+  assert.ok(deployScript.includes("LIVE release manifest invalid"));
   assert.ok(deployScript.includes("Cloudflare-Workers-Version-Key"));
   assert.ok(deployScript.includes("battlecruiser-release-"));
   assert.ok(deployScript.includes("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA"));
