@@ -162,6 +162,9 @@ test("draft start handle resizes the beginning while preserving the final date",
   const lastHandle = draftSegments(window).at(-1).querySelector('[data-bc7-vp-resize="end"]');
   startDrag(window, lastHandle);
   drop(window, window.document.querySelector('[data-date="2099-01-07"]'));
+  const secondDay = window.document.querySelector('[data-bc7-vp-responsible="1"]');
+  secondDay.value = "staff-2";
+  secondDay.dispatchEvent(new window.Event("change", { bubbles: true }));
   const firstHandle = draftSegments(window)[0].querySelector('[data-bc7-vp-resize="start"]');
   assert.ok(firstHandle);
   startDrag(window, firstHandle);
@@ -170,6 +173,8 @@ test("draft start handle resizes the beginning while preserving the final date",
   assert.equal(draftSegments(window).length, 2);
   assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2099-01-06");
   assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2099-01-07");
+  assert.equal(window.document.querySelector('[data-bc7-vp-responsible="0"]').value, "staff-2",
+    "shrinking the start must preserve the assignment of the remaining original second day");
   assert.equal(calls.create.length, 0);
 });
 
