@@ -107,7 +107,7 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
 
 
 test("canonical Jornada planner applies the database two-day minimum in input and save paths",()=>{
-  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej\. 5"/);
+  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31" placeholder="2–31"/);
   assert.doesNotMatch(ui,/id="bc7-days-count"[^>]*value="7"/);
   assert.match(ui,/if\(!value\)return 0/,"an empty duration stays empty until the administrator enters a value");
   assert.match(ui,/if\(!n\).*Indica cuántos días quieres programar/s);
