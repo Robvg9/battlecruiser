@@ -184,8 +184,8 @@ test("post-deploy verifier uses the exact no-store URL and cache-header contract
   assert.ok(verifier.includes('cache: "no-store"'));
   assert.ok(deployScript.includes('"cache-control": "no-cache"'));
   assert.ok(verifier.includes('"cache-control": "no-cache"'));
-  assert.ok(deployScript.includes('"Cloudflare-Workers-Version-Key": versionKey'));
-  assert.ok(verifier.includes('"Cloudflare-Workers-Version-Key": versionAffinityKey'));
+  assert.ok(deployScript.includes("const workerVersionBaseUrl = buildWorkerVersionBaseUrl(PROD_BASE, workerVersionId)"));
+  assert.ok(verifier.includes("const baseUrl = deployment.worker_version_url"));
   assert.ok(deployScript.includes('"/?bc_deploy_ready=" + stamp'));
   assert.ok(verifier.includes('"/?bc_deploy_ready=" + stamp'));
   assert.ok(deployScript.includes('"/app.js?bc_deploy_ready=" + stamp + "-app"'));
@@ -208,7 +208,8 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.ok(liveOfflineE2e.includes("deployment.worker_version_url"));
   assert.ok(liveOfflineE2e.includes("deployment.json"));
   assert.doesNotMatch(liveOfflineE2e, /Cloudflare-Workers-Version-Key|LIVE_VERSION_AFFINITY_KEY/);
-  assert.ok(liveOfflineE2e.includes('Fetch.enable", {'));
+  assert.doesNotMatch(liveOfflineE2e, /Fetch\.enable|Fetch\.requestPaused/,
+    "exact Worker Version URLs remove the need for interception-based affinity headers");
   assert.ok(liveOfflineE2e.includes('Fetch.continueRequest'));
   assert.doesNotMatch(liveOfflineE2e, /Network\.setExtraHTTPHeaders/,
     "LIVE version affinity must not leak to Supabase/CDN cross-origin requests");

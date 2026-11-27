@@ -125,7 +125,7 @@ jobs:
         shell: pwsh
         run: |
           $deployment = Get-Content 'test-results/release/deployment.json' -Raw | ConvertFrom-Json
-          if ($deployment.worker_version_url -notmatch '^https://[0-9a-f]{8}-battlecruiser\\.robvg9\\.workers\\.dev
+          if ($deployment.worker_version_url -notmatch '^https://[0-9a-f]{8}-battlecruiser\.robvg9\.workers\.dev        if: github.event_name == 'workflow_run'
         env:
           BC_EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
           BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -154,6 +154,12 @@ jobs:
         shell: cmd
         run: node test/verify-pr-preview-assets.js
 
+      - name: Select isolated preview URL
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          "BC_LIVE_BASE_URL=https://bc-pr-224-battlecruiser.robvg9.workers.dev" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Run real-browser offline recovery E2E
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
         env:
@@ -176,12 +182,6 @@ jobs:
           retention-days: 90
 ) { throw 'Invalid exact Worker Version URL in deployment.json.' }
           "BC_LIVE_BASE_URL=$($deployment.worker_version_url)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Select isolated preview URL
-        if: github.event_name == 'pull_request'
-        shell: pwsh
-        run: |
-          "BC_LIVE_BASE_URL=https://bc-pr-224-battlecruiser.robvg9.workers.dev" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Verify production serves exact application release provenance
         if: github.event_name == 'workflow_run'
@@ -216,7 +216,6 @@ jobs:
       - name: Run real-browser offline recovery E2E
         if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
         env:
-          BC_LIVE_BASE_URL: ${{ github.event_name == 'pull_request' && 'https://bc-pr-224-battlecruiser.robvg9.workers.dev' || 'https://battlecruiser.robvg9.workers.dev' }}
           BC_EXPECTED_RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '' }}
           BC_EXPECTED_DEPLOY_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
         shell: cmd
