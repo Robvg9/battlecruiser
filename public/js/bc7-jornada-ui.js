@@ -1018,10 +1018,15 @@
     return Math.floor(count);
   }
   function readDayRows(){
-    return Array.from(document.querySelectorAll('#bc7-day-rows .bc7-day-row')).map((r,i)=>{
-      const works=r.querySelector('[data-bc7-works]')?.checked===true;
-      const person=r.querySelector('[data-bc7-person]')?.value||'';
-      return {numero_dia:i+1,trabaja:works,responsable_id:works?person:null};
+    const host=$('bc7-day-rows');
+    if(!host)return [];
+    const workInputs=Array.from(host.querySelectorAll('[data-bc7-works]'));
+    const people=Array.from(host.querySelectorAll('[data-bc7-person]'));
+    return workInputs.map((input,index)=>{
+      const row=input.closest('.bc7-day-row');
+      const person=(row&&row.querySelector('[data-bc7-person]'))||people[index]||null;
+      const works=input.checked===true;
+      return {numero_dia:index+1,trabaja:works,responsable_id:works?(person?.value||''):null};
     });
   }
   function buildDayRows(){
@@ -1033,7 +1038,13 @@
       const d=old[i]||{trabaja:true,responsable_id:null};
       return '<div class="bc7-day-row" role="group" aria-label="Día '+(i+1)+'"><div class="bc7-day-main"><strong>Día '+(i+1)+'</strong><span class="bc7-day-date">'+esc(fmtDateHuman(addDays(anchor,i)))+'</span></div><label class="bc7-check"><input type="checkbox" data-bc7-works '+(d.trabaja?'checked':'')+'><span>Trabaja</span></label><label class="bc7-field bc7-day-person"><span>Responsable</span><select data-bc7-person '+(!d.trabaja||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(d.responsable_id)+'</select></label></div>';
     }).join('');
-    host.querySelectorAll('[data-bc7-works]').forEach(ch=>ch.addEventListener('change',()=>{const row=ch.closest('.bc7-day-row');const person=row&&row.querySelector('[data-bc7-person]');if(person){person.disabled=!ch.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!ch.checked)person.value='';}}));
+    const workInputs=Array.from(host.querySelectorAll('[data-bc7-works]'));
+    const people=Array.from(host.querySelectorAll('[data-bc7-person]'));
+    workInputs.forEach((ch,index)=>ch.addEventListener('change',()=>{
+      const row=ch.closest('.bc7-day-row');
+      const person=(row&&row.querySelector('[data-bc7-person]'))||people[index]||null;
+      if(person){person.disabled=!ch.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!ch.checked)person.value='';}
+    }));
     state.lastPreview=null;
     if($('bc7-preview'))$('bc7-preview').innerHTML='';
   }
