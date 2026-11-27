@@ -315,6 +315,16 @@ test("a multi-day Jornada spans every covered date and appears in the inspector 
 test("manual scheduling preview is local and a changed assignment must be reviewed again", async (t) => {
   const { window, calls } = setup(t, { admin: true, rows: [] });
 
+  // Wait for the authenticated admin boot to finish before editing the form:
+  // boot() replaces the tab shell while it hydrates the responsible catalog.
+  const adminReady = await waitFor(() => {
+    const panel = window.document.getElementById("bc7-admin-details");
+    return !!panel && panel.hidden === false;
+  });
+  assert.ok(adminReady, "the admin planner must finish booting before the test edits it");
+  const responsibleCatalog = await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  assert.equal(responsibleCatalog.length, 1, "the eligible responsible catalog must be ready");
+
   const havanaToday = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date());
@@ -323,10 +333,11 @@ test("manual scheduling preview is local and a changed assignment must be review
   window.document.getElementById("bc7-start-date").value = tomorrow;
   window.document.getElementById("bc7-days-count").value = "2";
   window.document.querySelector("[data-bc7-build]").click();
-  await waitFor(() => {
+  const rowsReady = await waitFor(() => {
     const selects = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]"));
     return selects.length === 2 && selects.every(select => !select.disabled && Array.from(select.options).some(option => option.value === "dep-1"));
   });
+  assert.ok(rowsReady, "the planner must render two working days with the loaded responsible");
   window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]").forEach(select => {
     select.value = "dep-1";
     select.dispatchEvent(new window.Event("change", { bubbles: true }));
