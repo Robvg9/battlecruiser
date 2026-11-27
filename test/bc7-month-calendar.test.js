@@ -333,10 +333,15 @@ test("manual scheduling preview is local and a changed assignment must be review
   });
   window.document.querySelector("[data-bc7-preview]").click();
   await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
-  assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false);
-  window.document.querySelector("#bc7-day-rows [data-bc7-works]").checked = false;
-  window.document.querySelector("#bc7-day-rows [data-bc7-works]").dispatchEvent(new window.Event("change", { bubbles: true }));
-  window.document.querySelector("[data-bc7-create]").click();
-  await waitFor(() => /asignación cambió/.test(window.document.getElementById("bc7-create-msg").textContent));
-  assert.equal(calls.some(call => call.name === "bc5_crear_jornada_unica"), false);
+  assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
+    "day-by-day preview must not use the saved-rotation RPC");
+  assert.ok(window.document.getElementById("bc7-preview").textContent.includes("Beatriz"));
+  const changedStart = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+2, 12)).toISOString().slice(0,10);
+  const startInput = window.document.getElementById("bc7-start-date");
+  startInput.value = changedStart;
+  startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(window.document.getElementById("bc7-preview").textContent, "",
+    "changing the date must clear the now-stale local preview");
+  assert.equal(calls.some(call => call.name === "bc5_crear_jornada_unica"), false,
+    "previewing and editing the form must remain read-only until the owner creates it");
 });
