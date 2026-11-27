@@ -154,6 +154,62 @@ test("draft end handle resizes the range live without a server write", (t) => {
   assert.equal(calls.preview.length, 0);
 });
 
+test("draft start handle resizes the beginning while preserving the final date", (t) => {
+  const { window, calls } = setup(t);
+  const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
+  startDrag(window, tool);
+  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  const lastHandle = draftSegments(window).at(-1).querySelector('[data-bc7-vp-resize="end"]');
+  startDrag(window, lastHandle);
+  drop(window, window.document.querySelector('[data-date="2026-11-30"]'));
+  const firstHandle = draftSegments(window)[0].querySelector('[data-bc7-vp-resize="start"]');
+  assert.ok(firstHandle);
+  startDrag(window, firstHandle);
+  dragOver(window, window.document.querySelector('[data-date="2026-11-29"]'));
+  drop(window, window.document.querySelector('[data-date="2026-11-29"]'));
+  assert.equal(draftSegments(window).length, 2);
+  assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2026-11-29");
+  assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2026-11-30");
+  assert.equal(calls.create.length, 0);
+});
+
+test("dragging a draft segment moves the whole period without changing its duration", (t) => {
+  const { window, calls } = setup(t);
+  const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
+  startDrag(window, tool);
+  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  startDrag(window, draftSegments(window)[0]);
+  dragOver(window, window.document.querySelector('[data-date="2026-11-30"]'));
+  drop(window, window.document.querySelector('[data-date="2026-11-30"]'));
+  assert.equal(draftSegments(window).length, 2);
+  assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2026-11-30");
+  assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2026-12-01");
+  assert.equal(calls.create.length, 0);
+});
+
+test("a server preflight conflict keeps the draft local and disables confirmation", async (t) => {
+  const { window, calls } = setup(t, {
+    preview: {
+      valid: false,
+      conflicts: [{ date: "2026-11-28", kind: "warehouse", detail: "El almacén ya está ocupado." }],
+      note: "Conflicto de programación."
+    }
+  });
+  const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
+  startDrag(window, tool);
+  drop(window, window.document.querySelector('[data-date="2026-11-28"]'));
+  for (const [index, personId] of [[0,"staff-1"],[1,"staff-2"]]) {
+    const select = window.document.querySelector('[data-bc7-vp-responsible="' + index + '"]');
+    select.value = personId;
+    select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  }
+  window.document.querySelector("[data-bc7-vp-preview]").click();
+  assert.equal(await waitFor(() => calls.preview.length === 1), true);
+  assert.equal(window.document.querySelector("[data-bc7-vp-create]").disabled, true);
+  assert.match(window.document.getElementById("bc7-visual-draft-panel").textContent, /almacén ya está ocupado/i);
+  assert.equal(calls.create.length, 0);
+});
+
 test("responsible amulets can be dropped onto an individual draft day", (t) => {
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
