@@ -15,8 +15,8 @@ const CSS = read("public/style.css");
 
 test("PWA shell, Jornada UI and approvals stay aligned with the current release", () => {
   assertPwaReleaseAligned(assert,{app:APP,serviceWorker:SW,index:INDEX});
-  assert.ok(INDEX.includes('js/offline.js?v=9.5.103'));
-  assert.ok(SW.includes('./js/offline.js?v=9.5.103'));
+  assert.ok(INDEX.includes('js/offline.js?v=9.5.104'));
+  assert.ok(SW.includes('./js/offline.js?v=9.5.104'));
   assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"bc7-jornada-ui.js"});
   assertModuleCacheAligned(assert,{app:APP,serviceWorker:SW,moduleName:"aprobaciones-admin.js"});
 });
