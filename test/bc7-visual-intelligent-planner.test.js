@@ -225,6 +225,8 @@ test("a server preflight conflict keeps the draft local and disables confirmatio
   }
   window.document.querySelector("[data-bc7-vp-preview]").click();
   assert.equal(await waitFor(() => calls.preview.length === 1), true);
+  assert.equal(await waitFor(() => /almacén ya está ocupado/i.test(window.document.getElementById("bc7-visual-draft-panel").textContent)), true,
+    "the asynchronous preflight result must be rendered before the assertion");
   assert.equal(window.document.querySelector("[data-bc7-vp-create]").disabled, true);
   assert.match(window.document.getElementById("bc7-visual-draft-panel").textContent, /almacén ya está ocupado/i);
   assert.equal(calls.create.length, 0);
@@ -262,10 +264,15 @@ test("explicit preview and confirmation delegate to the existing Jornada creatio
   assert.equal(await waitFor(() => calls.preview.length === 1), true);
   assert.equal(calls.preview[0].warehouseId, "warehouse-1");
   assert.equal(calls.preview[0].schedule.length, 2);
-  assert.equal(window.document.querySelector("[data-bc7-vp-create]").disabled, false);
+  assert.equal(await waitFor(() => {
+    const button=window.document.querySelector("[data-bc7-vp-create]");
+    return button && button.disabled===false;
+  }), true, "the asynchronous preflight must finish before the confirmation becomes enabled");
 
   window.document.querySelector("[data-bc7-vp-create]").click();
   assert.equal(await waitFor(() => calls.create.length === 1), true);
+  assert.equal(await waitFor(() => window.document.getElementById("bc7-visual-draft-panel").hidden), true,
+    "a successful server result should clear the ephemeral draft");
   assert.deepEqual(calls.create[0].schedule.map(row => row.responsable_id), ["staff-1","staff-2"]);
   assert.equal(window.document.getElementById("bc7-visual-draft-panel").hidden, true,
     "the draft disappears only after the bridge confirms creation");
@@ -308,7 +315,7 @@ test("non-admin sees no creation palette or staff amulets", (t) => {
 test("offline mode cannot expose a draft creation tool", (t) => {
   const { window } = setup(t, { online: false });
   assert.equal(window.document.querySelector('[data-bc7-vp-tool="new"]'), null);
-  assert.match(window.document.getElementById("bc7-visual-tools").textContent, /Administración/);
+  assert.match(window.document.getElementById("bc7-visual-tools").textContent, /Sin conexión|modo de consulta/);
 });
 
 test("planner module is loaded immediately after Jornada and precached offline", () => {
