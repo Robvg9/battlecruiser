@@ -6,6 +6,7 @@ const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawn, execFileSync } = require("node:child_process");
 const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { buildWorkerVersionBaseUrl } = require("../scripts/cloudflare-worker-version.js");
 const expectedDeployRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
 const expectedReleaseSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toLowerCase();
 const PREVIEW_BASE_URL = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
@@ -20,6 +21,12 @@ if (expectedReleaseSha) {
   deployment = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
   assert(deployment.source_sha === expectedReleaseSha, "deployment.json no corresponde al SHA LIVE esperado.");
   assert(String(deployment.workflow_run_id) === expectedDeployRunId, "deployment.json no corresponde al workflow LIVE esperado.");
+  const exactVersionUrl = buildWorkerVersionBaseUrl(
+    "https://battlecruiser.robvg9.workers.dev",
+    deployment.worker_version_id
+  );
+  assert(deployment.worker_version_url === exactVersionUrl,
+    "deployment.json no apunta al hostname de la versión Cloudflare indicada.");
 }
 const BASE_URL = (process.env.BC_LIVE_BASE_URL || (deployment && deployment.worker_version_url) ||
   "https://battlecruiser.robvg9.workers.dev").replace(/\/+$/, "");

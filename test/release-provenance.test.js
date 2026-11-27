@@ -210,7 +210,8 @@ test("Chromium LIVE E2E uses the same run-bound artifact but keeps byte-exact co
   assert.doesNotMatch(liveOfflineE2e, /Cloudflare-Workers-Version-Key|LIVE_VERSION_AFFINITY_KEY/);
   assert.doesNotMatch(liveOfflineE2e, /Fetch\.enable|Fetch\.requestPaused/,
     "exact Worker Version URLs remove the need for interception-based affinity headers");
-  assert.ok(liveOfflineE2e.includes('Fetch.continueRequest'));
+  assert.doesNotMatch(liveOfflineE2e, /Fetch\.continueRequest|Fetch\.enable|Fetch\.requestPaused/,
+    "the exact Worker Version URL avoids any CDP request interception for version affinity");
   assert.doesNotMatch(liveOfflineE2e, /Network\.setExtraHTTPHeaders/,
     "LIVE version affinity must not leak to Supabase/CDN cross-origin requests");
   assert.match(liveOfflineE2e, /startupPerformanceCold/);
