@@ -325,6 +325,11 @@ test("manual scheduling preview is local and a changed assignment must be review
   const responsibleCatalog = await window.__BC7_JORNADA__.refreshResponsibleStaff();
   assert.equal(responsibleCatalog.length, 1, "the eligible responsible catalog must be ready");
 
+  const warehouse = window.document.getElementById("bc7-warehouse");
+  assert.equal(warehouse.options.length, 2, "the fixture must expose the active warehouse");
+  warehouse.value = "warehouse-1";
+  window.document.getElementById("bc7-plan-mode").value = "explicit";
+
   const havanaToday = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date());
@@ -349,7 +354,8 @@ test("manual scheduling preview is local and a changed assignment must be review
   assert.deepEqual(workInputs.map(input => input.checked), [true, true]);
   assert.deepEqual(personSelects.map(select => select.value), ["dep-1", "dep-1"]);
   window.document.querySelector("[data-bc7-preview]").click();
-  await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
+  const previewed = await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
+  assert.ok(previewed, "the explicit assignment should pass local validation and render a preview");
   assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
     "day-by-day preview must not use the saved-rotation RPC");
   assert.equal(window.document.querySelectorAll("#bc7-preview .bc7-jornada").length, 2,
