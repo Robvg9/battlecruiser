@@ -335,7 +335,8 @@ test("manual scheduling preview is local and a changed assignment must be review
   await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
   assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
     "day-by-day preview must not use the saved-rotation RPC");
-  assert.ok(window.document.getElementById("bc7-preview").textContent.includes("Beatriz"));
+  assert.equal(window.document.querySelectorAll("#bc7-preview .bc7-jornada").length, 2,
+    "the local preview should render both requested days");
   const changedStart = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+2, 12)).toISOString().slice(0,10);
   const startInput = window.document.getElementById("bc7-start-date");
   startInput.value = changedStart;
