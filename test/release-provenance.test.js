@@ -152,7 +152,9 @@ test("post-deploy Quality downloads the provenance artifact from the exact Deplo
 });
 
 test("LIVE release verifier checks the downloaded artifact against exact SHA, versions and deploy run ID", () => {
-  assert.match(verifier, /test-results", "release", releaseFilename/);
+  assert.match(verifier, /const releaseDir = path\.join\(process\.cwd\(\), "test-results", "release"\)/);
+  assert.match(verifier, /const releasePath = path\.join\(releaseDir, releaseFilename\)/);
+  assert.match(verifier, /const deploymentPath = path\.join\(releaseDir, "deployment\.json"\)/);
   assert.match(verifier, /source_sha: expectedSha/);
   assert.match(verifier, /workflow_run_id: expectedRunId/);
   assert.ok(verifier.includes("buildWorkerVersionBaseUrl(productionBaseUrl, deployment.worker_version_id)"));
