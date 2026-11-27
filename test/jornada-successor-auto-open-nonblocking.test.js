@@ -47,7 +47,7 @@ test("previous FINAL receives audit overlays; original cut and global stock rema
 
 test("retail Jornada payment automation remains out of scope",()=>{
   assert.doesNotMatch(migration,/CuevaCoin|pago_automatico|payroll|pago_salario/i);
-  assert.match(app,/VERSION="9\.5\.170"/);
-  assert.match(app,/bc7-jornada-ui\.js","7\.69"/);
-  assert.match(sw,/BC_SW_VERSION = "9\.5\.170"/);
+  assert.match(app,/VERSION="9\.5\.171"/);
+  assert.match(app,/bc7-jornada-ui\.js","7\.70"/);
+  assert.match(sw,/BC_SW_VERSION = "9\.5\.171"/);
 });

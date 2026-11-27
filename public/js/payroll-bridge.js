@@ -119,6 +119,60 @@
       finally{autoProcessing=false;}
     }
   }
+  function ensureAdminModal(){
+    let modal=document.getElementById('bc-payroll-admin-modal');
+    if(modal)return modal;
+    if(!document.getElementById('bc-payroll-admin-modal-style')){
+      const style=document.createElement('style');
+      style.id='bc-payroll-admin-modal-style';
+      style.textContent=
+        'body.bc-payroll-admin-modal-open{overflow:hidden}' +
+        '#bc-payroll-admin-modal[hidden]{display:none!important}' +
+        '#bc-payroll-admin-modal{position:fixed;inset:0;z-index:10070;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(3,10,8,.78);box-sizing:border-box}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-surface{position:relative;display:flex;flex-direction:column;width:min(980px,100%);max-height:min(94vh,900px);overflow:hidden;border:1px solid rgba(212,176,92,.32);border-radius:14px;background:var(--stone,#122a24);box-shadow:0 24px 72px rgba(0,0,0,.62);color:var(--text)}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(212,176,92,.18);flex:0 0 auto}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-head h2{margin:0;font-family:Cormorant Garamond,serif;font-size:1.35rem;color:var(--gold-bright,var(--gold))}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-close{width:36px;height:36px;border:1px solid var(--gold-dim);border-radius:8px;background:transparent;color:var(--text);font-size:20px;cursor:pointer}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-modal-content{min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 16px 18px}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-modal-content>#bc-payroll-admin-host{max-width:100%}' +
+        '#bc-payroll-admin-modal .bc-payroll-admin-modal-content .bc-payroll-admin{margin:0!important}' +
+        '@media(max-width:560px){#bc-payroll-admin-modal{padding:6px}#bc-payroll-admin-modal .bc-payroll-admin-surface{max-height:96vh;border-radius:11px}#bc-payroll-admin-modal .bc-payroll-admin-head{padding:10px 12px}#bc-payroll-admin-modal .bc-payroll-admin-modal-content{padding:9px 10px 14px}}';
+      document.head.appendChild(style);
+    }
+    modal=document.createElement('div');
+    modal.id='bc-payroll-admin-modal';
+    modal.hidden=true;
+    modal.innerHTML=
+      '<section class="bc-payroll-admin-surface" role="dialog" aria-modal="true" aria-labelledby="bc-payroll-admin-modal-title" tabindex="-1">' +
+        '<header class="bc-payroll-admin-head"><h2 id="bc-payroll-admin-modal-title">💰 Nómina · BattleCruiser ↔ CuevaCoin</h2>' +
+        '<button type="button" class="bc-payroll-admin-close" data-bcpay-admin-close aria-label="Cerrar nómina" title="Cerrar">×</button></header>' +
+        '<div class="bc-payroll-admin-modal-content"><div id="bc-payroll-admin-host"></div></div>' +
+      '</section>';
+    modal.addEventListener('click',event=>{
+      if(event.target===modal||event.target.closest?.('[data-bcpay-admin-close]'))closeAdminModal();
+    });
+    document.body.appendChild(modal);
+    return modal;
+  }
+  function closeAdminModal(){
+    const modal=document.getElementById('bc-payroll-admin-modal');
+    if(!modal||modal.hidden)return;
+    modal.hidden=true;
+    document.body.classList.remove('bc-payroll-admin-modal-open');
+    const trigger=modal._trigger;
+    if(trigger&&trigger.isConnected)trigger.focus();
+  }
+  async function openAdminModal(trigger){
+    const modal=ensureAdminModal();
+    modal._trigger=trigger||null;
+    modal.hidden=false;
+    document.body.classList.add('bc-payroll-admin-modal-open');
+    const surface=modal.querySelector('.bc-payroll-admin-surface');
+    if(surface)surface.focus();
+    const host=modal.querySelector('.bc-payroll-admin-modal-content');
+    await mountAdminPanel(host);
+    return true;
+  }
   async function mountAdminPanel(panel){
     if(!panel)return;
     let target=panel.querySelector('#bc-payroll-admin-host');
@@ -134,6 +188,18 @@
     finally{autoProcessing=false;}
   }
   async function click(event){
+    const closeButton=event.target.closest?.('[data-bcpay-admin-close]');
+    if(closeButton){closeAdminModal();return;}
+    const openButton=event.target.closest?.('[data-bcpay-open-admin]');
+    if(openButton){
+      event.preventDefault();
+      if(openButton.disabled)return;
+      openButton.disabled=true;
+      try{await openAdminModal(openButton);}
+      catch(error){alert('No se pudo abrir Nómina: '+(error.message||error));}
+      finally{openButton.disabled=false;}
+      return;
+    }
     const button=event.target.closest?.('[data-bcpay-credit],[data-bcpay-withdraw],[data-bcpay-reject],[data-bcpay-map-save],[data-bcpay-mode-save]');
     if(!button)return;
     const target=button.closest('#bc-payroll-admin-host')||lastHost||document.getElementById('bc-payroll-admin-host');
@@ -194,7 +260,7 @@
             (Array.isArray(people)?people:[]).map(person=>'<option value="'+esc(person.bc_usuario_id)+'">'+esc(person.nombre)+'</option>').join('');
           if(!people?.length){
             select.innerHTML='<option value="">No hay cuentas vinculadas</option>';
-            if(help)help.textContent='El Dueño debe confirmar primero el vínculo de esta persona con CuevaCoin en Aprobaciones administrativas.';
+            if(help)help.textContent='El Dueño debe confirmar primero el vínculo de esta persona con CuevaCoin en Administración → Nómina.';
           }
         }catch(error){
           select.innerHTML='<option value="">No se pudieron consultar las cuentas</option>';
@@ -212,5 +278,6 @@
     }
   });
   document.addEventListener('click',click);
-  window.BCPayrollBridge={invoke,rpc,mountAdminPanel,processAutomatic,refresh:()=>lastHost?refreshAdmin(lastHost):Promise.resolve()};
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')closeAdminModal();});
+  window.BCPayrollBridge={invoke,rpc,mountAdminPanel,openAdminModal,closeAdminModal,processAutomatic,refresh:()=>lastHost?refreshAdmin(lastHost):Promise.resolve()};
 })();

@@ -1,7 +1,7 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.170 — fix payroll mapping rendering and invalidate cached assets.
+// v9.5.171 — repair dashboards and move Nómina into Administración.
 (function hotfixV9475(){
-  const VERSION="9.5.170";
+  const VERSION="9.5.171";
   window.__BC_VERSION__=VERSION;
   document.addEventListener("wheel",function(event){var input=event.target&&event.target.closest?event.target.closest("input[type=number]"):null;if(input)event.preventDefault();},{capture:true,passive:false});
   function aplicarVersion(){
@@ -153,9 +153,9 @@
 })();
 (function cargarModulosDinamicos(){
   const modules=[
-    ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.9"],["payroll-bridge.js","1.1"],["bc7-jornada-ui.js","7.69"],["bc7-periodo-apertura-ui.js","1.8"],
+    ["turno-api.js","9.4.8"],["turno-runtime-contract-fix.js","9.4.1"],["turnos-maestro.js","9.4.9"],["payroll-bridge.js","1.2"],["bc7-jornada-ui.js","7.70"],["bc7-periodo-apertura-ui.js","1.8"],
     ["cache-update-fix.js","1.1"],["usuarios-permisos-rest.js","60.2"],["permisos-navegacion.js","67.9"],["fix-permisos-rol.js","60.2"],["m12-fe5-hide-vales.js","60.1"],
-    ["configuracion.js","20261104.1"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js","20261108.5"],["aprobaciones-admin.js","20261126.1"],["jornada-owner-review.js","1.22"],
+    ["configuracion.js","20261104.1"],["sync-race-fix.js","1.0"],["online-offline-guard.js",null],["operaciones-financieras.js","20261108.5"],["aprobaciones-admin.js","20261127.1"],["jornada-owner-review.js","1.22"],
     ["m26-ui-integridad.js","26.41"],["sesiones-operativas-ui.js","31.1"],["ui-visual-salon.js","54.2"],["roles-en-usuarios.js","33.7"],
     ["ui-layout-inteligente.js","33.1"],["ui-usuarios-dashboard.js","46.3"],["ui-operaciones-hub.js","43.5"],
     ["alta-usuario-sin-email.js","46.2"],["m22-sesiones-en-m21.js","25.5"],["m22-fe-patches-m21.js","22.1"],
@@ -174,12 +174,12 @@
     ["m43-productos-layout-fix.js","43.3"],["m44-productos-vistas.js","44.5"],["m45-reportes-ux-final.js","45.2"],["m47-productos-vista-final.js","47.5"],
     ["m49-turnos-layout-definitivo.js","49.6"],["m50-turno-step1-order.js","50.4"],["m54-movimientos-client-bridge.js","54.1"],["m51-movimientos-centro.js","51.10"],["m52-movimientos-auth-retry.js","52.2"],["movimiento-multiple.js","20261121.2"],["inventario-auditoria.js","1.1"],["hotfix-16-5-movimientos-operaciones-flotantes-20260902.js","16.13"],
     ["m53-inventario-centro.js","53.9"],["m55-productos-import.js","55.5"],["p0a-local-reads.js","p0a.1"],["m56-turnos-secuencia-ui.js","56.8"],["m57-turnos-sesion-ux-fix.js","57.6"],
-    ["m68-ventas-pos-definitivo.js","9.5.170"],["hotfix-regresiones-20260902.js","20261120.2"],["hotfix-configuracion-20260902.js","20261020.4"],
+    ["m68-ventas-pos-definitivo.js","9.5.171"],["hotfix-regresiones-20260902.js","20261120.2"],["hotfix-configuracion-20260902.js","20261020.4"],
     ["hotfix-inventario-inmediato-20260902.js","20260902.1"],["hotfix-integracion-final-20260902.js","20260902.1"],
     ["hotfix-14-regresiones-20260902.js","14.2"],["bc14-ventas-stock.js","2.1"],
     ["hotfix-17-1-productos-import-flow-20260903.js","17.1.1"],["hotfix-17-2-productos-save-20260903.js","17.4"],["hotfix-17-3-product-edit-modal-20260903.js","17.3"],["hotfix-17-4-turnos-tarde-visible-20260903.js","17.5"],["hotfix-17-5-compra-modal-controls-20260903.js","17.7"],["hotfix-17-6-presentaciones-visible-20260903.js","17.7"],["hotfix-17-final-loader-20260903.js","20261030.2"],
     ["hotfix-pulido-20260903.js","20261105.4"],["hotfix-pulido-20260903b.js","20261105.2"],["hotfix-pulido-20260903c.js","20260903.3"],["hotfix-pulido-20260903d.js","20261103.1"],
-    ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["bc-modal-manager.js","1.0"],["mi-cuenta.js","1.3"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.13"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.3"],["bajas-multiple.js","1.8"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.1"],["jornada-price-changes.js","1.0.5"]
+    ["hotfix-secciones-visibles-20260903.js","20261030.1"],["section-scope-fix.js","20261030.1"],["bc-modal-manager.js","1.0"],["mi-cuenta.js","1.3"],["m73-reportes-ux-modal.js","73.2"],["m74-pos-archive-retail.js","74.6"],["m75-productos-ui-compacto.js","75.13"],["m76-movimientos-operaciones.js","76.3"],["product-select-search.js","2.3"],["bajas-multiple.js","1.8"],["password-recovery-admin.js","1.0"],["bc-product-card-edit.js","1.1"],["bc-owner-quick-actions.js","1.2"],["jornada-price-changes.js","1.0.5"]
   ];
   let resolveUIReady;
   window.__BC_UI_READY__=new Promise(resolve=>{resolveUIReady=resolve;});
