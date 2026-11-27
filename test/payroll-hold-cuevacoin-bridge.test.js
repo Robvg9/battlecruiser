@@ -37,6 +37,7 @@ test("salary and withdrawal RPCs require owner identity and CuevaCoin transactio
   assert.match(bc,/bc7_payroll_finish_withdrawal/);
   assert.match(bc,/cuevacoin_pago_estado='APLICADO'/);
   assert.match(bc,/No se puede aprobar un retiro de salario sin confirmar el débito en CuevaCoin/);
+  assert.doesNotMatch(bridge,/\+\s*\+\(employeeRows/);
   assert.match(bridge,/action:'save_mapping'/);
   assert.match(bridge,/action:'credit_salary'/);
   assert.match(bridge,/action:'withdraw_salary'/);
