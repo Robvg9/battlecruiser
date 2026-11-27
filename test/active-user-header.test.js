@@ -49,7 +49,7 @@ test("PWA 9.5.173 serves the refreshed compact header and synchronized cache",()
   assert.match(app,/const VERSION="9\.5\.173"/);
   assert.match(index,/style\.css\?v=9\.5\.173/);
   assert.match(index,/app\.js\?v=9\.5\.173/);
-  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.168/);
+  assert.match(index,/usuarios-permisos\.js\?v=9\.5\.169/);
   assert.match(sw,/BC_SW_VERSION = "9\.5\.173"/);
-  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.168/);
+  assert.match(sw,/usuarios-permisos\.js\?v=9\.5\.169/);
 });
