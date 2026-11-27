@@ -30,7 +30,7 @@ test("salary unlock requires the accepted physical handover to the immediately c
   assert.match(migration,/e\.estado='ACEPTADA'/);
   assert.match(migration,/src\.turno_id<>dst\.turno_id/);
   assert.match(migration,/e\.fecha_destino=dp\.fecha/);
-  assert.match(migration,/dp\.fecha=coalesce\(sp\.fecha_fin,sp\.fecha\)\\+1/);
+  assert.match(migration,/dp\.fecha=coalesce\(sp\.fecha_fin,sp\.fecha\)\+1/);
   assert.match(migration,/sp\.almacen_id=dp\.almacen_id/);
-  assert.match(migration,/source_turn\.estado_maestro[\s\\S]*target_turn\.estado_maestro/);
+  assert.match(migration,/source_turn\.estado_maestro[\s\S]*target_turn\.estado_maestro/);
 });
