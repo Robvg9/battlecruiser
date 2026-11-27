@@ -269,3 +269,71 @@ test("desktop visual calendar keeps a balanced board beside its right-hand inspe
   assert.match(styles, /@media\(min-width:761px\) and \(max-width:1120px\).*?320px/,
     "the inspector must retain a responsive desktop width");
 });
+
+test("archived journeys remain visible on the monthly board and inspector, but read-only", async (t) => {
+  const month = currentMonth();
+  const historical = {
+    id: "programming-historic", turno_id: "turno-historic", almacen_id: "warehouse-1",
+    numero_dia: 1, fecha: month + "-08", fecha_fin: month + "-10", trabaja: true,
+    responsable_id: "dep-1", estado: "PROGRAMADA", sesion_id: "session-historic",
+    sesion_estado: "COMPLETADA", turno_estado_maestro: "CERRADO", es_responsable: false
+  };
+  const { window } = setup(t, { admin: true, rows: [historical] });
+  await waitFor(() => window.document.querySelector("#bc7-month-board .bc7-month-chip"));
+  assert.ok(window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + month + '-09"]'));
+  assert.equal(window.document.querySelectorAll("#bc7-schedule-list .bc7-jornada").length, 0);
+  assert.equal(window.document.getElementById("bc7-archived-schedule-count").textContent, "1");
+  window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + month + '-09"]').click();
+  const inspector = window.document.getElementById("bc7-calendar-detail");
+  assert.match(inspector.textContent, /Beatriz/);
+  assert.ok(inspector.querySelector('[data-bc7-open="session-historic"]'));
+  assert.equal(inspector.querySelector("[data-bc7-reschedule]"), null);
+});
+
+test("a multi-day Jornada spans every covered date and appears in the inspector on intermediate days", async (t) => {
+  const month = currentMonth(), start = month + "-05", middle = month + "-06", end = month + "-07";
+  const row = {
+    id: "programming-span", turno_id: "turno-span", almacen_id: "warehouse-1",
+    numero_dia: 1, fecha: start, fecha_fin: end, trabaja: true,
+    responsable_id: "dep-1", estado: "PROGRAMADO", sesion_id: "session-span",
+    sesion_estado: "EN_CURSO", es_responsable: false
+  };
+  const { window } = setup(t, { admin: true, rows: [row] });
+  await waitFor(() => window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + start + '"]'));
+  const first = window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + start + '"].is-range-start');
+  const second = window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + middle + '"].is-range-middle');
+  const third = window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + end + '"].is-range-end');
+  assert.ok(first && second && third);
+  assert.match(first.getAttribute("aria-label"), /Beatriz/);
+  window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + middle + '"]').click();
+  const detail = window.document.getElementById("bc7-calendar-detail");
+  assert.match(detail.textContent, /Beatriz/);
+  assert.match(detail.textContent, /05/);
+  assert.match(detail.textContent, /07/);
+});
+
+test("manual scheduling preview is local and a changed assignment must be reviewed again", async (t) => {
+  const { window, calls } = setup(t, { admin: true, rows: [] });
+  await waitFor(() => calls.some(call => call.name === "listar_usuarios_admin"));
+  const havanaToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  const parts = havanaToday.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+1, 12)).toISOString().slice(0,10);
+  window.document.getElementById("bc7-start-date").value = tomorrow;
+  window.document.getElementById("bc7-days-count").value = "2";
+  window.document.querySelector("[data-bc7-build]").click();
+  await waitFor(() => window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]").length === 2);
+  window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]").forEach(select => {
+    select.value = "dep-1";
+    select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  });
+  window.document.querySelector("[data-bc7-preview]").click();
+  await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
+  assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false);
+  window.document.querySelector("#bc7-day-rows [data-bc7-works]").checked = false;
+  window.document.querySelector("#bc7-day-rows [data-bc7-works]").dispatchEvent(new window.Event("change", { bubbles: true }));
+  window.document.querySelector("[data-bc7-create]").click();
+  await waitFor(() => /asignación cambió/.test(window.document.getElementById("bc7-create-msg").textContent));
+  assert.equal(calls.some(call => call.name === "bc5_crear_jornada_unica"), false);
+});
