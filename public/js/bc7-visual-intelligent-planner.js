@@ -32,7 +32,7 @@
   function ordinal(value){
     if(!isoDate(value))return NaN;
     const p=String(value).split('-').map(Number);
-    return Math.round(Date.UTC(p[0],p[1]-1,p[2],12)/86400000);
+    return Math.floor(Date.UTC(p[0],p[1]-1,p[2],12)/86400000);
   }
   function addDays(value,offset){
     const n=ordinal(value);
@@ -258,7 +258,7 @@
       if(index===0){
         const handle=document.createElement('button');
         handle.type='button';handle.className='bc7-vp-resize-handle';
-        handle.draggable=true;handle.dataset.bc7VpHandle='start';
+        handle.draggable=true;handle.dataset.bc7VpResize='start';
         handle.setAttribute('aria-label','Cambiar el primer día del período');
         handle.textContent='⋮';
         segment.appendChild(handle);
@@ -270,7 +270,7 @@
       if(index===draft.days-1){
         const handle=document.createElement('button');
         handle.type='button';handle.className='bc7-vp-resize-handle';
-        handle.draggable=true;handle.dataset.bc7VpHandle='end';
+        handle.draggable=true;handle.dataset.bc7VpResize='end';
         handle.setAttribute('aria-label','Cambiar el último día del período');
         handle.textContent='⋮';
         segment.appendChild(handle);
