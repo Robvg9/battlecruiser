@@ -660,7 +660,7 @@ function bcUsesPreviewAuthProxy() {
     "https://bc-pr-224-battlecruiser.robvg9.workers.dev",
     "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"
   ].includes(origin) ||
-    /^https:\/\/[a-f0-9]{8}-battlecruiser\.robvg9\.workers\.dev$/i.test(origin);
+    /^https:\/\/[a-z0-9]+(?:-[a-z0-9]+)*-battlecruiser\.robvg9\.workers\.dev$/i.test(origin);
 }
 
 function bcUsernameLoginEndpoint() {
