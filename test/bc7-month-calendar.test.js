@@ -235,8 +235,8 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
 
 test("desktop visual calendar keeps a balanced board beside its right-hand inspector", async (t) => {
   const { window, calls } = setup(t, { admin: true, rows: [] });
-  const modal = window.document.getElementById("bc7-visual-calendar-modal");
-  assert.ok(modal, "desktop visual-calendar modal must exist");
+  assert.ok(window.document.getElementById("bc7-visual-calendar-modal"),
+    "desktop visual-calendar modal must exist before authenticated boot");
 
   // Complete the initial authenticated boot before opening the async desktop view.
   const bootReady = await waitFor(() =>
@@ -250,11 +250,13 @@ test("desktop visual calendar keeps a balanced board beside its right-hand inspe
 
   window.matchMedia = () => ({ matches: true });
   const trigger = window.document.querySelector("[data-bc7-open-visual-calendar]");
-  assert.ok(trigger, "the visual-calendar control must be re-queried after authenticated boot re-renders the Jornada shell");
+  const modal = window.document.getElementById("bc7-visual-calendar-modal");
+  assert.ok(trigger && modal,
+    "the visual-calendar control and modal must be re-queried after authenticated boot re-renders the Jornada shell");
   let visualReadyEvents = 0;
   window.addEventListener("bc7:visual-calendar-updated", () => { visualReadyEvents += 1; });
   trigger.click();
-  assert.equal(modal.hidden, false, "desktop activation should open the visual calendar");
+  assert.equal(modal.hidden, false, "desktop activation should open the live visual calendar");
   const visualReady = await waitFor(() =>
     visualReadyEvents > 0 &&
     window.document.getElementById("bc7-visual-warehouse")?.value === "warehouse-1"
