@@ -19,6 +19,6 @@ test("ADMIN final inventory corrections allow active jornada session states and 
 });
 
 test("compact Jornada UI contract follows the 7.68 module marker",()=>{
-  assert.match(jornadaUi,/^\/\/ v7\.68 — keep Bajas checklist mounted after review submission; explicit final confirmation/m);
+  assert.match(jornadaUi,/^\/\/ v7\.69 — .*Bajas checklist mounted after review submission\./m);
   assert.doesNotMatch(jornadaUi,/^\/\/ v7\.67 — approved Jornada status and realtime calendar refresh/m);
 });

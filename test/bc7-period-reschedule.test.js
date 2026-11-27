@@ -142,6 +142,10 @@ function setup(t, options = {}) {
 }
 
 async function openMonthAndSelectSource(env, rows, expectMove = true) {
+  const booted = await waitFor(() =>
+    env.calls.some((call) => call.name === "bc5_mis_jornadas")
+  );
+  assert.ok(booted, "wait for the initial calendar request before changing months");
   if (env.admin) {
     const authorized = await waitFor(() => {
       const shortcut = env.window.document.querySelector("[data-bc7-open-planner]");

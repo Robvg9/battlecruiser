@@ -39,7 +39,7 @@ test("opening one jornada exposes the three task tabs and unifies cash/finance i
 test("compact Step 7 updates app loader and offline cache",()=>{
  assertPwaReleaseAligned(assert,{app,serviceWorker:sw,index});
  assertModuleCacheAligned(assert,{app,serviceWorker:sw,moduleName:"bc7-jornada-ui.js"});
- assert.match(ui,/^\/\/ v7\.68 — keep Bajas checklist mounted after review submission; explicit final confirmation/m);
+ assert.match(ui,/^\/\/ v7\.69 — .*Bajas checklist mounted after review submission\./m);
 });
 
 test("Step 7 keeps the work checkbox compact on Android mobile",()=>{
