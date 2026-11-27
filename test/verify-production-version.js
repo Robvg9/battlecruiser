@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const path = require("path");
 const https = require("https");
 const { releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { buildWorkerVersionBaseUrl } = require("../scripts/cloudflare-worker-version.js");
 const { textAssetMatches, normalizeTextAsset } = require("../scripts/normalize-text-asset.js");
 
 const appSource = fs.readFileSync(path.join(__dirname, "..", "public", "app.js"), "utf8");
@@ -21,11 +22,27 @@ const expectedSha = String(process.env.BC_EXPECTED_RELEASE_SHA || "").trim().toL
 if (!/^[0-9a-f]{40}$/.test(expectedSha)) throw new Error("BC_EXPECTED_RELEASE_SHA must be a full 40-character git SHA.");
 const expectedRunId = String(process.env.BC_EXPECTED_DEPLOY_RUN_ID || "").trim();
 if (!/^\d+$/.test(expectedRunId)) throw new Error("BC_EXPECTED_DEPLOY_RUN_ID must be the numeric ID of the deploy workflow run.");
-const versionAffinityKey = "battlecruiser-release-" + expectedRunId;
-
 const releaseFilename = releaseManifestFilename(expectedSha);
-const releasePath = path.join(process.cwd(), "test-results", "release", releaseFilename);
-const baseUrl = "https://battlecruiser.robvg9.workers.dev";
+const releaseDir = path.join(process.cwd(), "test-results", "release");
+const releasePath = path.join(releaseDir, releaseFilename);
+const deploymentPath = path.join(releaseDir, "deployment.json");
+const productionBaseUrl = "https://battlecruiser.robvg9.workers.dev";
+
+function readVerifiedDeploymentArtifact() {
+  if (!fs.existsSync(deploymentPath)) throw new Error("Missing exact Worker deployment artifact: " + deploymentPath);
+  const deployment = JSON.parse(fs.readFileSync(deploymentPath, "utf8"));
+  if (deployment.source_sha !== expectedSha || String(deployment.workflow_run_id) !== expectedRunId) {
+    throw new Error("Worker deployment artifact does not match the expected release SHA/workflow run.");
+  }
+  const exactUrl = buildWorkerVersionBaseUrl(productionBaseUrl, deployment.worker_version_id);
+  if (deployment.worker_version_url !== exactUrl) {
+    throw new Error("Worker deployment artifact URL does not match its exact version ID.");
+  }
+  return deployment;
+}
+
+const deployment = readVerifiedDeploymentArtifact();
+const baseUrl = deployment.worker_version_url;
 
 function describeError(error) {
   if (!error) return "unknown error";
@@ -42,7 +59,6 @@ function requestWithHttps(url) {
     const req = https.get(url, { headers: {
       "cache-control": "no-cache",
       pragma: "no-cache",
-      "Cloudflare-Workers-Version-Key": versionAffinityKey,
     } }, (res) => {
       let body = "";
       res.setEncoding("utf8");
@@ -57,15 +73,13 @@ function requestWithHttps(url) {
   });
 }
 async function requestWithFetch(url) {
-  // Keep the post-deploy verifier byte-for-byte aligned with the deploy smoke:
-  // same no-store fetch mode, cache headers, redirect behavior and Worker affinity.
+  // The URL pins the exact Worker version; no rollout-affinity header is needed.
   const response = await fetch(url, {
     cache: "no-store",
     redirect: "follow",
     headers: {
       "cache-control": "no-cache",
       pragma: "no-cache",
-      "Cloudflare-Workers-Version-Key": versionAffinityKey,
     },
     signal: AbortSignal.timeout(20000),
   });

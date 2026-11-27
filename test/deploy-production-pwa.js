@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { writeReleaseManifest, releaseManifestFilename } = require("../scripts/write-release-manifest.js");
+const { extractWorkerVersionId, buildWorkerVersionBaseUrl } = require("../scripts/cloudflare-worker-version.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const RESULT_DIR = path.join(ROOT, "test-results");
@@ -49,17 +50,14 @@ function findWranglerEntry() {
 }
 
 async function fetchText(url) {
-  // Keep the deploy smoke and post-deploy verifier on one Worker version.
-  // Cloudflare can otherwise route related HTML/assets requests to different
-  // versions during rollouts. Both workflows derive this key from the deploy run.
-  const versionKey = "battlecruiser-release-" + String(process.env.GITHUB_RUN_ID || "");
+  // The URL itself contains the exact deployed Worker version prefix.
+  // This avoids mixed-version responses during global deployment propagation.
   const response = await fetch(url, {
     cache: "no-store",
     redirect: "follow",
     headers: {
       "cache-control": "no-cache",
       pragma: "no-cache",
-      "Cloudflare-Workers-Version-Key": versionKey,
     },
     signal: AbortSignal.timeout(20000),
   });
@@ -71,17 +69,17 @@ async function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function verifyLiveRelease(expected) {
+async function verifyLiveRelease(expected, versionBaseUrl, workerVersionId) {
   const filename = releaseManifestFilename(expected.source_sha);
   for (let attempt = 1; attempt <= 30; attempt++) {
     try {
       const stamp = encodeURIComponent(String(process.env.GITHUB_RUN_ID) + "-" + attempt);
       const [index, app, sw, style, manifest] = await Promise.all([
-        fetchText(PROD_BASE + "/?bc_deploy_ready=" + stamp),
-        fetchText(PROD_BASE + "/app.js?bc_deploy_ready=" + stamp + "-app"),
-        fetchText(PROD_BASE + "/service-worker.js?bc_deploy_ready=" + stamp + "-sw"),
-        fetchText(PROD_BASE + "/style.css?bc_deploy_ready=" + stamp + "-style"),
-        fetchText(PROD_BASE + "/" + filename + "?bc_deploy_ready=" + stamp + "-manifest"),
+        fetchText(versionBaseUrl + "/?bc_deploy_ready=" + stamp),
+        fetchText(versionBaseUrl + "/app.js?bc_deploy_ready=" + stamp + "-app"),
+        fetchText(versionBaseUrl + "/service-worker.js?bc_deploy_ready=" + stamp + "-sw"),
+        fetchText(versionBaseUrl + "/style.css?bc_deploy_ready=" + stamp + "-style"),
+        fetchText(versionBaseUrl + "/" + filename + "?bc_deploy_ready=" + stamp + "-manifest"),
       ]);
 
       const statusesOk = [index, app, sw, style, manifest].every(x => x.status === 200);
@@ -144,6 +142,15 @@ async function verifyLiveRelease(expected) {
           const artifactDir = path.join(RESULT_DIR, "release");
           fs.mkdirSync(artifactDir, { recursive: true });
           fs.writeFileSync(path.join(artifactDir, filename), JSON.stringify(liveManifest, null, 2) + "\n", "utf8");
+          const deployment = {
+            source_sha: expected.source_sha,
+            workflow_run_id: expected.workflow_run_id,
+            worker_version_id: workerVersionId,
+            worker_version_url: versionBaseUrl,
+            production_base_url: PROD_BASE,
+          };
+          fs.writeFileSync(path.join(artifactDir, "deployment.json"), JSON.stringify(deployment, null, 2) + "\n", "utf8");
+          log("[deploy smoke] exact Worker Version URL=" + versionBaseUrl + " version_id=" + workerVersionId);
           log("[deploy smoke] PASS — exact LIVE SHA=" + liveManifest.source_sha + " assets=" + inventoryCount + " critical_asset_SHA256=PASS" +
             " app=" + liveManifest.app_version + " service-worker=" + liveManifest.service_worker_version +
             " deploy_run=" + liveManifest.workflow_run_id);
@@ -190,7 +197,7 @@ async function verifyLiveRelease(expected) {
     log("Expected PWA version: " + appMatch[1]);
     log("Runner storage for Wrangler cache: " + WRANGLER_ROOT);
 
-    // Embed immutable release provenance in the already-served PWA manifest for this exact commit/run.
+    // Publish a SHA-addressed release JSON without changing the installable PWA manifest.
     const localManifest = writeReleaseManifest();
     if (localManifest.source_sha !== sha || localManifest.workflow_run_id !== runId) {
       throw new Error("The local release manifest does not match this deploy workflow SHA/run.");
@@ -198,13 +205,18 @@ async function verifyLiveRelease(expected) {
 
     const wranglerEntry = findWranglerEntry();
     log("[deploy] Using Wrangler CLI: " + wranglerEntry);
-    runNodeScript(wranglerEntry, ["deploy", "--config", "wrangler.toml"], {
+    const wranglerResult = runNodeScript(wranglerEntry, ["deploy", "--config", "wrangler.toml"], {
       env: process.env,
       timeout: 15 * 60 * 1000,
     });
+    const wranglerOutput = String(wranglerResult.stdout || "") + "\n" + String(wranglerResult.stderr || "");
+    const workerVersionId = extractWorkerVersionId(wranglerOutput);
+    const workerVersionBaseUrl = buildWorkerVersionBaseUrl(PROD_BASE, workerVersionId);
+    log("[deploy] Wrangler current Version ID: " + workerVersionId);
+    log("[deploy] Exact version URL: " + workerVersionBaseUrl);
 
-    log("=== Smoke test production against exact release provenance ===");
-    await verifyLiveRelease(localManifest);
+    log("=== Smoke test exact deployed Worker version ===");
+    await verifyLiveRelease(localManifest, workerVersionBaseUrl, workerVersionId);
     log("PASS BATTLECRUISER_PWA_LIVE_EXACT_SHA");
   } catch (error) {
     failure = error;
