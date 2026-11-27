@@ -36,7 +36,7 @@ function ensurePanel(){
   b.id=ID;
   b.hidden=true;
   b.style.setProperty('display','none','important');
-  b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';
+  b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div id="bc-payroll-admin-host"></div><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';
   anchor.parentElement.insertBefore(b,anchor);
   return b;
 }
@@ -57,8 +57,15 @@ async function load(){
     jobs.push({k:'e',label:'Entregas de caja',promise:rpc('listar_entregas_caja',{p_ciclo_id:null,p_almacen_id:null,p_estado:null})});
     jobs.push({k:'c',label:'Cuadres de caja',promise:rpc('listar_cuadres',{p_limite:50,p_offset:0})});
   }
-  if(canViewOperationalQueue())jobs.push({k:'o',label:'Aprobaciones operativas',promise:rpc('listar_aprobaciones_admin')});
+  if(canViewOperationalQueue()){
+    jobs.push({k:'o',label:'Aprobaciones operativas',promise:rpc('listar_aprobaciones_admin')});
+    jobs.push({k:'pw',label:'Retiros de salario CuevaCoin',promise:rpc('bc7_payroll_list_pending_withdrawals')});
+  }
   const results=await Promise.allSettled(jobs.map(job=>job.promise)),rows=[],errors=[];
+  const payrollIndex=jobs.findIndex(job=>job.k==='pw');
+  const payrollResult=payrollIndex>=0?results[payrollIndex]:null;
+  const payrollIds=new Set(payrollResult&&payrollResult.status==='fulfilled'&&Array.isArray(payrollResult.value)
+    ?payrollResult.value.map(x=>String(x.id)):[]);
   results.forEach((result,index)=>{
     const job=jobs[index];
     if(result.status==='rejected'){
@@ -68,11 +75,15 @@ async function load(){
     const data=Array.isArray(result.value)?result.value:[];
     if(job.k==='e')data.filter(x=>['DECLARADA','CONTADA'].includes(x.estado)).forEach(x=>rows.push({rank:x.estado==='DECLARADA'?0:1,node:renderEntrega(x)}));
     if(job.k==='c')data.filter(x=>['CON_DIFERENCIA','EN_REVISION'].includes(x.estado)).forEach(x=>rows.push({rank:2,node:renderCuadre(x)}));
-    if(job.k==='o')data.forEach(x=>rows.push({rank:3,node:renderOperativa(x)}));
+    if(job.k==='o')data.filter(x=>!(String(x.tipo||'').toLowerCase()==='gasto'&&payrollIds.has(String(x.id)))).forEach(x=>rows.push({rank:3,node:renderOperativa(x)}));
   });
+  if(window.BCPayrollBridge&&typeof window.BCPayrollBridge.mountAdminPanel==='function'){
+    try{await window.BCPayrollBridge.mountAdminPanel(panel);}catch(error){errors.push('Nómina: '+String(error.message||error));}
+  }
   rows.sort((a,b)=>a.rank-b.rank);
-  if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(rows.length);
-  if(!rows.length&&!errors.length){
+  if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(rows.length+payrollIds.size);
+  const payrollHasContent=!!panel.querySelector('#bc-payroll-admin-host')?.textContent?.trim();
+  if(!rows.length&&!errors.length&&!payrollHasContent){
     el.textContent='';
     setApprovalPanelVisible(panel,false);
     return;
