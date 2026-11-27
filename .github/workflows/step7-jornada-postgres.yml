@@ -141,6 +141,9 @@ on:
       - '.github/workflows/step7-jornada-postgres.yml'
       - 'supabase/migrations/20261126035000_jornada_successor_receipt_safe_reconciliation.sql'
       - 'test/jornada-successor-receipt-safe-reconciliation-contract.sql'
+      - 'supabase/migrations/20261126162000_jornada_payroll_hold_cuevacoin_bridge.sql'
+      - 'supabase/migrations/20261127060000_payroll_mapping_dependienta_only.sql'
+      - 'test/payroll-mapping-eligibility-contract.sql'
       - 'test/jornada-successor-receipt-safe-reconciliation.test.js'
       - 'test/active-user-header.test.js'
   workflow_dispatch:
