@@ -1,5 +1,5 @@
 // ==== Battlecruiser · app.js ====
-// v9.5.173 — fix offline loading overlay and local workspace recovery.
+// v9.5.173 — repair dashboards, move payroll into Administration and fix offline loading overlay.
 (function hotfixV9475(){
   const VERSION="9.5.173";
   window.__BC_VERSION__=VERSION;
