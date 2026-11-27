@@ -34,6 +34,8 @@ function setup(t, overrides = {}) {
   window.matchMedia = () => ({ matches: true });
 
   const calls = { preview: [], create: [], movements: [], open: [] };
+  const runtimeErrors = [];
+  window.addEventListener("error", event => runtimeErrors.push(String(event.message||"window error")));
   const model = {
     admin: overrides.admin !== false,
     online: overrides.online !== false,
@@ -82,7 +84,7 @@ function setup(t, overrides = {}) {
   window.eval(MODULE);
 
   t.after(() => window.close());
-  return { window, model, calls, bridge };
+  return { window, model, calls, bridge, runtimeErrors };
 }
 
 function startDrag(window, target) {
@@ -123,16 +125,21 @@ async function waitFor(predicate, timeoutMs = 1000) {
   return !!predicate();
 }
 
-test("desktop palette creates an ephemeral two-day draft when dragged onto a calendar date", (t) => {
-  const { window, calls } = setup(t);
+test("desktop palette creates an ephemeral two-day draft, dims its source and cleans drag state", (t) => {
+  const { window, calls, runtimeErrors } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   assert.ok(tool, "ADMIN should see the New Jornada amulet");
   startDrag(window, tool);
+  assert.equal(tool.classList.contains("bc7-vp-drag-source"), true,
+    "the source amulet should dim while the gesture is active");
   drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
 
   assert.equal(window.document.getElementById("bc7-visual-draft-panel").hidden, false);
   assert.equal(draftSegments(window).length, 2);
   assert.equal(draftSegments(window)[0].getAttribute("aria-label").includes("Borrador"), true);
+  assert.equal(tool.classList.contains("bc7-vp-drag-source"), false,
+    "dropping the amulet must restore its original appearance");
+  assert.deepEqual(runtimeErrors, [], "drop must not raise a runtime error while clearing drag state");
   assert.equal(calls.preview.length, 0, "dragging only creates a local draft");
   assert.equal(calls.create.length, 0, "dragging never writes a Jornada");
 });
@@ -215,6 +222,34 @@ test("keyboard form controls can change the first date, duration, work/rest and 
   assert.equal(window.document.querySelector('[data-bc7-vp-responsible="0"]').value, "staff-2");
   assert.equal(window.document.querySelector('[data-bc7-vp-responsible="1"]').disabled, true);
   assert.equal(calls.create.length, 0, "editing the keyboard-accessible form never writes");
+});
+
+test("arrow keys move and resize the draft with Alt and Shift modifiers", (t) => {
+  const { window, calls } = setup(t);
+  window.document.querySelector('[data-bc7-vp-tool="new"]').click();
+  let segment=window.document.querySelector('[data-bc7-vp-draft-segment="1"]');
+  assert.ok(segment);
+  segment.focus();
+  segment.dispatchEvent(new window.KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true,cancelable:true}));
+  assert.equal(draftSegments(window).length,2);
+  assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date,"2099-01-06",
+    "ArrowRight moves the complete draft by one day");
+
+  segment=window.document.querySelector('[data-bc7-vp-draft-segment="1"]');
+  segment.focus();
+  segment.dispatchEvent(new window.KeyboardEvent("keydown",{key:"ArrowRight",shiftKey:true,bubbles:true,cancelable:true}));
+  assert.equal(draftSegments(window).length,3,
+    "Shift+ArrowRight extends the end without moving the start");
+  assert.equal(draftSegments(window)[2].closest("[data-date]")?.dataset.date,"2099-01-08");
+
+  segment=window.document.querySelector('[data-bc7-vp-draft-segment="1"]');
+  segment.focus();
+  segment.dispatchEvent(new window.KeyboardEvent("keydown",{key:"ArrowLeft",altKey:true,bubbles:true,cancelable:true}));
+  assert.equal(draftSegments(window).length,4,
+    "Alt+ArrowLeft moves the start earlier while preserving the end");
+  assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date,"2099-01-05");
+  assert.equal(draftSegments(window)[3].closest("[data-date]")?.dataset.date,"2099-01-08");
+  assert.equal(calls.create.length,0,"keyboard gestures remain local until explicit confirmation");
 });
 
 test("a server preflight conflict keeps the draft local and disables confirmation", async (t) => {
