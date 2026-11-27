@@ -195,7 +195,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/productos\.js\?v=20261118.1"><\/script>/);
   assert.match(sw, /\.\/js\/productos\.js\?v=20261118.1/, "the offline shell must precache the updated product module version");
   assert.match(index, /<script src="js\/ventas\.js\?v=20261105\.2"><\/script>/);
-  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.120"><\/script>/);
+  assert.match(index, /<script src="js\/auth\.js\?v=9\.5\.174-auth-proxy-20261127"><\/script>/);
   assert.match(index, /<script src="js\/catalogos\.js\?v=20261106\.1"><\/script>/);
   assert.match(index, /<script src="js\/hotfix-configuracion-20260902\.js\?v=20261020\.4"><\/script>/);
   assert.match(index, /<script src="js\/bc-modal-manager\.js\?v=1\.0"><\/script>/);
@@ -319,9 +319,9 @@ test('Light theme cache is pinned and low-glare styles do not use white surfaces
   assert.match(app, /\["m27-5-theme-dark-reset\.js","27\.5a3"\]/);
   assert.ok(sw.includes('./js/m27-5-theme-dark-reset.js?v=27.5a3'));
   assert.ok(index.includes('js/core.js?v=9.5.117'));
-  assert.ok(index.includes('js/auth.js?v=9.5.120'));
+  assert.ok(index.includes('js/auth.js?v=9.5.174-auth-proxy-20261127'));
   assert.ok(sw.includes('./js/core.js?v=9.5.117'));
-  assert.ok(sw.includes('./js/auth.js?v=9.5.120'));
+  assert.ok(sw.includes('./js/auth.js?v=9.5.174-auth-proxy-20261127'));
   assert.ok(theme.includes('--stone:#efede5;'));
   assert.ok(theme.includes('--stone-2:#e2ded3;'));
   assert.ok(theme.includes('--text:#202722;'));
