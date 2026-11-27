@@ -308,8 +308,8 @@ test("a multi-day Jornada spans every covered date and appears in the inspector 
   window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + middle + '"]').click();
   const detail = window.document.getElementById("bc7-calendar-detail");
   assert.match(detail.textContent, /Beatriz/);
-  assert.match(detail.textContent, /05/);
-  assert.match(detail.textContent, /07/);
+  assert.match(detail.textContent, /\b5\b/);
+  assert.match(detail.textContent, /\b7\b/);
 });
 
 test("manual scheduling preview is local and a changed assignment must be reviewed again", async (t) => {
