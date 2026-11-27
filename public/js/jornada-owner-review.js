@@ -608,7 +608,7 @@
         ?'La ganancia bruta sigue siendo parcial porque faltan costos/precios históricos para algunos productos vendidos. Puedes aprobar inventario y caja, pero la ganancia no quedará cerrada como total. ¿Confirmas que revisaste esa limitación?'
         :'Vas a aprobar y cerrar definitivamente este Turno. Comprueba antes los importes, inventario y observaciones. ¿Confirmas?';
       if(!confirm(confirmText))return;
-      await run(async()=>{await rpc('bc7_resolver_revision_jornada',{p_turno_id:activeTurnId,p_decision:'APROBAR',p_comentario:null});await openReview(activeTurnId);if(typeof window.refrescarAprobacionesAdmin==='function')await window.refrescarAprobacionesAdmin();if(typeof window.refrescarCentroControl==='function')await window.refrescarCentroControl();});
+      await run(async()=>{await rpc('bc7_resolver_revision_jornada',{p_turno_id:activeTurnId,p_decision:'APROBAR',p_comentario:null});await openReview(activeTurnId);if(typeof window.refrescarAprobacionesAdmin==='function')await window.refrescarAprobacionesAdmin();if(typeof window.refrescarCentroControl==='function')await window.refrescarCentroControl();if(window.BCPayrollBridge&&typeof window.BCPayrollBridge.processAutomatic==='function'){try{const payroll=await window.BCPayrollBridge.processAutomatic();if(payroll&&payroll.ok===false)setStatus('Turno aprobado. La nómina automática quedó pendiente de conciliación; revisa Aprobaciones administrativas.','error');}catch(error){setStatus('Turno aprobado. No se confirmó la nómina automática: '+(error.message||error)+'. Revisa Aprobaciones administrativas.','error');}}});
     }
   }
   async function run(fn){

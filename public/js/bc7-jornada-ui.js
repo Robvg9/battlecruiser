@@ -1286,6 +1286,9 @@
     if(createExpenses){
       html+='<details class="bc7-finance-fold"><summary>Registrar gasto</summary><form data-bc7-finance-form="gasto" data-bc7-finance-session="'+esc(sessionId)+'"><h4>Registrar gasto</h4>'+
         '<input type="hidden" data-bc7-op-key value="">'+
+        '<label class="bc7-field">Categoría<select data-bc7-expense-category><option value="OTROS">Otros gastos</option><option value="SALARIOS">Salarios · retiro de salario acumulado</option><option value="UTILES_DE_LA_CAFETERIA">Útiles de la cafetería</option></select></label>'+
+        '<label class="bc7-field" data-bc7-expense-beneficiary-wrap hidden>Persona que recibe el salario<select data-bc7-expense-beneficiary disabled><option value="">Selecciona una dependienta vinculada</option></select></label>'+
+        '<p class="bc7-muted" data-bc7-expense-type-help>Gasto ordinario de la Jornada.</p>'+
         '<label class="bc7-field">Concepto<input data-bc7-expense-concept maxlength="160" required placeholder="Motivo del gasto"></label>'+
         '<label class="bc7-field">Monto<input data-bc7-expense-amount type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="0.00"></label>'+
         '<label class="bc7-field">Descripción (opcional)<input data-bc7-expense-description maxlength="1000" placeholder="Detalle o referencia"></label>'+
@@ -1700,6 +1703,7 @@
     if(type==='gastos'){
       host.innerHTML='<h4>Gastos</h4><div class="bc7-list">'+rows.map(g=>
         '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(g.concepto||'Gasto')+' · '+esc(money(g.monto))+'</strong><p>'+esc(fmtDateHuman(g.creado_en))+' · '+esc(g.creado_nombre||'Responsable')+'</p></div><span class="bc7-pill '+(g.estado==='APROBADO'?'ok':g.estado==='RECHAZADO'?'warn':'')+'">'+esc(humanStatus(g.estado||'PENDIENTE'))+'</span></div>'+
+        (g.categoria&&g.categoria!=='LEGACY'?'<p class="bc7-muted">'+esc(g.categoria==='SALARIOS'?'Salarios':g.categoria==='UTILES_DE_LA_CAFETERIA'?'Útiles de la cafetería':'Otros gastos')+(g.beneficiario_nombre?' · '+esc(g.beneficiario_nombre):'')+(g.cuevacoin_pago_estado&&g.cuevacoin_pago_estado!=='NO_APLICA'?' · CuevaCoin '+esc(g.cuevacoin_pago_estado):'')+'</p>':'')+
         (g.descripcion?'<p>'+esc(g.descripcion)+'</p>':'')+
         (g.comentario_revision?'<p class="bc7-muted">Revisión: '+esc(g.comentario_revision)+'</p>':'')+'</article>'
       ).join('')+'</div>';
@@ -1771,7 +1775,14 @@
         if($('bc7-inventory-settlement'))msg($('bc7-inventory-settlement'),friendlyError(e,'calendar')+' No se modificaron datos.','error');
       }
     }
-    if(hasExpenses)renderFinanceList($('bc7-expenses-list'),arr(financeData.gastos),'gastos');
+    if(hasExpenses){
+      try{
+        const metadata=await rpc('bc7_payroll_list_expenses_for_session',{p_turno_sesion_id:sessionId});
+        const byId=new Map(arr(metadata).map(item=>[String(item.id),item]));
+        financeData.gastos=arr(financeData.gastos).map(item=>Object.assign({},item,byId.get(String(item.id))||{}));
+      }catch(_){/* Legacy finance view remains usable if the extended metadata RPC is unavailable. */}
+      renderFinanceList($('bc7-expenses-list'),arr(financeData.gastos),'gastos');
+    }
     if(hasReinvestments)renderFinanceList($('bc7-reinvestments-list'),arr(financeData.reinversiones),'reinversiones');
     return true;
   }
@@ -1797,9 +1808,14 @@
         const amount=Number(form.querySelector('[data-bc7-expense-amount]').value);
         const description=form.querySelector('[data-bc7-expense-description]').value.trim();
         if(!concept||!Number.isFinite(amount)||amount<=0)throw new Error('Completa un concepto y un monto mayor que cero.');
-        createdId=await rpc('bc7_registrar_gasto_jornada',{
-          p_turno_sesion_id:sessionId,p_concepto:concept,p_monto:amount,
-          p_descripcion:description||null,p_idempotency_key:key
+        const category=form.querySelector('[data-bc7-expense-category]')?.value||'OTROS';
+        const beneficiary=form.querySelector('[data-bc7-expense-beneficiary]')?.value||null;
+        if(category==='SALARIOS'&&!beneficiary)throw new Error('Selecciona la dependienta que recibe el retiro de salario.');
+        createdId=await rpc('bc7_payroll_registrar_gasto_jornada',{
+          p_turno_sesion_id:sessionId,p_categoria:category,
+          p_beneficiario_usuario_id:category==='SALARIOS'?beneficiary:null,
+          p_concepto:concept,p_monto:amount,p_descripcion:description||null,
+          p_idempotency_key:key
         });
       }else if(type==='reinversion'){
         const product=form.querySelector('[data-bc7-reinvestment-product]').value;
