@@ -36,7 +36,7 @@ function ensurePanel(){
   b.id=ID;
   b.hidden=true;
   b.style.setProperty('display','none','important');
-  b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div id="bc-payroll-admin-host"></div><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';
+  b.innerHTML='<h3>🔐 Aprobaciones administrativas</h3><p class="muted">Revisa cada solicitud en su propio menú flotante, consulta productos y motivos, y después acepta o rechaza.</p><div class="lista" id="admin-aprobaciones-lista"><p class="lista-estado">Cargando…</p></div>';
   anchor.parentElement.insertBefore(b,anchor);
   return b;
 }
@@ -77,13 +77,9 @@ async function load(){
     if(job.k==='c')data.filter(x=>['CON_DIFERENCIA','EN_REVISION'].includes(x.estado)).forEach(x=>rows.push({rank:2,node:renderCuadre(x)}));
     if(job.k==='o')data.filter(x=>!(String(x.tipo||'').toLowerCase()==='gasto'&&payrollIds.has(String(x.id)))).forEach(x=>rows.push({rank:3,node:renderOperativa(x)}));
   });
-  if(window.BCPayrollBridge&&typeof window.BCPayrollBridge.mountAdminPanel==='function'){
-    try{await window.BCPayrollBridge.mountAdminPanel(panel);}catch(error){errors.push('Nómina: '+String(error.message||error));}
-  }
   rows.sort((a,b)=>a.rank-b.rank);
-  if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(rows.length+payrollIds.size);
-  const payrollHasContent=!!panel.querySelector('#bc-payroll-admin-host')?.textContent?.trim();
-  if(!rows.length&&!errors.length&&!payrollHasContent){
+  if(typeof window.bcActualizarBadgeAprobacionesAdmin==='function')window.bcActualizarBadgeAprobacionesAdmin(rows.length);
+  if(!rows.length&&!errors.length){
     el.textContent='';
     setApprovalPanelVisible(panel,false);
     return;
