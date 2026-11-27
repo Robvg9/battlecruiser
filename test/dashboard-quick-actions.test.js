@@ -146,7 +146,7 @@ test("Nómina is a separate Administration option and its panel is not mounted i
   assert.equal(modal.hidden, false, "the option must open the Nómina modal");
   const host = window.document.getElementById("bc-payroll-admin-host");
   assert.ok(host && modal.contains(host), "the salary management panel must live inside the Nómina modal");
-  assert.ok(modal.querySelector("#bc-payroll-admin"), "the Nómina content must render");
+  assert.ok(modal.querySelector(".bc-payroll-admin"), "the Nómina content must render");
   assert.equal(window.document.querySelector("#admin-aprobaciones #bc-payroll-admin"), null,
     "the approvals container must remain separate");
   assert.match(modal.textContent, /Configuración actual: Manual/);
