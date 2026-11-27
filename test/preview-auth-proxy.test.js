@@ -283,7 +283,7 @@ test("frontend uses the exact preview-only same-origin login endpoint and keeps 
   assert.ok(authSource.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("function bcUsesPreviewAuthProxy()"));
-  assert.ok(authSource.includes("[a-z0-9]+(?:-[a-z0-9]+)*-battlecruiser"));
+  assert.ok(authSource.includes("(?:[a-f0-9]{8}|feat-intelligent-visual-planner-v1-20261127)-battlecruiser"));
   assert.ok(authSource.includes("return bcUsesPreviewAuthProxy()"));
   assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
