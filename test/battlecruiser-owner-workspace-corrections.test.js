@@ -15,6 +15,7 @@ const operations = read("public/js/ui-operaciones-hub.js");
 const quickActions = read("public/js/bc-owner-quick-actions.js");
 const centerControl = read("public/js/centro-control.js");
 const approvals = read("public/js/aprobaciones-admin.js");
+const jornadaUi = read("public/js/bc7-jornada-ui.js");
 const communication = read("public/js/comunicacion.js");
 const humanOperations = read("public/js/operacion-humana.js");
 const priceChanges = read("public/js/jornada-price-changes.js");
@@ -70,15 +71,18 @@ test("Operations hub exposes four compact primary create actions and keeps admin
   assert.match(operations, /buildSecondaryActions/);
 });
 
-test("Control Center shortcuts use existing purchase, transfer, low-stock, Jornada and pending workflows", () => {
+test("Control Center shortcuts use verified modal openers and visible destinations", () => {
   for (const label of ["Nueva compra", "Nueva transferencia", "Stock bajo", "Jornada actual", "Pendientes", "Cambios de precio"]) {
     assert.ok(quickActions.includes(label), "missing shortcut: " + label);
   }
-  assert.match(quickActions, /window\.__BC165_open\('compras'\)/);
-  assert.match(quickActions, /window\.__BC165_open\('transferencias'\)/);
-  assert.match(quickActions, /window\.__BC_openStockBajo\(\)/);
-  assert.match(quickActions, /window\.irATab\('jornada'\)/);
-  assert.match(quickActions, /window\.irATab\('pendientes'\)/);
+  assert.match(quickActions, /root\.addEventListener\('click'/);
+  assert.match(quickActions, /data-bc-owner-status/);
+  assert.match(quickActions, /async function openMovementModal/);
+  assert.match(quickActions, /modal && modal\.dataset\.type === kind/);
+  assert.match(quickActions, /async function openLowStock/);
+  assert.match(quickActions, /navigate\('jornada'\)/);
+  assert.match(quickActions, /navigate\('pendientes'\)/);
+  assert.match(jornadaUi, /navTo\('jornada'\);[\s\S]*openWorkspace\(sessionId\)/);
 });
 
 test("Operations dialogs open on the first tap while catalogs load in the visible modal", () => {
@@ -126,8 +130,8 @@ test("Empty dashboard queues disappear, but live approval, cash and communicatio
   assert.match(humanOperations, /function construirAlertasB7\(\)/);
 });
 
-test("All revised modules use matching online/offline cache keys in release 9.5.170", () => {
-  assert.equal(assertPwaReleaseAligned(assert, { app, serviceWorker, index }).appVersion, "9.5.170");
+test("All revised modules use matching online/offline cache keys in release 9.5.171", () => {
+  assert.equal(assertPwaReleaseAligned(assert, { app, serviceWorker, index }).appVersion, "9.5.171");
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "ui-operaciones-hub.js" });
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "bc-owner-quick-actions.js" });
   assertModuleCacheAligned(assert, { app, serviceWorker, moduleName: "jornada-price-changes.js" });
