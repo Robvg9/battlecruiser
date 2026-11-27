@@ -216,6 +216,10 @@
       host.innerHTML='<p class="bc7-vp-muted">Modo de consulta. Aquí se muestran jornadas y movimientos vinculados; la programación solo está disponible para Administración.</p>';
       return;
     }
+    if(!model.online){
+      host.innerHTML='<p class="bc7-vp-muted">Sin conexión. El calendario y los registros guardados siguen en modo de consulta. Conéctate para revisar conflictos y crear nuevas jornadas.</p>';
+      return;
+    }
     const staff=model.staff||[];
     host.innerHTML=
       '<div class="bc7-vp-section-kicker">CREAR</div>'+
