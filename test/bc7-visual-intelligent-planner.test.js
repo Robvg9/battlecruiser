@@ -187,6 +187,26 @@ test("dragging a draft segment moves the whole period without changing its durat
   assert.equal(calls.create.length, 0);
 });
 
+test("keyboard form controls can change the first date, duration, work/rest and responsible", (t) => {
+  const { window, calls } = setup(t);
+  window.document.querySelector('[data-bc7-vp-tool="new"]').click();
+  const start = window.document.querySelector("[data-bc7-vp-start]");
+  start.value = "2026-11-29";
+  start.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const days = window.document.querySelector("[data-bc7-vp-days]");
+  days.value = "3";
+  days.dispatchEvent(new window.Event("change", { bubbles: true }));
+  const person = window.document.querySelector('[data-bc7-vp-responsible="0"]');
+  person.value = "staff-2";
+  person.dispatchEvent(new window.Event("change", { bubbles: true }));
+  window.document.querySelector('[data-bc7-vp-toggle-rest="1"]').click();
+  assert.equal(draftSegments(window).length, 3);
+  assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date, "2026-11-29");
+  assert.equal(window.document.querySelector('[data-bc7-vp-responsible="0"]').value, "staff-2");
+  assert.equal(window.document.querySelector('[data-bc7-vp-responsible="1"]').disabled, true);
+  assert.equal(calls.create.length, 0, "editing the keyboard-accessible form never writes");
+});
+
 test("a server preflight conflict keeps the draft local and disables confirmation", async (t) => {
   const { window, calls } = setup(t, {
     preview: {
