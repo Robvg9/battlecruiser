@@ -25,7 +25,7 @@ test("Jornada calendar uses the requested status colors and labels", () => {
   assert.match(row, /class="bc7-pill warn">Pendiente de cierre maestro/);
   assert.match(row, /class="bc7-pill ok">En curso/);
   assert.match(row, /class="bc7-pill warn">Programada/);
-  assert.ok(row.includes("const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);"));
+  assert.ok(row.includes("const isTerminal=['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status)||masterStatus==='CERRADO';"));
   assert.ok(row.includes("const viewable=status==='COMPLETADA'||isOperationallySealed;"));
   assert.ok(ui.includes(".bc7-pill.closed{color:#efaaa2;border-color:#a45353;background:rgba(164,83,83,.10)}"));
 });
@@ -41,8 +41,8 @@ test("Transferencia keeps only the modern multi-product picker visible", () => {
     "the legacy single-product add editor must stay hidden despite the hidden attribute/CSS cascade");
   assert.match(transfer, /legacyForm\.style\.display = 'none'/,
     "the old one-product transfer form must also remain hidden");
-  assert.ok(app.includes('["bc7-jornada-ui.js","7.70"]'));
-  assert.ok(serviceWorker.includes("./js/bc7-jornada-ui.js?v=7.70"));
+  assert.ok(app.includes('["bc7-jornada-ui.js","7.71"]'));
+  assert.ok(serviceWorker.includes("./js/bc7-jornada-ui.js?v=7.71"));
 });
 
 test("PWA release and offline module cache are aligned for the transfer UI update", () => {
