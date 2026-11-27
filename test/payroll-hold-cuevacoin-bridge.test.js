@@ -37,6 +37,7 @@ test("salary and withdrawal RPCs require owner identity and CuevaCoin transactio
   assert.match(bc,/bc7_payroll_finish_withdrawal/);
   assert.match(bc,/cuevacoin_pago_estado='APLICADO'/);
   assert.match(bc,/No se puede aprobar un retiro de salario sin confirmar el débito en CuevaCoin/);
+  assert.doesNotMatch(bridge,/\+\s*\+\(employeeRows/);
   assert.match(bridge,/action:'save_mapping'/);
   assert.match(bridge,/action:'credit_salary'/);
   assert.match(bridge,/action:'withdraw_salary'/);
@@ -48,8 +49,8 @@ test("Jornada expenses capture SALARIOS and cafeteria supplies separately; payro
   assert.match(jornada,/bc7_payroll_registrar_gasto_jornada/);
   assert.match(bridge,/data-bc7-expense-beneficiary/);
   assert.match(bridge,/No modifica CuevaCoin/);
-  assert.match(app,/\["payroll-bridge\.js","1\.0"\]/);
-  assert.match(sw,/\.\/js\/payroll-bridge\.js\?v=1\.0/);
+  assert.match(app,/\["payroll-bridge\.js","1\.1"\]/);
+  assert.match(sw,/\.\/js\/payroll-bridge\.js\?v=1\.1/);
   assert.match(app,/\["bc7-jornada-ui\.js","7\.69"\]/);
   assert.match(sw,/\.\/js\/bc7-jornada-ui\.js\?v=7\.69/);
 });
