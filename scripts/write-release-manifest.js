@@ -98,17 +98,7 @@ function buildReleaseManifest({ appSource, swSource, sourceSha, workflowRunId, a
 function releaseManifestFilename(sourceSha) {
   const sha = String(sourceSha || "").trim().toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error("sourceSha must be a full 40-character git SHA.");
-  return "manifest.json";
-}
-
-function embedReleaseProvenance(pwaManifest, releaseManifest) {
-  if (!pwaManifest || typeof pwaManifest !== "object" || Array.isArray(pwaManifest)) {
-    throw new Error("The existing PWA manifest must be a JSON object.");
-  }
-  if (!releaseManifest || !/^[0-9a-f]{40}$/.test(String(releaseManifest.source_sha || ""))) {
-    throw new Error("Release provenance must contain a full source SHA.");
-  }
-  return { ...pwaManifest, build_provenance: releaseManifest };
+  return "release-" + sha + ".json";
 }
 
 function writeReleaseManifest() {
@@ -122,12 +112,10 @@ function writeReleaseManifest() {
     assetInventory: collectPublicAssets(publicDir),
   });
   const filename = releaseManifestFilename(manifest.source_sha);
-  const pwaManifestPath = path.join(publicDir, filename);
-  const pwaManifest = JSON.parse(fs.readFileSync(pwaManifestPath, "utf8"));
-  const combinedManifest = embedReleaseProvenance(pwaManifest, manifest);
-  fs.writeFileSync(pwaManifestPath, JSON.stringify(combinedManifest, null, 2) + "\n", "utf8");
-  console.log("[release] exact build provenance embedded in existing PWA manifest: public/" + filename +
-    " (" + manifest.asset_count + " assets with SHA-256; manifest.json excluded to avoid self-reference)");
+  const releasePath = path.join(publicDir, filename);
+  fs.writeFileSync(releasePath, JSON.stringify(manifest, null, 2) + String.fromCharCode(10), "utf8");
+  console.log("[release] immutable SHA-addressed release manifest: public/" + filename +
+    " (" + manifest.asset_count + " assets with SHA-256; standard PWA manifest left untouched)");
   return { ...manifest, filename, path: "public/" + filename };
 }
 
@@ -142,7 +130,6 @@ module.exports = {
   buildAssetInventory,
   buildReleaseManifest,
   collectPublicAssets,
-  embedReleaseProvenance,
   releaseManifestFilename,
   writeReleaseManifest,
 };
