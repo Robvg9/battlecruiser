@@ -99,10 +99,10 @@ test("price-change eligibility remains unchanged in this mission",()=>{
 });
 
 test("PWA asset versions are aligned",()=>{
-  assert.match(APP,/9\.5\.168/);
-  assert.match(SW,/9\.5\.168/);
-  assert.match(APP,/bc7-jornada-ui\.js","7\.68"/);
-  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.68/);
+  assert.match(APP,/9\.5\.170/);
+  assert.match(SW,/9\.5\.170/);
+  assert.match(APP,/bc7-jornada-ui\.js","7\.69"/);
+  assert.match(SW,/bc7-jornada-ui\.js\?v=7\.69/);
   assert.match(INDEX,/bc7-jornada-inventory-mobile\.css\?v=20261116\.3/);
   assert.match(SW,/bc7-jornada-inventory-mobile\.css\?v=20261116\.3/);
 });
