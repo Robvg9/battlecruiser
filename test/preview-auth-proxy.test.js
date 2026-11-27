@@ -10,6 +10,7 @@ const previewWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wrangl
 const productionWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wrangler.toml"), "utf8");
 
 const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
+const VERSIONED_PREVIEW_ORIGIN = "https://5584a3ac-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
@@ -176,10 +177,90 @@ test("non-proxy paths remain static assets", async () => {
   assert.equal(await response.text(), "static asset");
 });
 
+test("versioned Cloudflare preview host passes preflight through its isolated Worker", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response("unexpected", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request(VERSIONED_PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
+    method: "OPTIONS",
+    headers: {
+      Origin: VERSIONED_PREVIEW_ORIGIN,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "apikey,content-type",
+    },
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-origin"), VERSIONED_PREVIEW_ORIGIN);
+  assert.equal(upstreamCalls, 0, "preflight must not reach Supabase");
+});
+
+test("versioned Cloudflare preview login POST reaches Supabase through the production-origin proxy", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let capturedUrl = null;
+  let capturedInit = null;
+  globalThis.fetch = async (url, init) => {
+    capturedUrl = String(url);
+    capturedInit = init;
+    return new Response(JSON.stringify({ error: "Usuario o contraseña incorrectos." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": PRODUCTION_ORIGIN },
+    });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request(VERSIONED_PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
+    method: "POST",
+    headers: {
+      Origin: VERSIONED_PREVIEW_ORIGIN,
+      apikey: "sb_publishable_test_only",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ username: "fixture-user", password: "fixture-password" }),
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(capturedUrl, LOGIN_FUNCTION_URL);
+  assert.equal(capturedInit.headers.get("Origin"), PRODUCTION_ORIGIN);
+  assert.equal(capturedInit.headers.get("apikey"), "sb_publishable_test_only");
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Usuario o contraseña incorrectos." });
+});
+
+test("versioned preview Worker does not accept a different preview's Origin", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response("unexpected", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const foreignPreviewOrigin = "https://deadbeef-battlecruiser.robvg9.workers.dev";
+  const response = await worker.fetch(new Request(VERSIONED_PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
+    method: "POST",
+    headers: {
+      Origin: foreignPreviewOrigin,
+      apikey: "sb_publishable_test_only",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ username: "x", password: "y" }),
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(response.status, 403);
+  assert.equal(upstreamCalls, 0);
+});
+
 test("frontend uses the exact preview-only same-origin login endpoint and keeps LIVE direct", () => {
   assert.ok(authSource.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
-  assert.ok(authSource.includes("].includes(window.location.origin)"));
+  assert.match(authSource, /function bcUsesPreviewAuthProxy\\(\\)/);
+  assert.match(authSource, /\\[a-f0-9\\]\\{8\\}-battlecruiser/);
+  assert.match(authSource, /return bcUsesPreviewAuthProxy\\(\\)\\s*\\?/);
   assert.match(authSource, /\? "\/__bc_preview\/functions\/v1\/bc-username-login"/);
   assert.match(authSource, /: SUPABASE_URL \+ "\/functions\/v1\/bc-username-login"/);
   assert.equal((authSource.match(/bcUsernameLoginEndpoint\(\)/g) || []).length, 2,
