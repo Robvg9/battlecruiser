@@ -146,7 +146,6 @@ on:
       - 'supabase/migrations/20261127232000_jornada_parent_period_metadata.sql'
       - 'test/jornada-parent-period-metadata-fixture.sql'
       - 'test/jornada-parent-period-metadata-contract.sql'
-      - 'test/step7-jornada-postgres-windows-ci.js'
       - 'test/payroll-mapping-eligibility-contract.sql'
       - 'test/jornada-successor-receipt-safe-reconciliation.test.js'
       - 'test/active-user-header.test.js'
