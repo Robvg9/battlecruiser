@@ -377,41 +377,25 @@ test("manual scheduling preview is local and a changed assignment must be review
   const warehouse = window.document.getElementById("bc7-warehouse");
   assert.equal(warehouse.options.length, 2, "the fixture must expose the active warehouse");
   warehouse.value = "warehouse-1";
-  assert.equal(window.document.getElementById("bc7-plan-mode"), null, "the obsolete mode selector is no longer part of the single-responsible period form");
-  window.document.getElementById("bc7-period-responsible").value = "dep-1";
-
-  const havanaToday = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(new Date());
-  const parts = havanaToday.split("-").map(Number);
-  const tomorrow = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+1, 12)).toISOString().slice(0,10);
-  window.document.getElementById("bc7-start-date").value = tomorrow;
-  window.document.getElementById("bc7-days-count").value = "2";
-  window.document.querySelector("[data-bc7-build]").click();
-  const rowsReady = await waitFor(() => {
-    const selects = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]"));
-    return selects.length === 2 && selects.every(select => !select.disabled && Array.from(select.options).some(option => option.value === "dep-1"));
-  });
-  assert.ok(rowsReady, "the planner must render two working days with the loaded responsible");
-  window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]").forEach(select => {
-    select.value = "dep-1";
-    select.dispatchEvent(new window.Event("change", { bubbles: true }));
-  });
-  const workInputs = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-works]"));
-  const personSelects = Array.from(window.document.querySelectorAll("#bc7-day-rows [data-bc7-person]"));
-  assert.equal(workInputs.length, 2, "the planner must expose both daily work/rest controls");
-  assert.equal(personSelects.length, 2, "the planner must expose both responsible selectors");
-  assert.deepEqual(workInputs.map(input => input.checked), [true, true]);
-  assert.deepEqual(personSelects.map(select => select.value), ["dep-1", "dep-1"]);
-  window.document.querySelector("[data-bc7-preview]").click();
-  const previewed = await waitFor(() => /Vista previa de tu asignación/.test(window.document.getElementById("bc7-create-msg").textContent));
-  assert.ok(previewed, "the explicit assignment should pass local validation and render a preview");
-  assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
-    "day-by-day preview must not use the saved-rotation RPC");
-  assert.equal(window.document.querySelectorAll("#bc7-preview .bc7-jornada").length, 2,
-    "the local preview should render both requested days");
-  const changedStart = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+2, 12)).toISOString().slice(0,10);
   const startInput = window.document.getElementById("bc7-start-date");
+  const daysInput = window.document.getElementById("bc7-days-count");
+  startInput.value = tomorrow;
+  startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  daysInput.value = "2";
+  daysInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  window.document.getElementById("bc7-period-responsible").value = "dep-1";
+  window.document.getElementById("bc7-period-responsible").dispatchEvent(new window.Event("change", { bubbles: true }));
+  const summary = window.document.querySelector("#bc7-day-rows .bc7-period-summary");
+  assert.ok(summary, "the simplified form must summarize the continuous period instead of exposing obsolete per-day controls");
+  assert.match(summary.textContent, /2 días consecutivos/);
+  window.document.querySelector("[data-bc7-preview]").click();
+  const previewed = await waitFor(() => /Vista previa del período/.test(window.document.getElementById("bc7-create-msg").textContent));
+  assert.ok(previewed, "the selected responsible and period should pass local validation and render a preview");
+  assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
+    "period preview must not use the saved-rotation RPC");
+  assert.equal(window.document.querySelectorAll("#bc7-preview .bc7-jornada").length, 1,
+    "the local preview should render one grouped Jornada period");
+  const changedStart = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+2, 12)).toISOString().slice(0,10);
   startInput.value = changedStart;
   startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.equal(window.document.getElementById("bc7-preview").textContent, "",
