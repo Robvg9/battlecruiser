@@ -651,18 +651,26 @@ client.auth.onAuthStateChange(function (event, session) {
   }
 });
 
+function bcUsesPreviewAuthProxy() {
+  const origin = String(window.location.origin || "");
+  // Cloudflare Workers Builds creates immutable preview hosts using the
+  // eight-hex version prefix. Route those previews through their own Worker
+  // so the existing Supabase Edge Function sees the allowlisted LIVE Origin.
+  return [
+    "https://bc-pr-224-battlecruiser.robvg9.workers.dev",
+    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"
+  ].includes(origin) ||
+    /^https:\/\/(?:[a-f0-9]{8}|feat-intelligent-visual-planner-v1-20261127)-battlecruiser\.robvg9\.workers\.dev$/i.test(origin);
+}
+
 function bcUsernameLoginEndpoint() {
-  // The shared PR preview is a different origin from production. Route only
-  // that exact host through its isolated Worker proxy; LIVE keeps direct Supabase.
-  return ["https://bc-pr-224-battlecruiser.robvg9.workers.dev",
-    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"].includes(window.location.origin)
+  return bcUsesPreviewAuthProxy()
     ? "/__bc_preview/functions/v1/bc-username-login"
     : SUPABASE_URL + "/functions/v1/bc-username-login";
 }
 
 function bcPasswordRecoveryEndpoint() {
-  return ["https://bc-pr-224-battlecruiser.robvg9.workers.dev",
-    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"].includes(window.location.origin)
+  return bcUsesPreviewAuthProxy()
     ? "/__bc_preview/functions/v1/bc-password-recovery-admin"
     : SUPABASE_URL + "/functions/v1/bc-password-recovery-admin";
 }

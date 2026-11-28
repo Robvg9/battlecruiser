@@ -86,7 +86,7 @@ test("offline permission restoration releases a residual global loader after app
 test("release pins the patched offline assets in both the document and Service Worker", () => {
   const appVersion = app.match(/const VERSION\s*=\s*["']([^"']+)["']/)?.[1];
   const swVersion = serviceWorker.match(/BC_SW_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
-  assert.equal(appVersion, "9.5.173");
+  assert.equal(appVersion, "9.5.174");
   assert.equal(swVersion, appVersion);
 
   for (const [name, version] of [

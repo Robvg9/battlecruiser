@@ -165,9 +165,11 @@ async function openMonthAndSelectSource(env, rows, expectMove = true) {
     ) !== null
   );
   assert.ok(loaded, "the source period day should appear in the selected month");
-  env.window.document.querySelector(
-    '#bc7-month-board [data-bc7-calendar-select="' + rows[0].fecha + '"]'
-  ).click();
+  const periodChip=env.window.document.querySelector(
+    '#bc7-month-board .bc7-month-chip[data-bc7-calendar-select="' + rows[0].fecha + '"]'
+  );
+  assert.ok(periodChip,"the Jornada parent period must render as a calendar chip");
+  periodChip.click();
   if (!expectMove) return true;
   return await waitFor(() =>
     env.window.document.querySelector("#bc7-calendar-detail [data-bc7-period-move]") !== null

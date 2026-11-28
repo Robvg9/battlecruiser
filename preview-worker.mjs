@@ -2,6 +2,14 @@ const PREVIEW_ORIGINS = new Set([
   "https://bc-pr-224-battlecruiser.robvg9.workers.dev",
   "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"
 ]);
+
+const VERSIONED_PREVIEW_ORIGIN_RE = /^https:\/\/(?:[a-f0-9]{8}|feat-intelligent-visual-planner-v1-20261127)-battlecruiser\.robvg9\.workers\.dev$/i;
+
+function isPreviewOrigin(origin) {
+  return PREVIEW_ORIGINS.has(origin) ||
+    VERSIONED_PREVIEW_ORIGIN_RE.test(String(origin || ""));
+}
+
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
@@ -26,7 +34,7 @@ export default {
 
     // This Worker script is only enabled for the exact shared PR preview host.
     // All unrelated asset requests continue through the configured ASSETS binding.
-    if (!PREVIEW_ORIGINS.has(url.origin)) {
+    if (!isPreviewOrigin(url.origin)) {
       return env.ASSETS.fetch(request);
     }
     // Force the preview shell and versioned core assets through the same
@@ -67,7 +75,7 @@ export default {
 
     const requestOrigin = request.headers.get("Origin");
     if (request.method === "OPTIONS") {
-      if (!PREVIEW_ORIGINS.has(requestOrigin)) {
+      if (requestOrigin !== url.origin || !isPreviewOrigin(requestOrigin)) {
         return json({ error: "Origen no permitido." }, 403);
       }
       return new Response(null, {
@@ -86,8 +94,8 @@ export default {
     // A browser POST from the preview must carry its exact same-origin marker.
     // A GET is allowed only as a no-credential diagnostic: the upstream function
     // returns 405 before its rate limiter or auth/database logic can run.
-    const foreignOrigin = requestOrigin && !PREVIEW_ORIGINS.has(requestOrigin);
-    if ((request.method === "POST" && !PREVIEW_ORIGINS.has(requestOrigin)) ||
+    const foreignOrigin = requestOrigin && requestOrigin !== url.origin;
+    if ((request.method === "POST" && requestOrigin !== url.origin) ||
         (request.method === "GET" && foreignOrigin)) {
       return json({ error: "Origen no permitido." }, 403);
     }
