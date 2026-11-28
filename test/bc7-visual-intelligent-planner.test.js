@@ -180,8 +180,8 @@ test("resize grips are independent draggable targets and compact desktop layouts
   assert.equal(end.draggable,true);
   assert.equal(move.draggable,true);
   const css=window.document.getElementById("bc7-visual-planner-style").textContent;
-  assert.match(css,/flex:0 0 24px/,"resize targets must be wide enough to grab reliably");
-  assert.match(css,/@media\(max-width:1240px\)/,"compact desktop layouts must stack the inspector below the calendar");
+  assert.match(css,/flex:0 0 40px/,"resize targets must be easy to grab on a laptop trackpad");
+  assert.match(css,/@media\(max-width:1440px\)/,"small laptop widths must stack the inspector below the calendar");
 });
 
 test("draft end handle resizes the range live without a server write", (t) => {
@@ -448,6 +448,6 @@ test("offline mode cannot expose a draft creation tool", (t) => {
 });
 
 test("planner module is loaded immediately after Jornada and precached offline", () => {
-  assert.ok(APP.includes('["bc7-visual-intelligent-planner.js","1.1"]'));
-  assert.ok(SW.includes('./js/bc7-visual-intelligent-planner.js?v=1.1'));
+  assert.ok(APP.includes('["bc7-visual-intelligent-planner.js","1.2"]'));
+  assert.ok(SW.includes('./js/bc7-visual-intelligent-planner.js?v=1.2'));
 });
