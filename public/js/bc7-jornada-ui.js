@@ -3728,47 +3728,23 @@
     catch(e){msg($('bc7-hours-msg'),'No se guardó el horario. '+friendlyError(e,'hours'),'error');}
     finally{busy(btn,false);}
   }
-  async function savePattern(form){
-    const warehouse=$('bc7-warehouse')?.value;
-    const name=$('bc7-pattern-name').value.trim(),anchor=$('bc7-anchor').value,days=readDayRows();
-    if(!warehouse){msg($('bc7-pattern-msg'),'Selecciona un almacén.','error');return;}
-    if(!name||!anchor||!days.length){msg($('bc7-pattern-msg'),'Escribe un nombre para la rotación, elige la fecha desde la que comienza y muestra los días.','error');return;}
-    if(days.some(x=>x.trabaja)&&!staffCatalogReady()){msg($('bc7-pattern-msg'),'Espera a que se cargue la lista de personas disponibles antes de guardar la rotación.','error');return;}
-    const bad=days.find(x=>x.trabaja&&!x.responsable_id);
-    if(bad){msg($('bc7-pattern-msg'),'El Día '+bad.numero_dia+' está marcado como día de trabajo, pero todavía no tiene una persona asignada.','error');return;}
-    if(!confirm('Se guardará esta rotación para el almacén. Las jornadas que ya existen no cambiarán. ¿Confirmas?'))return;
-    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{await rpc('bc5_guardar_patron_jornada',{p_almacen_id:warehouse,p_nombre:name,p_fecha_ancla:anchor,p_patron:days});msg($('bc7-pattern-msg'),'Rotación guardada. Ya puedes revisar las fechas y crear la programación.','ok');state.lastPreview=null;}
-    catch(e){msg($('bc7-pattern-msg'),'No se pudo guardar la rotación. '+friendlyError(e,'pattern'),'error');}
-    finally{busy(btn,false);}
-  }
   async function previewPattern(btn){
-    const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount(),mode='explicit';
-    if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
+    const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount();
+    if(!n){msg($('bc7-create-msg'),'Indica cuántos días tendrá la Jornada (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
     if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha.','error');return;}
     if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return;}
-    if(mode==='explicit'){
-      if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de responsables.','error');return;}
-      let schedule=readDayRows();if(schedule.length!==n){buildDayRows();schedule=readDayRows();}
-      const responsibleId=$('bc7-period-responsible')?.value||'';
-      if(!responsibleId||schedule.some(x=>!x.trabaja||String(x.responsable_id||'')!==String(responsibleId))){msg($('bc7-create-msg'),'Selecciona una responsable para toda la Jornada.','error');return;}
-      if(!busy(btn,true))return;
-      try{
-        const rows=schedule.map((row,index)=>({...row,fecha:addDays(start,index),hora_inicio_prevista:$('bc7-hour-start')?.value||'07:00',hora_fin_prevista:$('bc7-hour-end')?.value||'23:00'}));
-        state.lastPreview={start,warehouse,days:n,rows,mode:'explicit'};
-        $('bc7-preview').innerHTML='<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(start))+' — '+esc(fmtDateHuman(addDays(start,n-1)))+'</strong><p>'+n+' días · '+esc(userName(schedule[0].responsable_id))+' · una sola Jornada</p></article>';
-        msg($('bc7-create-msg'),'Vista previa de tu asignación. No se ha guardado nada. El servidor comprobará fechas ocupadas y conflictos de responsables al crear.','');
-      }finally{busy(btn,false);}
-      return;
+    if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de responsables.','error');return;}
+    const schedule=readDayRows(),responsibleId=$('bc7-period-responsible')?.value||'';
+    if(!responsibleId||schedule.length!==n||schedule.some(day=>!day.trabaja||String(day.responsable_id||'')!==String(responsibleId))){
+      msg($('bc7-create-msg'),'Selecciona una responsable para toda la Jornada.','error');return;
     }
     if(!busy(btn,true))return;
     try{
-      const rows=arr(await rpc('bc5_previsualizar_jornada',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n}));
-      state.lastPreview={start,warehouse,days:n,rows,mode:'pattern'};
-      $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong><p>'+esc(String(r.hora_inicio_prevista).slice(0,5))+'–'+esc(String(r.hora_fin_prevista).slice(0,5))+'</p></div>'+(r.conflicto?'<span class="bc7-pill warn">Revisar</span>':'<span class="bc7-pill ok">Disponible</span>')+'</div>'+(r.motivo_conflicto?'<p>'+esc(friendlyError(r.motivo_conflicto,'preview'))+'</p>':'')+'</article>').join('');
-      msg($('bc7-create-msg'),rows.some(r=>r.conflicto)?'La vista previa contiene conflictos. Corrígelos antes de crear.':'Rotación verificada sin conflictos. Aún falta confirmar la creación.','');
-    }catch(e){state.lastPreview=null;msg($('bc7-create-msg'),friendlyError(e,'preview'),'error');}
-    finally{busy(btn,false);}
+      const rows=schedule.map((row,index)=>({...row,fecha:addDays(start,index),hora_inicio_prevista:$('bc7-hour-start')?.value||'07:00',hora_fin_prevista:$('bc7-hour-end')?.value||'23:00'}));
+      state.lastPreview={start,warehouse,days:n,rows,mode:'explicit'};
+      $('bc7-preview').innerHTML='<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(start))+' — '+esc(fmtDateHuman(addDays(start,n-1)))+'</strong><p>'+n+' días · '+esc(userName(responsibleId))+' · una sola Jornada</p></article>';
+      msg($('bc7-create-msg'),'Vista previa del período. No se ha guardado nada. El servidor comprobará fechas ocupadas y conflictos antes de crear.','');
+    }finally{busy(btn,false);}
   }
   async function createSchedule(btn){
     const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount();
@@ -4137,7 +4113,7 @@
     if(f.matches('[data-bc7-period-move-form]')){e.preventDefault();await confirmPeriodMove(f);}
     else if(f.id==='bc7-retro-successor-form'){e.preventDefault();await createRetroSuccessor(f);}
     else if(f.id==='bc7-hours-form'){e.preventDefault();await saveHours(f);}
-    else if(f.id==='bc7-pattern-form'){e.preventDefault();await savePattern(f);}
+    
     else if(f.matches('[data-bc7-reschedule]')){e.preventDefault();await reschedule(f);}
     else if(f.matches('[data-bc7-count-form]')){e.preventDefault();await saveCount(f);}
     else if(f.matches('[data-bc7-receive-form]')){e.preventDefault();await saveReceipt(f);}
