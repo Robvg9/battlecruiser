@@ -179,8 +179,8 @@
     host.innerHTML=html;
     const weekRows=cells/7;
     host.style.display='grid';host.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
-    host.style.gridTemplateRows='32px repeat('+weekRows+',104px)';
-    host.style.height=String(32+weekRows*104)+'px';host.style.boxSizing='border-box';host.style.position='relative';
+    host.style.gridTemplateRows='32px repeat('+weekRows+',108px)';
+    host.style.height=String(32+weekRows*108)+'px';host.style.boxSizing='border-box';host.style.position='relative';
     host.dataset.month=month;host.setAttribute('aria-busy',loading?'true':'false');
     host.setAttribute('role','grid');host.setAttribute('aria-colcount','7');host.setAttribute('aria-rowcount',String(weekRows+1));
     const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
@@ -778,6 +778,12 @@
         "#tab-jornada .bc7-month-chip.is-range-middle{margin-left:-7px;margin-right:-7px;width:calc(100% + 14px);border-right:0;border-left:0;border-radius:0}",
         "#tab-jornada .bc7-month-chip.is-range-end{margin-left:-7px;margin-right:0;width:calc(100% + 7px);border-left:0;border-radius:0 6px 6px 0}",
         "#tab-jornada .bc7-month-chip.is-range-week-continuation .bc7-month-chip-person{font-weight:800}",
+        "#tab-jornada .bc7-month-board{grid-template-columns:repeat(7,minmax(0,1fr));box-sizing:border-box}",
+        "#tab-jornada .bc7-month-weekday{height:32px;min-height:32px;box-sizing:border-box}",
+        "#tab-jornada .bc7-month-day{height:108px!important;min-height:0!important;max-height:108px!important;box-sizing:border-box;overflow:visible;padding:4px!important}",
+        "#tab-jornada .bc7-month-day-top{height:24px;min-height:24px;flex:0 0 24px;gap:4px}",
+        "#tab-jornada .bc7-month-day-events{display:flex;flex-direction:column;gap:2px;min-height:0;max-height:74px;overflow:visible}",
+        "#tab-jornada .bc7-month-chip{height:22px;min-height:22px;max-height:22px;flex:0 0 22px;box-sizing:border-box;padding:2px 4px}",
         "#tab-jornada .bc7-month-chip[draggable=true]{height:30px;min-height:30px;max-height:30px;box-sizing:border-box;padding:3px 5px;gap:4px;cursor:grab;touch-action:none;user-select:none}",
         "#tab-jornada .bc7-month-chip[draggable=true]:active{cursor:grabbing}",
         "#tab-jornada .bc7-month-chip-grip{display:inline-grid;flex:0 0 28px;width:28px;height:24px;place-items:center;border-radius:5px;background:rgba(10,23,42,.72);color:#fff;font-size:17px;line-height:1;cursor:grab}",
