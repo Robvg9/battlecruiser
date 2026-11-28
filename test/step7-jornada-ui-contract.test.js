@@ -41,7 +41,8 @@ test("Jornada waits for the authenticated profile and permissions before calling
 });
 
 test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write confirmations",()=>{
-  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_bajas_multiple_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
+  // F3 now builds the local draft preview and creates one continuous period directly; the legacy rotation-save and server-preview RPCs are not part of the active UI contract.
+  for(const rpc of ["bc5_mis_jornadas","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_bajas_multiple_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
     assert.ok(ui.includes(rpc),`UI no wired to ${rpc}`);
   }
   assert.match(ui,/confirm\(/);
