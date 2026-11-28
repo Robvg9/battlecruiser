@@ -141,8 +141,11 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     window.document.querySelectorAll("#bc7-month-board .bc7-month-day").length,
     expectedCells
   );
-  assert.equal(window.document.getElementById("bc7-month-board").style.gridTemplateRows,
-    `34px repeat(${expectedCells / 7},minmax(62px,1fr))`);
+  const board = window.document.getElementById("bc7-month-board");
+  assert.match(board.style.gridTemplateRows,/^32px repeat\(\d+,\s*104px\)$/,
+    "every calendar week must use the same fixed-height grid track");
+  assert.equal(board.style.height,String(32+(expectedCells/7)*104)+"px",
+    "the board must reserve an exact height for every rendered week");
   assert.equal(window.document.getElementById("bc7-month-board").getAttribute("aria-colcount"), "7");
 
   const read = calls.find((call) => call.name === "bc5_mis_jornadas");
@@ -190,17 +193,26 @@ test("month navigation changes the query window without creating or editing Jorn
   const { window, calls } = setup(t, { admin: true, rows: [] });
   await waitFor(() => calls.some((call) => call.name === "bc5_mis_jornadas"));
 
+  const parts = month.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(parts[0], parts[1], 1, 12));
+  const nextMonth = nextDate.toISOString().slice(0, 7);
   window.document.querySelector("[data-bc7-month-next]").click();
+  const board = window.document.getElementById("bc7-month-board");
+  assert.equal(board.dataset.month,nextMonth,
+    "the visible grid must switch to the selected month before its RPC resolves");
+  assert.equal(board.getAttribute("aria-busy"),"true",
+    "uncached month navigation must expose loading state immediately");
+  assert.ok(board.querySelector(".bc7-month-loading"),
+    "the loading state must replace the previous month rather than leave it under the new title");
+  assert.ok(board.querySelector('[data-date="'+nextMonth+'-01"]'),
+    "the loading grid must already contain dates for the newly selected month");
   const changed = await waitFor(() => {
     const reads = calls.filter((call) => call.name === "bc5_mis_jornadas");
-    return reads.length >= 2 && reads[1].payload.p_fecha_inicio !== month + "-01";
+    return reads.length >= 2 && reads[1].payload.p_fecha_inicio === nextMonth + "-01";
   });
   assert.ok(changed, "next month should trigger a fresh monthly read");
 
   const reads = calls.filter((call) => call.name === "bc5_mis_jornadas");
-  const parts = month.split("-").map(Number);
-  const nextDate = new Date(Date.UTC(parts[0], parts[1], 1, 12));
-  const nextMonth = nextDate.toISOString().slice(0, 7);
   assert.equal(reads[1].payload.p_fecha_inicio, nextMonth + "-01");
   assert.equal(reads[1].payload.p_fecha_fin, monthEnd(nextMonth));
   assert.equal(
