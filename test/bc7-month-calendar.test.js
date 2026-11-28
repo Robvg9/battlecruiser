@@ -142,9 +142,9 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     expectedCells
   );
   const board = window.document.getElementById("bc7-month-board");
-  assert.match(board.style.gridTemplateRows,/^32px repeat\(\d+,\s*104px\)$/,
+  assert.match(board.style.gridTemplateRows,/^32px repeat\(\d+,\s*108px\)$/,
     "every calendar week must use the same fixed-height grid track");
-  assert.equal(board.style.height,String(32+(expectedCells/7)*104)+"px",
+  assert.equal(board.style.height,String(32+(expectedCells/7)*108)+"px",
     "the board must reserve an exact height for every rendered week");
   assert.equal(window.document.getElementById("bc7-month-board").getAttribute("aria-colcount"), "7");
 
