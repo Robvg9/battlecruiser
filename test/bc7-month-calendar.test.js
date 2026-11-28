@@ -365,9 +365,16 @@ test("visual preflight applies one responsible to all working days of the Jornad
   assert.equal(validation.responsableId,"dep-1");
 });
 
-test("Jornada read RPC exposes the parent-period and master-close fields used by the calendar", () => {
+test("Jornada read RPC adds parent metadata without regressing multi-day calendar reads", () => {
   const migration=fs.readFileSync(path.join(__dirname,"..","supabase","migrations","20261127232000_jornada_parent_period_metadata.sql"),"utf8");
-  assert.ok(migration.includes("JOIN public.turnos t ON t.id=p.turno_id"));
+  assert.ok(migration.includes("'fecha_fin',coalesce(p.fecha_fin,p.fecha)"),
+    "the existing multi-day end date must remain in the RPC response");
+  assert.ok(migration.includes("LEFT JOIN public.turnos t ON t.id=p.turno_id"),
+    "rows must not disappear when optional parent metadata is unavailable");
+  assert.ok(migration.includes("WHERE p.fecha<=p_fecha_fin AND coalesce(p.fecha_fin,p.fecha)>=p_fecha_inicio"),
+    "the RPC must return periods that overlap the queried calendar window");
+  assert.ok(!migration.includes("WHERE p.fecha BETWEEN p_fecha_inicio AND p_fecha_fin"),
+    "periods beginning before the window but continuing inside it must remain visible");
   assert.ok(migration.includes("'turno_fecha_inicio',t.fecha"));
   assert.ok(migration.includes("'dias_turno',t.dias_turno"));
   assert.ok(migration.includes("'turno_estado_maestro',coalesce(t.estado_maestro,t.estado)"));

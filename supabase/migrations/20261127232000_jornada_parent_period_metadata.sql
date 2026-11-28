@@ -33,6 +33,7 @@ BEGIN
       'almacen_id',p.almacen_id,
       'numero_dia',p.numero_dia,
       'fecha',p.fecha,
+      'fecha_fin',coalesce(p.fecha_fin,p.fecha),
       'trabaja',p.trabaja,
       'responsable_id',CASE WHEN v_is_admin OR p.responsable_id=auth.uid()
                             THEN p.responsable_id ELSE NULL END,
@@ -53,9 +54,9 @@ BEGIN
   ),'[]'::jsonb)
   INTO v_result
   FROM public.turno_jornada_programacion p
-  JOIN public.turnos t ON t.id=p.turno_id
+  LEFT JOIN public.turnos t ON t.id=p.turno_id
   LEFT JOIN public.turno_sesiones s ON s.jornada_programacion_id=p.id
-  WHERE p.fecha BETWEEN p_fecha_inicio AND p_fecha_fin
+  WHERE p.fecha<=p_fecha_fin AND coalesce(p.fecha_fin,p.fecha)>=p_fecha_inicio
     AND (
       v_is_admin
       OR p.responsable_id=auth.uid()
