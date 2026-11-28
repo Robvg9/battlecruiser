@@ -379,7 +379,8 @@ test("manual scheduling preview is local and a changed assignment must be review
   warehouse.value = "warehouse-1";
   const startInput = window.document.getElementById("bc7-start-date");
   const daysInput = window.document.getElementById("bc7-days-count");
-  startInput.value = tomorrow;
+  const originalStart = "2099-01-05";
+  startInput.value = originalStart;
   startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
   daysInput.value = "2";
   daysInput.dispatchEvent(new window.Event("input", { bubbles: true }));
@@ -395,7 +396,7 @@ test("manual scheduling preview is local and a changed assignment must be review
     "period preview must not use the saved-rotation RPC");
   assert.equal(window.document.querySelectorAll("#bc7-preview .bc7-jornada").length, 1,
     "the local preview should render one grouped Jornada period");
-  const changedStart = new Date(Date.UTC(parts[0], parts[1]-1, parts[2]+2, 12)).toISOString().slice(0,10);
+  const changedStart = "2099-01-07";
   startInput.value = changedStart;
   startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
   assert.equal(window.document.getElementById("bc7-preview").textContent, "",
