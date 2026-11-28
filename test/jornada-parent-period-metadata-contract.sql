@@ -4,10 +4,10 @@
 
 DO $test$
 DECLARE
-  v_turno uuid := '94000000-0000-0000-0000-000000000001';
-  v_programacion uuid := '94000000-0000-0000-0000-000000000002';
+  v_turno uuid := gen_random_uuid();
+  v_programacion uuid := gen_random_uuid();
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
-  v_warehouse uuid := '94000000-0000-0000-0000-000000000003';
+  v_warehouse uuid := gen_random_uuid();
   v_rows jsonb;
   v_row jsonb;
 BEGIN
