@@ -16,7 +16,7 @@ test("BC7 fallback assigns one responsible to the complete Jornada period",()=>{
 
 test("BC7 fallback validates one responsible and writes every day as laborable",()=>{
   assert.match(SOURCE,/const responsibleId=\$\('bc7-period-responsible'\)\?\.value\|\|''/);
-  assert.match(SOURCE,/schedule\.some\(x=>!x\.trabaja\|\|String\(x\.responsable_id\|\|'\)\)!==String\(responsibleId\)\)/);
+  assert.match(SOURCE,/schedule\.some\(x=>!x\.trabaja\|\|String\(x\.responsable_id\|\|''\)!==String\(responsibleId\)\)/);
   assert.match(SOURCE,/p_programacion:schedule/);
   assert.match(SOURCE,/Jornada creada: '\+total\+' días consecutivos con una sola responsable/);
   assert.doesNotMatch(SOURCE,/días de descanso|de descanso|Descanso/);
