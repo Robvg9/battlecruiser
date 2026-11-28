@@ -147,8 +147,8 @@ test('movement operations load multi-product transfer before the compact modal',
 test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.ok(app.includes('["permisos-navegacion.js","67.9"]'));
   assert.ok(sw.includes("./js/permisos-navegacion.js?v=67.9"));
-  assert.ok(app.includes('const VERSION="9.5.174"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.174"'));
+  assert.ok(app.includes('const VERSION="9.5.175"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.175"'));
   assert.ok(app.includes('["m27-7-almacenes-modal.js","27.7f"]'),
     "warehouse modal loader must use the corrected RPC-contract build");
   assert.ok(sw.includes("./js/m27-7-almacenes-modal.js?v=27.7f"),
@@ -164,7 +164,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(adminVisibilityNormalizer, /function normalizeLabel\(\)/);
   assert.match(adminVisibilityNormalizer, /data-bc-permiso/);
   assert.doesNotMatch(adminVisibilityNormalizer, /MutationObserver|\.style\.display\s*=|removeAttribute\(/, "the legacy helper must not override permission visibility");
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.174"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.175"'));
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903\.js\?v=20261105\.4/);
   assert.match(sw, /\.\/js\/hotfix-pulido-20260903b\.js\?v=20261105\.2/);
   assert.match(sw, /\.\/js\/section-scope-fix\.js\?v=20261030\.1/);
@@ -177,7 +177,9 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(app, /\["bc-modal-manager\.js","1\.0"\]/);
   assert.match(app, /\["mi-cuenta\.js","1\.3"\]/);
   assert.ok(app.indexOf('["bc-modal-manager.js","1.0"]') < app.indexOf('["mi-cuenta.js","1.3"]'));
-  assert.match(app, /\["bc7-jornada-ui\.js","7.71"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-jornada-ui\.js","7.72"\]/, "the Step 7 jornada UI must be loaded dynamically");
+  assert.match(app, /\["bc7-visual-intelligent-planner\.js","1\.2"\]/, "the planner must load its refreshed responsive/drag implementation");
+  assert.match(sw, /\.\/js\/bc7-visual-intelligent-planner\.js\?v=1\.2/, "the offline shell must precache the refreshed planner");
   assert.match(app, /\["m26-ui-integridad\.js","26\.41"\]/);
   assert.match(app, /\["hotfix-17-2-productos-save-20260903\.js","17\.4"\]/, "the legacy compatibility module must refresh without duplicating product save");
   assert.match(sw, /\.\/js\/hotfix-17-2-productos-save-20260903\.js\?v=17\.4/, "the single-owner compatibility module must be cached for offline use");
@@ -204,10 +206,10 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/network-core\.js\?v=20261109\.3"><\/script>/);
   assert.match(sw, /\.\/js\/network-core\.js\?v=20261109\.3/);
   assert.match(sw, /\.\/js\/offline\.js/, "offline queue coordinator must be precached for fast resume recovery");
-  assert.ok(app.includes("// v9.5.174 — integrate desktop Intelligent Visual Jornada planner."));
-  assert.ok(index.includes('<script src="app.js?v=9.5.174"></script>'));
+  assert.ok(app.includes("// v9.5.175 — stabilize responsive Jornada calendar and planner."));
+  assert.ok(index.includes('<script src="app.js?v=9.5.175"></script>'));
   for (const asset of [
-    'style.css?v=9.5.174',
+    'style.css?v=9.5.175',
     'js/centro-control.js?v=9.5.71',
     'js/navegacion.js?v=9.5.65',
     'js/mando.js?v=9.5.139',
@@ -224,7 +226,7 @@ test('fixed LIVE scripts use refreshed cache keys and release version', () => {
   assert.match(index, /<script src="js\/reportes\.js\?v=20261105\.1"><\/script>/, "Reportes renderer must use a fresh cache key");
   assert.match(sw, /\.\/js\/bc-modal-manager\.js\?v=1\.0/);
   assert.match(sw, /\.\/js\/mi-cuenta\.js\?v=1\.3/);
-  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.71/, "the Step 7 workflow is available in the offline static cache");
+  assert.match(sw, /\.\/js\/bc7-jornada-ui\.js\?v=7.72/, "the Step 7 workflow is available in the offline static cache");
   assert.match(sw, /\.\/js\/hotfix-configuracion-20260902\.js\?v=20261020\.4/);
 
   const networkCore = fs.readFileSync('public/js/network-core.js', 'utf8');
@@ -290,15 +292,15 @@ test('Step 4 modal and Turnos layout invalidate their production cache keys', ()
   assert.match(app, /\["hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js","16\.13"\]/);
   assert.match(sw, /hotfix-16-5-movimientos-operaciones-flotantes-20260902\.js\?v=16\.13/);
   assert.match(app, /\["m49-turnos-layout-definitivo\.js","49\.6"\]/);
-  assert.ok(app.includes('const VERSION="9.5.174"'));
-  assert.ok(sw.includes('BC_SW_VERSION = "9.5.174"'));
+  assert.ok(app.includes('const VERSION="9.5.175"'));
+  assert.ok(sw.includes('BC_SW_VERSION = "9.5.175"'));
 });
 
 
 test('Conectividad compacta: estilos y recursos críticos comparten caché renovada', () => {
-  assert.ok(index.includes('style.css?v=9.5.174'));
+  assert.ok(index.includes('style.css?v=9.5.175'));
   assert.ok(index.includes('app.js?v=9.5.174'));
-  assert.ok(sw.includes('./style.css?v=9.5.174'));
+  assert.ok(sw.includes('./style.css?v=9.5.175'));
   assert.ok(sw.includes('./app.js?v=9.5.174'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
