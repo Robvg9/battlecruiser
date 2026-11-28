@@ -41,7 +41,8 @@ test("Jornada waits for the authenticated profile and permissions before calling
 });
 
 test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write confirmations",()=>{
-  for(const rpc of ["bc5_mis_jornadas","bc5_guardar_patron_jornada","bc5_previsualizar_jornada","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_bajas_multiple_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
+  // F3 now builds the local draft preview and creates one continuous period directly; the legacy rotation-save and server-preview RPCs are not part of the active UI contract.
+  for(const rpc of ["bc5_mis_jornadas","bc5_crear_jornada_unica","bc5_reprogramar_jornada","bc5_iniciar_jornada","bc5_cerrar_jornada","bc7_obtener_inventario_jornada","bc7_guardar_inventario_jornada","bc7_registrar_ajuste_jornada","bc7_registrar_bajas_multiple_jornada","bc7_registrar_gasto_jornada","bc7_registrar_reinversion_jornada","bc7_finanzas_jornada","bc7_ventas_jornada","bc_declarar_dinero","bc7_movimientos_sesion"]) {
     assert.ok(ui.includes(rpc),`UI no wired to ${rpc}`);
   }
   assert.match(ui,/confirm\(/);
@@ -107,7 +108,7 @@ test("Step 7 interface uses the canonical jornada RPCs and explicit safe-write c
 
 
 test("canonical Jornada planner applies the database two-day minimum in input and save paths",()=>{
-  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej\. 5"/);
+  assert.match(ui,/id="bc7-days-count" type="number" min="2" max="31" placeholder="2–31"/);
   assert.doesNotMatch(ui,/id="bc7-days-count"[^>]*value="7"/);
   assert.match(ui,/if\(!value\)return 0/,"an empty duration stays empty until the administrator enters a value");
   assert.match(ui,/if\(!n\).*Indica cuántos días quieres programar/s);
@@ -159,7 +160,7 @@ test("The Step 7 bundle is version aligned and available in the offline shell",(
   const valueStart = start + marker.length;
   const end = app.indexOf('"', valueStart);
   const moduleVersion = app.slice(valueStart, end);
-  assert.equal(moduleVersion,"7.70");
+  assert.equal(moduleVersion,"7.72");
   assert.match(ui,/data-bc7-save-cash-day/);
   assert.match(ui,/Enviar este día a Administración/);
   assert.ok(sw.includes("./js/bc7-jornada-ui.js?v=" + moduleVersion));

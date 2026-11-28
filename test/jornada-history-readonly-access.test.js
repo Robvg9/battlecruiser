@@ -12,7 +12,7 @@ test("completed Jornada sessions remain openable from the calendar in read-only 
   assert.match(row, /const viewable=status==='COMPLETADA'/);
   assert.match(row, /viewable\?'Ver jornada':'Gestionar jornada'/);
   assert.match(row, /data-bc7-open=/);
-  assert.match(row, /const isTerminal=\['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'\]/);
+  assert.match(row, /const isTerminal=\['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'\]/);
   assert.match(row, /state\.admin&&!isTerminal/,
     "rescheduling remains unavailable for completed or cancelled sessions");
 });

@@ -179,6 +179,11 @@ function estaDispositivoOffline() {
 
 let loadingCount = 0;
 
+// Loading owner único. El contador queda expuesto solo para el watchdog de compatibilidad.
+window.__bcLoadingCount = function () {
+  return loadingCount;
+};
+
 function showLoading() {
   loadingCount++;
   if (loadingCount === 1) {
@@ -190,6 +195,7 @@ function showLoading() {
       overlay.innerHTML = "<div class=\"spinner\"></div>";
       document.body.appendChild(overlay);
     }
+    overlay.style.display = "flex";
     overlay.classList.add("visible");
   }
 }
@@ -200,6 +206,7 @@ function hideLoading() {
     const overlay = document.getElementById("global-loading-overlay");
     if (overlay) {
       overlay.classList.remove("visible");
+      overlay.style.display = "none";
     }
   }
 }
@@ -208,7 +215,10 @@ function hideLoading() {
 function resetLoadingOverlay() {
   loadingCount = 0;
   const overlay = document.getElementById("global-loading-overlay");
-  if (overlay) overlay.classList.remove("visible");
+  if (overlay) {
+    overlay.classList.remove("visible");
+    overlay.style.display = "none";
+  }
 }
 
 // Ejecuta fn async con overlay; garantiza hide aunque falle.

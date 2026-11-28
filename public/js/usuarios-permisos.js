@@ -222,6 +222,9 @@ async function cargarContextoUsuario(sessionInicial) {
       _permisosCargaFallidaRed = true;
       if (typeof aplicarPermisosAInterfaz === "function") aplicarPermisosAInterfaz();
       if (typeof mostrarInfoUsuarioEnHeader === "function") mostrarInfoUsuarioEnHeader();
+      // Offline identity and cached permissions are ready: do not leave a network-era
+      // global loader covering the usable local workspace.
+      if (typeof resetLoadingOverlay === "function") resetLoadingOverlay();
       return;
     }
     var perfilRes = null;

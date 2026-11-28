@@ -141,8 +141,11 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     window.document.querySelectorAll("#bc7-month-board .bc7-month-day").length,
     expectedCells
   );
-  assert.equal(window.document.getElementById("bc7-month-board").style.gridTemplateRows,
-    `34px repeat(${expectedCells / 7},minmax(62px,1fr))`);
+  const board = window.document.getElementById("bc7-month-board");
+  assert.match(board.style.gridTemplateRows,/^32px repeat\(\d+,\s*108px\)$/,
+    "every calendar week must use the same fixed-height grid track");
+  assert.equal(board.style.height,String(32+(expectedCells/7)*108)+"px",
+    "the board must reserve an exact height for every rendered week");
   assert.equal(window.document.getElementById("bc7-month-board").getAttribute("aria-colcount"), "7");
 
   const read = calls.find((call) => call.name === "bc5_mis_jornadas");
@@ -155,6 +158,13 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     "the calendar read must never exceed the RPC's 31-day limit"
   );
 
+  const legacyRestChip=window.document.querySelector(
+    '#bc7-month-board [data-bc7-calendar-select="' + month + '-06"]'
+  );
+  assert.ok(legacyRestChip,"the second date of the same parent period should remain visible");
+  assert.equal(legacyRestChip.classList.contains("is-rest"),false,
+    "legacy status data must not reintroduce a visible rest category");
+  assert.doesNotMatch(legacyRestChip.textContent,/descanso/i);
   const dayButton = window.document.querySelector(
     '#bc7-month-board [data-bc7-calendar-select="' + month + '-05"]'
   );
@@ -183,17 +193,26 @@ test("month navigation changes the query window without creating or editing Jorn
   const { window, calls } = setup(t, { admin: true, rows: [] });
   await waitFor(() => calls.some((call) => call.name === "bc5_mis_jornadas"));
 
+  const parts = month.split("-").map(Number);
+  const nextDate = new Date(Date.UTC(parts[0], parts[1], 1, 12));
+  const nextMonth = nextDate.toISOString().slice(0, 7);
   window.document.querySelector("[data-bc7-month-next]").click();
+  const board = window.document.getElementById("bc7-month-board");
+  assert.equal(board.dataset.month,nextMonth,
+    "the visible grid must switch to the selected month before its RPC resolves");
+  assert.equal(board.getAttribute("aria-busy"),"true",
+    "uncached month navigation must expose loading state immediately");
+  assert.ok(board.querySelector(".bc7-month-loading"),
+    "the loading state must replace the previous month rather than leave it under the new title");
+  assert.ok(board.querySelector('[data-date="'+nextMonth+'-01"]'),
+    "the loading grid must already contain dates for the newly selected month");
   const changed = await waitFor(() => {
     const reads = calls.filter((call) => call.name === "bc5_mis_jornadas");
-    return reads.length >= 2 && reads[1].payload.p_fecha_inicio !== month + "-01";
+    return reads.length >= 2 && reads[1].payload.p_fecha_inicio === nextMonth + "-01";
   });
   assert.ok(changed, "next month should trigger a fresh monthly read");
 
   const reads = calls.filter((call) => call.name === "bc5_mis_jornadas");
-  const parts = month.split("-").map(Number);
-  const nextDate = new Date(Date.UTC(parts[0], parts[1], 1, 12));
-  const nextMonth = nextDate.toISOString().slice(0, 7);
   assert.equal(reads[1].payload.p_fecha_inicio, nextMonth + "-01");
   assert.equal(reads[1].payload.p_fecha_fin, monthEnd(nextMonth));
   assert.equal(
@@ -234,14 +253,31 @@ test("non-admin users retain their limited agenda and cannot see the planner sho
 });
 
 test("desktop visual calendar keeps a balanced board beside its right-hand inspector", async (t) => {
-  const { window } = setup(t, { admin: true, rows: [] });
-  const trigger = window.document.querySelector("[data-bc7-open-visual-calendar]");
-  const modal = window.document.getElementById("bc7-visual-calendar-modal");
-  assert.ok(trigger && modal, "desktop visual-calendar entry and modal must exist");
+  const { window, calls } = setup(t, { admin: true, rows: [] });
+  assert.ok(window.document.getElementById("bc7-visual-calendar-modal"),
+    "desktop visual-calendar modal must exist before authenticated boot");
+
+  // Complete the initial authenticated boot before opening the async desktop view.
+  const bootReady = await waitFor(() =>
+    calls.some(call => call.name === "turno_actual_usuario") &&
+    calls.some(call => call.name === "bc5_mis_jornadas") &&
+    window.document.getElementById("bc7-admin-details")?.hidden === false &&
+    window.document.querySelector("#bc7-month-board .bc7-month-day")
+  );
+  assert.ok(bootReady, "the Jornada admin boot and first calendar read must finish before opening the visual view");
+  await new Promise(resolve => setTimeout(resolve, 20));
 
   window.matchMedia = () => ({ matches: true });
+  const trigger = window.document.querySelector("[data-bc7-open-visual-calendar]");
+  const modal = window.document.getElementById("bc7-visual-calendar-modal");
+  assert.ok(trigger && modal,
+    "the visual-calendar control and modal must be re-queried after authenticated boot re-renders the Jornada shell");
   trigger.click();
-  assert.equal(modal.hidden, false, "desktop activation should open the visual calendar");
+  assert.equal(modal.hidden, false, "desktop activation should open the live visual calendar");
+  // This test covers the calendar layout, not the authenticated warehouse refresh.
+  // The base calendar opens and renders from its own cache/RPC; the advanced F3
+  // warehouse selector is covered by the planner module tests.
+  await new Promise(resolve => setTimeout(resolve, 30));
 
   const layout = modal.querySelector(".bc7-visual-calendar-layout");
   assert.ok(layout.querySelector(".bc7-visual-calendar-main #bc7-month-board"),
@@ -268,4 +304,115 @@ test("desktop visual calendar keeps a balanced board beside its right-hand inspe
     "the inspector must keep its visible desktop layout");
   assert.match(styles, /@media\(min-width:761px\) and \(max-width:1120px\).*?320px/,
     "the inspector must retain a responsive desktop width");
+});
+
+test("archived journeys remain visible on the monthly board and inspector, but read-only", async (t) => {
+  const month = currentMonth();
+  const historical = {
+    id: "programming-historic", turno_id: "turno-historic", almacen_id: "warehouse-1",
+    numero_dia: 1, fecha: month + "-08", fecha_fin: month + "-10", trabaja: true,
+    responsable_id: "dep-1", estado: "PROGRAMADA", sesion_id: "session-historic",
+    sesion_estado: "COMPLETADA", turno_estado_maestro: "CERRADO", es_responsable: false
+  };
+  const { window } = setup(t, { admin: true, rows: [historical] });
+  await waitFor(() => window.document.querySelector("#bc7-month-board .bc7-month-chip"));
+  assert.ok(window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + month + '-09"]'));
+  assert.equal(window.document.querySelectorAll("#bc7-schedule-list .bc7-jornada").length, 0);
+  assert.equal(window.document.getElementById("bc7-archived-schedule-count").textContent, "1");
+  window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + month + '-09"]').click();
+  const inspector = window.document.getElementById("bc7-calendar-detail");
+  assert.match(inspector.textContent, /Beatriz/);
+  assert.ok(inspector.querySelector('[data-bc7-open="session-historic"]'));
+  assert.equal(inspector.querySelector("[data-bc7-reschedule]"), null);
+});
+
+test("a multi-day Jornada spans every covered date and appears in the inspector on intermediate days", async (t) => {
+  const month = currentMonth(), start = month + "-05", middle = month + "-06", end = month + "-07";
+  const row = {
+    id: "programming-span", turno_id: "turno-span", almacen_id: "warehouse-1",
+    numero_dia: 1, fecha: start, fecha_fin: end, trabaja: true,
+    responsable_id: "dep-1", estado: "PROGRAMADO", sesion_id: "session-span",
+    sesion_estado: "EN_CURSO", es_responsable: false
+  };
+  const { window } = setup(t, { admin: true, rows: [row] });
+  await waitFor(() => window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + start + '"]'));
+  const first = window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + start + '"].is-range-start');
+  const second = window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + middle + '"].is-range-middle');
+  const third = window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + end + '"].is-range-end');
+  assert.ok(first && second && third);
+  assert.match(first.getAttribute("aria-label"), /Beatriz/);
+  window.document.querySelector('#bc7-month-board [data-bc7-calendar-select="' + middle + '"]').click();
+  const detail = window.document.getElementById("bc7-calendar-detail");
+  assert.match(detail.textContent, /Beatriz/);
+  assert.match(detail.textContent, /\b5\b/);
+  assert.match(detail.textContent, /\b7\b/);
+});
+
+test("visual preflight applies one responsible to all working days of the Jornada", async (t) => {
+  const {window}=setup(t,{admin:true,rows:[]});
+  const adminReady=await waitFor(()=>window.document.getElementById("bc7-admin-details")?.hidden===false);
+  assert.ok(adminReady);
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  const validation=await window.__BC7_JORNADA__.visualPlanner.previewDraft({
+    warehouseId:"warehouse-1",startDate:"2099-01-05",days:2,responsableId:"dep-1",
+    schedule:[
+      {numero_dia:1,trabaja:true,responsable_id:"dep-1"},
+      {numero_dia:2,trabaja:true,responsable_id:"different-day-person"}
+    ]
+  });
+  assert.equal(validation.valid,true);
+  assert.equal(validation.schedule.map(day=>day.responsable_id).join(","),"dep-1,dep-1");
+  assert.equal(validation.responsableId,"dep-1");
+});
+
+test("Jornada read RPC exposes the parent-period and master-close fields used by the calendar", () => {
+  const migration=fs.readFileSync(path.join(__dirname,"..","supabase","migrations","20261127232000_jornada_parent_period_metadata.sql"),"utf8");
+  assert.ok(migration.includes("JOIN public.turnos t ON t.id=p.turno_id"));
+  assert.ok(migration.includes("'turno_fecha_inicio',t.fecha"));
+  assert.ok(migration.includes("'dias_turno',t.dias_turno"));
+  assert.ok(migration.includes("'turno_estado_maestro',coalesce(t.estado_maestro,t.estado)"));
+});
+
+test("manual scheduling preview is local and a changed assignment must be reviewed again", async (t) => {
+  const { window, calls } = setup(t, { admin: true, rows: [] });
+
+  // Wait for the authenticated admin boot to finish before editing the form:
+  // boot() replaces the tab shell while it hydrates the responsible catalog.
+  const adminReady = await waitFor(() => {
+    const panel = window.document.getElementById("bc7-admin-details");
+    return !!panel && panel.hidden === false;
+  });
+  assert.ok(adminReady, "the admin planner must finish booting before the test edits it");
+  const responsibleCatalog = await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  assert.equal(responsibleCatalog.length, 1, "the eligible responsible catalog must be ready");
+
+  const warehouse = window.document.getElementById("bc7-warehouse");
+  assert.equal(warehouse.options.length, 2, "the fixture must expose the active warehouse");
+  warehouse.value = "warehouse-1";
+  const startInput = window.document.getElementById("bc7-start-date");
+  const daysInput = window.document.getElementById("bc7-days-count");
+  const originalStart = "2099-01-05";
+  startInput.value = originalStart;
+  startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  daysInput.value = "2";
+  daysInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  window.document.getElementById("bc7-period-responsible").value = "dep-1";
+  window.document.getElementById("bc7-period-responsible").dispatchEvent(new window.Event("change", { bubbles: true }));
+  const summary = window.document.querySelector("#bc7-day-rows .bc7-period-summary");
+  assert.ok(summary, "the simplified form must summarize the continuous period instead of exposing obsolete per-day controls");
+  assert.match(summary.textContent, /2 días consecutivos/);
+  window.document.querySelector("[data-bc7-preview]").click();
+  const previewed = await waitFor(() => /Vista previa del período/.test(window.document.getElementById("bc7-create-msg").textContent));
+  assert.ok(previewed, "the selected responsible and period should pass local validation and render a preview");
+  assert.equal(calls.some(call => call.name === "bc5_previsualizar_jornada"), false,
+    "period preview must not use the saved-rotation RPC");
+  assert.equal(window.document.querySelectorAll("#bc7-preview .bc7-jornada").length, 1,
+    "the local preview should render one grouped Jornada period");
+  const changedStart = "2099-01-07";
+  startInput.value = changedStart;
+  startInput.dispatchEvent(new window.Event("input", { bubbles: true }));
+  assert.equal(window.document.getElementById("bc7-preview").textContent, "",
+    "changing the date must clear the now-stale local preview");
+  assert.equal(calls.some(call => call.name === "bc5_crear_jornada_unica"), false,
+    "previewing and editing the form must remain read-only until the owner creates it");
 });

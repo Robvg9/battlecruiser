@@ -111,8 +111,8 @@ test("admin UI exposes the retroactive period opening workflow and only confirms
   assert.match(ui, /bc7_admin_abrir_jornada_existente/);
   assert.match(ui, /column.*Fin|norm\\(v\\)==='fin'/);
   assert.match(ui, /stock general no se modificará/i);
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.8"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.9"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.9"));
   assertPwaReleaseAligned(assert,{app,serviceWorker,index});
 });
 
@@ -241,11 +241,11 @@ test("opening confirmation unlocks when the real start time or responsible chang
   assert.match(ui, /\$\('bc7-period-person'\)\.addEventListener\('change',updateConfirm\)/);
 });
 
-test("period opening form version 1.8 is loaded dynamically and precached",()=>{
+test("period opening form version 1.9 is loaded dynamically and precached",()=>{
   const app=fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8");
   const sw=fs.readFileSync(path.join(__dirname, "../public/service-worker.js"), "utf8");
-  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.8"]'));
-  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.8"));
+  assert.ok(app.includes('["bc7-periodo-apertura-ui.js","1.9"]'));
+  assert.ok(sw.includes("./js/bc7-periodo-apertura-ui.js?v=1.9"));
 });
 
 

@@ -3,7 +3,7 @@ name: BattleCruiser Quality
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, feat/jornada-planner-calendar-history-ux-20261127]
   # Run production E2E only after the separate deploy workflow has completed.
   # A push trigger races the deploy and can compare old LIVE assets against new source files.
   workflow_run:

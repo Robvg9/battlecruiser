@@ -1,5 +1,5 @@
 // BattleCruiser — apertura administrativa de jornada ya iniciada
-// v1.7 — importación de la columna Fin, mapeo de familias y bloqueo de filas sin correspondencia.
+// v1.9 — importación externa en opciones plegadas; mapeo y bloqueos conservados.
 (function(){
   'use strict';
   if(window.__BC7_PERIOD_OPENING__)return;
@@ -133,10 +133,10 @@
   function insertButton(){
     const panel=$('bc7-admin-panel');
     if(!panel||$('bc7-period-open-card'))return;
-    const card=document.createElement('section');
-    card.id='bc7-period-open-card';card.className='bc7-card';
-    card.innerHTML='<h3>Importar cierre externo · uso excepcional</h3><p class="bc7-muted">Solo cuando no exista un inventario final confirmado de la jornada anterior. Si hay una entrega pendiente, recupera la jornada sucesora para heredar el inventario automáticamente, sin Excel ni recaptura.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" id="bc7-period-open-button">Importar inventario externo</button></div><p class="bc7-msg" id="bc7-period-open-status" role="status" aria-live="polite"></p>';
-    const first=panel.querySelector('form')||panel.firstElementChild;
+    const card=document.createElement('details');
+    card.id='bc7-period-open-card';card.className='bc7-detail bc7-card';
+    card.innerHTML='<summary>Importar cierre externo · uso excepcional</summary><div class="bc7-detail-body"><p class="bc7-muted">Solo cuando no exista un inventario final confirmado de la jornada anterior. Si hay una entrega pendiente, recupera la jornada sucesora para heredar el inventario automáticamente, sin Excel ni recaptura.</p><div class="bc7-actions"><button type="button" class="bc7-btn primary" id="bc7-period-open-button">Importar inventario externo</button></div><p class="bc7-msg" id="bc7-period-open-status" role="status" aria-live="polite"></p></div>';
+    const first=Array.from(panel.children).find(child=>child.matches('form,details'))||panel.firstElementChild;
     if(first)panel.insertBefore(card,first);else panel.appendChild(card);
   }
   function csvMatrix(text){

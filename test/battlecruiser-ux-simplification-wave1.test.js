@@ -12,7 +12,7 @@ const jornada=fs.readFileSync("public/js/bc7-jornada-ui.js","utf8");
 const price=fs.readFileSync("public/js/jornada-price-changes.js","utf8");
 
 test("Jornada planner starts with no duration and calendar starts on today",()=>{
-  assert.match(jornada,/id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej\. 5"/);
+  assert.match(jornada,/id="bc7-days-count" type="number" min="2" max="31" placeholder="2–31"/);
   assert.doesNotMatch(jornada,/id="bc7-days-count"[^>]*value=/);
   assert.match(jornada,/if\(!value\)return 0/);
   assert.match(jornada,/if\(!n\).*Indica cuántos días quieres programar/s);

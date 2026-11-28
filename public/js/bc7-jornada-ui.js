@@ -1,11 +1,11 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.68 — keep Bajas checklist mounted after review submission; explicit final confirmation.
+// v7.72 — restore archived and multi-day calendar periods; simplify Jornada planning; stabilize responsive calendar rows, navigation and planner drag UX.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],selected:null,detail:null,loading:false,warehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
+  const state={admin:false,rows:[],calendarRows:[],selected:null,detail:null,loading:false,warehouseId:'',visualWarehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,periodMoveDragDays:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -46,7 +46,8 @@
   function calendarStatus(row){
     const status=String(row&&(row.sesion_estado||row.estado)||'').toUpperCase();
     const master=String(row&&(row.turno_estado_maestro||row.turno_estado)||'').toUpperCase();
-    if(!row||row.trabaja===false||status==='DESCANSO')return {kind:'rest',short:'Descanso',label:'Descanso'};
+    if(!row)return {kind:'other',short:'Programada',label:'Programada'};
+    if(row.trabaja===false||status==='DESCANSO')return {kind:'scheduled',short:'Programada',label:'Programada'};
     if(status==='EN_CURSO')return {kind:'running',short:'En curso',label:'En curso'};
     if(['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status)&&master==='CERRADO')return {kind:'closed',short:'Aprobada',label:'Aprobada y cerrada por el Dueño'};
     if(status==='CERRADA_OPERATIVAMENTE')return {kind:'sealed',short:'Pendiente de cuadre',label:'Pendiente de cuadre · cierre operativo realizado'};
@@ -55,61 +56,152 @@
     if(['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status))return {kind:'scheduled',short:'Programada',label:'Programada'};
     return {kind:'other',short:humanStatus(status),label:humanStatus(status)};
   }
-  function renderMonthCalendar(month,rows){
+  function jornadaRangeStart(row){return String(row&&row.fecha||'').slice(0,10);}
+  function jornadaRangeEnd(row){const start=jornadaRangeStart(row),candidate=String(row&&(row.fecha_fin||row.fecha)||start).slice(0,10);return candidate>=start?candidate:start;}
+  function jornadaCoversDate(row,date){const start=jornadaRangeStart(row),end=jornadaRangeEnd(row);return !!start&&start<=date&&end>=date;}
+  function groupJornadaPeriods(rows){
+    const groups=new Map();
+    arr(rows).forEach((row,index)=>{
+      const parent=String(row&&row.turno_id||'').trim(),key=parent?'turno:'+parent:'programacion:'+(row&&row.id||row&&row.sesion_id||index);
+      if(!groups.has(key))groups.set(key,{...row,_periodRows:[],_periodKey:key});
+      groups.get(key)._periodRows.push(row);
+    });
+    return Array.from(groups.values()).map(group=>{
+      const items=group._periodRows.slice().sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
+      const first=items[0]||group,start=String(first.turno_fecha_inicio||periodStartForRow(first)||jornadaRangeStart(first)).slice(0,10);
+      const count=Number(first.dias_turno||0),declaredEnd=count>0?addDays(start,count-1):'';
+      const ends=items.map(item=>String(item.fecha_fin||item.fecha||'').slice(0,10)).filter(value=>/^\d{4}-\d{2}-\d{2}$/.test(value));
+      if(declaredEnd)ends.push(declaredEnd);
+      const end=ends.reduce((latest,value)=>value>latest?value:latest,start);
+      const span=Math.max(1,Math.round((Date.parse(end+'T00:00:00Z')-Date.parse(start+'T00:00:00Z'))/86400000)+1);
+      const work=items,ids=Array.from(new Set(work.filter(item=>item.responsable_id).map(item=>String(item.responsable_id))));
+      const priority=status=>{const value=String(status||'').toUpperCase();return value==='EN_CURSO'?0:value==='CERRADA_OPERATIVAMENTE'?1:value==='COMPLETADA'?2:['PROGRAMADA','PROGRAMADO'].includes(value)?3:['CANCELADA','CANCELADO'].includes(value)?5:4;};
+      const sorted=work.slice().sort((a,b)=>priority(a.sesion_estado||a.estado)-priority(b.sesion_estado||b.estado));
+      group._periodRows=items;group._periodDays=count>0?count:span;
+      group._workingDays=work.length;
+      group._responsibleIds=ids;group._responsibleLabel=ids.length===1?userName(ids[0]):ids.length>1?'Varios responsables':'Sin asignar';
+      group._displayStatusRow=sorted[0]||first;group.fecha=start;group.fecha_fin=end;group.dias_turno=group._periodDays;
+      group.trabaja=work.length>0;group.responsable_id=ids.length===1?ids[0]:null;
+      group.sesion_id=(sorted.find(item=>item.sesion_id)||first).sesion_id||null;
+      group.sesion_estado=group._displayStatusRow.sesion_estado||group._displayStatusRow.estado||'';
+      return group;
+    });
+  }
+
+  function renderVisualWarehouseSelector(){
+    const options=warehouses();
+    const current=String(state.visualWarehouseId||'');
+    const formValue=String($('bc7-warehouse')?.value||'');
+    const firstRow=arr(state.calendarRows||state.rows).find(row=>row&&row.almacen_id);
+    const rowValue=String(firstRow&&firstRow.almacen_id||'');
+    if(!options.some(item=>String(item.id)===current)){
+      state.visualWarehouseId=options.some(item=>String(item.id)===formValue)?formValue:
+        (options.some(item=>String(item.id)===rowValue)?rowValue:
+        (options.length?String(options[0].id):rowValue));
+    }
+    const selected=String(state.visualWarehouseId||'');
+    const select=$('bc7-visual-warehouse');
+    if(select){
+      const rows=options.slice();
+      if(selected&&!rows.some(item=>String(item.id)===selected)){
+        rows.push({id:selected,nombre:warehouseName(selected)});
+      }
+      select.innerHTML=rows.length
+        ?rows.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.nombre||item.id)+'</option>').join('')
+        :'<option value="">Cargando almacenes…</option>';
+      select.value=selected;
+      select.disabled=rows.length===0;
+    }
+    return selected;
+  }
+  function visualBoardRows(){
+    const warehouseId=renderVisualWarehouseSelector();
+    if(!warehouseId)return [];
+    return arr(state.calendarRows||state.rows).filter(row=>String(row&&row.almacen_id||'')===String(warehouseId));
+  }
+  function notifyVisualCalendarUpdated(){
+    try{window.dispatchEvent(new Event('bc7:visual-calendar-updated'));}catch(_){}
+  }
+  function renderMonthCalendar(month,rows,options){
     const host=$('bc7-month-board');
     if(!host)return;
+    options=options||{};
     const parts=monthParts(month);
-    if(!parts){host.innerHTML='<div class="bc7-empty">Elige un mes válido.</div>';return;}
-    const count=monthDayCount(month);
-    const first=new Date(Date.UTC(parts.year,parts.month-1,1,12));
-    const offset=(first.getUTCDay()+6)%7;
-    const cells=Math.ceil((offset+count)/7)*7;
-    const weekdays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-    const today=dateHavana();
+    if(!parts){host.innerHTML='<div class="bc7-empty">Elige un mes válido.</div>';host.setAttribute('aria-busy','false');return;}
+    const count=monthDayCount(month),first=new Date(Date.UTC(parts.year,parts.month-1,1,12));
+    const offset=(first.getUTCDay()+6)%7,cells=Math.ceil((offset+count)/7)*7;
+    const weekdays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],today=dateHavana(),dates=[];
+    for(let index=0;index<cells;index++)dates.push(new Date(Date.UTC(parts.year,parts.month-1,1+index-offset,12)).toISOString().slice(0,10));
+    const periods=groupJornadaPeriods(rows),firstCell=dates[0],lastCell=dates[dates.length-1],periodsByDate=new Map();
+    // Index only visible period/date pairs once; avoid a full filter+sort per cell.
+    periods.forEach(period=>{
+      const rangeStart=String(jornadaRangeStart(period)||'').slice(0,10);
+      const rangeEnd=String(jornadaRangeEnd(period)||rangeStart).slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(rangeStart)||!/^\d{4}-\d{2}-\d{2}$/.test(rangeEnd)||rangeEnd<firstCell||rangeStart>lastCell)return;
+      const from=rangeStart<firstCell?firstCell:rangeStart,to=rangeEnd>lastCell?lastCell:rangeEnd;
+      for(let date=from;date<=to;date=addDays(date,1)){
+        if(!periodsByDate.has(date))periodsByDate.set(date,[]);
+        periodsByDate.get(date).push(period);
+      }
+    });
+    periodsByDate.forEach(dayRows=>dayRows.sort((left,right)=>jornadaRangeStart(left).localeCompare(jornadaRangeStart(right))||jornadaRangeEnd(left).localeCompare(jornadaRangeEnd(right))));
     let html=weekdays.map(day=>'<div class="bc7-month-weekday" role="columnheader">'+day+'</div>').join('');
     for(let index=0;index<cells;index++){
-      const date=new Date(Date.UTC(parts.year,parts.month-1,1+index-offset,12));
-      const iso=date.toISOString().slice(0,10);
-      const dayRows=rows.filter(row=>String(row&&row.fecha||'').slice(0,10)===iso);
-      const inside=iso.slice(0,7)===month;
-      const selected=state.calendarSelectedDate===iso;
-      const classes=['bc7-month-day'];
+      const iso=dates[index],date=new Date(iso+'T12:00:00Z'),dayRows=periodsByDate.get(iso)||[];
+      const inside=iso.slice(0,7)===month,selected=state.calendarSelectedDate===iso,classes=['bc7-month-day'];
       if(!inside)classes.push('bc7-month-day--outside');
       if(selected)classes.push('bc7-month-day--selected');
       if(today===iso)classes.push('bc7-month-day--today');
-      const chips=dayRows.slice(0,2).map(row=>{
-        const stateInfo=calendarStatus(row);
-        const person=row.trabaja===false?'Descanso':userName(row.responsable_id);
-        const title=fmtDateHuman(iso)+' · '+person+' · '+stateInfo.label;
-        const drag=canOfferPeriodMove(row)?' draggable="true" data-bc7-period-drag="'+esc(row.id)+'" title="'+esc(title+' · Arrastra para proponer el traslado de todo el período')+'" aria-grabbed="false"':' title="'+esc(title)+'"';
-        return '<button type="button" class="bc7-month-chip is-'+stateInfo.kind+'" data-bc7-calendar-select="'+iso+'"'+drag+' aria-label="'+esc(title+(canOfferPeriodMove(row)?' · Arrastrable; también puedes usar el botón Mover período completo':'') )+'"><span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(person)+'</span><span class="bc7-month-chip-status">'+esc(stateInfo.short)+'</span></button>';
+      const chips=dayRows.slice(0,2).map(period=>{
+        const daily=period._periodRows.find(item=>jornadaRangeStart(item)===iso)||period._displayStatusRow||period;
+        const stateInfo=calendarStatus(daily),person=period._responsibleLabel||'Sin asignar';
+        const rangeStart=jornadaRangeStart(period),rangeEnd=jornadaRangeEnd(period),multiDay=rangeEnd>rangeStart;
+        const weekContinuation=multiDay&&iso>rangeStart&&new Date(iso+'T12:00:00Z').getUTCDay()===1;
+        const segmentStart=iso===rangeStart||weekContinuation,segmentEnd=iso===rangeEnd,chipClasses=['bc7-month-chip','is-'+stateInfo.kind];
+        if(multiDay)chipClasses.push('is-multi-day',segmentStart?'is-range-start':(segmentEnd?'is-range-end':'is-range-middle'));
+        if(weekContinuation)chipClasses.push('is-range-week-continuation');
+        const periodLabel=fmtDateHuman(rangeStart)+(multiDay?' — '+fmtDateHuman(rangeEnd):''),title=periodLabel+' · '+person+' · '+stateInfo.label+' · '+period._periodDays+' día(s)';
+        const moveSource=(period._periodRows||[]).find(row=>canOfferPeriodMove(row))||null,canMove=!!moveSource;
+        const periodDays=Math.max(1,Number(period._periodDays||(period._periodRows||[]).length||1));
+        const drag=canMove?' draggable="true" data-bc7-period-drag="'+esc(moveSource.id)+'" data-bc7-period-days="'+periodDays+'" title="'+esc(title+' · Arrastra desde el agarre para proponer el traslado del período')+'" aria-grabbed="false"':' title="'+esc(title)+'"';
+        const visibleName=!multiDay||segmentStart?person:'',visibleStatus=!multiDay||segmentStart?stateInfo.short:'';
+        return '<button type="button" class="'+chipClasses.join(' ')+'" data-bc7-period-id="'+esc(period._periodKey)+'" data-bc7-calendar-select="'+iso+'"'+drag+' aria-label="'+esc(title+(canMove?' · Arrastrable; también puedes usar el botón Mover período completo':''))+'">'+
+          (canMove?'<span class="bc7-month-chip-grip" aria-hidden="true">⠿</span>':'')+
+          '<span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(visibleName)+'</span><span class="bc7-month-chip-status">'+esc(visibleStatus)+'</span></button>';
       }).join('');
       const more=dayRows.length>2?'<button type="button" class="bc7-month-more" data-bc7-calendar-select="'+iso+'">+'+(dayRows.length-2)+' más</button>':'';
       const empty=inside&&!dayRows.length?'<span class="bc7-month-empty">—</span>':'';
       html+='<div class="'+classes.join(' ')+'" data-date="'+iso+'" role="gridcell" aria-selected="'+(selected?'true':'false')+'"><div class="bc7-month-day-top"><button type="button" class="bc7-month-date" '+(!inside?'disabled':'')+' data-bc7-calendar-select="'+iso+'" aria-label="'+esc(fmtDateHuman(iso))+'" aria-pressed="'+(selected?'true':'false')+'">'+date.getUTCDate()+'</button>'+(today===iso?'<span class="bc7-month-today-tag">HOY</span>':'')+(dayRows.length?'<span class="bc7-month-count">'+dayRows.length+'</span>':'')+'</div><div class="bc7-month-day-events">'+chips+more+empty+'</div></div>';
     }
+    const loading=options.loading===true,error=options.error===true;
+    if(loading||error)html+='<div class="bc7-month-loading'+(error?' is-error':'')+'" role="status" aria-live="polite">'+
+      (loading?'<span class="bc7-month-loading-spinner" aria-hidden="true"></span><span>Cargando '+esc(monthTitle(month))+'…</span>':'<span>No se pudo cargar '+esc(monthTitle(month))+'. Pulsa «Actualizar» para intentarlo de nuevo.</span>')+'</div>';
     host.innerHTML=html;
     const weekRows=cells/7;
     host.style.display='grid';host.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
-    host.style.gridTemplateRows='34px repeat('+weekRows+',minmax(62px,1fr))';
+    host.style.gridTemplateRows='32px repeat('+weekRows+',108px)';
+    host.style.height=String(32+weekRows*108)+'px';host.style.boxSizing='border-box';host.style.position='relative';
+    host.dataset.month=month;host.setAttribute('aria-busy',loading?'true':'false');
     host.setAttribute('role','grid');host.setAttribute('aria-colcount','7');host.setAttribute('aria-rowcount',String(weekRows+1));
-    const label=$('bc7-month-label');
-    if(label)label.textContent=monthTitle(month);
+    const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
   }
   function renderCalendarDetail(date,rows){
     const host=$('bc7-calendar-detail');
     if(!host)return;
-    const dayRows=rows.filter(row=>String(row&&row.fecha||'').slice(0,10)===date);
+    const dayPeriods=groupJornadaPeriods(rows).filter(period=>jornadaCoversDate(period,date))
+      .sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||jornadaRangeEnd(a).localeCompare(jornadaRangeEnd(b)));
     const title=fmtDateHuman(date);
-    host.innerHTML='<div class="bc7-calendar-detail-head"><div><span class="bc7-muted">DÍA SELECCIONADO</span><h4>'+esc(title)+'</h4></div><span class="bc7-calendar-detail-count">'+dayRows.length+' '+(dayRows.length===1?'registro':'registros')+'</span></div>'+(dayRows.length?'<div class="bc7-calendar-detail-list">'+dayRows.map(rowHtml).join('')+'</div>':'<div class="bc7-empty">No hay una jornada programada para esta fecha. Puedes elegir otro día o crear una programación desde el panel de administrador.</div>');
+    host.innerHTML='<div class="bc7-calendar-detail-head"><div><span class="bc7-muted">DÍA SELECCIONADO</span><h4>'+esc(title)+'</h4></div><span class="bc7-calendar-detail-count">'+dayPeriods.length+' '+(dayPeriods.length===1?'jornada':'jornadas')+'</span></div>'+(dayPeriods.length?'<div class="bc7-calendar-detail-list">'+dayPeriods.map(periodGroupHtml).join('')+'</div>':'<div class="bc7-empty">No hay una jornada programada para esta fecha. Puedes elegir otro día o crear una programación desde el panel de administrador.</div>');
     renderPeriodMovePreview();
   }
   function selectCalendarDate(date){
     const month=$('bc7-calendar-month')?.value||dateHavana().slice(0,7);
     if(String(date||'').slice(0,7)!==month)return;
     state.calendarSelectedDate=date;
-    renderMonthCalendar(month,state.rows);
-    renderCalendarDetail(date,state.rows);
+    const rows=visualBoardRows();
+    renderMonthCalendar(month,rows);
+    renderCalendarDetail(date,rows);
+    notifyVisualCalendarUpdated();
   }
   function periodStartForRow(row){
     const day=Number(row&&row.numero_dia);
@@ -160,9 +252,9 @@
           throw new Error('Al menos un día ya comenzó, se cerró o no tiene una sesión futura coherente.');
       }else if(row.trabaja===false){
         if(programState!=='DESCANSO'||(row.sesion_id&&sessionState!=='CANCELADA'))
-          throw new Error('Un día de descanso tiene una sesión incompatible; el período debe revisarse antes de moverlo.');
+          throw new Error('Una fecha tiene una sesión incompatible; el período debe revisarse antes de moverlo.');
       }else{
-        throw new Error('El período contiene un día sin estado de trabajo/descanso válido.');
+        throw new Error('El período contiene una fecha con datos de programación no válidos.');
       }
     }
     if(!period.some(row=>String(row.id)===String(sourceRow.id)))
@@ -245,7 +337,7 @@
     const draft=state.periodMoveDraft;
     if(!host){host=document.createElement('section');host.id='bc7-period-move-preview';host.className='bc7-period-move-preview';container.appendChild(host);}
     host.innerHTML='<div class="bc7-period-move-head"><div><span class="bc7-muted">VISTA PREVIA · TODAVÍA SIN GUARDAR</span><h4>Mover período completo</h4></div><span class="bc7-period-move-days">'+draft.days+' días</span></div>'+
-      '<p class="bc7-muted">Se desplazarán juntos los días de trabajo y descanso, conservando responsables, secuencia y almacén. El servidor vuelve a comprobar inventario, actividad, conflictos y permisos antes de guardar.</p>'+
+      '<p class="bc7-muted">Se desplazará el período completo, conservando responsable, secuencia y almacén. El servidor vuelve a comprobar inventario, actividad, conflictos y permisos antes de guardar.</p>'+
       '<div class="bc7-period-move-original"><span>Actual</span><strong>'+esc(fmtDateHuman(draft.originalStart))+' — '+esc(fmtDateHuman(draft.originalEnd))+'</strong></div>'+
       '<form data-bc7-period-move-form><label class="bc7-field">Nueva fecha del primer día<input type="date" data-bc7-period-start min="'+esc(dateHavana())+'" value="'+esc(draft.nextStart)+'" required></label>'+
       '<label class="bc7-field">Motivo obligatorio<textarea data-bc7-period-reason rows="2" maxlength="1000" required placeholder="Explica por qué se desplaza este período">'+esc(draft.reason||'')+'</textarea></label>'+
@@ -300,7 +392,7 @@
       if(!result||String(result.turno_id||'')!==draft.turnoId)
         throw new Error('El servidor no devolvió una confirmación válida del traslado.');
       state.periodMoveDraft=null;
-      state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;
+      state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;state.periodMoveDragDays=null;
       const picker=$('bc7-calendar-month');
       if(picker)picker.value=start.slice(0,7);
       state.calendarSelectedDate=start;
@@ -314,7 +406,7 @@
     }
   }
   function clearPeriodMoveDrag(){
-    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;
+    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;state.periodMoveDragDays=null;
     renderPeriodMoveGhost();
   }
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
@@ -370,13 +462,11 @@
   }
   function refreshResponsibleSelectors(){
     const people=eligibleStaff();
-    document.querySelectorAll('#bc7-day-rows [data-bc7-person],#bc7-schedule-list [data-bc7-reperson],#bc7-calendar-detail [data-bc7-reperson]').forEach(sel=>{
+    document.querySelectorAll('#bc7-period-responsible,#bc7-schedule-list [data-bc7-reperson],#bc7-calendar-detail [data-bc7-reperson]').forEach(sel=>{
       const previous=sel.value;
       sel.innerHTML=staffOptions(previous);
       if(previous&&people.some(user=>String(user.id)===String(previous)))sel.value=previous;
-      const row=sel.closest('.bc7-day-row,form');
-      const works=sel.matches('[data-bc7-person]')?row?.querySelector('[data-bc7-works]')?.checked!==false:row?.querySelector('[data-bc7-rework]')?.checked!==false;
-      sel.disabled=!works||state.staffLoading||!state.staffLoaded||!people.length;
+      sel.disabled=state.staffLoading||!state.staffLoaded||!people.length;
     });
     staffFeedback();
   }
@@ -432,7 +522,7 @@
     else if(/fecha inicial de la sucesora debe ser anterior a hoy/.test(value)) message='La recuperación requiere que la fecha inicial ya haya comenzado. Para un inicio de hoy o futuro, usa la programación normal.';
     else if(/opcion se reserva para periodos ya terminados/.test(value)) message='La recuperación solo se admite cuando la fecha inicial del nuevo período ya pasó. Para un inicio de hoy o futuro, usa la programación normal.';
     else if(/retroactiv|fecha.*(pasad|anterior)|no se admiten jornadas retroactivas|no se admiten programaciones retroactivas/.test(value)) message='La fecha de inicio ya pasó. Esta ruta solo sirve para recuperar una jornada iniciada en una fecha anterior.';
-    else if(/no hay patron activo|no existe patron activo|patron activo/.test(value)) message='Todavía no hay una rotación guardada para este almacén. Guarda una rotación o elige «Elegir responsables día por día».';
+    else if(/no hay patron activo|no existe patron activo|patron activo/.test(value)) message='La programación requiere una única responsable para todo el período.';
     else if(/ya existe programacion|programacion para el almacen|programacion.*fecha|fecha.*ya existe/.test(value) && !/opcion se reserva para periodos ya terminados/.test(value)) message='Ya hay una jornada programada para una o más de esas fechas en este almacén. Revisa el calendario y elige fechas libres.';
     else if(/asignacion legacy|otra jornada programada|otro turno pendiente|ya tiene otra jornada/.test(value)) message='La persona elegida ya tiene otro turno pendiente en esa fecha. Elige otra persona o revisa ese turno.';
     else if(/turno activo para este almacen|hay un turno activo|turno activo o duplicado/.test(value)) message='Este almacén ya tiene un turno abierto o pendiente. Revisa ese turno antes de crear otra programación.';
@@ -450,7 +540,7 @@
     else if(context==='inventory'&&code==='23514') message='El servidor no pudo confirmar el corte físico por el estado actual de la jornada. Actualiza la pantalla y revisa el estado del inventario.';
     else if(code==='22023'||/rango.*invalido|patron incompleto|entrada invalida|debe tener una entrada/.test(value)) message='Hay algún dato de la programación que debemos corregir. Revisa las fechas, la duración y que cada día de trabajo tenga una persona asignada.';
     else if(context==='transfer'&&/motivo/.test(value)) message=raw;
-    else if(code==='23514'||/no puede|no se puede|conflicto/.test(value)) message='La programación no cumple una regla de trabajo. Revisa los días de descanso, los responsables y las fechas repetidas.';
+    else if(code==='23514'||/no puede|no se puede|conflicto/.test(value)) message='La programación no cumple una regla de trabajo. Revisa la disponibilidad de la responsable y las fechas repetidas.';
     else if(/offline|sin conexion|failed to fetch|network|timeout|fetch failed|load failed|cliente supabase no disponible/.test(value)) message='No se pudo conectar con el servicio. Comprueba internet y vuelve a intentarlo.';
     else if(code==='P0002') message='No encontramos la configuración o la programación que necesitas. Revisa el almacén y vuelve a cargar la sección.';
     else if(context==='staff') message='No se pudo cargar la lista de responsables. Comprueba la conexión y pulsa «Reintentar carga de responsables».';
@@ -466,7 +556,7 @@
   }
   function humanStatus(value){
     const key=String(value||'').toUpperCase();
-    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Descanso',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada',ESPERANDO_ENTREGA:'Esperando entrega',ESPERANDO_APROBACION:'Esperando aprobación',DECLARACION_APROBADA:'Declaración aprobada · conteo físico pendiente'};
+    const labels={PROGRAMADO:'Programado',PROGRAMADA:'Programada',PENDIENTE:'Pendiente',EN_CURSO:'En curso',COMPLETADA:'Completada',CERRADA:'Cerrada',CERRADO:'Cerrado',CANCELADA:'Cancelada',CANCELADO:'Cancelado',DESCANSO:'Programada',ABIERTO:'Abierto',APROBADO:'Aprobado',APROBADA:'Aprobada',RECHAZADO:'Rechazado',RECHAZADA:'Rechazada',ESPERANDO_ENTREGA:'Esperando entrega',ESPERANDO_APROBACION:'Esperando aprobación',DECLARACION_APROBADA:'Declaración aprobada · conteo físico pendiente'};
     return labels[key]||'En revisión';
   }
   function friendlyTimezone(value){
@@ -683,12 +773,31 @@
         "#tab-jornada .bc7-month-chip-dot{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:var(--gold)}",
         "#tab-jornada .bc7-month-chip-person{overflow:hidden;min-width:0;color:var(--text);font-size:9px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}",
         "#tab-jornada .bc7-month-chip-status{display:none}",
+        "#tab-jornada .bc7-month-chip.is-multi-day{position:relative;z-index:3;gap:4px;border-top-width:1px;border-bottom-width:1px}",
+        "#tab-jornada .bc7-month-chip.is-range-start{margin-left:0;margin-right:-7px;width:calc(100% + 7px);border-right:0;border-radius:6px 0 0 6px}",
+        "#tab-jornada .bc7-month-chip.is-range-middle{margin-left:-7px;margin-right:-7px;width:calc(100% + 14px);border-right:0;border-left:0;border-radius:0}",
+        "#tab-jornada .bc7-month-chip.is-range-end{margin-left:-7px;margin-right:0;width:calc(100% + 7px);border-left:0;border-radius:0 6px 6px 0}",
+        "#tab-jornada .bc7-month-chip.is-range-week-continuation .bc7-month-chip-person{font-weight:800}",
+        "#tab-jornada .bc7-month-board{grid-template-columns:repeat(7,minmax(0,1fr));box-sizing:border-box}",
+        "#tab-jornada .bc7-month-weekday{height:32px;min-height:32px;box-sizing:border-box}",
+        "#tab-jornada .bc7-month-day{height:108px!important;min-height:0!important;max-height:108px!important;box-sizing:border-box;overflow:visible;padding:4px!important}",
+        "#tab-jornada .bc7-month-day-top{height:24px;min-height:24px;flex:0 0 24px;gap:4px}",
+        "#tab-jornada .bc7-month-day-events{display:flex;flex-direction:column;gap:2px;min-height:0;max-height:74px;overflow:visible}",
+        "#tab-jornada .bc7-month-chip{height:22px;min-height:22px;max-height:22px;flex:0 0 22px;box-sizing:border-box;padding:2px 4px}",
+        "#tab-jornada .bc7-month-chip[draggable=true]{height:30px;min-height:30px;max-height:30px;box-sizing:border-box;padding:3px 5px;gap:4px;cursor:grab;touch-action:none;user-select:none}",
+        "#tab-jornada .bc7-month-chip[draggable=true]:active{cursor:grabbing}",
+        "#tab-jornada .bc7-month-chip-grip{display:inline-grid;flex:0 0 28px;width:28px;height:24px;place-items:center;border-radius:5px;background:rgba(10,23,42,.72);color:#fff;font-size:17px;line-height:1;cursor:grab}",
+        "#tab-jornada .bc7-month-loading{position:absolute;z-index:50;inset:32px 0 0;display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;background:rgba(6,14,28,.78);backdrop-filter:blur(3px);color:#dce8ff;font-size:13px;font-weight:800;text-align:center;pointer-events:none}",
+        "#tab-jornada .bc7-month-loading.is-error{color:#ffcfbf}",
+        "#tab-jornada .bc7-month-loading-spinner{width:18px;height:18px;flex:0 0 18px;border:2px solid rgba(222,234,255,.25);border-top-color:#9cc6ff;border-radius:50%;animation:bc7-month-spin .8s linear infinite}",
+        "@keyframes bc7-month-spin{to{transform:rotate(360deg)}}",
+
+        "#tab-jornada .bc7-month-day-events{overflow:visible}",
         "#tab-jornada .bc7-month-chip.is-running{border-color:rgba(95,174,127,.44);background:rgba(95,174,127,.10)}",
         "#tab-jornada .bc7-month-chip.is-running .bc7-month-chip-dot{background:#7fc99a}",
         "#tab-jornada .bc7-month-chip.is-scheduled{border-color:rgba(216,181,92,.48);background:rgba(216,181,92,.09)}",
         "#tab-jornada .bc7-month-chip.is-closed,#tab-jornada .bc7-month-chip.is-sealed{border-color:rgba(197,105,105,.38);background:rgba(197,105,105,.08)}",
         "#tab-jornada .bc7-month-chip.is-closed .bc7-month-chip-dot,#tab-jornada .bc7-month-chip.is-sealed .bc7-month-chip-dot{background:#ca7777}",
-        "#tab-jornada .bc7-month-chip.is-rest{border-style:dashed;opacity:.75}",
         "#tab-jornada .bc7-month-more{justify-self:start;border:0;background:transparent;color:var(--gold);font-size:9px;cursor:pointer}",
         "#tab-jornada .bc7-month-empty{padding:2px 5px;color:var(--mist);font-size:10px;opacity:.4}",
         "#tab-jornada .bc7-calendar-detail{margin-top:12px;padding:10px;border:1px solid var(--gold-dim);border-radius:9px;background:rgba(255,255,255,.018)}",
@@ -696,6 +805,11 @@
         "#tab-jornada .bc7-calendar-detail-head h4{margin:3px 0 0;color:var(--text);font-size:14px;text-transform:capitalize}",
         "#tab-jornada .bc7-calendar-detail-count{color:var(--mist);font-size:10px}",
         "#tab-jornada .bc7-calendar-detail-list{display:grid;gap:7px}",
+        "#tab-jornada .bc7-jornada-period{display:grid;gap:8px;border-color:rgba(145,154,210,.28)}",
+        "#tab-jornada .bc7-jornada-period .bc7-period-days{border-top:1px solid var(--gold-dim);padding-top:7px}",
+        "#tab-jornada .bc7-jornada-period .bc7-period-days>summary{font-size:10px}",
+        "#tab-jornada .bc7-jornada-period .bc7-period-day-records{display:grid;gap:6px;padding-top:7px}",
+        "#tab-jornada .bc7-period-day-entry{display:grid;gap:6px;padding:8px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(255,255,255,.015)}",
         "#tab-jornada .bc7-legacy-calendar-controls{display:none!important}",
         "#tab-jornada #bc7-schedule-list{display:grid!important}",
         ".bc7-visual-calendar-modal[hidden]{display:none!important}",
@@ -803,24 +917,34 @@
       '<header class="bc7-hero"><div><h2>Jornada e inventario</h2></div><div class="bc7-hero-actions"><button type="button" class="bc7-help-icon" data-bc7-help-open aria-label="Abrir guía de Jornada" title="Guía de Jornada">?</button><div id="bc7-status" class="bc7-status">Comprobando acceso…</div></div></header>'+
       '<section id="bc7-current-session-card" class="bc7-card" hidden aria-live="polite"></section>'+
       '<div id="bc7-help-modal" class="bc7-help-modal" hidden><button type="button" class="bc7-help-backdrop" data-bc7-help-close aria-label="Cerrar guía"></button><section class="bc7-help-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-help-title"><header><div><span>GUÍA OPERATIVA</span><h3 id="bc7-help-title">Jornada e inventario</h3></div><button type="button" class="bc7-btn" data-bc7-help-close aria-label="Cerrar">✕</button></header><div class="bc7-help-content"><p><b>Esta sección organiza cada período de trabajo y conserva la evidencia física y administrativa.</b></p><h4>¿Para qué sirve esta sección?</h4><p>Aquí organizas quién trabaja cada día. Cada responsable inicia su jornada, confirma el inventario físico inicial y final, y registra sus operaciones. Esta sección no es el historial general; para consultar todos los movimientos, entra en Movimientos → Historial.</p><p>Si no aparece una jornada, prueba otro mes y pulsa «Actualizar calendario». Una asignación solo queda confirmada cuando la valida el servidor.</p><h4>Estados de una jornada</h4><ul><li><b>Programada:</b> tiene fecha y responsable, pero aún no comienza.</li><li><b>En curso:</b> la responsable está trabajando y puede registrar operaciones.</li><li><b>Pendiente de cuadre:</b> la operación se selló; falta completar o revisar los datos físicos y administrativos. El sello no cierra el Turno maestro.</li><li><b>Pendiente de cierre maestro:</b> la jornada terminó, pero el Dueño aún debe revisar el período y aprobar el cierre definitivo.</li><li><b>Archivada:</b> el Turno maestro ya se cerró o la programación se canceló. Se conserva para consulta, fuera de la lista principal.</li></ul><h4>Los cinco pasos de la responsable</h4><ol><li><b>Entregas diarias de efectivo:</b> una entrega por cada fecha del período; registra 0 CUP si ese día no se entregó efectivo.</li><li><b>Gastos:</b> registrar todos los gastos reales.</li><li><b>Reinversiones:</b> registrar las compras/reinversiones correspondientes.</li><li><b>Bajas:</b> enviar todas las bajas y mermas y confirmar expresamente que no faltan más.</li><li><b>Inventario final:</b> contar físicamente cada producto del período y guardar el corte.</li></ol><h4>Reglas de seguridad</h4><ul><li>Enviar un bloque no aprueba automáticamente su contenido; Administración lo revisa por separado.</li><li>Una discrepancia de inventario queda auditada; no se reescribe el conteo inicial ni se ajusta el stock global automáticamente.</li><li>Los movimientos posteriores al corte deben atribuirse con evidencia; no se cargan a una persona solo por coincidir en fecha.</li><li>La jornada y el Turno maestro son estados distintos. El cierre operativo no equivale a aprobación administrativa.</li></ul><p>El historial archivado permanece disponible en el desplegable «Jornadas archivadas».</p></div></section></div>'+
-      '<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Organizar jornadas · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">'+
-       '<h3>Crear y organizar jornadas</h3><p class="bc7-muted">Elige el almacén, la fecha y quién trabaja cada día. Puedes asignar las personas una por una o repetir una rotación que hayas guardado.</p>'+
-       '<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">¿Cómo quieres organizar los días?<select id="bc7-plan-mode"><option value="explicit">Elegir responsables día por día</option><option value="pattern">Repetir una rotación guardada</option></select></label></div>'+
-       '<form id="bc7-hours-form"><h4>Horario operativo</h4><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Hora local del almacén<input type="hidden" id="bc7-timezone" value="America/Havana"><span id="bc7-timezone-label" class="bc7-muted">Hora de Cuba (La Habana)</span></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form>'+
-       '<form id="bc7-pattern-form"><h4>Guardar una rotación de trabajo</h4><div class="bc7-grid"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. 5 días trabajando y 2 descansando" required></label><label class="bc7-field">Fecha desde la que se repite la rotación<input id="bc7-anchor" type="date" required></label><label class="bc7-field">Duración de la rotación (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="Ej. 5" inputmode="numeric"></label><label class="bc7-field">Primera fecha que quieres programar<input id="bc7-start-date" type="date" required></label></div><div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button><button class="bc7-btn" type="submit">Guardar rotación</button></div><p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div><p class="bc7-msg" id="bc7-pattern-msg"></p></form>'+
-       '<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Revisar fechas</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div><label class="bc7-field">Nota (opcional)<input id="bc7-schedule-note" maxlength="1000" placeholder="Motivo administrativo o nota"></label><div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>'+'<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar una jornada atrasada · Entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Prepara una sucesora cuya fecha de inicio ya pasó, aunque el período siga en curso, usando el inventario final del turno ya cerrado. Conserva la duración del período anterior. No se modifica el stock global ni se inventa un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>'+
-      '</section></details>'+
-      '<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Jornadas programadas</h3><span class="bc7-muted">Tu vista habitual se mantiene aquí. El tablero visual avanzado se abre aparte en computadora.</span></div><button class="bc7-btn primary bc7-visual-calendar-open" type="button" data-bc7-open-visual-calendar aria-haspopup="dialog" aria-controls="bc7-visual-calendar-modal">✦ Abrir tablero visual</button></div>'+
+      `<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Organizar jornadas · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">
+<h3>Crear y organizar jornadas</h3><p class="bc7-muted">Elige el almacén, la duración y una responsable para toda la Jornada. Todas las fechas del período quedan agrupadas.</p>
+<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">Responsable de toda la Jornada<select id="bc7-period-responsible">'+staffOptions()+'</select></label></div>
+<form id="bc7-create-period-form"><h4>Período y responsables</h4><div class="bc7-grid"><label class="bc7-field">Primera fecha<input id="bc7-start-date" type="date" required></label><label class="bc7-field">Duración (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="2–31" inputmode="numeric"></label></div>
+
+<p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div>
+<p class="bc7-muted">Todas las fechas del período son laborables y comparten la responsable seleccionada.</p></form>
+<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Vista previa</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div>
+<details class="bc7-detail" id="bc7-schedule-note-details"><summary>Nota opcional</summary><div class="bc7-detail-body"><label class="bc7-field">Motivo administrativo o nota<input id="bc7-schedule-note" maxlength="1000" placeholder="Nota (opcional)"></label></div></details>
+<div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>
+<details class="bc7-detail" id="bc7-hours-details"><summary>Horario operativo · opciones avanzadas</summary><div class="bc7-detail-body"><form id="bc7-hours-form"><div class="bc7-grid"><label class="bc7-field">Apertura<input type="time" id="bc7-hour-start" value="07:00" required></label><label class="bc7-field">Cierre<input type="time" id="bc7-hour-end" value="23:00" required></label></div><label class="bc7-field">Zona horaria<input type="hidden" id="bc7-timezone" value="America/Havana"><span id="bc7-timezone-label" class="bc7-muted">Hora de Cuba (La Habana)</span></label><button class="bc7-btn" type="submit">Guardar horario</button><p class="bc7-msg" id="bc7-hours-msg"></p></form></div></details>
+<details class="bc7-detail" id="bc7-retro-successor-box"><summary>Recuperar jornada atrasada · entrega pendiente</summary><div class="bc7-detail-body"><p class="bc7-muted">Usa esta opción solo para recuperar una sucesora cuya fecha inicial ya pasó y que dispone de una entrega pendiente. Hereda el inventario disponible; no inventa ni recaptura un inventario inicial.</p><div class="bc7-actions"><button class="bc7-btn primary" type="button" data-bc7-retro-handover-open>Buscar entregas pendientes</button></div><div id="bc7-retro-handover-content"><p class="bc7-muted">Pulsa para consultar las entregas que aún no tienen sucesora.</p></div></div></details>
+</section></details>`+'<section class="bc7-card" id="bc7-calendar-section"><div class="bc7-workspace-head"><div><h3>Jornadas programadas</h3><span class="bc7-muted">Tu vista habitual se mantiene aquí. El tablero visual avanzado se abre aparte en computadora.</span></div><button class="bc7-btn primary bc7-visual-calendar-open" type="button" data-bc7-open-visual-calendar aria-haspopup="dialog" aria-controls="bc7-visual-calendar-modal">✦ Abrir tablero visual</button></div>'+
       '<div id="bc7-visual-calendar-modal" class="bc7-visual-calendar-modal" hidden>'+
       '<button type="button" class="bc7-visual-calendar-backdrop" data-bc7-close-visual-calendar aria-label="Cerrar calendario visual"></button>'+
       '<section class="bc7-visual-calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-visual-calendar-title">'+
       '<header class="bc7-visual-calendar-header"><div><span class="bc7-visual-calendar-kicker">PLANIFICADOR OPERATIVO · BATTLECRUISER</span><h2 id="bc7-visual-calendar-title">Calendario de jornadas</h2><p>Organiza períodos futuros, revisa responsables y mueve jornadas completas con una vista previa segura.</p></div><button type="button" class="bc7-visual-calendar-close" data-bc7-close-visual-calendar aria-label="Cerrar">×</button></header>'+
       '<div class="bc7-visual-calendar-layout"><section class="bc7-visual-calendar-main">'+
-      '<div class="bc7-month-nav" aria-label="Navegación del calendario"><button class="bc7-btn" type="button" data-bc7-month-prev aria-label="Mes anterior">‹</button><label class="bc7-month-picker"><span>Mes</span><input id="bc7-calendar-month" type="month" aria-label="Mes del calendario"></label><button class="bc7-btn" type="button" data-bc7-month-next aria-label="Mes siguiente">›</button><button class="bc7-btn" type="button" data-bc7-month-today>Hoy</button><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar</button><strong id="bc7-month-label" class="bc7-month-label"></strong></div>'+
+      '<div class="bc7-month-nav" aria-label="Navegación del calendario"><label class="bc7-visual-warehouse-picker"><span>ALMACÉN</span><select id="bc7-visual-warehouse" aria-label="Almacén del tablero"><option value="">Cargando almacenes…</option></select></label><button class="bc7-btn" type="button" data-bc7-month-prev aria-label="Mes anterior">‹</button><label class="bc7-month-picker"><span>Mes</span><input id="bc7-calendar-month" type="month" aria-label="Mes del calendario"></label><button class="bc7-btn" type="button" data-bc7-month-next aria-label="Mes siguiente">›</button><button class="bc7-btn" type="button" data-bc7-month-today>Hoy</button><button class="bc7-btn" type="button" data-bc7-refresh>Actualizar</button><strong id="bc7-month-label" class="bc7-month-label"></strong></div>'+
       '<input type="date" id="bc7-list-from" hidden><input type="number" id="bc7-list-days" min="1" max="31" value="31" hidden>'+
       '<div id="bc7-month-board" class="bc7-month-board" aria-label="Calendario de jornadas"><div class="bc7-empty">Cargando calendario…</div></div>'+
-      '</section><aside class="bc7-visual-calendar-side"><div class="bc7-visual-calendar-side-title"><span>INSPECTOR</span><h3>Jornada seleccionada</h3><p>Selecciona un día para ver sus jornadas y acciones.</p></div>'+
+      '</section><aside class="bc7-visual-calendar-side"><div class="bc7-visual-calendar-side-title"><span>HERRAMIENTAS Y AMULETOS</span><h3>Planificador visual</h3><p>Arrastra una jornada al calendario. Los borradores no se guardan hasta confirmarlos.</p></div>'+
+      '<section id="bc7-visual-tools" class="bc7-visual-tools" aria-label="Amuletos disponibles"><div class="bc7-empty">Cargando herramientas…</div></section>'+
+      '<section id="bc7-visual-draft-panel" class="bc7-visual-draft-panel" hidden aria-live="polite"></section>'+
+      '<div class="bc7-visual-calendar-side-title"><span>INSPECTOR</span><h3>Jornada seleccionada</h3><p>Selecciona un día para ver sus jornadas y acciones.</p></div>'+
       '<section id="bc7-calendar-detail" class="bc7-calendar-detail" aria-live="polite"><div class="bc7-empty">Selecciona un día del calendario para ver sus detalles.</div></section>'+
+      '<section id="bc7-visual-activity" class="bc7-visual-activity" aria-live="polite"><div class="bc7-empty">La actividad real de la jornada aparecerá aquí.</div></section>'+
+      '<section id="bc7-visual-history-panel" class="bc7-visual-history-panel" aria-live="polite"><div class="bc7-empty">El historial aparecerá aquí.</div></section>'+
       '<div class="bc7-visual-calendar-legend"><div class="bc7-visual-calendar-side-title"><span>ESTADOS</span><h3>Leyenda</h3></div><div class="bc7-visual-calendar-legend-row"><i class="is-running"></i><span>En curso</span></div><div class="bc7-visual-calendar-legend-row"><i class="is-scheduled"></i><span>Programada</span></div><div class="bc7-visual-calendar-legend-row"><i class="is-closed"></i><span>Cerrada</span></div></div>'+
       '<button class="bc7-btn primary bc7-visual-calendar-create" type="button" data-bc7-open-planner>+ Programar jornada</button></aside></div></section></div>'+
       '<div id="bc7-schedule-list" class="bc7-list"><div class="bc7-empty">Cargando calendario…</div></div><details id="bc7-archived-schedule" class="bc7-archive" hidden><summary>Jornadas archivadas (<span id="bc7-archived-schedule-count">0</span>)</summary><div id="bc7-archived-schedule-list" class="bc7-list"></div></details><p class="bc7-msg" id="bc7-list-msg" role="status" aria-live="polite"></p></section>'+
@@ -997,24 +1121,16 @@
     return Math.floor(count);
   }
   function readDayRows(){
-    return Array.from(document.querySelectorAll('#bc7-day-rows .bc7-day-row')).map((r,i)=>{
-      const works=r.querySelector('[data-bc7-works]')?.checked===true;
-      const person=r.querySelector('[data-bc7-person]')?.value||'';
-      return {numero_dia:i+1,trabaja:works,responsable_id:works?person:null};
-    });
+    const n=scheduleDayCount(),responsibleId=$('bc7-period-responsible')?.value||null;
+    return Array.from({length:n},(_,index)=>({numero_dia:index+1,trabaja:true,responsable_id:responsibleId}));
   }
   function buildDayRows(){
     const host=$('bc7-day-rows');if(!host)return;
-    const n=scheduleDayCount();
-    if(!n){host.innerHTML='<p class="bc7-muted">Escribe primero cuántos días tendrá la rotación (entre 2 y 31) y pulsa «Mostrar días».</p>';state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';return;}
-    const old=readDayRows();const mode=$('bc7-plan-mode')?.value||'explicit';const anchor=mode==='pattern'?($('bc7-anchor')?.value||$('bc7-start-date')?.value||dateHavana()):($('bc7-start-date')?.value||$('bc7-anchor')?.value||dateHavana());
-    host.innerHTML=Array.from({length:n},(_,i)=>{
-      const d=old[i]||{trabaja:true,responsable_id:null};
-      return '<div class="bc7-day-row" role="group" aria-label="Día '+(i+1)+'"><div class="bc7-day-main"><strong>Día '+(i+1)+'</strong><span class="bc7-day-date">'+esc(fmtDateHuman(addDays(anchor,i)))+'</span></div><label class="bc7-check"><input type="checkbox" data-bc7-works '+(d.trabaja?'checked':'')+'><span>Trabaja</span></label><label class="bc7-field bc7-day-person"><span>Responsable</span><select data-bc7-person '+(!d.trabaja||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(d.responsable_id)+'</select></label></div>';
-    }).join('');
-    host.querySelectorAll('[data-bc7-works]').forEach(ch=>ch.addEventListener('change',()=>{const row=ch.closest('.bc7-day-row');const person=row&&row.querySelector('[data-bc7-person]');if(person){person.disabled=!ch.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!ch.checked)person.value='';}}));
-    state.lastPreview=null;
-    if($('bc7-preview'))$('bc7-preview').innerHTML='';
+    const n=scheduleDayCount(),start=$('bc7-start-date')?.value||dateHavana();
+    if(!n){host.innerHTML='<p class="bc7-muted">Indica la duración del período para revisar sus fechas.</p>';state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';return;}
+    host.innerHTML='<div class="bc7-period-summary" role="group" aria-label="Período completo"><strong>'+esc(fmtDateHuman(start))+' — '+esc(fmtDateHuman(addDays(start,n-1)))+'</strong><span>'+n+' días consecutivos · una sola Jornada</span><p>La misma responsable queda asignada a todas las fechas del período.</p></div>';
+    const person=$('bc7-period-responsible');if(person)person.disabled=state.staffLoading||!state.staffLoaded||!eligibleStaff().length;
+    state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';
   }
   async function loadHours(){
     const warehouseId=$('bc7-warehouse')?.value;if(!warehouseId)return;
@@ -1022,23 +1138,34 @@
   }
   function rowHtml(r){
     const status=String(r.sesion_estado||r.estado||'—').toUpperCase();
-    const rest=!r.trabaja||r.estado==='DESCANSO';
     const isOperationallySealed=status==='CERRADA_OPERATIVAMENTE';
     const masterStatus=String(r.turno_estado_maestro||r.turno_estado||'').toUpperCase();
     const isApprovedMasterClose=masterStatus==='CERRADO'&&['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status);
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
     const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
     const pendingMasterClose=['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
-    const pill=rest?'<span class="bc7-pill">Descanso</span>':isApprovedMasterClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
-    const isTerminal=['COMPLETADA','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status);
+    const pill=isApprovedMasterClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
+    const isTerminal=['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status)||masterStatus==='CERRADO';
     const viewable=status==='COMPLETADA'||isOperationallySealed;
-    const action=(!rest&&r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
-    const periodMove=canOfferPeriodMove(r)?'<button class="bc7-btn" type="button" data-bc7-period-move="'+esc(r.id)+'">Mover período completo</button>':'';
+    const action=(r.sesion_id&&(viewable||!isTerminal))?'<button class="bc7-btn primary" type="button" data-bc7-open="'+esc(r.sesion_id)+'">'+(viewable?'Ver jornada':'Gestionar jornada')+'</button>':'';
     let reschedule='';
     if(state.admin&&!isTerminal){
-      reschedule='<details class="bc7-reschedule"><summary>Reprogramar responsable / descanso</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-check"><input type="checkbox" data-bc7-rework '+(!rest?'checked':'')+'> Jornada laborable</label><label class="bc7-field">Responsable<select data-bc7-reperson '+(rest||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Ausencia, sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reprogramación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
+      reschedule='<details class="bc7-reschedule"><summary>Reasignar responsable</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-field">Responsable<select data-bc7-reperson '+(state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reasignación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
     }
-    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+periodMove+'</div>'+reschedule+'</article>';
+    return '<article class="bc7-period-day-entry"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(userName(r.responsable_id))+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
+  }
+  function periodGroupHtml(period){
+    const rows=period._periodRows||[],statusRow=period._displayStatusRow||rows.find(row=>row.trabaja!==false)||rows[0]||period;
+    const info=calendarStatus(statusRow),badgeClass=info.kind==='running'?'ok':info.kind==='closed'?'closed':['scheduled','sealed','review'].includes(info.kind)?'warn':'';
+    const start=jornadaRangeStart(period),end=jornadaRangeEnd(period),range=start===end?fmtDateHuman(start):fmtDateHuman(start)+' – '+fmtDateHuman(end);
+    const person=period._responsibleLabel||'Sin asignar';
+    const moveSource=rows.find(row=>canOfferPeriodMove(row))||null;
+    const move=moveSource?'<div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-period-move="'+esc(moveSource.id)+'">Mover período completo</button></div>':'';
+    return '<article class="bc7-jornada bc7-jornada-period" data-bc7-period-turno="'+esc(period.turno_id||period._periodKey||'')+'">'+
+      '<div class="bc7-jornada-top"><div><strong>Jornada · '+esc(range)+' · '+esc(warehouseName(period.almacen_id))+'</strong>'+
+      '<p>'+esc(person)+' · '+esc(period._periodDays||rows.length)+' día(s)</p></div>'+
+      '<span class="bc7-pill '+badgeClass+'">'+esc(info.label)+'</span></div>'+move+
+      '<details class="bc7-period-days"><summary>Distribución diaria y sesiones ('+rows.length+')</summary><div class="bc7-period-day-records">'+rows.map(rowHtml).join('')+'</div></details></article>';
   }
   let calendarRefreshTimer=null;
   let calendarRealtimeChannel=null;
@@ -1121,30 +1248,50 @@
     const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
     const user=currentUser()||{},key=String(user.id||user.username||user.email||'authenticated-user')+'|'+month;
     const requestRevision=state.calendarRevision||0;
-    const renderRows=data=>{
+    const cached=state.calendarCache.get(key);
+    const freshCache=!!(cached&&Date.now()-cached.at<60000);
+    const renderRows=(data,renderOptions)=>{
+      renderOptions=renderOptions||{};
+      const keepLoading=renderOptions.loading===true;
       if(requestRevision!==(state.calendarRevision||0))return;
       if(String($('bc7-calendar-month')?.value||month)!==month)return;
-      state.calendarLoading=false;state.calendarLoadError='';
+      state.calendarLoading=keepLoading;state.calendarLoadError='';
       const archived=[],visible=[];
       data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(['COMPLETADA','CERRADA','CERRADO'].includes(st)&&master==='CERRADO')||(st==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
       const rank=row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();return st==='EN_CURSO'?0:st==='CERRADA_OPERATIVAMENTE'?1:(st==='COMPLETADA'?2:3);};
       visible.sort((a,b)=>rank(a)-rank(b)||String(a.fecha||'').localeCompare(String(b.fecha||''))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
       archived.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
       state.rows=visible;state.archivedRows=archived;
+      const calendarRows=[...visible,...archived].sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||Number(a.numero_dia||0)-Number(b.numero_dia||0));
+      state.calendarRows=calendarRows;
       if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;}
-      if(board)renderMonthCalendar(month,visible);renderCalendarDetail(state.calendarSelectedDate,visible);
-      if(list)list.innerHTML=visible.length?visible.map(rowHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango.</strong><p>Prueba otro mes. Las jornadas cerradas aparecen archivadas abajo. Una lista vacía no demuestra que el servidor esté caído. Una asignación solo queda confirmada cuando la valida el servidor.</p></div>';
+      renderVisualWarehouseSelector();
+      const boardRows=visualBoardRows();
+      if(board)renderMonthCalendar(month,boardRows,{loading:keepLoading});renderCalendarDetail(state.calendarSelectedDate,boardRows);
+      notifyVisualCalendarUpdated();
+      const visiblePeriods=groupJornadaPeriods(visible);
+      if(list)list.innerHTML=visiblePeriods.length?visiblePeriods.map(periodGroupHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango.</strong><p>Prueba otro mes. Las jornadas cerradas aparecen archivadas abajo. Una lista vacía no demuestra que el servidor esté caído. Una asignación solo queda confirmada cuando la valida el servidor.</p></div>';
       const archive=$('bc7-archived-schedule'),archiveList=$('bc7-archived-schedule-list'),archiveCount=$('bc7-archived-schedule-count');
-      if(archive&&state.admin){archive.hidden=!archived.length;if(archiveCount)archiveCount.textContent=String(archived.length);if(archiveList)archiveList.innerHTML=archived.map(rowHtml).join('');}
+      const archivedPeriods=groupJornadaPeriods(archived);
+      if(archive&&state.admin){archive.hidden=!archivedPeriods.length;if(archiveCount)archiveCount.textContent=String(archivedPeriods.length);if(archiveList)archiveList.innerHTML=archivedPeriods.map(periodGroupHtml).join('');}
       renderWorkerDashboard();
     };
-    const cached=state.calendarCache.get(key);
-    if(!force&&cached&&Date.now()-cached.at<60000){state.calendarLoading=false;state.calendarLoadError='';renderRows(cached.rows);return true;}
-    const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
+    if(!force&&freshCache){state.calendarLoading=false;state.calendarLoadError='';renderRows(cached.rows);return true;}
     state.calendarLoading=true;state.calendarLoadError='';
     renderWorkerDashboardState('Cargando tus jornadas…','Estamos consultando tus asignaciones y el estado de tu jornada.');
-    if(board&&!board.querySelector('.bc7-month-day'))board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
-    if(list&&!list.querySelector('.bc7-jornada'))list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    if(cached)renderRows(cached.rows,{loading:true});
+    else{
+      state.rows=[];state.archivedRows=[];state.calendarRows=[];
+      if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
+        const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;
+      }
+      if(board)renderMonthCalendar(month,[],{loading:true});
+      const detail=$('bc7-calendar-detail');
+      if(detail)detail.innerHTML='<div class="bc7-empty">Cargando las jornadas de '+esc(monthTitle(month))+'…</div>';
+      if(list)list.innerHTML='<div class="bc7-empty">Cargando las jornadas de '+esc(monthTitle(month))+'…</div>';
+      notifyVisualCalendarUpdated();
+    }
+    const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
     msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
     request=(async()=>{try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
@@ -1154,8 +1301,11 @@
     }catch(e){
       if(String($('bc7-calendar-month')?.value||month)===month){
         state.calendarLoading=false;state.calendarLoadError=friendlyError(e,'calendar');
-        if(!cached){state.rows=[];
-          if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+        if(cached){
+          renderRows(cached.rows);
+        }else{
+          state.rows=[];state.archivedRows=[];state.calendarRows=[];
+          if(board)renderMonthCalendar(month,[],{error:true});
           if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
           const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
         }
@@ -3619,80 +3769,60 @@
     catch(e){msg($('bc7-hours-msg'),'No se guardó el horario. '+friendlyError(e,'hours'),'error');}
     finally{busy(btn,false);}
   }
-  async function savePattern(form){
-    const warehouse=$('bc7-warehouse')?.value;
-    const name=$('bc7-pattern-name').value.trim(),anchor=$('bc7-anchor').value,days=readDayRows();
-    if(!warehouse){msg($('bc7-pattern-msg'),'Selecciona un almacén.','error');return;}
-    if(!name||!anchor||!days.length){msg($('bc7-pattern-msg'),'Escribe un nombre para la rotación, elige la fecha desde la que comienza y muestra los días.','error');return;}
-    if(days.some(x=>x.trabaja)&&!staffCatalogReady()){msg($('bc7-pattern-msg'),'Espera a que se cargue la lista de personas disponibles antes de guardar la rotación.','error');return;}
-    const bad=days.find(x=>x.trabaja&&!x.responsable_id);
-    if(bad){msg($('bc7-pattern-msg'),'El Día '+bad.numero_dia+' está marcado como día de trabajo, pero todavía no tiene una persona asignada.','error');return;}
-    if(!confirm('Se guardará esta rotación para el almacén. Las jornadas que ya existen no cambiarán. ¿Confirmas?'))return;
-    const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{await rpc('bc5_guardar_patron_jornada',{p_almacen_id:warehouse,p_nombre:name,p_fecha_ancla:anchor,p_patron:days});msg($('bc7-pattern-msg'),'Rotación guardada. Ya puedes revisar las fechas y crear la programación.','ok');state.lastPreview=null;}
-    catch(e){msg($('bc7-pattern-msg'),'No se pudo guardar la rotación. '+friendlyError(e,'pattern'),'error');}
-    finally{busy(btn,false);}
-  }
   async function previewPattern(btn){
     const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount();
-    if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
-    if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha que quieres programar.','error');return;}
+    if(!n){msg($('bc7-create-msg'),'Indica cuántos días tendrá la Jornada (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
+    if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha.','error');return;}
     if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return;}
+    if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de responsables.','error');return;}
+    const schedule=readDayRows(),responsibleId=$('bc7-period-responsible')?.value||'';
+    if(!responsibleId||schedule.length!==n||schedule.some(day=>!day.trabaja||String(day.responsable_id||'')!==String(responsibleId))){
+      msg($('bc7-create-msg'),'Selecciona una responsable para toda la Jornada.','error');return;
+    }
     if(!busy(btn,true))return;
     try{
-      const rows=arr(await rpc('bc5_previsualizar_jornada',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n}));
-      state.lastPreview={start,warehouse,days:n,rows,mode:'pattern'};
-      $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong><p>'+esc(String(r.hora_inicio_prevista).slice(0,5))+'–'+esc(String(r.hora_fin_prevista).slice(0,5))+'</p></div>'+(r.conflicto?'<span class="bc7-pill warn">Revisar</span>':'<span class="bc7-pill ok">Disponible</span>')+'</div>'+(r.motivo_conflicto?'<p>'+esc(friendlyError(r.motivo_conflicto,'preview'))+'</p>':'')+'</article>').join('');
-      msg($('bc7-create-msg'),rows.some(r=>r.conflicto)?'La vista previa contiene conflictos. Corrígelos antes de crear.':'Vista previa sin conflictos detectados. Aún falta confirmar la creación.','');
-    }catch(e){state.lastPreview=null;msg($('bc7-create-msg'),friendlyError(e,'preview'),'error');}
-    finally{busy(btn,false);}
+      const rows=schedule.map((row,index)=>({...row,fecha:addDays(start,index),hora_inicio_prevista:$('bc7-hour-start')?.value||'07:00',hora_fin_prevista:$('bc7-hour-end')?.value||'23:00'}));
+      state.lastPreview={start,warehouse,days:n,rows,mode:'explicit'};
+      $('bc7-preview').innerHTML='<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(start))+' — '+esc(fmtDateHuman(addDays(start,n-1)))+'</strong><p>'+n+' días · '+esc(userName(responsibleId))+' · una sola Jornada</p></article>';
+      msg($('bc7-create-msg'),'Vista previa del período. No se ha guardado nada. El servidor comprobará fechas ocupadas y conflictos antes de crear.','');
+    }finally{busy(btn,false);}
   }
   async function createSchedule(btn){
     const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount();
-    if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
-    const mode=$('bc7-plan-mode')?.value||'explicit';
-    if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha que quieres programar.','error');return;}
-    if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return;}
+    if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return false;}
+    const mode='explicit';
+    if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha que quieres programar.','error');return false;}
+    if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return false;}
     let schedule=null;
-    if(mode==='explicit'&&!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de personas disponibles antes de crear las jornadas.','error');return;}
-    if(mode==='explicit'){
-      schedule=readDayRows();
-      if(schedule.length!==n){buildDayRows();schedule=readDayRows();}
-      const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
-      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como día de trabajo, pero todavía no tiene una persona asignada.','error');return;}
-      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días marcados como descanso, borra la persona que aparece asignada.','error');return;}
-      const dates=schedule.map((r,i)=>addDays(start,i));
-      state.lastPreview={start,warehouse,days:n,mode:'explicit',rows:schedule.map((r,i)=>({...r,fecha:dates[i],conflicto:false}))};
-      $('bc7-preview').innerHTML=state.lastPreview.rows.map(r=>'<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong></article>').join('');
-    }else{
-      if(!state.lastPreview||state.lastPreview.mode!=='pattern'||state.lastPreview.start!==start||state.lastPreview.warehouse!==warehouse||state.lastPreview.days!==n){
-        msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return;
-      }
-      if(state.lastPreview.rows.some(r=>r.conflicto)){msg($('bc7-create-msg'),'La revisión muestra fechas ocupadas o personas con otro turno. Corrige esos avisos antes de crear la programación. No se creó ningún cambio.','error');return;}
+    if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de personas disponibles antes de crear la Jornada.','error');return false;}
+    schedule=readDayRows();
+    const responsibleId=$('bc7-period-responsible')?.value||'';
+    if(schedule.length!==n||!responsibleId||schedule.some(x=>!x.trabaja||String(x.responsable_id||'')!==String(responsibleId))){
+      msg($('bc7-create-msg'),'Selecciona una única responsable para todo el período y vuelve a revisar.','error');return false;
     }
-    if(!confirm('Se crearán '+n+' días de jornada en '+warehouseName(warehouse)+'. Si alguna fecha o persona ya tiene otro turno, la aplicación te avisará. ¿Confirmas?'))return;
-    if(!busy(btn,true))return;
+    if(!confirm('Se crearán '+n+' días de jornada en '+warehouseName(warehouse)+'. Si alguna fecha o persona ya tiene otro turno, la aplicación te avisará. ¿Confirmas?'))return false;
+    if(!busy(btn,true))return false;
     try{
-      const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:mode==='pattern'?null:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
+      const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
       const monthInput=$('bc7-calendar-month');if(monthInput)monthInput.value=start.slice(0,7);state.calendarSelectedDate=start;
-      const total=Number(result&&result.dias_total),work=Number(result&&result.dias_laborables),rest=Number(result&&result.dias_descanso);
-      const summary=Number.isFinite(total)&&Number.isFinite(work)&&Number.isFinite(rest)?(total===1?'Se programó 1 día: ':'Se programaron '+total+' días: ')+work+' de trabajo y '+rest+' de descanso.':'La programación se creó correctamente.';
+      const total=Number(result&&result.dias_total);
+      const summary=Number.isFinite(total)?'Jornada creada: '+total+' días consecutivos con una sola responsable.':'La Jornada se creó correctamente.';
       msg($('bc7-create-msg'),summary,'ok');
-      state.lastPreview=null;await loadCalendar();
-    }catch(e){msg($('bc7-create-msg'),'No se pudo crear la programación. '+friendlyError(e,'create'),'error');}
+      state.lastPreview=null;await loadCalendar({force:true});
+      return true;
+    }catch(e){msg($('bc7-create-msg'),'No se pudo crear la programación. '+friendlyError(e,'create'),'error');return false;}
     finally{busy(btn,false);}
   }
   async function reschedule(form){
     const id=form.dataset.bc7Reschedule;
-    const works=form.querySelector('[data-bc7-rework]').checked;
     const person=form.querySelector('[data-bc7-reperson]').value||null;
     const reason=form.querySelector('[data-bc7-reason]').value.trim();
     const msgEl=form.querySelector('[data-bc7-remsg]');
-    if(works&&!staffCatalogReady()){msg(msgEl,'Espera a que se cargue la lista de personas disponibles antes de hacer el cambio.','error');return;}
-    if(!reason|| (works&&!person)||(!works&&person)){msg(msgEl,'Escribe el motivo del cambio y, si ese día se trabaja, elige quién lo cubrirá. En un día de descanso no debe quedar nadie asignado.','error');return;}
-    if(!confirm('Se guardará este cambio en el historial de la jornada. ¿Confirmas la ausencia, la sustitución o el día de descanso?'))return;
+    if(!staffCatalogReady()){msg(msgEl,'Espera a que se cargue la lista de responsables activos antes de hacer el cambio.','error');return;}
+    if(!reason||!person){msg(msgEl,'Selecciona la responsable de la jornada y escribe el motivo del cambio.','error');return;}
+    if(!confirm('Se guardará la reasignación en el historial de la jornada. ¿Confirmas el cambio de responsable?'))return;
     const btn=form.querySelector('button[type="submit"]');if(!busy(btn,true))return;
-    try{await rpc('bc5_reprogramar_jornada',{p_programacion_id:id,p_trabaja:works,p_responsable_id:works?person:null,p_motivo:reason});msg(msgEl,'Reprogramación guardada.','ok');await loadCalendar();}
+    try{await rpc('bc5_reprogramar_jornada',{p_programacion_id:id,p_trabaja:true,p_responsable_id:person,p_motivo:reason});msg(msgEl,'Responsable reasignada.','ok');await loadCalendar();}
     catch(e){msg(msgEl,'No se pudo guardar el cambio. '+friendlyError(e,'create'),'error');}
     finally{busy(btn,false);}
   }
@@ -3713,7 +3843,7 @@
       return false;
     }
     const today=dateHavana();
-    if($('bc7-anchor'))$('bc7-anchor').value=today;
+    
     if($('bc7-start-date'))$('bc7-start-date').value=today;
     if($('bc7-list-from'))$('bc7-list-from').value=today;
     if($('bc7-list-days'))$('bc7-list-days').value='31';
@@ -3738,7 +3868,7 @@
     if(!users().length)setStatus('Acceso verificado. La lista local de personas aún se está cargando. Una asignación solo queda confirmada cuando la valida el servidor.','');
     if($('bc7-warehouse'))$('bc7-warehouse').addEventListener('change',loadHours);
     // Catalog caches may finish loading just after auth/UI boot. Refresh their labels without changing any user selection.
-    const refreshCatalogs=()=>{fillWarehouses();refreshResponsibleSelectors();};
+    const refreshCatalogs=()=>{fillWarehouses();refreshResponsibleSelectors();renderVisualWarehouseSelector();notifyVisualCalendarUpdated();};
     setTimeout(refreshCatalogs,700);setTimeout(refreshCatalogs,1800);
     const staffRetry=$('bc7-staff-retry');
     if(staffRetry)staffRetry.addEventListener('click',async()=>{try{await ensureResponsibleCatalog(true);}catch(_){}});
@@ -3800,6 +3930,47 @@
     const back=e.target&&e.target.closest?e.target.closest('[data-bc7-back-calendar]'):null;
     if(back){e.preventDefault();returnToCalendar();}
   });
+  async function validateVisualDraft(payload){
+    if(!state.admin)throw new Error('Solo Administración puede crear una jornada desde el tablero visual.');
+    if(!navigator.onLine)throw new Error('Conéctate para revisar y confirmar la programación. El borrador permanece local.');
+    const warehouseId=String(payload&&payload.warehouseId||'');
+    const startDate=String(payload&&payload.startDate||'').slice(0,10);
+    const days=Number(payload&&payload.days);
+    const schedule=arr(payload&&payload.schedule),responsableId=String(payload&&payload.responsableId||'');
+    if(!warehouses().some(item=>String(item.id)===warehouseId))throw new Error('Selecciona un almacén activo disponible.');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||startDate<dateHavana())throw new Error('La fecha inicial debe ser hoy o futura.');
+    if(!Number.isInteger(days)||days<2||days>31||schedule.length!==days)throw new Error('El período debe tener entre 2 y 31 días asignados.');
+    if(!staffCatalogReady())await ensureResponsibleCatalog(false);
+    const people=new Map(eligibleStaff().map(person=>[String(person.id),person]));
+    if(!responsableId||!people.has(responsableId))throw new Error('Selecciona una persona activa como responsable de toda la jornada.');
+    const normalizedSchedule=schedule.map((item,index)=>{
+      if(!item||Number(item.numero_dia)!==index+1)throw new Error('La distribución del Día '+(index+1)+' está incompleta.');
+      return {numero_dia:index+1,trabaja:true,responsable_id:responsableId};
+    });
+    const conflicts=[],endDate=addDays(startDate,days-1);
+    const existing=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:startDate,p_fecha_fin:endDate}));
+    for(let index=0;index<days;index++){
+      const date=addDays(startDate,index),item=normalizedSchedule[index];
+      const onWarehouse=existing.filter(row=>String(row.almacen_id||'')===warehouseId&&jornadaCoversDate(row,date)&&!['CANCELADA','CANCELADO'].includes(String(row.sesion_estado||row.estado||'').toUpperCase()));
+      if(onWarehouse.length)conflicts.push({date,kind:'warehouse',detail:'El almacén ya tiene '+onWarehouse.length+' registro(s) en esta fecha.'});
+      const onResponsible=existing.filter(row=>row.trabaja===true&&String(row.responsable_id||'')===responsableId&&jornadaCoversDate(row,date)&&!['CANCELADA','CANCELADO'].includes(String(row.sesion_estado||row.estado||'').toUpperCase()));
+      if(onResponsible.length)conflicts.push({date,kind:'responsible',detail:(people.get(responsableId)?.nombre||'La persona seleccionada')+' ya tiene otra asignación visible.'});
+    }
+    return {valid:conflicts.length===0,warehouseId,startDate,endDate,days,responsableId,schedule:normalizedSchedule,conflicts,visibleRecordsChecked:existing.length,
+      note:'Todos los días del período son laborables y comparten una única responsable. Se revisan conflictos visibles y el servidor valida de nuevo al confirmar.'};
+  }
+  async function createVisualDraft(payload,button){
+    const validation=await validateVisualDraft(payload);
+    if(!validation.valid)return {ok:false,validation,message:'Corrige los conflictos antes de confirmar.'};
+    const warehouse=$('bc7-warehouse'),date=$('bc7-start-date'),count=$('bc7-days-count'),responsible=$('bc7-period-responsible');
+    if(!warehouse||!date||!count||!responsible)throw new Error('El formulario seguro de programación no está disponible.');
+    warehouse.value=validation.warehouseId;date.value=validation.startDate;count.value=String(validation.days);responsible.value=String(validation.responsableId||'');
+    buildDayRows();
+    if(!responsible.value||!eligibleStaff().some(person=>String(person.id)===responsible.value))throw new Error('No se pudo asignar la responsable única al período.');
+    validation.schedule=arr(validation.schedule);
+    const created=await createSchedule(button||document.querySelector('[data-bc7-create]'));
+    return {ok:created===true,message:$('bc7-create-msg')?.textContent||'',validation};
+  }
   window.__BC7_JORNADA__ = {
     openWorkspace: openWorkspace,
     responsibleName: userName,
@@ -3808,21 +3979,70 @@
       if (!sessionId) return false;
       navTo('jornada');
       return openWorkspace(sessionId);
+    },
+    visualPlanner:{
+      getSnapshot:function(){
+        const rows=visualBoardRows(),date=state.calendarSelectedDate||dateHavana();
+        return {
+          admin:state.admin===true,
+          online:navigator.onLine===true,
+          month:String($('bc7-calendar-month')?.value||date.slice(0,7)),
+          selectedDate:date,
+          warehouseId:String(state.visualWarehouseId||''),
+          warehouses:warehouses().map(item=>({id:String(item.id),name:String(item.nombre||item.id)})),
+          staff:state.admin?eligibleStaff().map(person=>({id:String(person.id),name:String(person.nombre||person.nombre_usuario||person.email||person.id)})):[],
+          rows:rows.slice(),
+          periods:groupJornadaPeriods(rows),
+          historyRows:groupJornadaPeriods(rows).filter(period=>(period._periodRows||[]).some(row=>['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(String(row.sesion_estado||row.estado||'').toUpperCase()))),
+          selectedRows:rows.filter(row=>jornadaCoversDate(row,date))
+        };
+      },
+      setWarehouse:function(id){
+        if(!warehouses().some(item=>String(item.id)===String(id)))return false;
+        state.visualWarehouseId=String(id);
+        renderVisualWarehouseSelector();
+        const month=String($('bc7-calendar-month')?.value||dateHavana().slice(0,7)),rows=visualBoardRows();
+        renderMonthCalendar(month,rows);renderCalendarDetail(state.calendarSelectedDate||dateHavana(),rows);notifyVisualCalendarUpdated();
+        return true;
+      },
+      selectDate:function(date){selectCalendarDate(date);},
+      previewDraft:validateVisualDraft,
+      createDraft:createVisualDraft,
+      loadMovements:async function(sessionId){
+        if(!sessionId)return [];
+        return arr(await rpc('bc7_movimientos_sesion',{p_turno_sesion_id:sessionId}));
+      },
+      openSessionMovements:async function(sessionId){
+        if(!sessionId)return false;
+        const opened=await openWorkspace(sessionId);
+        if(opened!==false)activateWorkspaceTab('movimientos');
+        return opened;
+      }
     }
   };
+  if(typeof window.__BC7_VISUAL_PLANNER_ATTACH__==='function')window.__BC7_VISUAL_PLANNER_ATTACH__();
+  document.addEventListener('change',function(e){
+    if(!e.target||e.target.id!=='bc7-visual-warehouse')return;
+    const id=String(e.target.value||'');
+    if(!id||!warehouses().some(item=>String(item.id)===id))return;
+    state.visualWarehouseId=id;
+    const month=String($('bc7-calendar-month')?.value||dateHavana().slice(0,7)),rows=visualBoardRows();
+    renderMonthCalendar(month,rows);renderCalendarDetail(state.calendarSelectedDate||dateHavana(),rows);notifyVisualCalendarUpdated();
+  });
   document.addEventListener('click',function(e){
     const t=e.target&&e.target.closest?e.target.closest('button,.tab-btn[data-tab="jornada"]'):null;if(!t)return;
     if(t.id==='bc7-warehouse-retry'){e.preventDefault();ensureWarehouseCatalog();return;}
     if(t.matches&&t.matches('.tab-btn[data-tab="jornada"]')){setTimeout(()=>{ensureWarehouseCatalog();},0);}
   });
-  function openVisualCalendar(){
+  async function openVisualCalendar(){
     const modal=$('bc7-visual-calendar-modal');
     const trigger=document.querySelector('[data-bc7-open-visual-calendar]');
     const supported=window.matchMedia&&window.matchMedia('(min-width:761px) and (hover:hover) and (pointer:fine)').matches;
     if(!modal||!supported)return;
     modal.hidden=false;document.body.classList.add('bc7-visual-calendar-open');
     if(trigger)trigger.setAttribute('aria-expanded','true');
-    modal.querySelector('.bc7-visual-calendar-close')?.focus();loadCalendar();
+    modal.querySelector('.bc7-visual-calendar-close')?.focus();
+    await ensureWarehouseCatalog();renderVisualWarehouseSelector();await loadCalendar();notifyVisualCalendarUpdated();
   }
   function closeVisualCalendar(){
     const modal=$('bc7-visual-calendar-modal');if(!modal)return;
@@ -3898,7 +4118,7 @@
       return;
     }
     const t=e.target&&e.target.closest?e.target.closest('button,[data-bc7-build]'):null;if(!t)return;
-    if(t.hasAttribute('data-bc7-open-visual-calendar')){openVisualCalendar();return;}
+    if(t.hasAttribute('data-bc7-open-visual-calendar')){await openVisualCalendar();return;}
     if(t.hasAttribute('data-bc7-close-visual-calendar')){closeVisualCalendar();return;}
     if(t.hasAttribute('data-bc7-period-move')){try{await openPeriodMovePreview(t.getAttribute('data-bc7-period-move'));}catch(error){const detail=error&&!error.code&&error.message?error.message:friendlyError(error,'calendar');msg($('bc7-list-msg'),'No se pudo preparar el traslado. '+detail,'error');}return;}
     if(t.hasAttribute('data-bc7-period-cancel')){state.periodMoveDraft=null;renderCalendarDetail(state.calendarSelectedDate||dateHavana(),state.rows);return;}
@@ -3934,7 +4154,7 @@
     if(f.matches('[data-bc7-period-move-form]')){e.preventDefault();await confirmPeriodMove(f);}
     else if(f.id==='bc7-retro-successor-form'){e.preventDefault();await createRetroSuccessor(f);}
     else if(f.id==='bc7-hours-form'){e.preventDefault();await saveHours(f);}
-    else if(f.id==='bc7-pattern-form'){e.preventDefault();await savePattern(f);}
+    
     else if(f.matches('[data-bc7-reschedule]')){e.preventDefault();await reschedule(f);}
     else if(f.matches('[data-bc7-count-form]')){e.preventDefault();await saveCount(f);}
     else if(f.matches('[data-bc7-receive-form]')){e.preventDefault();await saveReceipt(f);}
@@ -3947,16 +4167,17 @@
   });
   document.addEventListener('change',function(e){
     const t=e.target;
+    if(t&&t.matches('#bc7-warehouse,#bc7-start-date,#bc7-days-count,#bc7-period-responsible')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';if(t.matches('#bc7-start-date,#bc7-days-count'))buildDayRows();}
     if(t&&(t.matches('[data-bc7-receive-attest-fast]')||t.matches('[data-bc7-receive-attest-diff]'))){
       const f=t.closest('form[data-bc7-receive-form]'); if(f)syncReceiveFormState(f);
     }
     if(t&&t.matches('[data-bc7-period-start]')){syncPeriodMovePreview(t.closest('form'));return;}
-    if(t&&t.matches('[data-bc7-rework]')){const s=t.closest('form')?.querySelector('[data-bc7-reperson]');if(s){s.disabled=!t.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!t.checked)s.value='';}}
     if(t&&t.matches('[data-bc7-ajust-type]'))syncAdjustmentRows(t.closest('[data-bc7-adjust-form]'));
     if(t&&t.matches('[data-bc7-ajust-product]'))validateAdjustmentRow(t.closest('[data-bc7-adjustment-row]'));
   });
   document.addEventListener('input',function(e){
     const t=e.target;
+    if(t&&t.matches('#bc7-start-date,#bc7-days-count')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';buildDayRows();}
     if(t&&(t.matches('[data-bc7-receive-count]')||t.matches('[data-bc7-receive-search]')||t.matches('[data-bc7-receive-note]'))){
       const receiveForm=t.closest('form[data-bc7-receive-form]');
       if(receiveForm)syncReceiveFormState(receiveForm);
@@ -3972,6 +4193,7 @@
     const row=state.rows.find(item=>String(item.id)===String(chip.getAttribute('data-bc7-period-drag')));
     if(!row||!canOfferPeriodMove(row)){e.preventDefault();return;}
     state.periodMoveDrag=row;
+    state.periodMoveDragDays=Math.max(1,Number(chip.getAttribute('data-bc7-period-days'))||1);
     state.periodMoveDragRows=null;
     state.periodMoveDragRowsPromise=fetchMovablePeriod(row).then(period=>{
       state.periodMoveDragRows=period;
@@ -3993,7 +4215,7 @@
     const targetDate=cell.getAttribute('data-date');
     const source=state.periodMoveDrag;
     const period=state.periodMoveDragRows;
-    const days=period?period.days:1;
+    const days=period?period.days:Math.max(1,Number(state.periodMoveDragDays)||1);
     state.periodMoveDragPreview={start:addDays(targetDate,1-Number(source.numero_dia)),days,targetDate};
     renderPeriodMoveGhost();
   });
@@ -4004,7 +4226,7 @@
     const source=state.periodMoveDrag,target=cell.getAttribute('data-date'),promise=state.periodMoveDragRowsPromise;
     const button=document.querySelector('[data-bc7-period-drag="'+String(source.id).replace(/"/g,'\\"')+'"]');
     if(button)button.setAttribute('aria-grabbed','false');
-    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;
+    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;state.periodMoveDragDays=null;
     renderPeriodMoveGhost();
     try{await openPeriodMovePreview(source.id,target,promise);}
     catch(error){msg($('bc7-list-msg'),'No se pudo preparar el traslado completo. '+friendlyError(error,'calendar'),'error');}

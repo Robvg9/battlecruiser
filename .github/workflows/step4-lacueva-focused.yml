@@ -1,7 +1,7 @@
 name: BattleCruiser Step 4 Focused UI Tests — Windows
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/jornada-planner-calendar-history-ux-20261127]
     paths:
       - 'public/js/m29-turnos-organizacion.js'
       - 'public/js/bc7-jornada-ui.js'

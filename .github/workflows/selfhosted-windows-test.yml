@@ -4,7 +4,7 @@ name: BattleCruiser Windows Regression Test
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
+    branches: [main, feat/jornada-planner-calendar-history-ux-20261127]
     paths:
       - "public/**"
       - "test/**"
