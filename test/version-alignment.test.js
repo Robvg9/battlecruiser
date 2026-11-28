@@ -301,7 +301,7 @@ test('Conectividad compacta: estilos y recursos críticos comparten caché renov
   assert.ok(index.includes('style.css?v=9.5.175'));
   assert.ok(index.includes('app.js?v=9.5.175'));
   assert.ok(sw.includes('./style.css?v=9.5.175'));
-  assert.ok(sw.includes('./app.js?v=9.5.174'));
+  assert.ok(sw.includes('./app.js?v=9.5.175'));
   assert.ok(sw.includes('./js/configuracion.js?v=20261104.1'));
   assert.ok(app.includes('["configuracion.js","20261104.1"]'));
 });
