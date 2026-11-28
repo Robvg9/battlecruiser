@@ -658,7 +658,8 @@ function bcUsesPreviewAuthProxy() {
   // so the existing Supabase Edge Function sees the allowlisted LIVE Origin.
   return [
     "https://bc-pr-224-battlecruiser.robvg9.workers.dev",
-    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"
+    "https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev",
+    "https://feat-jornada-planner-calendar-history-ux-20261127-battlecruiser.robvg9.workers.dev"
   ].includes(origin) ||
     /^https:\/\/(?:[a-f0-9]{8}|feat-intelligent-visual-planner-v1-20261127)-battlecruiser\.robvg9\.workers\.dev$/i.test(origin);
 }
