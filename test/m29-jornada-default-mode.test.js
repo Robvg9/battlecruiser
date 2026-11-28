@@ -38,7 +38,7 @@ test("BC7 is the only creator and enforces the two-day complete-Jornada model", 
   assert.match(BC7, /async function createSchedule/);
   assert.match(BC7, /rpc\('bc5_previsualizar_jornada'/);
   assert.match(BC7, /rpc\('bc5_crear_jornada_unica'/);
-  assert.match(BC7, /Elegir responsables día por día/);
+  assert.match(BC7, /Responsable de toda la Jornada/);
   assert.match(BC7, /07:00/);
   assert.match(BC7, /23:00/);
   assert.match(BC7, /America\/Havana/);
