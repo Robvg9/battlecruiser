@@ -215,7 +215,7 @@
       validated:false,
       validatedSignature:'',
       conflicts:[],
-      message:'Borrador local. Asigna una responsable a toda la jornada; todos sus días serán laborables.',
+      message:'Borrador local. Asigna una responsable a toda la jornada; todas sus fechas pertenecen al mismo período.',
       messageKind:''
     };
     api().selectDate(date);

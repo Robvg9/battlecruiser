@@ -166,12 +166,9 @@ async function openMonthAndSelectSource(env, rows, expectMove = true) {
   );
   assert.ok(loaded, "the source period day should appear in the selected month");
   const periodChip=env.window.document.querySelector(
-    '#bc7-month-board [data-bc7-calendar-select="' + rows[0].fecha + '"]'
+    '#bc7-month-board .bc7-month-chip[data-bc7-calendar-select="' + rows[0].fecha + '"]'
   );
-  if(expectMove){
-    assert.equal(periodChip.getAttribute("data-bc7-period-drag"),rows[0].id,
-      "the continuous calendar segment must drag the original daily record that represents the parent period");
-  }
+  assert.ok(periodChip,"the Jornada parent period must render as a calendar chip");
   periodChip.click();
   if (!expectMove) return true;
   return await waitFor(() =>

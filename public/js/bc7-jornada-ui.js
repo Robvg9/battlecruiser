@@ -786,6 +786,7 @@
         "#tab-jornada .bc7-jornada-period .bc7-period-days{border-top:1px solid var(--gold-dim);padding-top:7px}",
         "#tab-jornada .bc7-jornada-period .bc7-period-days>summary{font-size:10px}",
         "#tab-jornada .bc7-jornada-period .bc7-period-day-records{display:grid;gap:6px;padding-top:7px}",
+        "#tab-jornada .bc7-period-day-entry{display:grid;gap:6px;padding:8px;border:1px solid var(--gold-dim);border-radius:8px;background:rgba(255,255,255,.015)}",
         "#tab-jornada .bc7-legacy-calendar-controls{display:none!important}",
         "#tab-jornada #bc7-schedule-list{display:grid!important}",
         ".bc7-visual-calendar-modal[hidden]{display:none!important}",
@@ -1137,7 +1138,7 @@
     const masterStatus=String(r.turno_estado_maestro||r.turno_estado||'').toUpperCase();
     const isApprovedMasterClose=masterStatus==='CERRADO'&&['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE'].includes(status);
     const isClosed=['COMPLETADA','CERRADA','CERRADO'].includes(status);
-    const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE','DESCANSO'].includes(status);
+    const isScheduled=['PROGRAMADA','PROGRAMADO','PENDIENTE'].includes(status);
     const pendingMasterClose=['COMPLETADA','CERRADA','CERRADO'].includes(status)&&['EN_CURSO','PENDIENTE_APROBACION'].includes(masterStatus);
     const pill=isApprovedMasterClose?'<span class="bc7-pill closed">Aprobada</span>':isOperationallySealed?'<span class="bc7-pill warn">Pendiente de cuadre</span>':pendingMasterClose?'<span class="bc7-pill warn">Pendiente de cierre maestro</span>':isClosed?'<span class="bc7-pill closed">Archivada</span>':status==='EN_CURSO'?'<span class="bc7-pill ok">En curso</span>':isScheduled?'<span class="bc7-pill warn">Programada</span>':'<span class="bc7-pill">'+esc(humanStatus(status))+'</span>';
     const isTerminal=['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(status)||masterStatus==='CERRADO';
@@ -1147,7 +1148,7 @@
     if(state.admin&&!isTerminal){
       reschedule='<details class="bc7-reschedule"><summary>Reasignar responsable</summary><form data-bc7-reschedule="'+esc(r.id)+'" data-bc7-session="'+esc(r.sesion_id||'')+'"><label class="bc7-field">Responsable<select data-bc7-reperson '+(state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(r.responsable_id)+'</select></label><label class="bc7-field">Motivo obligatorio<input data-bc7-reason maxlength="1000" required placeholder="Sustitución o corrección"></label><button class="bc7-btn" type="submit">Guardar reasignación</button><p class="bc7-msg" data-bc7-remsg></p></form></details>';
     }
-    return '<article class="bc7-jornada"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(userName(r.responsable_id))+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
+    return '<article class="bc7-period-day-entry"><div class="bc7-jornada-top"><div><strong>'+esc(fmtDateHuman(r.fecha))+(r.fecha_fin&&r.fecha_fin!==r.fecha?' – '+esc(fmtDateHuman(r.fecha_fin)):'')+' · '+esc(warehouseName(r.almacen_id))+'</strong><p>'+esc(userName(r.responsable_id))+'</p></div>'+pill+'</div><div class="bc7-actions">'+action+'</div>'+reschedule+'</article>';
   }
   function periodGroupHtml(period){
     const rows=period._periodRows||[],statusRow=period._displayStatusRow||rows.find(row=>row.trabaja!==false)||rows[0]||period;
