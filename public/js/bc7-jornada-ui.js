@@ -4150,7 +4150,7 @@
   });
   document.addEventListener('change',function(e){
     const t=e.target;
-    if(t&&t.matches('#bc7-warehouse,#bc7-plan-mode,#bc7-start-date,#bc7-days-count,#bc7-day-rows [data-bc7-works],#bc7-day-rows [data-bc7-person]')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';if(t.id==='bc7-plan-mode'&&t.value==='pattern'&&$('bc7-rotation-details'))$('bc7-rotation-details').open=true;}
+    if(t&&t.matches('#bc7-warehouse,#bc7-start-date,#bc7-days-count,#bc7-period-responsible')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';if(t.matches('#bc7-start-date,#bc7-days-count'))buildDayRows();}
     if(t&&(t.matches('[data-bc7-receive-attest-fast]')||t.matches('[data-bc7-receive-attest-diff]'))){
       const f=t.closest('form[data-bc7-receive-form]'); if(f)syncReceiveFormState(f);
     }
@@ -4160,7 +4160,7 @@
   });
   document.addEventListener('input',function(e){
     const t=e.target;
-    if(t&&t.matches('#bc7-start-date,#bc7-days-count')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';}
+    if(t&&t.matches('#bc7-start-date,#bc7-days-count')){state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';buildDayRows();}
     if(t&&(t.matches('[data-bc7-receive-count]')||t.matches('[data-bc7-receive-search]')||t.matches('[data-bc7-receive-note]'))){
       const receiveForm=t.closest('form[data-bc7-receive-form]');
       if(receiveForm)syncReceiveFormState(receiveForm);
