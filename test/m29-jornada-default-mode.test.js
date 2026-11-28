@@ -36,7 +36,7 @@ test("BC7 is the only creator and enforces the two-day complete-Jornada model", 
   assert.doesNotMatch(BC7, /id="bc7-days-count"[^>]*value="7"/);
   assert.match(BC7, /async function previewPattern/);
   assert.match(BC7, /async function createSchedule/);
-  assert.match(BC7, /rpc\('bc5_previsualizar_jornada'/);
+  assert.match(BC7, /const schedule=readDayRows\(\)/);
   assert.match(BC7, /rpc\('bc5_crear_jornada_unica'/);
   assert.match(BC7, /Responsable de toda la Jornada/);
   assert.match(BC7, /07:00/);
