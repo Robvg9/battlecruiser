@@ -14,6 +14,7 @@ const productionWranglerConfig = fs.readFileSync(path.join(__dirname, "..", "wra
 const PREVIEW_ORIGIN = "https://bc-pr-224-battlecruiser.robvg9.workers.dev";
 const VERSIONED_PREVIEW_ORIGIN = "https://5584a3ac-battlecruiser.robvg9.workers.dev";
 const BRANCH_PREVIEW_ORIGIN = "https://feat-intelligent-visual-planner-v1-20261127-battlecruiser.robvg9.workers.dev";
+const CURRENT_BRANCH_PREVIEW_ORIGIN = "https://feat-jornada-planner-calendar-history-ux-20261127-battlecruiser.robvg9.workers.dev";
 const PRODUCTION_ORIGIN = "https://battlecruiser.robvg9.workers.dev";
 const LOGIN_FUNCTION_URL = "https://papxnkkjtkxsitcsvcme.supabase.co/functions/v1/bc-username-login";
 const LOGIN_PROXY_PATH = "/__bc_preview/functions/v1/bc-username-login";
@@ -226,6 +227,59 @@ test("Cloudflare branch preview host passes preflight through its isolated Worke
   assert.equal(upstreamCalls, 0, "branch preview preflight must not reach Supabase");
 });
 
+test("current Jornada integration branch preview passes its exact-origin preflight", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCalls = 0;
+  globalThis.fetch = async () => {
+    upstreamCalls += 1;
+    return new Response("unexpected", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request(CURRENT_BRANCH_PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
+    method: "OPTIONS",
+    headers: {
+      Origin: CURRENT_BRANCH_PREVIEW_ORIGIN,
+      "Access-Control-Request-Method": "POST",
+      "Access-Control-Request-Headers": "apikey,content-type",
+    },
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("access-control-allow-origin"), CURRENT_BRANCH_PREVIEW_ORIGIN);
+  assert.equal(upstreamCalls, 0, "preflight must not reach Supabase");
+});
+
+test("current Jornada integration branch preview login POST uses the isolated proxy", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let capturedUrl = null;
+  let capturedInit = null;
+  globalThis.fetch = async (url, init) => {
+    capturedUrl = String(url);
+    capturedInit = init;
+    return new Response(JSON.stringify({ error: "Usuario o contraseña incorrectos." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": PRODUCTION_ORIGIN },
+    });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request(CURRENT_BRANCH_PREVIEW_ORIGIN + LOGIN_PROXY_PATH, {
+    method: "POST",
+    headers: {
+      Origin: CURRENT_BRANCH_PREVIEW_ORIGIN,
+      apikey: "sb_publishable_test_only",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ username: "fixture-user", password: "fixture-password" }),
+  }), { ASSETS: assetsBinding() });
+
+  assert.equal(capturedUrl, LOGIN_FUNCTION_URL);
+  assert.equal(capturedInit.headers.get("Origin"), PRODUCTION_ORIGIN);
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: "Usuario o contraseña incorrectos." });
+});
+
 test("versioned Cloudflare preview login POST reaches Supabase through the production-origin proxy", async (t) => {
   const originalFetch = globalThis.fetch;
   let capturedUrl = null;
@@ -292,6 +346,7 @@ test("preview auth proxy repair uses a fresh cache-busted script URL in HTML and
 test("frontend uses the exact preview-only same-origin login endpoint and keeps LIVE direct", () => {
   assert.ok(authSource.includes("https://bc-pr-224-battlecruiser.robvg9.workers.dev"));
   assert.ok(authSource.includes("https://ux-jornada-status-colors-transfer-modern-picker-battlecruiser.robvg9.workers.dev"));
+  assert.ok(authSource.includes(CURRENT_BRANCH_PREVIEW_ORIGIN), "the current integration branch origin must be allowlisted exactly");
   assert.ok(authSource.includes("function bcUsesPreviewAuthProxy()"));
   assert.ok(authSource.includes("(?:[a-f0-9]{8}|feat-intelligent-visual-planner-v1-20261127)-battlecruiser"));
   assert.ok(authSource.includes("return bcUsesPreviewAuthProxy()"));
