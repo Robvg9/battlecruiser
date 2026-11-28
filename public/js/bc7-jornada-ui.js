@@ -5,7 +5,7 @@
   if(window.__BC7_JORNADA_UI__) return;
   window.__BC7_JORNADA_UI__=true;
 
-  const state={admin:false,rows:[],calendarRows:[],selected:null,detail:null,loading:false,warehouseId:'',visualWarehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
+  const state={admin:false,rows:[],calendarRows:[],selected:null,detail:null,loading:false,warehouseId:'',visualWarehouseId:'',lastPreview:null,calendarSelectedDate:null,periodMoveDraft:null,periodMoveDrag:null,periodMoveDragRowsPromise:null,periodMoveDragRows:null,periodMoveDragPreview:null,periodMoveDragDays:null,workspaceTab:'inventario',staffLoading:false,staffLoaded:false,staffError:'',dailyCashData:null,dailyCashSessionId:null,dailyCashStatus:null,inventorySettlement:null,currentSession:null,receiveAttempts:{},workspaceRequestVersion:0,workspaceOperationSessionId:null,workspaceOperationPromise:null,workspaceOperationLoaded:false,calendarLoading:false,calendarLoadError:'',calendarCache:new Map(),calendarPromises:new Map(),calendarRevision:0};
   let warehouseLoadPromise=null,staffLoadPromise=null;
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -122,26 +122,33 @@
   function notifyVisualCalendarUpdated(){
     try{window.dispatchEvent(new Event('bc7:visual-calendar-updated'));}catch(_){}
   }
-  function renderMonthCalendar(month,rows){
+  function renderMonthCalendar(month,rows,options){
     const host=$('bc7-month-board');
     if(!host)return;
+    options=options||{};
     const parts=monthParts(month);
-    if(!parts){host.innerHTML='<div class="bc7-empty">Elige un mes válido.</div>';return;}
-    const count=monthDayCount(month);
-    const first=new Date(Date.UTC(parts.year,parts.month-1,1,12));
-    const offset=(first.getUTCDay()+6)%7;
-    const cells=Math.ceil((offset+count)/7)*7;
-    const weekdays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-    const today=dateHavana();
-    const periods=groupJornadaPeriods(rows);
+    if(!parts){host.innerHTML='<div class="bc7-empty">Elige un mes válido.</div>';host.setAttribute('aria-busy','false');return;}
+    const count=monthDayCount(month),first=new Date(Date.UTC(parts.year,parts.month-1,1,12));
+    const offset=(first.getUTCDay()+6)%7,cells=Math.ceil((offset+count)/7)*7;
+    const weekdays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],today=dateHavana(),dates=[];
+    for(let index=0;index<cells;index++)dates.push(new Date(Date.UTC(parts.year,parts.month-1,1+index-offset,12)).toISOString().slice(0,10));
+    const periods=groupJornadaPeriods(rows),firstCell=dates[0],lastCell=dates[dates.length-1],periodsByDate=new Map();
+    // Index only visible period/date pairs once; avoid a full filter+sort per cell.
+    periods.forEach(period=>{
+      const rangeStart=String(jornadaRangeStart(period)||'').slice(0,10);
+      const rangeEnd=String(jornadaRangeEnd(period)||rangeStart).slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(rangeStart)||!/^\d{4}-\d{2}-\d{2}$/.test(rangeEnd)||rangeEnd<firstCell||rangeStart>lastCell)return;
+      const from=rangeStart<firstCell?firstCell:rangeStart,to=rangeEnd>lastCell?lastCell:rangeEnd;
+      for(let date=from;date<=to;date=addDays(date,1)){
+        if(!periodsByDate.has(date))periodsByDate.set(date,[]);
+        periodsByDate.get(date).push(period);
+      }
+    });
+    periodsByDate.forEach(dayRows=>dayRows.sort((left,right)=>jornadaRangeStart(left).localeCompare(jornadaRangeStart(right))||jornadaRangeEnd(left).localeCompare(jornadaRangeEnd(right))));
     let html=weekdays.map(day=>'<div class="bc7-month-weekday" role="columnheader">'+day+'</div>').join('');
     for(let index=0;index<cells;index++){
-      const date=new Date(Date.UTC(parts.year,parts.month-1,1+index-offset,12));
-      const iso=date.toISOString().slice(0,10);
-      const dayRows=periods.filter(period=>jornadaCoversDate(period,iso)).sort((a,b)=>jornadaRangeStart(a).localeCompare(jornadaRangeStart(b))||jornadaRangeEnd(a).localeCompare(jornadaRangeEnd(b)));
-      const inside=iso.slice(0,7)===month;
-      const selected=state.calendarSelectedDate===iso;
-      const classes=['bc7-month-day'];
+      const iso=dates[index],date=new Date(iso+'T12:00:00Z'),dayRows=periodsByDate.get(iso)||[];
+      const inside=iso.slice(0,7)===month,selected=state.calendarSelectedDate===iso,classes=['bc7-month-day'];
       if(!inside)classes.push('bc7-month-day--outside');
       if(selected)classes.push('bc7-month-day--selected');
       if(today===iso)classes.push('bc7-month-day--today');
@@ -150,29 +157,33 @@
         const stateInfo=calendarStatus(daily),person=period._responsibleLabel||'Sin asignar';
         const rangeStart=jornadaRangeStart(period),rangeEnd=jornadaRangeEnd(period),multiDay=rangeEnd>rangeStart;
         const weekContinuation=multiDay&&iso>rangeStart&&new Date(iso+'T12:00:00Z').getUTCDay()===1;
-        const segmentStart=iso===rangeStart||weekContinuation,segmentEnd=iso===rangeEnd;
-        const chipClasses=['bc7-month-chip','is-'+stateInfo.kind];
+        const segmentStart=iso===rangeStart||weekContinuation,segmentEnd=iso===rangeEnd,chipClasses=['bc7-month-chip','is-'+stateInfo.kind];
         if(multiDay)chipClasses.push('is-multi-day',segmentStart?'is-range-start':(segmentEnd?'is-range-end':'is-range-middle'));
         if(weekContinuation)chipClasses.push('is-range-week-continuation');
-        const periodLabel=fmtDateHuman(rangeStart)+(multiDay?' — '+fmtDateHuman(rangeEnd):'');
-        const title=periodLabel+' · '+person+' · '+stateInfo.label+' · '+period._periodDays+' día(s)';
-        const moveSource=(period._periodRows||[]).find(row=>canOfferPeriodMove(row))||null;
-        const canMove=!!moveSource;
-        const drag=canMove?' draggable="true" data-bc7-period-drag="'+esc(moveSource.id)+'" title="'+esc(title+' · Arrastra para proponer el traslado del período')+'" aria-grabbed="false"':' title="'+esc(title)+'"';
+        const periodLabel=fmtDateHuman(rangeStart)+(multiDay?' — '+fmtDateHuman(rangeEnd):''),title=periodLabel+' · '+person+' · '+stateInfo.label+' · '+period._periodDays+' día(s)';
+        const moveSource=(period._periodRows||[]).find(row=>canOfferPeriodMove(row))||null,canMove=!!moveSource;
+        const periodDays=Math.max(1,Number(period._periodDays||(period._periodRows||[]).length||1));
+        const drag=canMove?' draggable="true" data-bc7-period-drag="'+esc(moveSource.id)+'" data-bc7-period-days="'+periodDays+'" title="'+esc(title+' · Arrastra desde el agarre para proponer el traslado del período')+'" aria-grabbed="false"':' title="'+esc(title)+'"';
         const visibleName=!multiDay||segmentStart?person:'',visibleStatus=!multiDay||segmentStart?stateInfo.short:'';
-        return '<button type="button" class="'+chipClasses.join(' ')+'" data-bc7-period-id="'+esc(period._periodKey)+'" data-bc7-calendar-select="'+iso+'"'+drag+' aria-label="'+esc(title+(canMove?' · Arrastrable; también puedes usar el botón Mover período completo':''))+'"><span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(visibleName)+'</span><span class="bc7-month-chip-status">'+esc(visibleStatus)+'</span></button>';
+        return '<button type="button" class="'+chipClasses.join(' ')+'" data-bc7-period-id="'+esc(period._periodKey)+'" data-bc7-calendar-select="'+iso+'"'+drag+' aria-label="'+esc(title+(canMove?' · Arrastrable; también puedes usar el botón Mover período completo':''))+'">'+
+          (canMove?'<span class="bc7-month-chip-grip" aria-hidden="true">⠿</span>':'')+
+          '<span class="bc7-month-chip-dot" aria-hidden="true"></span><span class="bc7-month-chip-person">'+esc(visibleName)+'</span><span class="bc7-month-chip-status">'+esc(visibleStatus)+'</span></button>';
       }).join('');
       const more=dayRows.length>2?'<button type="button" class="bc7-month-more" data-bc7-calendar-select="'+iso+'">+'+(dayRows.length-2)+' más</button>':'';
       const empty=inside&&!dayRows.length?'<span class="bc7-month-empty">—</span>':'';
       html+='<div class="'+classes.join(' ')+'" data-date="'+iso+'" role="gridcell" aria-selected="'+(selected?'true':'false')+'"><div class="bc7-month-day-top"><button type="button" class="bc7-month-date" '+(!inside?'disabled':'')+' data-bc7-calendar-select="'+iso+'" aria-label="'+esc(fmtDateHuman(iso))+'" aria-pressed="'+(selected?'true':'false')+'">'+date.getUTCDate()+'</button>'+(today===iso?'<span class="bc7-month-today-tag">HOY</span>':'')+(dayRows.length?'<span class="bc7-month-count">'+dayRows.length+'</span>':'')+'</div><div class="bc7-month-day-events">'+chips+more+empty+'</div></div>';
     }
+    const loading=options.loading===true,error=options.error===true;
+    if(loading||error)html+='<div class="bc7-month-loading'+(error?' is-error':'')+'" role="status" aria-live="polite">'+
+      (loading?'<span class="bc7-month-loading-spinner" aria-hidden="true"></span><span>Cargando '+esc(monthTitle(month))+'…</span>':'<span>No se pudo cargar '+esc(monthTitle(month))+'. Pulsa «Actualizar» para intentarlo de nuevo.</span>')+'</div>';
     host.innerHTML=html;
     const weekRows=cells/7;
     host.style.display='grid';host.style.gridTemplateColumns='repeat(7,minmax(0,1fr))';
-    host.style.gridTemplateRows='34px repeat('+weekRows+',minmax(62px,1fr))';
+    host.style.gridTemplateRows='32px repeat('+weekRows+',104px)';
+    host.style.height=String(32+weekRows*104)+'px';host.style.boxSizing='border-box';host.style.position='relative';
+    host.dataset.month=month;host.setAttribute('aria-busy',loading?'true':'false');
     host.setAttribute('role','grid');host.setAttribute('aria-colcount','7');host.setAttribute('aria-rowcount',String(weekRows+1));
-    const label=$('bc7-month-label');
-    if(label)label.textContent=monthTitle(month);
+    const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
   }
   function renderCalendarDetail(date,rows){
     const host=$('bc7-calendar-detail');
@@ -381,7 +392,7 @@
       if(!result||String(result.turno_id||'')!==draft.turnoId)
         throw new Error('El servidor no devolvió una confirmación válida del traslado.');
       state.periodMoveDraft=null;
-      state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;
+      state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;state.periodMoveDragDays=null;
       const picker=$('bc7-calendar-month');
       if(picker)picker.value=start.slice(0,7);
       state.calendarSelectedDate=start;
@@ -395,7 +406,7 @@
     }
   }
   function clearPeriodMoveDrag(){
-    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;
+    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;state.periodMoveDragDays=null;
     renderPeriodMoveGhost();
   }
   function qty(v){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('es-ES',{maximumFractionDigits:3}):'—';}
@@ -767,6 +778,10 @@
         "#tab-jornada .bc7-month-chip.is-range-middle{margin-left:-7px;margin-right:-7px;width:calc(100% + 14px);border-right:0;border-left:0;border-radius:0}",
         "#tab-jornada .bc7-month-chip.is-range-end{margin-left:-7px;margin-right:0;width:calc(100% + 7px);border-left:0;border-radius:0 6px 6px 0}",
         "#tab-jornada .bc7-month-chip.is-range-week-continuation .bc7-month-chip-person{font-weight:800}",
+        "#tab-jornada .bc7-month-chip[draggable=true]{height:30px;min-height:30px;max-height:30px;box-sizing:border-box;padding:3px 5px;gap:4px;cursor:grab;touch-action:none;user-select:none}",
+        "#tab-jornada .bc7-month-chip[draggable=true]:active{cursor:grabbing}",
+        "#tab-jornada .bc7-month-chip-grip{display:inline-grid;flex:0 0 28px;width:28px;height:24px;place-items:center;border-radius:5px;background:rgba(10,23,42,.72);color:#fff;font-size:17px;line-height:1;cursor:grab}",
+
         "#tab-jornada .bc7-month-day-events{overflow:visible}",
         "#tab-jornada .bc7-month-chip.is-running{border-color:rgba(95,174,127,.44);background:rgba(95,174,127,.10)}",
         "#tab-jornada .bc7-month-chip.is-running .bc7-month-chip-dot{background:#7fc99a}",
@@ -1223,10 +1238,14 @@
     const label=$('bc7-month-label');if(label)label.textContent=monthTitle(month);
     const user=currentUser()||{},key=String(user.id||user.username||user.email||'authenticated-user')+'|'+month;
     const requestRevision=state.calendarRevision||0;
-    const renderRows=data=>{
+    const cached=state.calendarCache.get(key);
+    const freshCache=!!(cached&&Date.now()-cached.at<60000);
+    const renderRows=(data,renderOptions)=>{
+      renderOptions=renderOptions||{};
+      const keepLoading=renderOptions.loading===true;
       if(requestRevision!==(state.calendarRevision||0))return;
       if(String($('bc7-calendar-month')?.value||month)!==month)return;
-      state.calendarLoading=false;state.calendarLoadError='';
+      state.calendarLoading=keepLoading;state.calendarLoadError='';
       const archived=[],visible=[];
       data.forEach(row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();const master=String(row.turno_estado_maestro||row.turno_estado||'').toUpperCase();const isArchived=state.admin&&(st==='CANCELADA'||st==='CANCELADO'||(['COMPLETADA','CERRADA','CERRADO'].includes(st)&&master==='CERRADO')||(st==='CERRADA_OPERATIVAMENTE'&&master==='CERRADO'));(isArchived?archived:visible).push(row);});
       const rank=row=>{const st=String(row.sesion_estado||row.estado||'').toUpperCase();return st==='EN_CURSO'?0:st==='CERRADA_OPERATIVAMENTE'?1:(st==='COMPLETADA'?2:3);};
@@ -1238,7 +1257,7 @@
       if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;}
       renderVisualWarehouseSelector();
       const boardRows=visualBoardRows();
-      if(board)renderMonthCalendar(month,boardRows);renderCalendarDetail(state.calendarSelectedDate,boardRows);
+      if(board)renderMonthCalendar(month,boardRows,{loading:keepLoading});renderCalendarDetail(state.calendarSelectedDate,boardRows);
       notifyVisualCalendarUpdated();
       const visiblePeriods=groupJornadaPeriods(visible);
       if(list)list.innerHTML=visiblePeriods.length?visiblePeriods.map(periodGroupHtml).join(''):'<div class="bc7-empty"><strong>No hay jornadas visibles en este rango.</strong><p>Prueba otro mes. Las jornadas cerradas aparecen archivadas abajo. Una lista vacía no demuestra que el servidor esté caído. Una asignación solo queda confirmada cuando la valida el servidor.</p></div>';
@@ -1247,13 +1266,22 @@
       if(archive&&state.admin){archive.hidden=!archivedPeriods.length;if(archiveCount)archiveCount.textContent=String(archivedPeriods.length);if(archiveList)archiveList.innerHTML=archivedPeriods.map(periodGroupHtml).join('');}
       renderWorkerDashboard();
     };
-    const cached=state.calendarCache.get(key);
-    if(!force&&cached&&Date.now()-cached.at<60000){state.calendarLoading=false;state.calendarLoadError='';renderRows(cached.rows);return true;}
+    if(!force&&freshCache){state.calendarLoading=false;state.calendarLoadError='';renderRows(cached.rows);return true;}
     const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
     state.calendarLoading=true;state.calendarLoadError='';
     renderWorkerDashboardState('Cargando tus jornadas…','Estamos consultando tus asignaciones y el estado de tu jornada.');
-    if(board&&!board.querySelector('.bc7-month-day'))board.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
-    if(list&&!list.querySelector('.bc7-jornada'))list.innerHTML='<div class="bc7-empty">Cargando calendario…</div>';
+    if(cached)renderRows(cached.rows,{loading:true});
+    else{
+      state.rows=[];state.archivedRows=[];state.calendarRows=[];
+      if(!state.calendarSelectedDate||state.calendarSelectedDate.slice(0,7)!==month){
+        const today=dateHavana();state.calendarSelectedDate=today.slice(0,7)===month?today:from;
+      }
+      if(board)renderMonthCalendar(month,[],{loading:true});
+      const detail=$('bc7-calendar-detail');
+      if(detail)detail.innerHTML='<div class="bc7-empty">Cargando las jornadas de '+esc(monthTitle(month))+'…</div>';
+      if(list)list.innerHTML='<div class="bc7-empty">Cargando las jornadas de '+esc(monthTitle(month))+'…</div>';
+      notifyVisualCalendarUpdated();
+    }
     msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
     request=(async()=>{try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
@@ -1263,8 +1291,8 @@
     }catch(e){
       if(String($('bc7-calendar-month')?.value||month)===month){
         state.calendarLoading=false;state.calendarLoadError=friendlyError(e,'calendar');
-        if(!cached){state.rows=[];state.calendarRows=[];
-          if(board)board.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
+        if(!cached){state.rows=[];state.archivedRows=[];state.calendarRows=[];
+          if(board)renderMonthCalendar(month,[],{error:true});
           if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
           const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
         }
@@ -4152,6 +4180,7 @@
     const row=state.rows.find(item=>String(item.id)===String(chip.getAttribute('data-bc7-period-drag')));
     if(!row||!canOfferPeriodMove(row)){e.preventDefault();return;}
     state.periodMoveDrag=row;
+    state.periodMoveDragDays=Math.max(1,Number(chip.getAttribute('data-bc7-period-days'))||1);
     state.periodMoveDragRows=null;
     state.periodMoveDragRowsPromise=fetchMovablePeriod(row).then(period=>{
       state.periodMoveDragRows=period;
@@ -4173,7 +4202,7 @@
     const targetDate=cell.getAttribute('data-date');
     const source=state.periodMoveDrag;
     const period=state.periodMoveDragRows;
-    const days=period?period.days:1;
+    const days=period?period.days:Math.max(1,Number(state.periodMoveDragDays)||1);
     state.periodMoveDragPreview={start:addDays(targetDate,1-Number(source.numero_dia)),days,targetDate};
     renderPeriodMoveGhost();
   });
@@ -4184,7 +4213,7 @@
     const source=state.periodMoveDrag,target=cell.getAttribute('data-date'),promise=state.periodMoveDragRowsPromise;
     const button=document.querySelector('[data-bc7-period-drag="'+String(source.id).replace(/"/g,'\\"')+'"]');
     if(button)button.setAttribute('aria-grabbed','false');
-    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;
+    state.periodMoveDrag=null;state.periodMoveDragRowsPromise=null;state.periodMoveDragRows=null;state.periodMoveDragPreview=null;state.periodMoveDragDays=null;
     renderPeriodMoveGhost();
     try{await openPeriodMovePreview(source.id,target,promise);}
     catch(error){msg($('bc7-list-msg'),'No se pudo preparar el traslado completo. '+friendlyError(error,'calendar'),'error');}
