@@ -7,12 +7,15 @@ DECLARE
   v_turno uuid := '94000000-0000-0000-0000-000000000001';
   v_programacion uuid := '94000000-0000-0000-0000-000000000002';
   v_owner uuid := '20000000-0000-0000-0000-000000000001';
-  v_warehouse uuid := '10000000-0000-0000-0000-000000000003';
+  v_warehouse uuid := '94000000-0000-0000-0000-000000000003';
   v_rows jsonb;
   v_row jsonb;
 BEGIN
   PERFORM set_config('request.jwt.claim.sub',v_owner::text,false);
   PERFORM set_config('test.bc_admin','true',false);
+
+  INSERT INTO public.almacenes(id,nombre,tipo,activo)
+  VALUES(v_warehouse,'Almacén Jornada Metadata Fixture','VENTA',true);
 
   INSERT INTO public.turnos(
     id,usuario_id,usuario_nombre,almacen_id,fecha,estado,
