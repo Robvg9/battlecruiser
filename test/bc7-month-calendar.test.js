@@ -377,7 +377,8 @@ test("manual scheduling preview is local and a changed assignment must be review
   const warehouse = window.document.getElementById("bc7-warehouse");
   assert.equal(warehouse.options.length, 2, "the fixture must expose the active warehouse");
   warehouse.value = "warehouse-1";
-  window.document.getElementById("bc7-plan-mode").value = "explicit";
+  assert.equal(window.document.getElementById("bc7-plan-mode"), null, "the obsolete mode selector is no longer part of the single-responsible period form");
+  window.document.getElementById("bc7-period-responsible").value = "dep-1";
 
   const havanaToday = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Havana", year: "numeric", month: "2-digit", day: "2-digit"
