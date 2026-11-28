@@ -451,13 +451,11 @@
   }
   function refreshResponsibleSelectors(){
     const people=eligibleStaff();
-    document.querySelectorAll('#bc7-day-rows [data-bc7-person],#bc7-schedule-list [data-bc7-reperson],#bc7-calendar-detail [data-bc7-reperson]').forEach(sel=>{
+    document.querySelectorAll('#bc7-period-responsible,#bc7-schedule-list [data-bc7-reperson],#bc7-calendar-detail [data-bc7-reperson]').forEach(sel=>{
       const previous=sel.value;
       sel.innerHTML=staffOptions(previous);
       if(previous&&people.some(user=>String(user.id)===String(previous)))sel.value=previous;
-      const row=sel.closest('.bc7-day-row,form');
-      const works=sel.matches('[data-bc7-person]')?row?.querySelector('[data-bc7-works]')?.checked!==false:true;
-      sel.disabled=!works||state.staffLoading||!state.staffLoaded||!people.length;
+      sel.disabled=state.staffLoading||!state.staffLoaded||!people.length;
     });
     staffFeedback();
   }
@@ -896,11 +894,11 @@
       '<div id="bc7-help-modal" class="bc7-help-modal" hidden><button type="button" class="bc7-help-backdrop" data-bc7-help-close aria-label="Cerrar guía"></button><section class="bc7-help-dialog" role="dialog" aria-modal="true" aria-labelledby="bc7-help-title"><header><div><span>GUÍA OPERATIVA</span><h3 id="bc7-help-title">Jornada e inventario</h3></div><button type="button" class="bc7-btn" data-bc7-help-close aria-label="Cerrar">✕</button></header><div class="bc7-help-content"><p><b>Esta sección organiza cada período de trabajo y conserva la evidencia física y administrativa.</b></p><h4>¿Para qué sirve esta sección?</h4><p>Aquí organizas quién trabaja cada día. Cada responsable inicia su jornada, confirma el inventario físico inicial y final, y registra sus operaciones. Esta sección no es el historial general; para consultar todos los movimientos, entra en Movimientos → Historial.</p><p>Si no aparece una jornada, prueba otro mes y pulsa «Actualizar calendario». Una asignación solo queda confirmada cuando la valida el servidor.</p><h4>Estados de una jornada</h4><ul><li><b>Programada:</b> tiene fecha y responsable, pero aún no comienza.</li><li><b>En curso:</b> la responsable está trabajando y puede registrar operaciones.</li><li><b>Pendiente de cuadre:</b> la operación se selló; falta completar o revisar los datos físicos y administrativos. El sello no cierra el Turno maestro.</li><li><b>Pendiente de cierre maestro:</b> la jornada terminó, pero el Dueño aún debe revisar el período y aprobar el cierre definitivo.</li><li><b>Archivada:</b> el Turno maestro ya se cerró o la programación se canceló. Se conserva para consulta, fuera de la lista principal.</li></ul><h4>Los cinco pasos de la responsable</h4><ol><li><b>Entregas diarias de efectivo:</b> una entrega por cada fecha del período; registra 0 CUP si ese día no se entregó efectivo.</li><li><b>Gastos:</b> registrar todos los gastos reales.</li><li><b>Reinversiones:</b> registrar las compras/reinversiones correspondientes.</li><li><b>Bajas:</b> enviar todas las bajas y mermas y confirmar expresamente que no faltan más.</li><li><b>Inventario final:</b> contar físicamente cada producto del período y guardar el corte.</li></ol><h4>Reglas de seguridad</h4><ul><li>Enviar un bloque no aprueba automáticamente su contenido; Administración lo revisa por separado.</li><li>Una discrepancia de inventario queda auditada; no se reescribe el conteo inicial ni se ajusta el stock global automáticamente.</li><li>Los movimientos posteriores al corte deben atribuirse con evidencia; no se cargan a una persona solo por coincidir en fecha.</li><li>La jornada y el Turno maestro son estados distintos. El cierre operativo no equivale a aprobación administrativa.</li></ul><p>El historial archivado permanece disponible en el desplegable «Jornadas archivadas».</p></div></section></div>'+
       `<details id="bc7-admin-details" class="bc7-admin-details" hidden><summary>Organizar jornadas · Administrador</summary><section id="bc7-admin-panel" class="bc7-card">
 <h3>Crear y organizar jornadas</h3><p class="bc7-muted">Elige el almacén, el período y quién trabaja cada día. La disponibilidad se valida al guardar.</p>
-<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">Elegir responsables día por día<select id="bc7-plan-mode"><option value="explicit">Día por día</option><option value="pattern">Rotación guardada</option></select></label></div>
+<div class="bc7-grid"><div><label class="bc7-field">Almacén<select id="bc7-warehouse"></select></label><p class="bc7-msg" id="bc7-warehouse-msg" role="status" aria-live="polite"></p><button class="bc7-btn" type="button" id="bc7-warehouse-retry" hidden>Reintentar carga de almacenes</button></div><label class="bc7-field">Responsable de toda la Jornada<select id="bc7-period-responsible">'+staffOptions()+'</select></label></div>
 <form id="bc7-pattern-form"><h4>Período y responsables</h4><div class="bc7-grid"><label class="bc7-field">Primera fecha<input id="bc7-start-date" type="date" required></label><label class="bc7-field">Duración (días)<input id="bc7-days-count" type="number" min="2" max="31" placeholder="2–31" inputmode="numeric"></label></div>
 <div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-build>Mostrar días</button></div>
 <p class="bc7-msg" id="bc7-staff-status" role="status" aria-live="polite">Cargando responsables activos…</p><button class="bc7-btn" type="button" id="bc7-staff-retry" hidden>Reintentar carga de responsables</button><div id="bc7-day-rows" class="bc7-day-rows"></div>
-<details class="bc7-detail" id="bc7-rotation-details"><summary>Opciones de rotación recurrente</summary><div class="bc7-detail-body"><label class="bc7-field">Nombre de la rotación<input id="bc7-pattern-name" maxlength="100" placeholder="Ej. Jornada continua del almacén"></label><label class="bc7-field">Fecha ancla de la rotación<input id="bc7-anchor" type="date"></label><button class="bc7-btn" type="submit">Guardar rotación</button></div></details><p class="bc7-msg" id="bc7-pattern-msg"></p></form>
+<p class="bc7-muted">Todas las fechas del período son laborables y comparten la responsable seleccionada.</p></form>
 <div class="bc7-actions"><button class="bc7-btn" type="button" data-bc7-preview>Vista previa</button><button class="bc7-btn primary" type="button" data-bc7-create>Crear programación</button></div>
 <details class="bc7-detail" id="bc7-schedule-note-details"><summary>Nota opcional</summary><div class="bc7-detail-body"><label class="bc7-field">Motivo administrativo o nota<input id="bc7-schedule-note" maxlength="1000" placeholder="Nota (opcional)"></label></div></details>
 <div id="bc7-preview" class="bc7-list"></div><p class="bc7-msg" id="bc7-create-msg"></p>
@@ -1098,35 +1096,16 @@
     return Math.floor(count);
   }
   function readDayRows(){
-    const host=$('bc7-day-rows');
-    if(!host)return [];
-    const workInputs=Array.from(host.querySelectorAll('[data-bc7-works]'));
-    const people=Array.from(host.querySelectorAll('[data-bc7-person]'));
-    return workInputs.map((input,index)=>{
-      const row=input.closest('.bc7-day-row');
-      const person=(row&&row.querySelector('[data-bc7-person]'))||people[index]||null;
-      const works=input.checked===true;
-      return {numero_dia:index+1,trabaja:works,responsable_id:works?(person?.value||''):null};
-    });
+    const n=scheduleDayCount(),responsibleId=$('bc7-period-responsible')?.value||null;
+    return Array.from({length:n},(_,index)=>({numero_dia:index+1,trabaja:true,responsable_id:responsibleId}));
   }
   function buildDayRows(){
     const host=$('bc7-day-rows');if(!host)return;
-    const n=scheduleDayCount();
-    if(!n){host.innerHTML='<p class="bc7-muted">Escribe primero cuántos días tendrá la rotación (entre 2 y 31) y pulsa «Mostrar días».</p>';state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';return;}
-    const old=readDayRows();const mode=$('bc7-plan-mode')?.value||'explicit';const anchor=mode==='pattern'?($('bc7-anchor')?.value||$('bc7-start-date')?.value||dateHavana()):($('bc7-start-date')?.value||$('bc7-anchor')?.value||dateHavana());
-    host.innerHTML=Array.from({length:n},(_,i)=>{
-      const d=old[i]||{trabaja:true,responsable_id:null};
-      return '<div class="bc7-day-row" role="group" aria-label="Día '+(i+1)+'"><div class="bc7-day-main"><strong>Día '+(i+1)+'</strong><span class="bc7-day-date">'+esc(fmtDateHuman(addDays(anchor,i)))+'</span></div><label class="bc7-check"><input type="checkbox" data-bc7-works '+(d.trabaja?'checked':'')+'><span>Trabaja</span></label><label class="bc7-field bc7-day-person"><span>Responsable</span><select data-bc7-person '+(!d.trabaja||state.staffLoading||!state.staffLoaded||!eligibleStaff().length?'disabled':'')+'>'+staffOptions(d.responsable_id)+'</select></label></div>';
-    }).join('');
-    const workInputs=Array.from(host.querySelectorAll('[data-bc7-works]'));
-    const people=Array.from(host.querySelectorAll('[data-bc7-person]'));
-    workInputs.forEach((ch,index)=>ch.addEventListener('change',()=>{
-      const row=ch.closest('.bc7-day-row');
-      const person=(row&&row.querySelector('[data-bc7-person]'))||people[index]||null;
-      if(person){person.disabled=!ch.checked||state.staffLoading||!state.staffLoaded||!eligibleStaff().length;if(!ch.checked)person.value='';}
-    }));
-    state.lastPreview=null;
-    if($('bc7-preview'))$('bc7-preview').innerHTML='';
+    const n=scheduleDayCount(),start=$('bc7-start-date')?.value||dateHavana();
+    if(!n){host.innerHTML='<p class="bc7-muted">Indica la duración del período para revisar sus fechas.</p>';state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';return;}
+    host.innerHTML='<div class="bc7-period-summary" role="group" aria-label="Período completo"><strong>'+esc(fmtDateHuman(start))+' — '+esc(fmtDateHuman(addDays(start,n-1)))+'</strong><span>'+n+' días consecutivos · una sola Jornada</span><p>La misma responsable queda asignada a todas las fechas del período.</p></div>';
+    const person=$('bc7-period-responsible');if(person)person.disabled=state.staffLoading||!state.staffLoaded||!eligibleStaff().length;
+    state.lastPreview=null;if($('bc7-preview'))$('bc7-preview').innerHTML='';
   }
   async function loadHours(){
     const warehouseId=$('bc7-warehouse')?.value;if(!warehouseId)return;
@@ -3764,21 +3743,20 @@
     finally{busy(btn,false);}
   }
   async function previewPattern(btn){
-    const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount(),mode=$('bc7-plan-mode')?.value||'explicit';
+    const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount(),mode='explicit';
     if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return;}
     if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha.','error');return;}
     if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return;}
     if(mode==='explicit'){
       if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de responsables.','error');return;}
       let schedule=readDayRows();if(schedule.length!==n){buildDayRows();schedule=readDayRows();}
-      const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
-      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como laborable, pero no tiene responsable.','error');return;}
-      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días de descanso debe quedar vacía la persona asignada.','error');return;}
+      const responsibleId=$('bc7-period-responsible')?.value||'';
+      if(!responsibleId||schedule.some(x=>!x.trabaja||String(x.responsable_id||'')!==String(responsibleId))){msg($('bc7-create-msg'),'Selecciona una responsable para toda la Jornada.','error');return;}
       if(!busy(btn,true))return;
       try{
         const rows=schedule.map((row,index)=>({...row,fecha:addDays(start,index),hora_inicio_prevista:$('bc7-hour-start')?.value||'07:00',hora_fin_prevista:$('bc7-hour-end')?.value||'23:00'}));
         state.lastPreview={start,warehouse,days:n,rows,mode:'explicit'};
-        $('bc7-preview').innerHTML=rows.map(r=>'<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(r.fecha))+' · '+esc(r.trabaja?userName(r.responsable_id):'Descanso')+'</strong></article>').join('');
+        $('bc7-preview').innerHTML='<article class="bc7-jornada"><strong>'+esc(fmtDateHuman(start))+' — '+esc(fmtDateHuman(addDays(start,n-1)))+'</strong><p>'+n+' días · '+esc(userName(schedule[0].responsable_id))+' · una sola Jornada</p></article>';
         msg($('bc7-create-msg'),'Vista previa de tu asignación. No se ha guardado nada. El servidor comprobará fechas ocupadas y conflictos de responsables al crear.','');
       }finally{busy(btn,false);}
       return;
@@ -3795,30 +3773,23 @@
   async function createSchedule(btn){
     const warehouse=$('bc7-warehouse')?.value,start=$('bc7-start-date')?.value,n=scheduleDayCount();
     if(!n){msg($('bc7-create-msg'),'Indica cuántos días quieres programar (entre 2 y 31).','error');$('bc7-days-count')?.focus();return false;}
-    const mode=$('bc7-plan-mode')?.value||'explicit';
+    const mode='explicit';
     if(!warehouse||!start){msg($('bc7-create-msg'),'Selecciona el almacén y la primera fecha que quieres programar.','error');return false;}
     if(start<dateHavana()){msg($('bc7-create-msg'),'La fecha de inicio ya pasó. Elige hoy o una fecha futura.','error');return false;}
     let schedule=null;
-    if(mode==='explicit'&&!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de personas disponibles antes de crear las jornadas.','error');return false;}
-    if(mode==='explicit'){
-      schedule=readDayRows();
-      if(schedule.length!==n){msg($('bc7-create-msg'),'Pulsa «Mostrar días» para generar todas las asignaciones y vuelve a revisar.','error');return false;}
-      const missing=schedule.find(x=>x.trabaja&&!x.responsable_id);
-      if(missing){msg($('bc7-create-msg'),'El Día '+missing.numero_dia+' está marcado como laborable, pero no tiene responsable.','error');return false;}
-      if(schedule.some(x=>!x.trabaja&&x.responsable_id)){msg($('bc7-create-msg'),'En los días de descanso debe quedar vacía la persona asignada.','error');return false;}
-    }else{
-      if(!state.lastPreview||state.lastPreview.mode!=='pattern'||state.lastPreview.start!==start||state.lastPreview.warehouse!==warehouse||state.lastPreview.days!==n){
-        msg($('bc7-create-msg'),'Antes de crear, pulsa «Revisar fechas» para comprobar que la rotación esté libre en el almacén elegido.','error');return false;
-      }
-      if(state.lastPreview.rows.some(r=>r.conflicto)){msg($('bc7-create-msg'),'La revisión muestra fechas ocupadas o personas con otro turno. Corrige esos avisos antes de crear la programación. No se creó ningún cambio.','error');return false;}
+    if(!staffCatalogReady()){msg($('bc7-create-msg'),'Espera a que se cargue la lista de personas disponibles antes de crear la Jornada.','error');return false;}
+    schedule=readDayRows();
+    const responsibleId=$('bc7-period-responsible')?.value||'';
+    if(schedule.length!==n||!responsibleId||schedule.some(x=>!x.trabaja||String(x.responsable_id||'')!==String(responsibleId))){
+      msg($('bc7-create-msg'),'Selecciona una única responsable para todo el período y vuelve a revisar.','error');return false;
     }
     if(!confirm('Se crearán '+n+' días de jornada en '+warehouseName(warehouse)+'. Si alguna fecha o persona ya tiene otro turno, la aplicación te avisará. ¿Confirmas?'))return false;
     if(!busy(btn,true))return false;
     try{
-      const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:mode==='pattern'?null:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
+      const result=await rpc('bc5_crear_jornada_unica',{p_almacen_id:warehouse,p_fecha_inicio:start,p_dias:n,p_programacion:schedule,p_observacion:$('bc7-schedule-note')?.value.trim()||null});
       const monthInput=$('bc7-calendar-month');if(monthInput)monthInput.value=start.slice(0,7);state.calendarSelectedDate=start;
-      const total=Number(result&&result.dias_total),work=Number(result&&result.dias_laborables),rest=Number(result&&result.dias_descanso);
-      const summary=Number.isFinite(total)&&Number.isFinite(work)&&Number.isFinite(rest)?(total===1?'Se programó 1 día: ':'Se programaron '+total+' días: ')+work+' de trabajo y '+rest+' de descanso.':'La programación se creó correctamente.';
+      const total=Number(result&&result.dias_total);
+      const summary=Number.isFinite(total)?'Jornada creada: '+total+' días consecutivos con una sola responsable.':'La Jornada se creó correctamente.';
       msg($('bc7-create-msg'),summary,'ok');
       state.lastPreview=null;await loadCalendar({force:true});
       return true;
@@ -3855,7 +3826,7 @@
       return false;
     }
     const today=dateHavana();
-    if($('bc7-anchor'))$('bc7-anchor').value=today;
+    
     if($('bc7-start-date'))$('bc7-start-date').value=today;
     if($('bc7-list-from'))$('bc7-list-from').value=today;
     if($('bc7-list-days'))$('bc7-list-days').value='31';
@@ -3974,18 +3945,12 @@
   async function createVisualDraft(payload,button){
     const validation=await validateVisualDraft(payload);
     if(!validation.valid)return {ok:false,validation,message:'Corrige los conflictos antes de confirmar.'};
-    const warehouse=$('bc7-warehouse'),date=$('bc7-start-date'),count=$('bc7-days-count'),mode=$('bc7-plan-mode');
-    if(!warehouse||!date||!count||!mode)throw new Error('El formulario seguro de programación no está disponible.');
-    warehouse.value=validation.warehouseId;date.value=validation.startDate;count.value=String(validation.days);mode.value='explicit';
+    const warehouse=$('bc7-warehouse'),date=$('bc7-start-date'),count=$('bc7-days-count'),responsible=$('bc7-period-responsible');
+    if(!warehouse||!date||!count||!responsible)throw new Error('El formulario seguro de programación no está disponible.');
+    warehouse.value=validation.warehouseId;date.value=validation.startDate;count.value=String(validation.days);responsible.value=String(validation.responsableId||'');
     buildDayRows();
-    const host=$('bc7-day-rows'),works=Array.from(host?.querySelectorAll('[data-bc7-works]')||[]),responsibles=Array.from(host?.querySelectorAll('[data-bc7-person]')||[]);
-    if(works.length!==validation.days||responsibles.length!==validation.days)throw new Error('No se pudieron preparar todos los días del borrador.');
+    if(!responsible.value||!eligibleStaff().some(person=>String(person.id)===responsible.value))throw new Error('No se pudo asignar la responsable única al período.');
     validation.schedule=arr(validation.schedule);
-    validation.schedule.forEach((item,index)=>{
-      works[index].checked=true;
-      works[index].dispatchEvent(new Event('change',{bubbles:true}));
-      responsibles[index].value=String(validation.responsableId||'');
-    });
     const created=await createSchedule(button||document.querySelector('[data-bc7-create]'));
     return {ok:created===true,message:$('bc7-create-msg')?.textContent||'',validation};
   }
