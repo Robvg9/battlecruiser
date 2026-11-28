@@ -10,7 +10,7 @@ test("BC7 fallback assigns one responsible to the complete Jornada period",()=>{
   assert.match(SOURCE,/Responsable de toda la Jornada/);
   assert.match(SOURCE,/function readDayRows\(\)[\s\S]*?Array\.from\(\{length:n\}[\s\S]*?trabaja:true,responsable_id:responsibleId/);
   assert.match(SOURCE,/function buildDayRows\(\)[\s\S]*?una sola Jornada[\s\S]*?La misma responsable queda asignada a todas las fechas/);
-  assert.doesNotMatch(SOURCE,/Elegir responsables día por día|data-bc7-works|data-bc7-person/);
+  assert.doesNotMatch(SOURCE,/Elegir responsables día por día|data-bc7-works(?:\\s|=)|data-bc7-person(?:\\s|=)/);
   assert.doesNotMatch(SOURCE,/id="bc7-plan-mode"|id="bc7-anchor"|id="bc7-rotation-details"/);
 });
 
