@@ -75,12 +75,11 @@
     while(draft.schedule.length<draft.days)draft.schedule.push(makeDay(draft.schedule.length));
     const responsibleId=draft.responsableId?String(draft.responsableId):null;
     draft.schedule=draft.schedule.slice(0,draft.days).map((item,index)=>({
-      numero_dia:index+1,trabaja:item.trabaja!==false,
-      responsable_id:item.trabaja===false?null:responsibleId
+      numero_dia:index+1,trabaja:true,responsable_id:responsibleId
     }));
   }
   function isComplete(draft){
-    return !!draft&&(!draft.schedule.some(day=>day.trabaja===true)||!!draft.responsableId);
+    return !!draft&&draft.schedule.length===draft.days&&!!draft.responsableId;
   }
   function signature(draft){
     if(!draft)return '';
@@ -144,7 +143,6 @@
       '.bc7-vp-field input,.bc7-vp-field select{min-width:0;width:100%;min-height:34px;font-size:11px}',
       '.bc7-vp-day-list{display:grid;gap:6px;margin:8px 0}',
       '.bc7-vp-day-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;padding:7px;border:1px solid rgba(201,162,77,.22);border-radius:8px;background:rgba(0,0,0,.12)}',
-      '.bc7-vp-day-row.is-rest{opacity:.78}',
       '.bc7-vp-day-copy{display:grid;gap:3px;min-width:0}',
       '.bc7-vp-day-copy strong{font-size:11px}',
       '.bc7-vp-day-copy small{font-size:9px;color:var(--mist)}',
@@ -180,7 +178,6 @@
       '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-start:not(.is-range-end){width:calc(100% + 7px);margin-right:-7px;border-radius:7px 0 0 7px;border-right-color:transparent;position:relative;z-index:3}',
       '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-middle{width:calc(100% + 14px);margin-left:-7px;margin-right:-7px;border-radius:0;border-left-color:transparent;border-right-color:transparent;position:relative;z-index:3}',
       '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-end:not(.is-range-start){width:calc(100% + 7px);margin-left:-7px;border-radius:0 7px 7px 0;border-left-color:transparent;position:relative;z-index:3}',
-      '.bc7-vp-draft-segment.is-rest{border-color:rgba(201,162,77,.7);background:rgba(201,162,77,.17)}',
       '.bc7-vp-draft-segment.is-unassigned{border-style:dashed;border-color:#e2ae58;background:rgba(201,145,52,.18)}',
       '.bc7-vp-drag-source{opacity:.34!important;filter:saturate(.42);transform:scale(.985)}',
       '.bc7-vp-draft-label{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
@@ -218,7 +215,7 @@
       validated:false,
       validatedSignature:'',
       conflicts:[],
-      message:'Borrador local. Asigna una responsable a toda la jornada y marca solo los días de descanso.',
+      message:'Borrador local. Asigna una responsable a toda la jornada; todos sus días serán laborables.',
       messageKind:''
     };
     api().selectDate(date);
@@ -275,12 +272,11 @@
       const cell=board.querySelector('[data-date="'+date+'"]');
       const events=cell&&cell.querySelector('.bc7-month-day-events');
       if(!events)continue;
-      const item=draft.schedule[index],first=index===0,last=index===draft.days-1;
-      const label=item.trabaja?personName(model,draft.responsableId):'Descanso';
+      const first=index===0,last=index===draft.days-1;
+      const label=personName(model,draft.responsableId);
       const segment=document.createElement('div');
       segment.className='bc7-vp-draft-segment'+
-        (item.trabaja===false?' is-rest':'')+
-        (item.trabaja&&!draft.responsableId?' is-unassigned':'')+
+        (!draft.responsableId?' is-unassigned':'')+
         (first?' is-period-start':'')+(last?' is-period-end':'')+(!first&&!last?' is-period-middle':'');
       segment.draggable=true;
       segment.dataset.bc7VpDraftSegment=String(index+1);
@@ -297,7 +293,7 @@
       }
       const text=document.createElement('span');
       text.className='bc7-vp-draft-label';
-      text.textContent=first?'Borrador · '+personName(model,draft.responsableId):(item.trabaja===false?'Descanso':'');
+      text.textContent=first?'Borrador · '+personName(model,draft.responsableId):'';
       segment.appendChild(text);
       if(last){
         const handle=document.createElement('button');
@@ -417,7 +413,6 @@
     host.hidden=false;
     const sameWarehouse=String(model&&model.warehouseId||'')===String(draft.warehouseId);
     const staff=model&&model.staff||[];
-    const working=draft.schedule.filter(item=>item.trabaja===true).length;
     const validated=draft.validated===true&&draft.validatedSignature===signature(draft);
     const conflicts=draft.conflicts||[];
     const canCreate=!!(model&&model.admin&&model.online&&sameWarehouse&&validated&&!conflicts.length&&isComplete(draft));
@@ -426,9 +421,8 @@
     ).join('');
     const rows=draft.schedule.map((day,index)=>{
       const date=addDays(draft.startDate,index);
-      return '<div class="bc7-vp-day-row'+(day.trabaja?'':' is-rest')+'">'+
-        '<div class="bc7-vp-day-copy"><strong>Día '+(index+1)+' · '+esc(humanDate(date))+'</strong><small>'+(day.trabaja?'Laborable':'Descanso')+'</small></div>'+
-        '<div class="bc7-vp-day-actions"><button type="button" class="bc7-btn" data-bc7-vp-toggle-rest="'+index+'">'+(day.trabaja?'Marcar descanso':'Marcar trabajo')+'</button></div>'+
+      return '<div class="bc7-vp-day-row">'+
+        '<div class="bc7-vp-day-copy"><strong>Día '+(index+1)+' · '+esc(humanDate(date))+'</strong></div>'+
       '</div>';
     }).join('');
     host.innerHTML=
@@ -439,17 +433,17 @@
         '<label class="bc7-vp-field"><span>Días</span><input type="number" min="2" max="31" inputmode="numeric" data-bc7-vp-days value="'+draft.days+'"></label>'+
       '</div>'+
       (!sameWarehouse?'<p class="bc7-vp-status error">Este borrador pertenece a '+esc(warehouseName(model,draft.warehouseId))+'. Selecciona ese almacén arriba para continuar.</p>':'')+
-      '<label class="bc7-vp-period-responsible"><span>RESPONSABLE DE TODA LA JORNADA</span><select data-bc7-vp-period-responsible>'+responsibleOptions+'</select><small class="bc7-vp-muted">La misma persona quedará asignada a todos los días laborables de este período.</small></label>'+
+      '<label class="bc7-vp-period-responsible"><span>RESPONSABLE DE TODA LA JORNADA</span><select data-bc7-vp-period-responsible>'+responsibleOptions+'</select><small class="bc7-vp-muted">La misma persona será responsable de cada fecha de este período.</small></label>'+
       '<div class="bc7-vp-day-list">'+rows+'</div>'+
       '<div class="bc7-vp-draft-actions">'+
         '<button type="button" class="bc7-btn" data-bc7-vp-preview '+(!model.online||!sameWarehouse?'disabled':'')+'>Revisar conflictos</button>'+
         '<button type="button" class="bc7-btn primary" data-bc7-vp-create '+(!canCreate?'disabled':'')+'>Confirmar y crear</button>'+
       '</div>'+
-      '<div class="bc7-vp-status '+(draft.messageKind||'')+'">'+esc(readableMessage(draft.message,'Asigna una responsable y revisa el período antes de crearlo.'))+'</div>'+
+      '<div class="bc7-vp-status '+(draft.messageKind||'')+'">'+esc(readableMessage(draft.message,'Asigna una responsable y revisa la jornada antes de crearla.'))+'</div>'+
       (conflicts.length?'<ul class="bc7-vp-conflicts">'+conflicts.map(item=>'<li>'+esc(humanDate(item.date))+': '+esc(item.detail)+'</li>').join('')+'</ul>':'')+
       '<p class="bc7-vp-muted">'+esc(readableMessage(draft.validationNote,'La revisión consulta las programaciones visibles. El servidor vuelve a validar todos los conflictos al crear.'))+'</p>'+
       '<div class="bc7-vp-status" id="bc7-vp-gesture-status" aria-live="polite"></div>'+
-      '<p class="bc7-vp-muted">'+working+' día(s) laborable(s) · '+(draft.days-working)+' día(s) de descanso · '+(draft.responsableId?'responsable de jornada asignada':'falta seleccionar responsable de jornada')+'</p>';
+      '<p class="bc7-vp-muted">'+draft.days+' día(s) · '+(draft.responsableId?'responsable de jornada asignada':'falta seleccionar responsable de jornada')+'</p>';
   }
 
   async function runPreview(){
@@ -723,12 +717,6 @@
     if(tool){event.preventDefault();newDraft(snapshot()?.selectedDate||today(),snapshot());return;}
     const segment=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-draft-segment]'):null;
     if(segment){const model=snapshot();if(model)api().selectDate(addDays(state.draft.startDate,Number(segment.dataset.bc7VpDraftSegment)-1));return;}
-    const toggle=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-toggle-rest]'):null;
-    if(toggle&&state.draft){
-      const index=Number(toggle.dataset.bc7VpToggleRest),item=state.draft.schedule[index];
-      if(item){item.trabaja=!item.trabaja;normalizeSchedule(state.draft);invalidate(item.trabaja?'El día vuelve a ser laborable. La responsable asignada a la jornada se aplicará automáticamente.':'Día marcado como descanso. La jornada conserva una sola responsable.');render();}
-      return;
-    }
     const preview=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-preview]'):null;
     if(preview){event.preventDefault();runPreview();return;}
     const create=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-create]'):null;

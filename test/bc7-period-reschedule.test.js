@@ -165,9 +165,14 @@ async function openMonthAndSelectSource(env, rows, expectMove = true) {
     ) !== null
   );
   assert.ok(loaded, "the source period day should appear in the selected month");
-  env.window.document.querySelector(
+  const periodChip=env.window.document.querySelector(
     '#bc7-month-board [data-bc7-calendar-select="' + rows[0].fecha + '"]'
-  ).click();
+  );
+  if(expectMove){
+    assert.equal(periodChip.getAttribute("data-bc7-period-drag"),rows[0].id,
+      "the continuous calendar segment must drag the original daily record that represents the parent period");
+  }
+  periodChip.click();
   if (!expectMove) return true;
   return await waitFor(() =>
     env.window.document.querySelector("#bc7-calendar-detail [data-bc7-period-move]") !== null

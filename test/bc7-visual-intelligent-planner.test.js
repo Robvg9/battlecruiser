@@ -143,6 +143,8 @@ test("desktop palette creates an ephemeral two-day draft, dims its source and cl
   assert.equal(draftSegments(window)[1].querySelector(".bc7-vp-draft-label").textContent,"",
     "one Jornada label spans the period instead of D2/D3 daily labels");
   assert.equal(window.document.querySelector("[data-bc7-vp-responsible]"),null,"the planner must not ask for an assignee per day");
+  assert.equal(window.document.querySelector("[data-bc7-vp-toggle-rest]"),null,"no Jornada date can be changed into a rest day");
+  assert.doesNotMatch(window.document.getElementById("bc7-visual-draft-panel").textContent,/descanso|laborable/i);
   assert.equal(tool.classList.contains("bc7-vp-drag-source"), false,
     "dropping the amulet must restore its original appearance");
   assert.deepEqual(runtimeErrors, [], "drop must not raise a runtime error while clearing drag state");
@@ -223,7 +225,7 @@ test("dragging a draft segment moves the whole period without changing its durat
   assert.equal(calls.create.length, 0);
 });
 
-test("keyboard form controls can change the first date, duration, work/rest and responsible", (t) => {
+test("keyboard form controls change the date, duration and one responsible; no day can be marked as rest", async (t) => {
   const { window, calls } = setup(t);
   window.document.querySelector('[data-bc7-vp-tool="new"]').click();
   const start = window.document.querySelector("[data-bc7-vp-start]");
@@ -235,12 +237,19 @@ test("keyboard form controls can change the first date, duration, work/rest and 
   const person = window.document.querySelector("[data-bc7-vp-period-responsible]");
   person.value = "staff-2";
   person.dispatchEvent(new window.Event("change", { bubbles: true }));
-  window.document.querySelector('[data-bc7-vp-toggle-rest="1"]').click();
+  const panel=window.document.getElementById("bc7-visual-draft-panel");
+  assert.equal(window.document.querySelector('[data-bc7-vp-toggle-rest]'),null);
+  assert.doesNotMatch(panel.textContent,/descanso|laborable/i);
   assert.equal(draftSegments(window).length, 3);
   assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date, "2099-01-06");
   assert.equal(window.document.querySelector("[data-bc7-vp-period-responsible]").value, "staff-2");
-  assert.equal(window.document.querySelector("[data-bc7-vp-responsible]"), null);
-  assert.equal(calls.create.length, 0, "editing the keyboard-accessible form never writes");
+  window.document.querySelector("[data-bc7-vp-preview]").click();
+  assert.equal(await waitFor(()=>calls.preview.length===1),true);
+  assert.equal(calls.preview[0].schedule.every(day=>day.trabaja===true),true,
+    "every date of the period is always laborable");
+  assert.equal(calls.preview[0].schedule.map(day=>day.responsable_id).join(","),"staff-2,staff-2,staff-2",
+    "one responsible is copied to every date");
+  assert.equal(calls.create.length, 0, "editing and reviewing the keyboard-accessible form never writes");
 });
 
 test("arrow keys move and resize the draft with Alt and Shift modifiers", (t) => {
@@ -337,6 +346,8 @@ test("explicit preview and confirmation delegate to the existing Jornada creatio
   assert.equal(await waitFor(() => calls.preview.length === 1), true);
   assert.equal(calls.preview[0].warehouseId, "warehouse-1");
   assert.equal(calls.preview[0].schedule.length, 2);
+  assert.equal(calls.preview[0].schedule.every(day=>day.trabaja===true),true);
+  assert.equal(calls.preview[0].schedule.map(day=>day.responsable_id).join(","),"staff-1,staff-1");
   assert.equal(await waitFor(() => {
     const button=window.document.querySelector("[data-bc7-vp-create]");
     return button && button.disabled===false;

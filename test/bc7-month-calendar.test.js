@@ -155,6 +155,13 @@ test("Jornada renders a seven-column monthly calendar using the exact 31-day-saf
     "the calendar read must never exceed the RPC's 31-day limit"
   );
 
+  const legacyRestChip=window.document.querySelector(
+    '#bc7-month-board [data-bc7-calendar-select="' + month + '-06"]'
+  );
+  assert.ok(legacyRestChip,"the second date of the same parent period should remain visible");
+  assert.equal(legacyRestChip.classList.contains("is-rest"),false,
+    "legacy status data must not reintroduce a visible rest category");
+  assert.doesNotMatch(legacyRestChip.textContent,/descanso/i);
   const dayButton = window.document.querySelector(
     '#bc7-month-board [data-bc7-calendar-select="' + month + '-05"]'
   );
