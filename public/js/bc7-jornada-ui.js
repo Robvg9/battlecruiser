@@ -1291,7 +1291,10 @@
     }catch(e){
       if(String($('bc7-calendar-month')?.value||month)===month){
         state.calendarLoading=false;state.calendarLoadError=friendlyError(e,'calendar');
-        if(!cached){state.rows=[];state.archivedRows=[];state.calendarRows=[];
+        if(cached){
+          renderRows(cached.rows);
+        }else{
+          state.rows=[];state.archivedRows=[];state.calendarRows=[];
           if(board)renderMonthCalendar(month,[],{error:true});
           if(list)list.innerHTML='<div class="bc7-empty">No se pudo consultar el calendario.</div>';
           const detail=$('bc7-calendar-detail');if(detail)detail.innerHTML='<div class="bc7-empty">No se pudieron consultar los detalles de este mes.</div>';
