@@ -165,6 +165,25 @@ test("dragging over an unchanged calendar cell reuses the ghost instead of rebui
     "repeated dragover events over the same date must not replace preview nodes");
 });
 
+test("resize grips are independent draggable targets and compact desktop layouts stack the inspector", (t) => {
+  const {window}=setup(t);
+  const tool=window.document.querySelector('[data-bc7-vp-tool="new"]');
+  startDrag(window,tool);
+  drop(window,window.document.querySelector('[data-date="2099-01-05"]'));
+  const first=draftSegments(window)[0];
+  const last=draftSegments(window).at(-1);
+  const start=first.querySelector('[data-bc7-vp-resize="start"]');
+  const end=last.querySelector('[data-bc7-vp-resize="end"]');
+  const move=first.querySelector('[data-bc7-vp-draft-move]');
+  assert.equal(first.draggable,false,"the parent segment must not swallow drags from its edge controls");
+  assert.equal(start.draggable,true);
+  assert.equal(end.draggable,true);
+  assert.equal(move.draggable,true);
+  const css=window.document.getElementById("bc7-visual-planner-style").textContent;
+  assert.match(css,/flex:0 0 24px/,"resize targets must be wide enough to grab reliably");
+  assert.match(css,/@media\(max-width:1240px\)/,"compact desktop layouts must stack the inspector below the calendar");
+});
+
 test("draft end handle resizes the range live without a server write", (t) => {
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
@@ -173,6 +192,8 @@ test("draft end handle resizes the range live without a server write", (t) => {
   const last = draftSegments(window).at(-1);
   const handle = last.querySelector('[data-bc7-vp-resize="end"]');
   assert.ok(handle, "the final segment exposes a resize handle");
+  assert.equal(last.draggable,false,"the parent segment cannot capture the edge gesture");
+  assert.equal(handle.draggable,true);
   startDrag(window, handle);
   dragOver(window, window.document.querySelector('[data-date="2099-01-08"]'));
   assert.ok(window.document.querySelector('[data-bc7-vp-ghost]'), "a ghost range is drawn during the gesture");
@@ -200,6 +221,8 @@ test("draft start handle resizes the beginning while preserving the final date",
     "dropping onto any covered day assigns the responsible to the complete parent Jornada");
   const firstHandle = draftSegments(window)[0].querySelector('[data-bc7-vp-resize="start"]');
   assert.ok(firstHandle);
+  assert.equal(draftSegments(window)[0].draggable,false);
+  assert.equal(firstHandle.draggable,true);
   startDrag(window, firstHandle);
   dragOver(window, window.document.querySelector('[data-date="2099-01-06"]'));
   drop(window, window.document.querySelector('[data-date="2099-01-06"]'));
@@ -216,7 +239,9 @@ test("dragging a draft segment moves the whole period without changing its durat
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
   drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
-  startDrag(window, draftSegments(window)[0]);
+  const moveHandle=draftSegments(window)[0].querySelector("[data-bc7-vp-draft-move]");
+  assert.ok(moveHandle,"moving a Jornada uses a dedicated grip, not the parent segment");
+  startDrag(window,moveHandle);
   dragOver(window, window.document.querySelector('[data-date="2099-01-07"]'));
   drop(window, window.document.querySelector('[data-date="2099-01-07"]'));
   assert.equal(draftSegments(window).length, 2);
@@ -423,6 +448,6 @@ test("offline mode cannot expose a draft creation tool", (t) => {
 });
 
 test("planner module is loaded immediately after Jornada and precached offline", () => {
-  assert.ok(APP.includes('["bc7-visual-intelligent-planner.js","1.0"]'));
-  assert.ok(SW.includes('./js/bc7-visual-intelligent-planner.js?v=1.0'));
+  assert.ok(APP.includes('["bc7-visual-intelligent-planner.js","1.1"]'));
+  assert.ok(SW.includes('./js/bc7-visual-intelligent-planner.js?v=1.1'));
 });
