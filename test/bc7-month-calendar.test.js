@@ -329,6 +329,31 @@ test("a multi-day Jornada spans every covered date and appears in the inspector 
   assert.match(detail.textContent, /\b7\b/);
 });
 
+test("visual preflight applies one responsible to all working days of the Jornada", async (t) => {
+  const {window}=setup(t,{admin:true,rows:[]});
+  const adminReady=await waitFor(()=>window.document.getElementById("bc7-admin-details")?.hidden===false);
+  assert.ok(adminReady);
+  await window.__BC7_JORNADA__.refreshResponsibleStaff();
+  const validation=await window.__BC7_JORNADA__.visualPlanner.previewDraft({
+    warehouseId:"warehouse-1",startDate:"2099-01-05",days:2,responsableId:"dep-1",
+    schedule:[
+      {numero_dia:1,trabaja:true,responsable_id:"dep-1"},
+      {numero_dia:2,trabaja:true,responsable_id:"different-day-person"}
+    ]
+  });
+  assert.equal(validation.valid,true);
+  assert.equal(validation.schedule.map(day=>day.responsable_id).join(","),"dep-1,dep-1");
+  assert.equal(validation.responsableId,"dep-1");
+});
+
+test("Jornada read RPC exposes the parent-period and master-close fields used by the calendar", () => {
+  const migration=fs.readFileSync(path.join(__dirname,"..","supabase","migrations","20261127232000_jornada_parent_period_metadata.sql"),"utf8");
+  assert.ok(migration.includes("JOIN public.turnos t ON t.id=p.turno_id"));
+  assert.ok(migration.includes("'turno_fecha_inicio',t.fecha"));
+  assert.ok(migration.includes("'dias_turno',t.dias_turno"));
+  assert.ok(migration.includes("'turno_estado_maestro',coalesce(t.estado_maestro,t.estado)"));
+});
+
 test("manual scheduling preview is local and a changed assignment must be reviewed again", async (t) => {
   const { window, calls } = setup(t, { admin: true, rows: [] });
 

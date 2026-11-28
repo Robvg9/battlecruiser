@@ -19,6 +19,7 @@ function setup(t, overrides = {}) {
       '<div id="bc7-visual-tools"></div>' +
       '<section id="bc7-visual-draft-panel" hidden></section>' +
       '<section id="bc7-visual-activity"></section>' +
+      '<section id="bc7-visual-history-panel"></section>' +
       '<div id="bc7-month-board" role="grid">' +
         DAYS.map(date =>
           '<div class="bc7-month-day" data-date="' + date + '"><div class="bc7-month-day-events"></div></div>'
@@ -137,11 +138,29 @@ test("desktop palette creates an ephemeral two-day draft, dims its source and cl
   assert.equal(window.document.getElementById("bc7-visual-draft-panel").hidden, false);
   assert.equal(draftSegments(window).length, 2);
   assert.equal(draftSegments(window)[0].getAttribute("aria-label").includes("Borrador"), true);
+  assert.ok(draftSegments(window)[0].classList.contains("is-period-start"));
+  assert.ok(draftSegments(window)[1].classList.contains("is-period-end"));
+  assert.equal(draftSegments(window)[1].querySelector(".bc7-vp-draft-label").textContent,"",
+    "one Jornada label spans the period instead of D2/D3 daily labels");
+  assert.equal(window.document.querySelector("[data-bc7-vp-responsible]"),null,"the planner must not ask for an assignee per day");
   assert.equal(tool.classList.contains("bc7-vp-drag-source"), false,
     "dropping the amulet must restore its original appearance");
   assert.deepEqual(runtimeErrors, [], "drop must not raise a runtime error while clearing drag state");
   assert.equal(calls.preview.length, 0, "dragging only creates a local draft");
   assert.equal(calls.create.length, 0, "dragging never writes a Jornada");
+});
+
+test("dragging over an unchanged calendar cell reuses the ghost instead of rebuilding the DOM", (t) => {
+  const {window}=setup(t);
+  const tool=window.document.querySelector('[data-bc7-vp-tool="new"]');
+  const target=window.document.querySelector('[data-date="2099-01-05"]');
+  startDrag(window,tool);
+  dragOver(window,target);
+  const ghost=window.document.querySelector("[data-bc7-vp-ghost]");
+  assert.ok(ghost,"the first hover must render a preview");
+  dragOver(window,target);
+  assert.strictEqual(window.document.querySelector("[data-bc7-vp-ghost]"),ghost,
+    "repeated dragover events over the same date must not replace preview nodes");
 });
 
 test("draft end handle resizes the range live without a server write", (t) => {
@@ -170,13 +189,13 @@ test("draft start handle resizes the beginning while preserving the final date",
   startDrag(window, lastHandle);
   drop(window, window.document.querySelector('[data-date="2099-01-07"]'));
   const staffAmulet = window.document.querySelector('[data-bc7-vp-staff="staff-2"]');
-  const secondDaySlot = window.document.querySelector('[data-bc7-vp-day-slot="1"]');
+  const secondDayCell = window.document.querySelector('[data-date="2099-01-06"]');
   startDrag(window, staffAmulet);
-  dragOver(window, secondDaySlot);
-  drop(window, secondDaySlot);
-  const assignedSecondDay = window.document.querySelector('[data-bc7-vp-responsible="1"]');
-  assert.equal(assignedSecondDay.value, "staff-2",
-    "the original second day must receive the dropped responsible amulet before resize");
+  dragOver(window, secondDayCell);
+  drop(window, secondDayCell);
+  const assignedPeriod = window.document.querySelector('[data-bc7-vp-period-responsible]');
+  assert.equal(assignedPeriod.value, "staff-2",
+    "dropping onto any covered day assigns the responsible to the complete parent Jornada");
   const firstHandle = draftSegments(window)[0].querySelector('[data-bc7-vp-resize="start"]');
   assert.ok(firstHandle);
   startDrag(window, firstHandle);
@@ -185,8 +204,8 @@ test("draft start handle resizes the beginning while preserving the final date",
   assert.equal(draftSegments(window).length, 2);
   assert.equal(draftSegments(window)[0].closest('[data-date]')?.dataset.date, "2099-01-06");
   assert.equal(draftSegments(window)[1].closest('[data-date]')?.dataset.date, "2099-01-07");
-  assert.equal(window.document.querySelector('[data-bc7-vp-responsible="0"]').value, "staff-2",
-    "shrinking the start must preserve the assignment of the remaining original second day");
+  assert.equal(window.document.querySelector("[data-bc7-vp-period-responsible]").value, "staff-2",
+    "changing the range must preserve the single Jornada-level responsible");
   assert.equal(calls.create.length, 0);
 });
 
@@ -213,14 +232,14 @@ test("keyboard form controls can change the first date, duration, work/rest and 
   const days = window.document.querySelector("[data-bc7-vp-days]");
   days.value = "3";
   days.dispatchEvent(new window.Event("change", { bubbles: true }));
-  const person = window.document.querySelector('[data-bc7-vp-responsible="0"]');
+  const person = window.document.querySelector("[data-bc7-vp-period-responsible]");
   person.value = "staff-2";
   person.dispatchEvent(new window.Event("change", { bubbles: true }));
   window.document.querySelector('[data-bc7-vp-toggle-rest="1"]').click();
   assert.equal(draftSegments(window).length, 3);
   assert.equal(draftSegments(window)[0].closest("[data-date]")?.dataset.date, "2099-01-06");
-  assert.equal(window.document.querySelector('[data-bc7-vp-responsible="0"]').value, "staff-2");
-  assert.equal(window.document.querySelector('[data-bc7-vp-responsible="1"]').disabled, true);
+  assert.equal(window.document.querySelector("[data-bc7-vp-period-responsible]").value, "staff-2");
+  assert.equal(window.document.querySelector("[data-bc7-vp-responsible]"), null);
   assert.equal(calls.create.length, 0, "editing the keyboard-accessible form never writes");
 });
 
@@ -263,11 +282,9 @@ test("a server preflight conflict keeps the draft local and disables confirmatio
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
   drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
-  for (const [index, personId] of [[0,"staff-1"],[1,"staff-2"]]) {
-    const select = window.document.querySelector('[data-bc7-vp-responsible="' + index + '"]');
-    select.value = personId;
-    select.dispatchEvent(new window.Event("change", { bubbles: true }));
-  }
+  const select = window.document.querySelector("[data-bc7-vp-period-responsible]");
+  select.value = "staff-1";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
   window.document.querySelector("[data-bc7-vp-preview]").click();
   assert.equal(await waitFor(() => calls.preview.length === 1), true);
   assert.equal(await waitFor(() => /almacén ya está ocupado/i.test(window.document.getElementById("bc7-visual-draft-panel").textContent)), true,
@@ -277,20 +294,33 @@ test("a server preflight conflict keeps the draft local and disables confirmatio
   assert.equal(calls.create.length, 0);
 });
 
-test("responsible amulets can be dropped onto an individual draft day", (t) => {
+test("object-shaped preflight notes render as readable text, never [object Object]", async (t) => {
+  const {window}=setup(t,{preview:{valid:true,conflicts:[],note:{detail:"Validación del período confirmada."}}});
+  window.document.querySelector('[data-bc7-vp-tool="new"]').click();
+  const responsible=window.document.querySelector("[data-bc7-vp-period-responsible]");
+  responsible.value="staff-1";
+  responsible.dispatchEvent(new window.Event("change",{bubbles:true}));
+  window.document.querySelector("[data-bc7-vp-preview]").click();
+  const panel=window.document.getElementById("bc7-visual-draft-panel");
+  assert.equal(await waitFor(()=>panel.textContent.includes("Validación del período confirmada.")),true);
+  assert.equal(panel.textContent.includes("[object Object]"),false);
+});
+
+test("a responsible amulet dropped onto any day assigns the whole Jornada", (t) => {
   const { window, calls } = setup(t);
   const tool = window.document.querySelector('[data-bc7-vp-tool="new"]');
   startDrag(window, tool);
   drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
 
   const person = window.document.querySelector('[data-bc7-vp-staff="staff-1"]');
-  const slot = window.document.querySelector('[data-bc7-vp-day-slot="0"]');
+  const day = window.document.querySelector('[data-date="2099-01-06"]');
   startDrag(window, person);
-  dragOver(window, slot);
-  drop(window, slot);
+  dragOver(window, day);
+  drop(window, day);
 
-  const select = window.document.querySelector('[data-bc7-vp-responsible="0"]');
+  const select = window.document.querySelector("[data-bc7-vp-period-responsible]");
   assert.equal(select.value, "staff-1");
+  assert.equal(window.document.querySelector("[data-bc7-vp-responsible]"),null);
   assert.equal(calls.create.length, 0);
 });
 
@@ -300,11 +330,9 @@ test("explicit preview and confirmation delegate to the existing Jornada creatio
   startDrag(window, tool);
   drop(window, window.document.querySelector('[data-date="2099-01-05"]'));
 
-  for (const [index, personId] of [[0,"staff-1"],[1,"staff-2"]]) {
-    const select = window.document.querySelector('[data-bc7-vp-responsible="' + index + '"]');
-    select.value = personId;
-    select.dispatchEvent(new window.Event("change", { bubbles: true }));
-  }
+  const select = window.document.querySelector("[data-bc7-vp-period-responsible]");
+  select.value = "staff-1";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
   window.document.querySelector("[data-bc7-vp-preview]").click();
   assert.equal(await waitFor(() => calls.preview.length === 1), true);
   assert.equal(calls.preview[0].warehouseId, "warehouse-1");
@@ -320,8 +348,8 @@ test("explicit preview and confirmation delegate to the existing Jornada creatio
     "a successful server result should clear the ephemeral draft");
   assert.equal(
     calls.create[0].schedule.map(row => row.responsable_id).join(","),
-    "staff-1,staff-2",
-    "the server bridge receives the exact two responsible IDs in day order"
+    "staff-1,staff-1",
+    "the server bridge receives the same responsible ID for every working day of one Jornada"
   );
   assert.equal(window.document.getElementById("bc7-visual-draft-panel").hidden, true,
     "the draft disappears only after the bridge confirms creation");
@@ -352,6 +380,22 @@ test("movement amulets show only real session rows and provide a read-only open 
   assert.equal(activity.querySelectorAll("input,select").length, 0);
   activity.querySelector("[data-bc7-vp-open-session]").click();
   assert.deepEqual(calls.open, ["session-1"]);
+});
+
+test("history panel groups completed Jornada periods and shows master-close status separately", (t) => {
+  const period={
+    id:"history-program",turno_id:"history-turno",almacen_id:"warehouse-1",
+    fecha:"2099-01-03",fecha_fin:"2099-01-04",_periodDays:2,_responsibleLabel:"Adriana",
+    _periodRows:[{id:"history-program",fecha:"2099-01-03",sesion_id:"history-session",
+      sesion_estado:"COMPLETADA",turno_estado_maestro:"PENDIENTE_APROBACION",trabaja:true}]
+  };
+  const {window,calls}=setup(t,{model:{historyRows:[period]}});
+  const history=window.document.getElementById("bc7-visual-history-panel");
+  assert.match(history.textContent,/HISTORIAL DE JORNADAS/);
+  assert.match(history.textContent,/Adriana/);
+  assert.match(history.textContent,/Completada · cierre maestro por verificar/);
+  history.querySelector("[data-bc7-vp-history-open]").click();
+  assert.deepEqual(calls.open,["history-session"]);
 });
 
 test("non-admin sees no creation palette or staff amulets", (t) => {

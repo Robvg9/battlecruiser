@@ -59,19 +59,28 @@
     const item=(model&&model.warehouses||[]).find(row=>String(row.id)===String(id));
     return item?item.name:String(id||'Almacén');
   }
-  function makeDay(index){
-    return {numero_dia:index+1,trabaja:true,responsable_id:null};
+  function readableMessage(value,fallback){
+    if(typeof value==='string'&&value.trim())return value.trim();
+    if(value&&typeof value==='object'){
+      for(const key of ['message','detail','details','error_description','hint','error']){
+        const item=value[key];if(typeof item==='string'&&item.trim())return item.trim();
+      }
+      try{const json=JSON.stringify(value);if(json&&json!=='{}')return json;}catch(_){}
+    }
+    if(value!=null&&typeof value!=='object')return String(value);
+    return fallback||'No se pudo completar la operación. Revisa los datos e inténtalo de nuevo.';
   }
+  function makeDay(index){return {numero_dia:index+1,trabaja:true};}
   function normalizeSchedule(draft){
     while(draft.schedule.length<draft.days)draft.schedule.push(makeDay(draft.schedule.length));
+    const responsibleId=draft.responsableId?String(draft.responsableId):null;
     draft.schedule=draft.schedule.slice(0,draft.days).map((item,index)=>({
-      numero_dia:index+1,
-      trabaja:item.trabaja!==false,
-      responsable_id:item.trabaja===false?null:(item.responsable_id||null)
+      numero_dia:index+1,trabaja:item.trabaja!==false,
+      responsable_id:item.trabaja===false?null:responsibleId
     }));
   }
   function isComplete(draft){
-    return !!draft&&draft.schedule.every(day=>day.trabaja!==true||!!day.responsable_id);
+    return !!draft&&(!draft.schedule.some(day=>day.trabaja===true)||!!draft.responsableId);
   }
   function signature(draft){
     if(!draft)return '';
@@ -79,10 +88,8 @@
       warehouseId:draft.warehouseId,
       startDate:draft.startDate,
       days:draft.days,
-      schedule:draft.schedule.map(day=>({
-        trabaja:day.trabaja===true,
-        responsable_id:day.responsable_id||null
-      }))
+      responsableId:draft.responsableId||null,
+      schedule:draft.schedule.map(day=>({trabaja:day.trabaja===true}))
     });
   }
   function invalidate(message){
@@ -95,12 +102,13 @@
   }
   function announce(message,kind){
     const status=$('bc7-vp-gesture-status');
+    const readable=readableMessage(message,'');
     if(status){
-      status.textContent=message||'';
+      status.textContent=readable;
       status.className='bc7-vp-status '+(kind||'');
     }
     if(state.draft){
-      state.draft.message=message;
+      state.draft.message=readable;
       state.draft.messageKind=kind||'';
       renderDraftPanel(snapshot());
     }
@@ -152,7 +160,26 @@
       '.bc7-vp-status.ok{color:#a6e3bc;border:1px solid rgba(90,183,125,.35)}',
       '.bc7-vp-status.error{color:#ffb5a7;border:1px solid rgba(205,88,76,.42)}',
       '.bc7-vp-conflicts{margin:7px 0;padding-left:17px;color:#ffb5a7;font-size:10px}',
-      '.bc7-vp-draft-segment{position:relative;display:flex;align-items:center;gap:3px;min-height:22px;margin:2px 0;padding:3px 5px;border:1px solid rgba(123,205,226,.7);border-radius:5px;background:rgba(57,160,184,.25);color:var(--text);font-size:9px;font-weight:800;cursor:grab;overflow:visible;z-index:2}',
+      '.bc7-vp-period-responsible{display:grid;gap:5px;margin:9px 0;padding:9px;border:1px solid rgba(117,171,219,.3);border-radius:8px;background:rgba(58,116,169,.08)}',
+      '.bc7-vp-period-responsible span{font-size:10px;font-weight:800;color:var(--mist)}',
+      '.bc7-vp-period-responsible select{width:100%;min-height:34px;font-size:11px}',
+      '.bc7-visual-history-panel{padding:10px;border:1px solid rgba(145,154,210,.22);border-radius:10px;background:rgba(4,10,21,.35);color:#eaf0ff}',
+      '.bc7-vp-history-list{display:grid;gap:6px;margin-top:7px}',
+      '.bc7-vp-history-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px;border:1px solid rgba(145,154,210,.16);border-radius:7px;background:rgba(255,255,255,.025)}',
+      '.bc7-vp-history-item strong{font-size:10px;color:#eef2ff}',
+      '.bc7-vp-history-item small{display:block;margin-top:3px;font-size:9px;color:#aebbd4}',
+      '.bc7-vp-history-item button{min-height:27px;padding:4px 7px;font-size:9px}',
+      '.bc7-vp-draft-segment{position:relative;display:flex;align-items:center;gap:3px;min-height:22px;margin:2px 0;padding:3px 5px;border:1px solid rgba(123,205,226,.7);border-radius:5px;background:rgba(57,160,184,.25);color:var(--text);font-size:9px;font-weight:800;cursor:grab;overflow:visible;z-index:3;transition:background-color .12s ease,border-color .12s ease,opacity .12s ease}',
+      '.bc7-vp-draft-segment.is-period-start:not(.is-period-end){width:calc(100% + 7px);margin-right:-7px;border-radius:6px 0 0 6px;border-right-color:transparent}',
+      '.bc7-vp-draft-segment.is-period-middle{width:calc(100% + 14px);margin-left:-7px;margin-right:-7px;border-radius:0;border-left-color:transparent;border-right-color:transparent}',
+      '.bc7-vp-draft-segment.is-period-end:not(.is-period-start){width:calc(100% + 7px);margin-left:-7px;border-radius:0 6px 6px 0;border-left-color:transparent}',
+      '.bc7-vp-ghost-segment.is-period-start:not(.is-period-end){width:calc(100% + 7px);margin-right:-7px;border-radius:6px 0 0 6px}',
+      '.bc7-vp-ghost-segment.is-period-middle{width:calc(100% + 14px);margin-left:-7px;margin-right:-7px;border-radius:0;border-left-color:transparent;border-right-color:transparent}',
+      '.bc7-vp-ghost-segment.is-period-end:not(.is-period-start){width:calc(100% + 7px);margin-left:-7px;border-radius:0 6px 6px 0}',
+      '#tab-jornada .bc7-visual-calendar-main .bc7-month-day-events{display:flex;flex-direction:column;gap:0!important;overflow:visible}',
+      '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-start:not(.is-range-end){width:calc(100% + 7px);margin-right:-7px;border-radius:7px 0 0 7px;border-right-color:transparent;position:relative;z-index:3}',
+      '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-middle{width:calc(100% + 14px);margin-left:-7px;margin-right:-7px;border-radius:0;border-left-color:transparent;border-right-color:transparent;position:relative;z-index:3}',
+      '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-end:not(.is-range-start){width:calc(100% + 7px);margin-left:-7px;border-radius:0 7px 7px 0;border-left-color:transparent;position:relative;z-index:3}',
       '.bc7-vp-draft-segment.is-rest{border-color:rgba(201,162,77,.7);background:rgba(201,162,77,.17)}',
       '.bc7-vp-draft-segment.is-unassigned{border-style:dashed;border-color:#e2ae58;background:rgba(201,145,52,.18)}',
       '.bc7-vp-drag-source{opacity:.34!important;filter:saturate(.42);transform:scale(.985)}',
@@ -186,11 +213,12 @@
       warehouseId:model.warehouseId,
       startDate:date,
       days:2,
+      responsableId:null,
       schedule:[makeDay(0),makeDay(1)],
       validated:false,
       validatedSignature:'',
       conflicts:[],
-      message:'Borrador local. Asigna un responsable a cada día laborable y revisa los conflictos antes de crear.',
+      message:'Borrador local. Asigna una responsable a toda la jornada y marca solo los días de descanso.',
       messageKind:''
     };
     api().selectDate(date);
@@ -227,8 +255,8 @@
       '<button type="button" class="bc7-vp-palette-card" draggable="true" data-bc7-vp-tool="new" aria-label="Nueva jornada. Arrastra al día inicial o pulsa para crear un borrador">'+
         '<span class="bc7-vp-palette-icon" aria-hidden="true">✦</span><span class="bc7-vp-palette-copy"><strong>Nueva jornada</strong><small>Arrastra al primer día del período. Se crea como borrador local.</small></span>'+
       '</button>'+
-      '<div class="bc7-vp-section-kicker">RESPONSABLES</div>'+
-      '<p class="bc7-vp-palette-hint">Arrastra una persona a cada día laborable o selecciónala en el inspector del borrador.</p>'+
+      '<div class="bc7-vp-section-kicker">RESPONSABLE DE LA JORNADA</div>'+
+      '<p class="bc7-vp-palette-hint">La jornada tiene una sola responsable. Arrastra su amuleto sobre cualquier día del período para asignarla a toda la jornada.</p>'+
       (staff.length?'<div class="bc7-vp-staff-list">'+staff.map(person=>
         '<button type="button" class="bc7-vp-staff-chip" draggable="true" data-bc7-vp-staff="'+esc(person.id)+'" aria-label="Responsable '+esc(person.name)+'">'+esc(person.name)+'</button>'
       ).join('')+'</div>':'<div class="bc7-vp-muted">No hay responsables elegibles cargados. Actualiza el catálogo de responsables en Jornada.</div>')+
@@ -247,34 +275,36 @@
       const cell=board.querySelector('[data-date="'+date+'"]');
       const events=cell&&cell.querySelector('.bc7-month-day-events');
       if(!events)continue;
-      const item=draft.schedule[index];
-      const label=item.trabaja?personName(model,item.responsable_id):'Descanso';
+      const item=draft.schedule[index],first=index===0,last=index===draft.days-1;
+      const label=item.trabaja?personName(model,draft.responsableId):'Descanso';
       const segment=document.createElement('div');
-      segment.className='bc7-vp-draft-segment'+(item.trabaja===false?' is-rest':'')+(item.trabaja&&!item.responsable_id?' is-unassigned':'');
+      segment.className='bc7-vp-draft-segment'+
+        (item.trabaja===false?' is-rest':'')+
+        (item.trabaja&&!draft.responsableId?' is-unassigned':'')+
+        (first?' is-period-start':'')+(last?' is-period-end':'')+(!first&&!last?' is-period-middle':'');
       segment.draggable=true;
       segment.dataset.bc7VpDraftSegment=String(index+1);
+      segment.dataset.bc7VpPeriodSegment='true';
       segment.setAttribute('role','button');
       segment.setAttribute('tabindex','0');
-      segment.setAttribute('aria-label','Borrador, día '+(index+1)+', '+label+'. Arrastra para mover el período.');
-      if(index===0){
+      segment.setAttribute('aria-label','Borrador de una sola jornada, día '+(index+1)+' de '+draft.days+', '+label+'. Arrastra para mover el período completo.');
+      if(first){
         const handle=document.createElement('button');
         handle.type='button';handle.className='bc7-vp-resize-handle';
         handle.draggable=true;handle.dataset.bc7VpResize='start';
         handle.setAttribute('aria-label','Cambiar el primer día del período');
-        handle.textContent='⋮';
-        segment.appendChild(handle);
+        handle.textContent='⋮';segment.appendChild(handle);
       }
       const text=document.createElement('span');
       text.className='bc7-vp-draft-label';
-      text.textContent=(index===0?'Borrador · ':'D'+(index+1)+' · ')+label;
+      text.textContent=first?'Borrador · '+personName(model,draft.responsableId):(item.trabaja===false?'Descanso':'');
       segment.appendChild(text);
-      if(index===draft.days-1){
+      if(last){
         const handle=document.createElement('button');
         handle.type='button';handle.className='bc7-vp-resize-handle';
         handle.draggable=true;handle.dataset.bc7VpResize='end';
         handle.setAttribute('aria-label','Cambiar el último día del período');
-        handle.textContent='⋮';
-        segment.appendChild(handle);
+        handle.textContent='⋮';segment.appendChild(handle);
       }
       events.appendChild(segment);
     }
@@ -327,8 +357,9 @@
       cell.classList.add('bc7-vp-drop-target');
       const ghost=document.createElement('div');
       ghost.dataset.bc7VpGhost='true';
-      ghost.className='bc7-vp-ghost-segment'+(valid&&occupied.length===0?'':' is-conflict');
-      ghost.textContent=index===0?'Vista previa · '+days+' días':(valid?'·':'Ocupado');
+      ghost.className='bc7-vp-ghost-segment'+(valid&&occupied.length===0?'':' is-conflict')+
+        (index===0?' is-period-start':'')+(index===days-1?' is-period-end':'')+(index>0&&index<days-1?' is-period-middle':'');
+      ghost.textContent=index===0?'Vista previa · '+days+' días':'';
       events.appendChild(ghost);
     }
     const status=$('bc7-vp-gesture-status');
@@ -368,12 +399,12 @@
 
   function assignStaff(date,personId){
     const draft=state.draft;
-    if(!draft)return false;
+    if(!draft||!personId)return false;
     const index=dayDelta(draft.startDate,date);
     if(index<0||index>=draft.days)return false;
-    draft.schedule[index].trabaja=true;
-    draft.schedule[index].responsable_id=String(personId);
-    invalidate(draft,'Se actualizó el responsable del día '+(index+1)+'. Revisa los conflictos.');
+    draft.responsableId=String(personId);
+    normalizeSchedule(draft);
+    invalidate(draft,'Responsable asignada a toda la jornada. Revisa los conflictos.');
     return true;
   }
 
@@ -390,16 +421,14 @@
     const validated=draft.validated===true&&draft.validatedSignature===signature(draft);
     const conflicts=draft.conflicts||[];
     const canCreate=!!(model&&model.admin&&model.online&&sameWarehouse&&validated&&!conflicts.length&&isComplete(draft));
+    const responsibleOptions='<option value="">Selecciona una responsable para toda la jornada</option>'+staff.map(person=>
+      '<option value="'+esc(person.id)+'"'+(String(person.id)===String(draft.responsableId||'')?' selected':'')+'>'+esc(person.name)+'</option>'
+    ).join('');
     const rows=draft.schedule.map((day,index)=>{
       const date=addDays(draft.startDate,index);
-      const options='<option value="">'+(day.trabaja?'Selecciona responsable':'Día de descanso')+'</option>'+staff.map(person=>
-        '<option value="'+esc(person.id)+'"'+(String(person.id)===String(day.responsable_id||'')?' selected':'')+'>'+esc(person.name)+'</option>'
-      ).join('');
       return '<div class="bc7-vp-day-row'+(day.trabaja?'':' is-rest')+'">'+
-        '<div class="bc7-vp-day-copy"><strong>Día '+(index+1)+' · '+esc(humanDate(date))+'</strong><small>'+(day.trabaja?(day.responsable_id?'Responsable asignado':'Requiere responsable'):'Descanso')+'</small></div>'+
+        '<div class="bc7-vp-day-copy"><strong>Día '+(index+1)+' · '+esc(humanDate(date))+'</strong><small>'+(day.trabaja?'Laborable':'Descanso')+'</small></div>'+
         '<div class="bc7-vp-day-actions"><button type="button" class="bc7-btn" data-bc7-vp-toggle-rest="'+index+'">'+(day.trabaja?'Marcar descanso':'Marcar trabajo')+'</button></div>'+
-        '<label class="bc7-vp-day-person"><select data-bc7-vp-responsible="'+index+'" '+(!day.trabaja?'disabled':'')+'>'+options+'</select></label>'+
-        '<div class="bc7-vp-day-slot" data-bc7-vp-day-slot="'+index+'">Arrastra aquí a un responsable para asignarlo a este día</div>'+
       '</div>';
     }).join('');
     host.innerHTML=
@@ -410,16 +439,17 @@
         '<label class="bc7-vp-field"><span>Días</span><input type="number" min="2" max="31" inputmode="numeric" data-bc7-vp-days value="'+draft.days+'"></label>'+
       '</div>'+
       (!sameWarehouse?'<p class="bc7-vp-status error">Este borrador pertenece a '+esc(warehouseName(model,draft.warehouseId))+'. Selecciona ese almacén arriba para continuar.</p>':'')+
+      '<label class="bc7-vp-period-responsible"><span>RESPONSABLE DE TODA LA JORNADA</span><select data-bc7-vp-period-responsible>'+responsibleOptions+'</select><small class="bc7-vp-muted">La misma persona quedará asignada a todos los días laborables de este período.</small></label>'+
       '<div class="bc7-vp-day-list">'+rows+'</div>'+
       '<div class="bc7-vp-draft-actions">'+
         '<button type="button" class="bc7-btn" data-bc7-vp-preview '+(!model.online||!sameWarehouse?'disabled':'')+'>Revisar conflictos</button>'+
         '<button type="button" class="bc7-btn primary" data-bc7-vp-create '+(!canCreate?'disabled':'')+'>Confirmar y crear</button>'+
       '</div>'+
-      '<div class="bc7-vp-status '+(draft.messageKind||'')+'">'+esc(draft.message||'Asigna cada día y revisa el período antes de crearlo.')+'</div>'+
+      '<div class="bc7-vp-status '+(draft.messageKind||'')+'">'+esc(readableMessage(draft.message,'Asigna una responsable y revisa el período antes de crearlo.'))+'</div>'+
       (conflicts.length?'<ul class="bc7-vp-conflicts">'+conflicts.map(item=>'<li>'+esc(humanDate(item.date))+': '+esc(item.detail)+'</li>').join('')+'</ul>':'')+
-      '<p class="bc7-vp-muted">'+esc(draft.validationNote||'La revisión consulta las programaciones visibles. El servidor vuelve a validar todos los conflictos al crear.')+'</p>'+
+      '<p class="bc7-vp-muted">'+esc(readableMessage(draft.validationNote,'La revisión consulta las programaciones visibles. El servidor vuelve a validar todos los conflictos al crear.'))+'</p>'+
       '<div class="bc7-vp-status" id="bc7-vp-gesture-status" aria-live="polite"></div>'+
-      '<p class="bc7-vp-muted">'+working+' día(s) laborable(s) · '+(draft.days-working)+' día(s) de descanso · '+(isComplete(draft)?'responsables completos':'faltan responsables')+'</p>';
+      '<p class="bc7-vp-muted">'+working+' día(s) laborable(s) · '+(draft.days-working)+' día(s) de descanso · '+(draft.responsableId?'responsable de jornada asignada':'falta seleccionar responsable de jornada')+'</p>';
   }
 
   async function runPreview(){
@@ -434,7 +464,7 @@
       draft.messageKind='error';render();return;
     }
     if(!isComplete(draft)){
-      draft.message='Asigna una persona activa a cada día laborable antes de revisar.';
+      draft.message='Selecciona una persona activa como responsable de toda la jornada antes de revisar.';
       draft.messageKind='error';render();return;
     }
     const before=signature(draft);
@@ -445,20 +475,21 @@
         warehouseId:draft.warehouseId,
         startDate:draft.startDate,
         days:draft.days,
+        responsableId:draft.responsableId,
         schedule:draft.schedule
       });
       if(!state.draft||signature(state.draft)!==before)return;
       draft.validated=result.valid===true;
       draft.validatedSignature=draft.validated?before:'';
       draft.conflicts=result.conflicts||[];
-      draft.validationNote=result.note||'El servidor validará de nuevo antes de guardar.';
+      draft.validationNote=readableMessage(result.note,'El servidor validará de nuevo antes de guardar.');
       draft.message=draft.validated
         ?'Revisión sin conflictos visibles. El servidor volverá a validar al confirmar.'
         :'Se encontraron conflictos. Corrige los días marcados y vuelve a revisar.';
       draft.messageKind=draft.validated?'ok':'error';
     }catch(error){
       draft.validated=false;draft.validatedSignature='';
-      draft.message=String(error&&error.message||error||'No se pudo revisar la programación.');
+      draft.message=readableMessage(error,'No se pudo revisar la programación.');
       draft.messageKind='error';
     }
     render();
@@ -472,7 +503,7 @@
       draft.messageKind='error';render();return;
     }
     if(!isComplete(draft)){
-      draft.message='Asigna a una persona activa a cada día laborable.';
+      draft.message='Selecciona una persona activa como responsable de toda la jornada.';
       draft.messageKind='error';render();return;
     }
     button.disabled=true;button.textContent='Validando y creando…';
@@ -482,6 +513,7 @@
         warehouseId:draft.warehouseId,
         startDate:draft.startDate,
         days:draft.days,
+        responsableId:draft.responsableId,
         schedule:draft.schedule
       },button);
       if(!state.draft)return;
@@ -494,12 +526,12 @@
       }else{
         draft.validated=false;draft.validatedSignature='';
         draft.conflicts=result&&result.validation&&result.validation.conflicts||[];
-        draft.message=String(result&&result.message||'El servidor no confirmó la creación. El borrador se conserva.');
+        draft.message=readableMessage(result&&result.message,'El servidor no confirmó la creación. El borrador se conserva.');
         draft.messageKind='error';render();
       }
     }catch(error){
       draft.validated=false;draft.validatedSignature='';
-      draft.message=String(error&&error.message||error||'No se pudo crear la programación. El borrador se conserva.');
+      draft.message=readableMessage(error,'No se pudo crear la programación. El borrador se conserva.');
       draft.messageKind='error';render();
     }
   }
@@ -569,6 +601,26 @@
     host.innerHTML+='<p class="bc7-vp-muted">Amuletos informativos. Consultarlos no cambia inventario, caja ni atribuciones.</p>';
   }
 
+  function renderHistoryPanel(model){
+    const host=$('bc7-visual-history-panel');if(!host)return;
+    const periods=(model.historyRows||[]).slice().sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+    const heading='<div class="bc7-vp-section-kicker">HISTORIAL DE JORNADAS</div><p class="bc7-vp-muted">Períodos completados, cerrados o con cierre operativo. La aprobación del Turno maestro se muestra por separado.</p>';
+    if(!periods.length){host.innerHTML=heading+'<p class="bc7-vp-muted">No hay jornadas finalizadas en el mes y almacén seleccionados.</p>';return;}
+    host.innerHTML=heading+'<div class="bc7-vp-history-list">'+periods.slice(0,10).map(period=>{
+      const rows=period._periodRows||[];
+      const record=rows.find(row=>row.sesion_id&&['COMPLETADA','CERRADA','CERRADO','CERRADA_OPERATIVAMENTE','CANCELADA','CANCELADO'].includes(String(row.sesion_estado||row.estado||'').toUpperCase()))||rows[0]||period;
+      const sessionId=record.sesion_id||'',status=String(record.sesion_estado||record.estado||'').toUpperCase();
+      const master=String(record.turno_estado_maestro||record.turno_estado||'').toUpperCase();
+      const stateLabel=master==='CERRADO'?'Aprobada y cerrada':status==='CERRADA_OPERATIVAMENTE'?'Cierre operativo · cuadre pendiente':
+        status==='COMPLETADA'?'Completada · cierre maestro por verificar':
+        ['CANCELADA','CANCELADO'].includes(status)?'Cancelada':'Finalizada';
+      const start=String(period.fecha||'').slice(0,10),end=String(period.fecha_fin||period.fecha||'').slice(0,10);
+      const range=humanDate(start)+(end>start?' – '+humanDate(end):'');
+      const person=period._responsibleLabel||'Responsable no disponible';
+      return '<article class="bc7-vp-history-item"><div><strong>'+esc(range)+' · '+esc(warehouseName(model,period.almacen_id))+'</strong><small>'+esc(person)+' · '+Number(period._periodDays||rows.length||1)+' día(s) · '+esc(stateLabel)+'</small></div>'+
+        (sessionId?'<button type="button" class="bc7-btn" data-bc7-vp-history-open="'+esc(sessionId)+'">Ver</button>':'')+'</article>';
+    }).join('')+'</div>'+(periods.length>10?'<p class="bc7-vp-muted">Se muestran 10 de '+periods.length+' jornadas. Cambia de mes para consultar otros períodos.</p>':'');
+  }
   function render(){
     const model=snapshot();
     if(!model)return;
@@ -577,6 +629,7 @@
     renderDraftPanel(model);
     renderDraftSegments(model);
     renderMovementPanel(model);
+    renderHistoryPanel(model);
   }
   function createTransfer(event,type){
     const data=event&&event.dataTransfer;
@@ -620,17 +673,24 @@
     if(event.dataTransfer)event.dataTransfer.dropEffect=state.drag.type==='staff'||state.drag.type==='new'?'copy':'move';
     const model=snapshot();
     if(state.drag.type==='staff'){
-      clearGhost();
       const date=(cell&&cell.dataset.date)||(slot&&state.draft?addDays(state.draft.startDate,Number(slot.dataset.bc7VpDaySlot)):'');
       const index=state.draft&&isoDate(date)?dayDelta(state.draft.startDate,date):-1;
+      const key='staff:'+date;
+      if(state.drag.lastTargetKey===key)return;
+      state.drag.lastTargetKey=key;
+      clearGhost();
       if(index>=0&&index<state.draft.days){
-        if(cell)cell.classList.add('bc7-vp-drop-target');
-        const drop=$('bc7-visual-draft-panel')?.querySelector('[data-bc7-vp-day-slot="'+index+'"]');
-        if(drop)drop.classList.add('is-drop-target');
+        for(let day=0;day<state.draft.days;day++){
+          const target=$('bc7-month-board')?.querySelector('[data-date="'+addDays(state.draft.startDate,day)+'"]');
+          if(target)target.classList.add('bc7-vp-drop-target');
+        }
       }
       return;
     }
-    if(cell)renderGhost(model,cell.dataset.date);
+    if(cell){
+      const key=String(state.drag.type||'')+':'+String(cell.dataset.date||'');
+      if(state.drag.lastTargetKey!==key){state.drag.lastTargetKey=key;renderGhost(model,cell.dataset.date);}
+    }
   }
   function onDrop(event){
     if(!state.drag)return;
@@ -666,7 +726,7 @@
     const toggle=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-toggle-rest]'):null;
     if(toggle&&state.draft){
       const index=Number(toggle.dataset.bc7VpToggleRest),item=state.draft.schedule[index];
-      if(item){item.trabaja=!item.trabaja;if(!item.trabaja)item.responsable_id=null;invalidate(item.trabaja?'El día vuelve a ser laborable. Asigna responsable y revisa.':'Día marcado como descanso. Revisa de nuevo.');render();}
+      if(item){item.trabaja=!item.trabaja;normalizeSchedule(state.draft);invalidate(item.trabaja?'El día vuelve a ser laborable. La responsable asignada a la jornada se aplicará automáticamente.':'Día marcado como descanso. La jornada conserva una sola responsable.');render();}
       return;
     }
     const preview=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-preview]'):null;
@@ -676,6 +736,8 @@
     const discard=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-discard]'):null;
     if(discard){state.draft=null;clearGhost();render();return;}
     const open=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-open-session]'):null;
+    const history=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-history-open]'):null;
+    if(history){Promise.resolve(api().openSessionMovements(history.dataset.bc7VpHistoryOpen)).catch(error=>announce(readableMessage(error,'No se pudo abrir el detalle histórico.'),'error'));return;}
     if(open){api().openSessionMovements(open.dataset.bc7VpOpenSession);return;}
   }
   function onKeyDown(event){
@@ -728,9 +790,11 @@
       invalidate('Cambió la duración. Revisa de nuevo los conflictos.');
       render();return;
     }
-    if(target.matches&&target.matches('[data-bc7-vp-responsible]')){
-      const index=Number(target.dataset.bc7VpResponsible),day=state.draft.schedule[index];
-      if(day&&day.trabaja){day.responsable_id=target.value||null;invalidate('Cambió el responsable. Revisa de nuevo los conflictos.');render();}
+    if(target.matches&&target.matches('[data-bc7-vp-period-responsible]')){
+      state.draft.responsableId=target.value||null;
+      normalizeSchedule(state.draft);
+      invalidate('Cambió la responsable de toda la jornada. Revisa de nuevo los conflictos.');
+      render();
     }
   }
 
