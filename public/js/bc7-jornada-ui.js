@@ -1,5 +1,5 @@
 // BattleCruiser Step 7 — Jornada única, inventario físico, movimientos y cierre
-// v7.72 — stabilize responsive calendar rows, navigation and planner drag UX.
+// v7.72 — restore archived and multi-day calendar periods; simplify Jornada planning; stabilize responsive calendar rows, navigation and planner drag UX.
 (function bc7JornadaUI(){
   'use strict';
   if(window.__BC7_JORNADA_UI__) return;
