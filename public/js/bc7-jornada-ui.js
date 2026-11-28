@@ -787,6 +787,10 @@
         "#tab-jornada .bc7-month-chip[draggable=true]{height:30px;min-height:30px;max-height:30px;box-sizing:border-box;padding:3px 5px;gap:4px;cursor:grab;touch-action:none;user-select:none}",
         "#tab-jornada .bc7-month-chip[draggable=true]:active{cursor:grabbing}",
         "#tab-jornada .bc7-month-chip-grip{display:inline-grid;flex:0 0 28px;width:28px;height:24px;place-items:center;border-radius:5px;background:rgba(10,23,42,.72);color:#fff;font-size:17px;line-height:1;cursor:grab}",
+        "#tab-jornada .bc7-month-loading{position:absolute;z-index:50;inset:32px 0 0;display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;background:rgba(6,14,28,.78);backdrop-filter:blur(3px);color:#dce8ff;font-size:13px;font-weight:800;text-align:center;pointer-events:none}",
+        "#tab-jornada .bc7-month-loading.is-error{color:#ffcfbf}",
+        "#tab-jornada .bc7-month-loading-spinner{width:18px;height:18px;flex:0 0 18px;border:2px solid rgba(222,234,255,.25);border-top-color:#9cc6ff;border-radius:50%;animation:bc7-month-spin .8s linear infinite}",
+        "@keyframes bc7-month-spin{to{transform:rotate(360deg)}}",
 
         "#tab-jornada .bc7-month-day-events{overflow:visible}",
         "#tab-jornada .bc7-month-chip.is-running{border-color:rgba(95,174,127,.44);background:rgba(95,174,127,.10)}",
@@ -1273,7 +1277,6 @@
       renderWorkerDashboard();
     };
     if(!force&&freshCache){state.calendarLoading=false;state.calendarLoadError='';renderRows(cached.rows);return true;}
-    const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
     state.calendarLoading=true;state.calendarLoadError='';
     renderWorkerDashboardState('Cargando tus jornadas…','Estamos consultando tus asignaciones y el estado de tu jornada.');
     if(cached)renderRows(cached.rows,{loading:true});
@@ -1288,6 +1291,7 @@
       if(list)list.innerHTML='<div class="bc7-empty">Cargando las jornadas de '+esc(monthTitle(month))+'…</div>';
       notifyVisualCalendarUpdated();
     }
+    const existing=state.calendarPromises.get(key);if(!force&&existing)return existing;
     msg($('bc7-list-msg'),force?'Actualizando calendario…':'');let request;
     request=(async()=>{try{
       const data=arr(await rpc('bc5_mis_jornadas',{p_fecha_inicio:from,p_fecha_fin:to}));
