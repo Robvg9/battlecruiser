@@ -116,10 +116,10 @@
   function ensureStyles(){
     if($('bc7-visual-planner-style'))return;
     const rules=[
-      '.bc7-visual-calendar-dialog{width:min(96vw,1680px)!important;height:min(94vh,980px)!important}',
-      '.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) minmax(320px,390px)!important;min-height:0!important}',
-      '.bc7-visual-calendar-main{min-width:0;min-height:0}',
-      '.bc7-visual-calendar-side{min-height:0;max-height:calc(94vh - 130px);overflow:auto;overscroll-behavior:contain;padding:10px!important}',
+      '.bc7-visual-calendar-dialog{width:min(96vw,1680px)!important;height:min(94dvh,980px)!important;max-width:calc(100vw - 18px)!important;max-height:calc(100dvh - 18px)!important;box-sizing:border-box}',
+      '.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) minmax(270px,330px)!important;min-height:0!important;gap:clamp(8px,1.2vw,16px)!important;padding:clamp(8px,1.2vw,16px)!important}',
+      '.bc7-visual-calendar-main{min-width:0;min-height:0;overflow:hidden}',
+      '.bc7-visual-calendar-side{min-width:0;min-height:0;max-height:calc(94dvh - 130px);overflow:auto;overscroll-behavior:contain;padding:10px!important;overflow-wrap:anywhere}',
       '.bc7-visual-warehouse-picker{display:flex;flex-direction:column;gap:3px;min-width:145px}',
       '.bc7-visual-warehouse-picker span{font-size:9px;font-weight:800;letter-spacing:.08em;color:var(--mist)}',
       '.bc7-visual-warehouse-picker select{min-height:34px;max-width:190px}',
@@ -167,7 +167,7 @@
       '.bc7-vp-history-item strong{font-size:10px;color:#eef2ff}',
       '.bc7-vp-history-item small{display:block;margin-top:3px;font-size:9px;color:#aebbd4}',
       '.bc7-vp-history-item button{min-height:27px;padding:4px 7px;font-size:9px}',
-      '.bc7-vp-draft-segment{position:relative;display:flex;align-items:center;gap:3px;min-height:22px;margin:2px 0;padding:3px 5px;border:1px solid rgba(123,205,226,.7);border-radius:5px;background:rgba(57,160,184,.25);color:var(--text);font-size:9px;font-weight:800;cursor:grab;overflow:visible;z-index:3;transition:background-color .12s ease,border-color .12s ease,opacity .12s ease}',
+      '.bc7-vp-draft-segment{position:relative;display:flex;align-items:center;gap:3px;min-height:30px;margin:2px 0;padding:2px 4px;border:1px solid rgba(123,205,226,.7);border-radius:5px;background:rgba(57,160,184,.25);color:var(--text);font-size:9px;font-weight:800;cursor:default;overflow:visible;z-index:3;user-select:none;transition:background-color .12s ease,border-color .12s ease,opacity .12s ease}',
       '.bc7-vp-draft-segment.is-period-start:not(.is-period-end){width:calc(100% + 7px);margin-right:-7px;border-radius:6px 0 0 6px;border-right-color:transparent}',
       '.bc7-vp-draft-segment.is-period-middle{width:calc(100% + 14px);margin-left:-7px;margin-right:-7px;border-radius:0;border-left-color:transparent;border-right-color:transparent}',
       '.bc7-vp-draft-segment.is-period-end:not(.is-period-start){width:calc(100% + 7px);margin-left:-7px;border-radius:0 6px 6px 0;border-left-color:transparent}',
@@ -180,8 +180,10 @@
       '#tab-jornada .bc7-visual-calendar-main .bc7-month-chip.is-multi-day.is-range-end:not(.is-range-start){width:calc(100% + 7px);margin-left:-7px;border-radius:0 7px 7px 0;border-left-color:transparent;position:relative;z-index:3}',
       '.bc7-vp-draft-segment.is-unassigned{border-style:dashed;border-color:#e2ae58;background:rgba(201,145,52,.18)}',
       '.bc7-vp-drag-source{opacity:.34!important;filter:saturate(.42);transform:scale(.985)}',
-      '.bc7-vp-draft-label{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.bc7-vp-resize-handle{flex:0 0 10px;width:10px;height:15px;padding:0;border:0;border-radius:3px;background:rgba(255,255,255,.23);color:var(--text);font-size:9px;cursor:ew-resize}',
+      '.bc7-vp-draft-label{display:block;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.bc7-vp-resize-handle{position:relative;z-index:8;flex:0 0 24px;width:24px;height:28px;min-height:28px;padding:0;border:1px solid rgba(221,237,255,.38);border-radius:5px;background:rgba(232,241,255,.30);color:#fff;font-size:13px;font-weight:900;line-height:1;cursor:ew-resize;touch-action:none;user-select:none}',
+      '.bc7-vp-move-handle{display:inline-grid;flex:0 0 22px;place-items:center;width:22px;height:22px;border:1px solid rgba(221,237,255,.3);border-radius:4px;background:rgba(9,24,39,.52);color:#fff;font-size:13px;line-height:1;cursor:grab;touch-action:none;user-select:none}',
+      '.bc7-vp-move-handle:active{cursor:grabbing}',
       '.bc7-vp-ghost-segment{min-height:20px;margin:2px 0;padding:3px 5px;border:1px dashed #67d4e9;border-radius:5px;background:rgba(65,183,207,.2);color:var(--text);font-size:9px;font-weight:800;pointer-events:none}',
       '.bc7-vp-ghost-segment.is-conflict{border-color:#ed746b;background:rgba(191,62,54,.24)}',
       '.bc7-vp-drop-target{outline:2px solid rgba(104,213,235,.78);outline-offset:-3px}',
@@ -192,7 +194,7 @@
       '.bc7-vp-movement-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:6px 7px;border-radius:6px;background:rgba(255,255,255,.025);font-size:10px}',
       '.bc7-vp-movement-item small{display:block;color:var(--mist);font-size:9px;margin-top:2px}',
       '.bc7-vp-movement-value{white-space:nowrap;font-weight:800}',
-      '@media(max-width:900px){.bc7-visual-calendar-dialog{width:98vw!important}.bc7-visual-calendar-layout{grid-template-columns:minmax(0,1fr) 300px!important}.bc7-visual-calendar-side{padding:7px!important}}'
+      '@media(max-width:1240px){.bc7-visual-calendar-modal{padding:8px!important}.bc7-visual-calendar-dialog{width:98vw!important;height:96dvh!important;max-height:calc(100dvh - 16px)!important}.bc7-visual-calendar-layout{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(390px,auto) auto!important;gap:10px!important;padding:10px!important;overflow-y:auto!important;overscroll-behavior:contain;align-content:start}.bc7-visual-calendar-main{min-height:390px!important}.bc7-visual-calendar-side{max-height:none!important;overflow:visible!important}.bc7-visual-calendar-main .bc7-month-board{grid-template-rows:34px repeat(6,minmax(50px,auto))!important}}'
     ];
     const style=document.createElement('style');
     style.id='bc7-visual-planner-style';
@@ -278,12 +280,12 @@
       segment.className='bc7-vp-draft-segment'+
         (!draft.responsableId?' is-unassigned':'')+
         (first?' is-period-start':'')+(last?' is-period-end':'')+(!first&&!last?' is-period-middle':'');
-      segment.draggable=true;
+      segment.draggable=false;
       segment.dataset.bc7VpDraftSegment=String(index+1);
       segment.dataset.bc7VpPeriodSegment='true';
       segment.setAttribute('role','button');
       segment.setAttribute('tabindex','0');
-      segment.setAttribute('aria-label','Borrador de una sola jornada, día '+(index+1)+' de '+draft.days+', '+label+'. Arrastra para mover el período completo.');
+      segment.setAttribute('aria-label','Borrador de una sola jornada, día '+(index+1)+' de '+draft.days+', '+label+'. Usa el tirador central para moverla y los laterales para ajustar sus fechas.');
       if(first){
         const handle=document.createElement('button');
         handle.type='button';handle.className='bc7-vp-resize-handle';
@@ -293,8 +295,20 @@
       }
       const text=document.createElement('span');
       text.className='bc7-vp-draft-label';
+      text.draggable=true;
+      text.dataset.bc7VpDraftMove='true';
+      text.setAttribute('aria-label','Arrastrar para mover toda la jornada');
       text.textContent=first?'Borrador · '+personName(model,draft.responsableId):'';
       segment.appendChild(text);
+      const moveHandle=document.createElement('span');
+      moveHandle.className='bc7-vp-move-handle';
+      moveHandle.draggable=true;
+      moveHandle.dataset.bc7VpDraftMove='true';
+      moveHandle.setAttribute('role','button');
+      moveHandle.setAttribute('aria-label','Arrastrar para mover toda la jornada');
+      moveHandle.title='Arrastrar para mover toda la jornada';
+      moveHandle.textContent='⠿';
+      segment.appendChild(moveHandle);
       if(last){
         const handle=document.createElement('button');
         handle.type='button';handle.className='bc7-vp-resize-handle';
@@ -642,7 +656,7 @@
     clearGhost();
   }
   function onDragStart(event){
-    const target=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-tool],[data-bc7-vp-staff],[data-bc7-vp-resize],[data-bc7-vp-draft-segment]'):null;
+    const target=event.target&&event.target.closest?event.target.closest('[data-bc7-vp-tool],[data-bc7-vp-staff],[data-bc7-vp-resize],[data-bc7-vp-draft-move],[data-bc7-vp-draft-segment]'):null;
     if(!target)return;
     if(target.hasAttribute('data-bc7-vp-tool')){
       state.drag={type:'new'};createTransfer(event,'new');
@@ -650,7 +664,7 @@
       state.drag={type:'staff',staffId:target.getAttribute('data-bc7-vp-staff')};createTransfer(event,'staff');
     }else if(target.hasAttribute('data-bc7-vp-resize')){
       state.drag={type:'resize-'+target.getAttribute('data-bc7-vp-resize')};createTransfer(event,state.drag.type);
-    }else if(target.hasAttribute('data-bc7-vp-draft-segment')){
+    }else if(target.hasAttribute('data-bc7-vp-draft-move')||target.hasAttribute('data-bc7-vp-draft-segment')){
       state.drag={type:'move'};createTransfer(event,'move');
     }else return;
     const source=target.closest('[data-bc7-vp-draft-segment],[data-bc7-vp-tool],[data-bc7-vp-staff]')||target;
