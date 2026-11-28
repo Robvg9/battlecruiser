@@ -1,6 +1,6 @@
 -- PostgreSQL 17 disposable contract for Jornada parent-period metadata.
 -- Never run against Supabase LIVE.
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 DO $test$
 DECLARE
